@@ -74,6 +74,145 @@ GLFWmonitor* VulkanEngine::cliMonitorSelection()
     return monitors[monitorIdx];
 }
 
+void VulkanEngine::initDisplay()
+{
+    auto device = _device->physicalDevice;
+
+    // Get Xlib displays
+    uint32_t displayCount = 0;
+    vkGetPhysicalDeviceDisplayPropertiesKHR(device, &displayCount, nullptr);
+    std::vector<VkDisplayPropertiesKHR> displayProperties(displayCount);
+    vkGetPhysicalDeviceDisplayPropertiesKHR(device, &displayCount, displayProperties.data());
+
+    // List all displays and their properties
+    std::cout << "Available Displays:\n";
+    for (uint32_t i = 0; i < displayCount; ++i) {
+        std::cout << "Index: " << i << ", Name: " << displayProperties[i].displayName
+                  << ", Physical Dimensions: " << displayProperties[i].physicalDimensions.width
+                  << "x" << displayProperties[i].physicalDimensions.height << " mm"
+                  << ", Physical Resolution: " << displayProperties[i].physicalResolution.width
+                  << "x" << displayProperties[i].physicalResolution.height << " pixels"
+                  << std::endl;
+    }
+
+    // Get user input for display selection
+    uint32_t selectedIndex;
+    do {
+        std::cout << "Enter the index of the display you want to use (0-" << displayCount - 1
+                  << "): ";
+        std::cin >> selectedIndex;
+    } while (selectedIndex >= displayCount);
+
+    _display = displayProperties[selectedIndex].display;
+
+    // Get the X11 display name for the selected Vulkan display
+    PFN_vkGetRandROutputDisplayEXT vkGetRandROutputDisplayEXT
+        = reinterpret_cast<PFN_vkGetRandROutputDisplayEXT>(
+            vkGetInstanceProcAddr(_instance, "vkGetRandROutputDisplayEXT")
+        );
+    ASSERT(vkGetRandROutputDisplayEXT);
+
+    Display* xDisplay = XOpenDisplay(NULL);
+    ASSERT(xDisplay);
+
+    int screenCount = ScreenCount(xDisplay);
+    for (int i = 0; i < screenCount; ++i) {
+        Screen* screen = ScreenOfDisplay(xDisplay, i);
+        Window root = RootWindowOfScreen(screen);
+        XRRScreenResources* resources = XRRGetScreenResources(xDisplay, root);
+
+        for (int j = 0; j < resources->noutput; ++j) {
+            RROutput output = resources->outputs[j];
+            VkDisplayKHR display;
+            VkResult result = vkGetRandROutputDisplayEXT(device, xDisplay, output, &display);
+            if (result == VK_SUCCESS && display == _display) {
+                // We found the X11 output that corresponds to our Vulkan display
+                goto found_display;
+            }
+        }
+
+        XRRFreeScreenResources(resources);
+    }
+
+    // If we get here, we didn't find a matching display
+    throw std::runtime_error("Couldn't find matching X11 display for Vulkan display");
+
+found_display:
+    // Acquire the display
+    PFN_vkAcquireXlibDisplayEXT vkAcquireXlibDisplayEXT
+        = reinterpret_cast<PFN_vkAcquireXlibDisplayEXT>(
+            vkGetInstanceProcAddr(_instance, "vkAcquireXlibDisplayEXT")
+        );
+    ASSERT(vkAcquireXlibDisplayEXT);
+
+    VkResult result = vkAcquireXlibDisplayEXT(device, xDisplay, _display);
+    VK_CHECK_RESULT(result);
+    // Get display mode properties
+    uint32_t modeCount = 0;
+    vkGetDisplayModePropertiesKHR(device, _display, &modeCount, nullptr);
+    std::vector<VkDisplayModePropertiesKHR> modeProperties(modeCount);
+    vkGetDisplayModePropertiesKHR(device, _display, &modeCount, modeProperties.data());
+
+    // List all modes for the selected display
+    std::cout << "Available Modes for selected display:\n";
+    for (uint32_t i = 0; i < modeCount; ++i) {
+        std::cout << "Index: " << i
+                  << ", Resolution: " << modeProperties[i].parameters.visibleRegion.width << "x"
+                  << modeProperties[i].parameters.visibleRegion.height
+                  << ", Refresh Rate: " << modeProperties[i].parameters.refreshRate << " Hz"
+                  << std::endl;
+    }
+
+    // Get user input for mode selection
+    uint32_t selectedModeIndex;
+    do {
+        std::cout << "Enter the index of the mode you want to use (0-" << modeCount - 1 << "): ";
+        std::cin >> selectedModeIndex;
+    } while (selectedModeIndex >= modeCount);
+
+    VkDisplayModeKHR displayMode = modeProperties[selectedModeIndex].displayMode;
+
+    // Find a compatible plane
+    uint32_t planeCount = 0;
+    vkGetPhysicalDeviceDisplayPlanePropertiesKHR(device, &planeCount, nullptr);
+    for (uint32_t i = 0; i < planeCount; i++) {
+        uint32_t displayCount = 0;
+        vkGetDisplayPlaneSupportedDisplaysKHR(device, i, &displayCount, nullptr);
+        if (displayCount > 0) {
+            std::vector<VkDisplayKHR> displays(displayCount);
+            vkGetDisplayPlaneSupportedDisplaysKHR(device, i, &displayCount, displays.data());
+            if (std::find(displays.begin(), displays.end(), _display) != displays.end()) {
+                _displayPlaneIndex = i;
+                break;
+            }
+        }
+    }
+
+    // Create display surface
+    VkDisplaySurfaceCreateInfoKHR surfaceCreateInfo = {};
+    surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_DISPLAY_SURFACE_CREATE_INFO_KHR;
+    surfaceCreateInfo.displayMode = displayMode;
+    surfaceCreateInfo.planeIndex = _displayPlaneIndex;
+    surfaceCreateInfo.planeStackIndex = 0;
+    surfaceCreateInfo.transform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+    surfaceCreateInfo.globalAlpha = 1.0f;
+    surfaceCreateInfo.alphaMode = VK_DISPLAY_PLANE_ALPHA_OPAQUE_BIT_KHR;
+    surfaceCreateInfo.imageExtent = modeProperties[selectedModeIndex].parameters.visibleRegion;
+
+    VK_CHECK_RESULT(
+        vkCreateDisplayPlaneSurfaceKHR(_instance, &surfaceCreateInfo, nullptr, &_displaySurface)
+    );
+
+    _surface = _displaySurface;
+
+    // Store the display properties for later use
+    _displayExtent = modeProperties[selectedModeIndex].parameters.visibleRegion;
+
+
+    // Close X11 display
+    XCloseDisplay(xDisplay);
+}
+
 void VulkanEngine::initGLFW(const InitOptions& options)
 {
     glfwInit();
@@ -149,7 +288,7 @@ void VulkanEngine::Init(const VulkanEngine::InitOptions& options)
 #if __APPLE__
     MoltenVKConfig::Setup();
 #endif // __APPLE__
-    //initGLFW(options);
+    initGLFW(options);
     { // Input Handling
         auto keyCallback = [](GLFWwindow* window, int key, int scancode, int action, int mods) {
             VulkanEngine* pThis = reinterpret_cast<VulkanEngine*>(glfwGetWindowUserPointer(window));
@@ -271,10 +410,6 @@ void VulkanEngine::createDevice()
 {
     VkPhysicalDevice physicalDevice = this->pickPhysicalDevice();
     this->_device = std::make_shared<VQDevice>(physicalDevice);
-    this->_device->InitQueueFamilyIndices(this->_surface);
-    this->_device->CreateLogicalDeviceAndQueue(getRequiredDeviceExtensions());
-    this->_device->CreateGraphicsCommandPool();
-    this->_device->CreateGraphicsCommandBuffer(NUM_FRAME_IN_FLIGHT);
     this->_deletionStack.push([this]() { this->_device->Cleanup(); });
 }
 
@@ -346,8 +481,13 @@ void VulkanEngine::initVulkan()
 {
     INFO("Initializing Vulkan...");
     this->createInstance();
-    this->createSurface();
+    // this->createSurface();
     this->createDevice();
+    this->initDisplay();
+    this->_device->InitQueueFamilyIndices(this->_surface);
+    this->_device->CreateLogicalDeviceAndQueue(getRequiredDeviceExtensions());
+    this->_device->CreateGraphicsCommandPool();
+    this->_device->CreateGraphicsCommandBuffer(NUM_FRAME_IN_FLIGHT);
     this->initSwapChain();
     this->createImageViews();
     this->createRenderPass();
@@ -617,13 +757,14 @@ bool VulkanEngine::checkDeviceExtensionSupport(VkPhysicalDevice device)
 
 bool VulkanEngine::isDeviceSuitable(VkPhysicalDevice device)
 {
-    DEBUG("checking is device suitable");
 
     // check device properties and features
     VkPhysicalDeviceProperties deviceProperties;
     VkPhysicalDeviceFeatures deviceFeatures;
     vkGetPhysicalDeviceProperties(device, &deviceProperties);
     vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
+
+    DEBUG("checking device {}", deviceProperties.deviceName);
     bool platformRequirements =
 #if __APPLE__
         true;
@@ -634,10 +775,17 @@ bool VulkanEngine::isDeviceSuitable(VkPhysicalDevice device)
 
     // check queue families
     if (platformRequirements) {
-        QueueFamilyIndices indices = this->findQueueFamilies(device); // look for queue familieis
-        return indices.graphicsFamily.has_value() && indices.presentationFamily.has_value()
-               && checkDeviceExtensionSupport(device); // found graphics queue
+        bool suitable = checkDeviceExtensionSupport(device);
+        if (!suitable) {
+            DEBUG("failed extension requirements");
+        }
+        return suitable;
+        // do not check for queue families, trust jensen
+        // QueueFamilyIndices indices = this->findQueueFamilies(device); // look for queue familieis
+        // return indices.graphicsFamily.has_value() && indices.presentationFamily.has_value()
+        //        && checkDeviceExtensionSupport(device); // found graphics queue
     } else {
+        DEBUG("failed platform requirements");
         return false;
     }
 }
@@ -684,8 +832,9 @@ void VulkanEngine::createSwapChain()
     SwapChainSupportDetails swapChainSupport = querySwapChainSupport(_device->physicalDevice);
     VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
     VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
+    DEBUG("present mode: {}", string_VkPresentModeKHR(presentMode));
     VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities);
-
+    extent = _displayExtent;
     uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
     if (swapChainSupport.capabilities.maxImageCount > 0
         && imageCount > swapChainSupport.capabilities.maxImageCount) {
@@ -694,7 +843,8 @@ void VulkanEngine::createSwapChain()
 
     VkSwapchainCreateInfoKHR createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-    createInfo.surface = _surface;
+    // createInfo.surface = _surface;
+    createInfo.surface = _displaySurface;
 
     createInfo.minImageCount = imageCount;
     createInfo.imageFormat = surfaceFormat.format;
@@ -715,6 +865,8 @@ void VulkanEngine::createSwapChain()
         createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
     }
 
+    createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
     createInfo.preTransform = swapChainSupport.capabilities.currentTransform;
     createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
     createInfo.presentMode = presentMode;
@@ -734,10 +886,9 @@ void VulkanEngine::createSwapChain()
         createInfo.pNext = &swapChainCounterCreateInfo;
     }
 
-    if (vkCreateSwapchainKHR(this->_device->logicalDevice, &createInfo, nullptr, &_swapChain)
-        != VK_SUCCESS) {
-        FATAL("Failed to create swap chain!");
-    }
+    VK_CHECK_RESULT(
+        vkCreateSwapchainKHR(this->_device->logicalDevice, &createInfo, nullptr, &_swapChain)
+    );
 
     vkGetSwapchainImagesKHR(this->_device->logicalDevice, _swapChain, &imageCount, nullptr);
     _swapChainData.image.resize(imageCount);
@@ -797,25 +948,25 @@ VulkanEngine::SwapChainSupportDetails VulkanEngine::querySwapChainSupport(VkPhys
 {
     SwapChainSupportDetails details;
 
-    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, _surface, &details.capabilities);
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, _displaySurface, &details.capabilities);
 
     uint32_t formatCount;
-    vkGetPhysicalDeviceSurfaceFormatsKHR(device, _surface, &formatCount, nullptr);
+    vkGetPhysicalDeviceSurfaceFormatsKHR(device, _displaySurface, &formatCount, nullptr);
 
     if (formatCount != 0) {
         details.formats.resize(formatCount);
         vkGetPhysicalDeviceSurfaceFormatsKHR(
-            device, _surface, &formatCount, details.formats.data()
+            device, _displaySurface, &formatCount, details.formats.data()
         );
     }
 
     uint32_t presentModeCount;
-    vkGetPhysicalDeviceSurfacePresentModesKHR(device, _surface, &presentModeCount, nullptr);
+    vkGetPhysicalDeviceSurfacePresentModesKHR(device, _displaySurface, &presentModeCount, nullptr);
 
     if (presentModeCount != 0) {
         details.presentModes.resize(presentModeCount);
         vkGetPhysicalDeviceSurfacePresentModesKHR(
-            device, _surface, &presentModeCount, details.presentModes.data()
+            device, _displaySurface, &presentModeCount, details.presentModes.data()
         );
     }
 

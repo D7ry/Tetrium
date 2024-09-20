@@ -13,10 +13,10 @@
 #endif
 
 // linux
-// #include "X11/Xlib.h"
-// #include <X11/extensions/Xrandr.h>
-// #include "vulkan/vulkan_xlib.h"
-// #include "vulkan/vulkan_xlib_xrandr.h"
+#include "X11/Xlib.h"
+#include <X11/extensions/Xrandr.h>
+#include "vulkan/vulkan_xlib.h"
+#include "vulkan/vulkan_xlib_xrandr.h"
 
 // vq library
 #include "lib/VQBuffer.h"
@@ -50,13 +50,18 @@ class VulkanEngine
 #ifndef NDEBUG
         VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
 #endif // NDEBUG
-        // VK_EXT_DIRECT_MODE_DISPLAY_EXTENSION_NAME,
-        // VK_EXT_ACQUIRE_XLIB_DISPLAY_EXTENSION_NAME
+        VK_EXT_DIRECT_MODE_DISPLAY_EXTENSION_NAME,
+        VK_EXT_ACQUIRE_XLIB_DISPLAY_EXTENSION_NAME,
+        VK_KHR_XLIB_SURFACE_EXTENSION_NAME,
+        VK_KHR_SURFACE_EXTENSION_NAME,
+        VK_KHR_DISPLAY_EXTENSION_NAME,
     };
     // required device extensions
     static inline const std::vector<const char*> DEFAULT_DEVICE_EXTENSIONS = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME,
+        //https://forums.developer.nvidia.com/t/vk-khr-display-swapchain-not-present-on-linux/70781
+        // VK_KHR_DISPLAY_SWAPCHAIN_EXTENSION_NAME,
 #if __APPLE__ // molten vk support
         VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME,
     // VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME
@@ -69,8 +74,6 @@ class VulkanEngine
 
     // instance extensions required for even-odd rendering
     std::unordered_set<std::string> EVEN_ODD_INSTANCE_EXTENSIONS = {
-        VK_KHR_SURFACE_EXTENSION_NAME,
-        VK_KHR_DISPLAY_EXTENSION_NAME,
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_EXT_display_surface_counter.html
         VK_EXT_DISPLAY_SURFACE_COUNTER_EXTENSION_NAME,
     };
@@ -125,6 +128,7 @@ class VulkanEngine
     /* ---------- Initialization Subroutines ---------- */
     GLFWmonitor* cliMonitorSelection();
     void initGLFW(const InitOptions& options);
+    void initDisplay();
     void initVulkan();
     void createInstance();
     void createSurface();
@@ -201,6 +205,12 @@ class VulkanEngine
     VkSwapchainKHR _swapChain = VK_NULL_HANDLE;
     VkFormat _swapChainImageFormat;
     VkExtent2D _swapChainExtent; // resolution of the swapchain images
+
+    /* ---------- display ---------- */
+    VkExtent2D _displayExtent;
+    VkDisplayKHR _display;
+    VkSurfaceKHR _displaySurface;
+    uint32_t _displayPlaneIndex;
 
     struct
     {

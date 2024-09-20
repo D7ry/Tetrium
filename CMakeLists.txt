@@ -90,12 +90,15 @@ if(APPLE)
     target_compile_definitions(${PROJECT_NAME} PRIVATE VK_USE_PLATFORM_MACOS_MVK)
 else() # ~APPLE
     find_package(Vulkan REQUIRED)
+    find_package(X11 REQUIRED)
     target_link_libraries(${PROJECT_NAME} Vulkan::Vulkan)
 endif() # APPLE
 
 target_link_libraries(${PROJECT_NAME} 
     spdlog::spdlog 
     glfw
+    ${X11_LIBRARIES}
+    Xrandr
 )
 
 # debug flag for unix
