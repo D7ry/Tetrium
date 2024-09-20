@@ -78,21 +78,26 @@ target_include_directories(${PROJECT_NAME}
 target_precompile_headers(${PROJECT_NAME} PUBLIC src/PCH.h)
 
 # vulkan
-if(APPLE)
-    set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)
-    set(VULKAN_LIB_PATH $ENV{HOME}/lib/VulkanSDK/1.3.290.1/macOS/lib/libvulkan.1.3.290.dylib)
-    set(MOLTENVK_LIB_PATH $ENV{HOME}/lib/VulkanSDK/1.3.290.1/macOS/lib/libMoltenVK.dylib)
-    include_directories(~/lib/VulkanSDK/1.3.290.1/macOS/include)
-    target_link_libraries(${PROJECT_NAME} 
-        ${VULKAN_LIB_PATH}
-        ${MOLTENVK_LIB_PATH}
-    )
-    target_compile_definitions(${PROJECT_NAME} PRIVATE VK_USE_PLATFORM_MACOS_MVK)
-endif() # APPLE
-if (LINUX)
+if (UNIX)
+    if(APPLE)
+        set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)
+        set(VULKAN_LIB_PATH $ENV{HOME}/lib/VulkanSDK/1.3.290.1/macOS/lib/libvulkan.1.3.290.dylib)
+        set(MOLTENVK_LIB_PATH $ENV{HOME}/lib/VulkanSDK/1.3.290.1/macOS/lib/libMoltenVK.dylib)
+        include_directories(~/lib/VulkanSDK/1.3.290.1/macOS/include)
+        target_link_libraries(${PROJECT_NAME} 
+            ${VULKAN_LIB_PATH}
+            ${MOLTENVK_LIB_PATH}
+        )
+        target_compile_definitions(${PROJECT_NAME} PRIVATE VK_USE_PLATFORM_MACOS_MVK)
+    else()
     find_package(Vulkan REQUIRED)
     find_package(X11 REQUIRED)
-    target_link_libraries(${PROJECT_NAME} Vulkan::Vulkan)
+    target_link_libraries(${PROJECT_NAME} Vulkan::Vulkan
+        ${X11_LIBRARIES}
+        Xrandr
+    )
+
+    endif() # APPLE
 endif() # LINUX
 if (WIN32)
     set(VULKAN_SDK_PATH "C:/VulkanSDK/1.3.290.0")
@@ -110,7 +115,6 @@ endif() # WIN32
 target_link_libraries(${PROJECT_NAME} 
     spdlog::spdlog 
     glfw
-
 )
 
 # debug flag for unix
