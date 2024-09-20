@@ -41,7 +41,7 @@ class VulkanEngine
     /* ---------- constants ---------- */
 
     // required device extensions
-    static inline const std::vector<const char*> DEVICE_EXTENSIONS = {
+    static inline const std::vector<const char*> DEFAULT_DEVICE_EXTENSIONS = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME,
 #if __APPLE__ // molten vk support
@@ -55,10 +55,19 @@ class VulkanEngine
     //  trivial validation layer error that may be safely ignored.
 
     // instance extensions required for even-odd rendering
-    std::unordered_set<std::string> EVEN_ODD_INSTANCE_EXTENSIONS
-        = {VK_KHR_SURFACE_EXTENSION_NAME,
-           VK_KHR_DISPLAY_EXTENSION_NAME,
-           VK_EXT_DISPLAY_SURFACE_COUNTER_EXTENSION_NAME};
+    std::unordered_set<std::string> EVEN_ODD_INSTANCE_EXTENSIONS = {
+        VK_KHR_SURFACE_EXTENSION_NAME,
+        VK_KHR_DISPLAY_EXTENSION_NAME,
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_EXT_display_surface_counter.html
+        VK_EXT_DISPLAY_SURFACE_COUNTER_EXTENSION_NAME,
+    };
+
+    // device extensions required for even-odd rendering
+    // only tested on NVIDIA GPUs
+    static inline const std::vector<char*> EVEN_ODD_DEVICE_EXTENSIONS = {
+        // https://registry.khronos.org/VulkanSC/specs/1.0-extensions/man/html/VK_EXT_display_control.html
+        VK_EXT_DISPLAY_CONTROL_EXTENSION_NAME
+    };
 
   public:
     struct InitOptions
@@ -110,13 +119,18 @@ class VulkanEngine
     void createRenderPass(); // create main render pass
     void createFramebuffers();
     void createSynchronizationObjects();
+
+    /* ---------- Even-Odd frame ---------- */
     void checkEvenOddFrameSupport(); // checks hw support for even-odd rendering
+    void setUpEvenOddFrame();        // set up resources for even-odd frame
+
 
     /* ---------- Physical Device Selection ---------- */
     QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
     bool checkDeviceExtensionSupport(VkPhysicalDevice device);
     bool isDeviceSuitable(VkPhysicalDevice device);
     VkPhysicalDevice pickPhysicalDevice();
+    const std::vector<const char*> getRequiredDeviceExtensions() const;
 
     /* ---------- Swapchain ---------- */
     SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device);
@@ -225,6 +239,9 @@ class VulkanEngine
     float _FOV = 90;
     float _timeSinceStartSeconds; // seconds in time since engine start
     unsigned long int _numTicks;  // how many ticks has happened so far
+
+    uint64_t _surfaceCounterValue = 0;
+    PFN_vkGetSwapchainCounterEXT _pFNvkGetSwapchainCounterEXT = nullptr;
 
     /* ---------- Engine Components ---------- */
     DeletionStack _deletionStack;

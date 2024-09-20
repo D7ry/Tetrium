@@ -12,7 +12,7 @@ void ImGuiWidgetDeviceInfo::Draw(const VulkanEngine* engine) {
         ImGui::Text("Device: %s", device->properties.deviceName);
         ImGui::Text("Device Extensions: ");
         ImGui::Indent(INDENT);
-        for (const char* extension : engine->DEVICE_EXTENSIONS) {
+        for (const char* extension : engine->getRequiredDeviceExtensions()) {
             ImGui::Text("%s", extension);
         }
         ImGui::Indent(-INDENT);

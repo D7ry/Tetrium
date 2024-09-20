@@ -272,10 +272,20 @@ void VulkanEngine::createDevice()
     VkPhysicalDevice physicalDevice = this->pickPhysicalDevice();
     this->_device = std::make_shared<VQDevice>(physicalDevice);
     this->_device->InitQueueFamilyIndices(this->_surface);
-    this->_device->CreateLogicalDeviceAndQueue(DEVICE_EXTENSIONS);
+    this->_device->CreateLogicalDeviceAndQueue(getRequiredDeviceExtensions());
     this->_device->CreateGraphicsCommandPool();
     this->_device->CreateGraphicsCommandBuffer(NUM_FRAME_IN_FLIGHT);
     this->_deletionStack.push([this]() { this->_device->Cleanup(); });
+}
+
+void VulkanEngine::setUpEvenOddFrame()
+{
+    _pFNvkGetSwapchainCounterEXT = reinterpret_cast<PFN_vkGetSwapchainCounterEXT>(
+        vkGetInstanceProcAddr(_instance, "vkGetSwapchainCounterEXT")
+    );
+    if (_pFNvkGetSwapchainCounterEXT == nullptr) {
+        PANIC("Failed to get function pointer to {}", "vkGetSwapchainCounterEXT");
+    }
 }
 
 // check for hardware and software support for even-odd frame rendering.
@@ -360,6 +370,7 @@ void VulkanEngine::initVulkan()
     }
     if (_evenOddMode) {
         checkEvenOddFrameSupport();
+        setUpEvenOddFrame();
     }
     this->_deletionStack.push([this]() { this->_imguiManager.Cleanup(_device->logicalDevice); });
     INFO("Vulkan initialized.");
@@ -596,8 +607,9 @@ bool VulkanEngine::checkDeviceExtensionSupport(VkPhysicalDevice device)
         device, nullptr, &extensionCount, availableExtensions.data()
     );
 
+    auto vRequiredExtensions = getRequiredDeviceExtensions();
     std::set<std::string> requiredExtensions(
-        this->DEVICE_EXTENSIONS.begin(), this->DEVICE_EXTENSIONS.end()
+        vRequiredExtensions.begin(), vRequiredExtensions.end()
     );
 
     for (const auto& extension : availableExtensions) {
@@ -632,6 +644,17 @@ bool VulkanEngine::isDeviceSuitable(VkPhysicalDevice device)
     } else {
         return false;
     }
+}
+
+const std::vector<const char*> VulkanEngine::getRequiredDeviceExtensions() const
+{
+    std::vector<const char*> extensions = DEFAULT_DEVICE_EXTENSIONS;
+    if (_evenOddMode) {
+        for (auto extension : EVEN_ODD_DEVICE_EXTENSIONS) {
+            extensions.push_back(extension);
+        }
+    }
+    return extensions;
 }
 
 // pick a physical device that satisfies `isDeviceSuitable()`
@@ -1070,6 +1093,13 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     PROFILE_SCOPE(&_profiler, "Render Tick");
     vkWaitForFences(_device->logicalDevice, 1, &sync.fenceInFlight, VK_TRUE, UINT64_MAX);
 
+    VK_CHECK_RESULT(_pFNvkGetSwapchainCounterEXT(
+        _device->logicalDevice,
+        _swapChain,
+        VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_BIT_EXT,
+        &_surfaceCounterValue
+    ));
+
     //  Acquire an image from the swap chain
     uint32_t imageIndex;
     VkResult result = vkAcquireNextImageKHR(
@@ -1229,6 +1259,7 @@ void VulkanEngine::drawImGui()
     if (ImGui::Begin("Vulkan Engine")) {
         if (ImGui::BeginTabBar("Engine Tab")) {
             if (ImGui::BeginTabItem("General")) {
+                ImGui::Text("Surface counter: %lu", _surfaceCounterValue);
                 ImGui::SeparatorText("Camera");
                 {
                     ImGui::Text(
