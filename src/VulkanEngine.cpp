@@ -360,7 +360,15 @@ void VulkanEngine::createInstance()
     createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     createInfo.pApplicationInfo = &appInfo;
 
-    std::vector<const char*> instanceExtensions;
+    std::vector<const char*> instanceExtensions = {
+#ifndef NDEBUG
+        VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
+#endif // NDEBUG
+        // for even-odd surface counter query
+        VK_KHR_SURFACE_EXTENSION_NAME,
+        VK_KHR_DISPLAY_EXTENSION_NAME,
+        VK_EXT_DISPLAY_SURFACE_COUNTER_EXTENSION_NAME,
+    };
     // get glfw Extensions
     {
         uint32_t glfwExtensionCount = 0;
@@ -382,9 +390,6 @@ void VulkanEngine::createInstance()
         createInfo.pNext = &appleLayerSettings;
     }
 #endif // __APPLE__
-#ifndef NDEBUG
-    instanceExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-#endif // NDEBUG
     createInfo.enabledExtensionCount = instanceExtensions.size();
     createInfo.ppEnabledExtensionNames = instanceExtensions.data();
 
@@ -405,10 +410,11 @@ void VulkanEngine::createInstance()
 
 #ifndef NDEBUG
     // enable debug printing
-    VkValidationFeatureEnableEXT enabled[] = {VK_VALIDATION_FEATURE_ENABLE_DEBUG_PRINTF_EXT};
+    // VkValidationFeatureEnableEXT enabled[] = {VK_VALIDATION_FEATURE_ENABLE_DEBUG_PRINTF_EXT};
+    VkValidationFeatureEnableEXT enabled[] = {};
     VkValidationFeaturesEXT features{VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT};
     features.disabledValidationFeatureCount = 0;
-    features.enabledValidationFeatureCount = 1;
+    features.enabledValidationFeatureCount = sizeof(enabled) / sizeof(enabled[0]);
     features.pDisabledValidationFeatures = nullptr;
     features.pEnabledValidationFeatures = enabled;
 
