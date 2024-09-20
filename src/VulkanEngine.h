@@ -37,9 +37,33 @@ class TickContext;
 
 class VulkanEngine
 {
+  private:
+    /* ---------- constants ---------- */
+
+    // required device extensions
+    static inline const std::vector<const char*> DEVICE_EXTENSIONS = {
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+        VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME,
+#if __APPLE__ // molten vk support
+        VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME,
+    // VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME
+#endif // __APPLE__
+    };
+    //  NOTE: appple M3 does not have
+    //  `VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME` which moltenVK
+    //  requires to enable for metal compatbility. disabling it leads to a
+    //  trivial validation layer error that may be safely ignored.
+
+    // instance extensions required for even-odd rendering
+    std::unordered_set<std::string> EVEN_ODD_INSTANCE_EXTENSIONS
+        = {VK_KHR_SURFACE_EXTENSION_NAME,
+           VK_KHR_DISPLAY_EXTENSION_NAME,
+           VK_EXT_DISPLAY_SURFACE_COUNTER_EXTENSION_NAME};
+
   public:
     struct InitOptions
     {
+        bool evenOddMode = true;
         bool fullScreen = false;             // full screen mode
         bool manualMonitorSelection = false; // the user may select a monitor that's not the primary
                                              // monitor through CLI
@@ -86,6 +110,7 @@ class VulkanEngine
     void createRenderPass(); // create main render pass
     void createFramebuffers();
     void createSynchronizationObjects();
+    void checkEvenOddFrameSupport(); // checks hw support for even-odd rendering
 
     /* ---------- Physical Device Selection ---------- */
     QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
@@ -108,20 +133,6 @@ class VulkanEngine
     void cleanupSwapChain();
     void createImageViews();
     void createDepthBuffer();
-
-    // required device extensions
-    static inline const std::vector<const char*> DEVICE_EXTENSIONS = {
-        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-        VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME,
-#if __APPLE__ // molten vk support
-        VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME,
-    // VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME
-#endif // __APPLE__
-    };
-    //  NOTE: appple M3 does not have
-    //  `VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME` which moltenVK
-    //  requires to enable for metal compatbility. disabling it leads to a
-    //  trivial validation layer error that may be safely ignored.
 
     bool checkValidationLayerSupport();
 
@@ -190,6 +201,9 @@ class VulkanEngine
     /* ---------- Render Passes ---------- */
     // main render pass, and currently the only render pass
     VkRenderPass _mainRenderPass = VK_NULL_HANDLE;
+
+    /* ---------- Instance-static Data ---------- */
+    bool _evenOddMode = false; // whether to render in even-odd frame mode
 
     /* ---------- Tick-dynamic Data ---------- */
     bool _framebufferResized = false;

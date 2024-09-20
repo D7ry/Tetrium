@@ -201,7 +201,7 @@ void VulkanEngine::Init(const VulkanEngine::InitOptions& options)
     }
 
     _renderer.Init(&initCtx);
-    _deletionStack.push([this]() {  _renderer.Cleanup(); });
+    _deletionStack.push([this]() { _renderer.Cleanup(); });
     // create example mesh
     {
         // lil cow
@@ -216,6 +216,7 @@ void VulkanEngine::Init(const VulkanEngine::InitOptions& options)
         // register lil cow
         _renderer.AddEntity(spot);
     }
+    _evenOddMode = options.evenOddMode;
 }
 
 void VulkanEngine::Run()
@@ -276,9 +277,46 @@ void VulkanEngine::createDevice()
     this->_deletionStack.push([this]() { this->_device->Cleanup(); });
 }
 
+// check for hardware and software support for even-odd frame rendering.
+void VulkanEngine::checkEvenOddFrameSupport()
+{
+    bool success = true;
+    // check instance extensions
+    uint32_t numExtensions = 0;
+    VkResult result = VK_SUCCESS;
+
+    VK_CHECK_RESULT(vkEnumerateInstanceExtensionProperties(nullptr, &numExtensions, nullptr));
+    std::vector<VkExtensionProperties> extensions(numExtensions);
+    VK_CHECK_RESULT(
+        vkEnumerateInstanceExtensionProperties(nullptr, &numExtensions, extensions.data())
+    );
+
+    std::unordered_set<std::string> evenOddExtensions = EVEN_ODD_INSTANCE_EXTENSIONS;
+
+    for (VkExtensionProperties& property : extensions) {
+        evenOddExtensions.erase(std::string(property.extensionName));
+    }
+
+    if (!evenOddExtensions.empty()) {
+        ERROR("The following instance extensions required for even-odd rendering is not available: "
+        );
+        for (const std::string& extension : evenOddExtensions) {
+            ERROR(extension);
+        }
+        success = false;
+    }
+
+    if (!success) {
+        PANIC("Even-odd frame not supported!");
+    }
+}
+
 void VulkanEngine::initVulkan()
 {
     INFO("Initializing Vulkan...");
+    if (_evenOddMode) {
+        checkEvenOddFrameSupport();
+    }
     this->createInstance();
     this->createSurface();
     this->createDevice();
@@ -364,10 +402,6 @@ void VulkanEngine::createInstance()
 #ifndef NDEBUG
         VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
 #endif // NDEBUG
-        // for even-odd surface counter query
-        VK_KHR_SURFACE_EXTENSION_NAME,
-        VK_KHR_DISPLAY_EXTENSION_NAME,
-        VK_EXT_DISPLAY_SURFACE_COUNTER_EXTENSION_NAME,
     };
     // get glfw Extensions
     {
@@ -390,6 +424,11 @@ void VulkanEngine::createInstance()
         createInfo.pNext = &appleLayerSettings;
     }
 #endif // __APPLE__
+    if (_evenOddMode) {
+        for (const std::string& evenOddExtensionName : EVEN_ODD_INSTANCE_EXTENSIONS) {
+            instanceExtensions.push_back(evenOddExtensionName.c_str());
+        }
+    }
     createInfo.enabledExtensionCount = instanceExtensions.size();
     createInfo.ppEnabledExtensionNames = instanceExtensions.data();
 
