@@ -726,6 +726,18 @@ void VulkanEngine::createSwapChain()
 
     createInfo.oldSwapchain = VK_NULL_HANDLE;
 
+    VkSwapchainCounterCreateInfoEXT swapChainCounterCreateInfo{
+        .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_COUNTER_CREATE_INFO_EXT,
+        .pNext = NULL,
+        .surfaceCounters = VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_BIT_EXT
+    };
+    
+    if (_evenOddMode) {
+        DEBUG("swapchain created with counter support!");
+        swapChainCounterCreateInfo.pNext = createInfo.pNext;
+        createInfo.pNext = &swapChainCounterCreateInfo;
+    }
+
     if (vkCreateSwapchainKHR(this->_device->logicalDevice, &createInfo, nullptr, &_swapChain)
         != VK_SUCCESS) {
         FATAL("Failed to create swap chain!");
@@ -1096,7 +1108,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     VK_CHECK_RESULT(_pFNvkGetSwapchainCounterEXT(
         _device->logicalDevice,
         _swapChain,
-        VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_BIT_EXT,
+        VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_EXT,
         &_surfaceCounterValue
     ));
 
