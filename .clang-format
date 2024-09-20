@@ -1,0 +1,45 @@
+BasedOnStyle: LLVM
+IndentWidth: 4
+ContinuationIndentWidth: 4
+PointerAlignment: Left
+ColumnLimit: 100
+
+# Function declaration and definition
+AlignAfterOpenBracket: BlockIndent
+AllowAllArgumentsOnNextLine: true
+AllowAllParametersOfDeclarationOnNextLine: false
+AlwaysBreakAfterReturnType: None
+PenaltyReturnTypeOnItsOwnLine: 1000 # add big penalty so that return type never has its own line
+
+AlwaysBreakAfterDefinitionReturnType: None
+AlwaysBreakBeforeMultilineStrings: false
+BinPackArguments: false
+BinPackParameters: false
+
+BreakBeforeBinaryOperators: All
+BreakBeforeTernaryOperators: true
+BreakConstructorInitializersBeforeComma: false
+ConstructorInitializerAllOnOneLineOrOnePerLine: true
+MaxEmptyLinesToKeep: 1
+
+AlwaysBreakTemplateDeclarations: Yes
+
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterClass: true
+  AfterEnum: true
+  AfterStruct: true
+  AfterFunction: true
+  AfterNamespace: true
+  SplitEmptyFunction: true
+
+SeparateDefinitionBlocks: Always
+
+SortIncludes: CaseSensitive
+# multipel declarations are aligned to right
+# AlignConsecutiveDeclarations:
+#   Enabled: true
+#   AcrossEmptyLines: true
+#   AcrossComments: false
+#   AlignCompound: true
+#   PadOperators: true

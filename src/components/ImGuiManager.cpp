@@ -3,7 +3,8 @@
 #include "imgui.h"
 #include "implot.h"
 
-void ImGuiManager::setupImGuiStyle() {
+void ImGuiManager::setupImGuiStyle()
+{
     auto& style = ImGui::GetStyle();
     auto& colors = style.Colors;
     // Theme from https://github.com/ArranzCNL/ImprovedCameraSE-NG
@@ -47,16 +48,15 @@ void ImGuiManager::setupImGuiStyle() {
     colors[ImGuiCol_TabUnfocusedActive] = ImVec4{0.2f, 0.2f, 0.2f, 1.0f};
 }
 
-void ImGuiManager::InitializeImgui() {
+void ImGuiManager::InitializeImgui()
+{
     INFO("Initializing imgui...");
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImPlot::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
-    io.ConfigFlags
-        |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
-    io.ConfigFlags
-        |= ImGuiConfigFlags_NavEnableGamepad; // Enable Gamepad Controls
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
     ImGui::StyleColorsDark();
 #if __APPLE__
     ImFont* font = io.Fonts->AddFontFromFileTTF(
@@ -75,10 +75,10 @@ void ImGuiManager::BindVulkanResources(
     uint32_t graphicsQueueFamilyIndex,
     VkQueue graphicsQueue,
     int imageCount
-) {
+)
+{
     if (this->_imGuiRenderPass == VK_NULL_HANDLE) {
-        FATAL("Render pass must be initialized before binding vulkan resources!"
-        );
+        FATAL("Render pass must be initialized before binding vulkan resources!");
     }
     ImGui_ImplGlfw_InitForVulkan(window, true);
 
@@ -88,10 +88,9 @@ void ImGuiManager::BindVulkanResources(
     initInfo.Device = device;
     initInfo.QueueFamily = graphicsQueueFamilyIndex;
     initInfo.Queue = graphicsQueue;
-    initInfo.PipelineCache = VK_NULL_HANDLE; // keeping it none is fine
-    initInfo.DescriptorPool
-        = _imguiDescriptorPool;          // imgui custom descriptor pool
-    initInfo.Allocator = VK_NULL_HANDLE; // keeping it none is fine
+    initInfo.PipelineCache = VK_NULL_HANDLE;        // keeping it none is fine
+    initInfo.DescriptorPool = _imguiDescriptorPool; // imgui custom descriptor pool
+    initInfo.Allocator = VK_NULL_HANDLE;            // keeping it none is fine
     initInfo.MinImageCount = 2;
     initInfo.ImageCount = imageCount;
     initInfo.CheckVkResultFn = nullptr;
@@ -99,17 +98,14 @@ void ImGuiManager::BindVulkanResources(
     ImGui_ImplVulkan_Init(&initInfo);
 };
 
-void ImGuiManager::InitializeRenderPass(
-    VkDevice logicalDevice,
-    VkFormat swapChainImageFormat
-) {
+void ImGuiManager::InitializeRenderPass(VkDevice logicalDevice, VkFormat swapChainImageFormat)
+{
     INFO("Creating render pass...");
     VkAttachmentDescription colorAttachment{};
     colorAttachment.format = swapChainImageFormat;
     colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
 
-    colorAttachment.loadOp
-        = VK_ATTACHMENT_LOAD_OP_LOAD; // load from previou pass
+    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD; // load from previou pass
     colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 
     // don't care about stencil
@@ -148,9 +144,7 @@ void ImGuiManager::InitializeRenderPass(
     renderPassInfo.dependencyCount = 1;
     renderPassInfo.pDependencies = &dependency;
 
-    if (vkCreateRenderPass(
-            logicalDevice, &renderPassInfo, nullptr, &this->_imGuiRenderPass
-        )
+    if (vkCreateRenderPass(logicalDevice, &renderPassInfo, nullptr, &this->_imGuiRenderPass)
         != VK_SUCCESS) {
         FATAL("Failed to create render pass!");
     }
@@ -158,7 +152,8 @@ void ImGuiManager::InitializeRenderPass(
 
 void ImGuiManager::InitializeFonts() { ImGui_ImplVulkan_CreateFontsTexture(); }
 
-void ImGuiManager::DestroyFrameBuffers(VkDevice device) {
+void ImGuiManager::DestroyFrameBuffers(VkDevice device)
+{
     DEBUG("Destroying imgui frame buffers...");
     for (auto framebuffer : _imGuiFramebuffers) {
         vkDestroyFramebuffer(device, framebuffer, nullptr);
@@ -170,7 +165,8 @@ void ImGuiManager::InitializeFrameBuffer(
     VkDevice device,
     std::vector<VkImageView>& swapChainImageViews,
     VkExtent2D extent
-) {
+)
+{
     DEBUG("Creating imgui frame buffers...");
     if (swapChainImageViews.size() != bufferCount) {
         FATAL("Swap chain image views must be the same size as the number of "
@@ -196,36 +192,31 @@ void ImGuiManager::InitializeFrameBuffer(
     DEBUG("Imgui frame buffers created.");
 }
 
-void ImGuiManager::InitializeDescriptorPool(
-    int frames_in_flight,
-    VkDevice logicalDevice
-) {
+void ImGuiManager::InitializeDescriptorPool(int frames_in_flight, VkDevice logicalDevice)
+{
     // create a pool that will allocate to actual descriptor sets
     uint32_t descriptorSetCount = static_cast<uint32_t>(frames_in_flight);
     VkDescriptorPoolSize poolSizes[] = {
-        {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, descriptorSetCount
-        } // image sampler for imgui
+        {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, descriptorSetCount} // image sampler for imgui
     };
 
     VkDescriptorPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     poolInfo.poolSizeCount
-        = sizeof(poolSizes)
-          / sizeof(VkDescriptorPoolSize); // number of pool sizes
+        = sizeof(poolSizes) / sizeof(VkDescriptorPoolSize); // number of pool sizes
     poolInfo.pPoolSizes = poolSizes;
     poolInfo.maxSets = descriptorSetCount; // number of descriptor sets, set to
                                            // the number of frames in flight
     poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
 
-    if (vkCreateDescriptorPool(
-            logicalDevice, &poolInfo, nullptr, &_imguiDescriptorPool
-        )
+    if (vkCreateDescriptorPool(logicalDevice, &poolInfo, nullptr, &_imguiDescriptorPool)
         != VK_SUCCESS) {
         FATAL("Failed to create descriptor pool!");
     }
 }
 
-void ImGuiManager::Cleanup(VkDevice logicalDevice) {
+void ImGuiManager::Cleanup(VkDevice logicalDevice)
+{
     INFO("Cleaning up imgui...");
     ImGui_ImplVulkan_Shutdown();
     ImGui_ImplGlfw_Shutdown();
@@ -236,7 +227,8 @@ void ImGuiManager::Cleanup(VkDevice logicalDevice) {
     vkDestroyDescriptorPool(logicalDevice, _imguiDescriptorPool, nullptr);
 }
 
-void ImGuiManager::RecordCommandBuffer(const TickContext* tickData) {
+void ImGuiManager::RecordCommandBuffer(const TickContext* tickData)
+{
     auto CB = tickData->graphics.CB;
     auto FB = tickData->graphics.currentFB;
     auto extent = tickData->graphics.currentFBextend;
@@ -245,8 +237,7 @@ void ImGuiManager::RecordCommandBuffer(const TickContext* tickData) {
     VkRenderPassBeginInfo renderPassInfo{};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     renderPassInfo.renderPass = _imGuiRenderPass;
-    renderPassInfo.framebuffer
-        = _imGuiFramebuffers[tickData->graphics.currentSwapchainImageIndex];
+    renderPassInfo.framebuffer = _imGuiFramebuffers[tickData->graphics.currentSwapchainImageIndex];
     renderPassInfo.renderArea.extent = extent;
     renderPassInfo.renderArea.offset = {0, 0};
     renderPassInfo.clearValueCount = 0;
@@ -263,7 +254,8 @@ void ImGuiManager::RecordCommandBuffer(const TickContext* tickData) {
     vkCmdEndRenderPass(CB);
 }
 
-void ImGuiManager::BeginImGuiContext() {
+void ImGuiManager::BeginImGuiContext()
+{
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplGlfw_NewFrame();
 
@@ -272,7 +264,8 @@ void ImGuiManager::BeginImGuiContext() {
 
 void ImGuiManager::EndImGuiContext() { ImGui::Render(); }
 
-void ImGuiManager::ClearImGuiElements() {
+void ImGuiManager::ClearImGuiElements()
+{
     BeginImGuiContext();
     EndImGuiContext();
 }

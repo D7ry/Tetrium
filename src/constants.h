@@ -1,8 +1,7 @@
 #pragma once
 // absolute constants
-const int NUM_FRAME_IN_FLIGHT = 2; // how many frames to pipeline
-const int TEXTURE_ARRAY_SIZE
-    = 2048; // size of the texture array for bindless texture indexing
+const int NUM_FRAME_IN_FLIGHT = 2;   // how many frames to pipeline
+const int TEXTURE_ARRAY_SIZE = 2048; // size of the texture array for bindless texture indexing
 
 // default setting values.
 // Note taht values are only used on engine initialization
@@ -20,8 +19,7 @@ const float FOV = 90.f;
 const float ZNEAR = 0.1f;
 const float ZFAR = 500.f;
 
-const float PROFILER_PERF_PLOT_RANGE_SECONDS
-    = 10; // how large the plot window is
+const float PROFILER_PERF_PLOT_RANGE_SECONDS = 10; // how large the plot window is
 
 #if !__APPLE__
 const float MAX_FPS = 144.f;
@@ -46,8 +44,7 @@ const bool ENABLE_VALIDATION_LAYERS = false;
 const bool ENABLE_VALIDATION_LAYERS = true;
 #endif // NDEBUG
 
-const std::array<const char*, 1> VALIDATION_LAYERS
-    = {"VK_LAYER_KHRONOS_validation"};
+const std::array<const char*, 1> VALIDATION_LAYERS = {"VK_LAYER_KHRONOS_validation"};
 
 const char* const APPLICATION_NAME = "Vulkan Application";
 
@@ -71,3 +68,9 @@ const struct
 } // namespace DEFAULTS
 
 using INDEX_BUFFER_INDEX_TYPE = unsigned int;
+
+namespace DIRECTORIES
+{
+    const std::string ASSETS = "../assets/";
+    const std::string SHADERS = "../shaders/";
+}

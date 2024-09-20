@@ -21,13 +21,17 @@
 
 // Engine Components
 #include "components/Camera.h"
+#include "components/DeletionStack.h"
 #include "components/DeltaTimer.h"
 #include "components/ImGuiManager.h"
 #include "components/InputManager.h"
 #include "components/Profiler.h"
 #include "components/TextureManager.h"
-#include "components/DeletionStack.h"
 #include "components/imgui_widgets/ImGuiWidget.h"
+
+// ecs
+#include "ecs/entity/Entity.h"
+#include "ecs/system/SimpleRenderSystem.h"
 
 class TickContext;
 
@@ -36,10 +40,9 @@ class VulkanEngine
   public:
     struct InitOptions
     {
-        bool fullScreen = false; // full screen mode
-        bool manualMonitorSelection
-            = false; // the user may select a monitor that's not the primary
-                     // monitor through CLI
+        bool fullScreen = false;             // full screen mode
+        bool manualMonitorSelection = false; // the user may select a monitor that's not the primary
+                                             // monitor through CLI
     };
 
     // Engine-wide static UBO that gets updated every Tick()
@@ -123,9 +126,7 @@ class VulkanEngine
     bool checkValidationLayerSupport();
 
     /* ---------- Debug Utilities ---------- */
-    void populateDebugMessengerCreateInfo(
-        VkDebugUtilsMessengerCreateInfoEXT& createInfo
-    );
+    void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo);
     void setupDebugMessenger(); // unused for now
     static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
         VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -135,11 +136,7 @@ class VulkanEngine
     );
 
     /* ---------- Input ---------- */
-    static void framebufferResizeCallback(
-        GLFWwindow* window,
-        int width,
-        int height
-    );
+    static void framebufferResizeCallback(GLFWwindow* window, int width, int height);
     void cursorPosCallback(GLFWwindow* window, double xpos, double ypos);
     void bindDefaultInputs();
 
@@ -183,8 +180,7 @@ class VulkanEngine
         VkFence fenceInFlight;
     };
 
-    std::array<EngineSynchronizationPrimitives, NUM_FRAME_IN_FLIGHT>
-        _synchronizationPrimitives;
+    std::array<EngineSynchronizationPrimitives, NUM_FRAME_IN_FLIGHT> _synchronizationPrimitives;
 
     /* ---------- Depth Buffer ---------- */
     VkImage _depthImage;
@@ -224,8 +220,7 @@ class VulkanEngine
     Camera _mainCamera;
     InputManager _inputManager;
     Profiler _profiler;
-    std::unique_ptr<std::vector<Profiler::Entry>> _lastProfilerData
-        = _profiler.NewProfile();
+    std::unique_ptr<std::vector<Profiler::Entry>> _lastProfilerData = _profiler.NewProfile();
 
     // ImGui widgets
     friend class ImGuiWidgetDeviceInfo;
@@ -234,4 +229,7 @@ class VulkanEngine
     ImGuiWidgetPerfPlot _widgetPerfPlot;
     friend class ImGuiWidgetUBOViewer;
     ImGuiWidgetUBOViewer _widgetUBOViewer;
+
+    // ecs Systems
+    SimpleRenderSystem _renderer;
 };

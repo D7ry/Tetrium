@@ -55,6 +55,7 @@ add_executable(${PROJECT_NAME}
         src/lib/VQDevice.cpp
         src/lib/VQUtils.cpp
         src/structs/Vertex.cpp
+        src/ecs/system/SimpleRenderSystem.cpp
 )
 
 target_sources(${PROJECT_NAME} 
