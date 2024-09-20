@@ -78,33 +78,6 @@ void VulkanEngine::initDisplay()
 {
     auto device = _device->physicalDevice;
 
-    // Get Xlib displays
-    uint32_t displayCount = 0;
-    vkGetPhysicalDeviceDisplayPropertiesKHR(device, &displayCount, nullptr);
-    std::vector<VkDisplayPropertiesKHR> displayProperties(displayCount);
-    vkGetPhysicalDeviceDisplayPropertiesKHR(device, &displayCount, displayProperties.data());
-
-    // List all displays and their properties
-    std::cout << "Available Displays:\n";
-    for (uint32_t i = 0; i < displayCount; ++i) {
-        std::cout << "Index: " << i << ", Name: " << displayProperties[i].displayName
-                  << ", Physical Dimensions: " << displayProperties[i].physicalDimensions.width
-                  << "x" << displayProperties[i].physicalDimensions.height << " mm"
-                  << ", Physical Resolution: " << displayProperties[i].physicalResolution.width
-                  << "x" << displayProperties[i].physicalResolution.height << " pixels"
-                  << std::endl;
-    }
-
-    // Get user input for display selection
-    uint32_t selectedIndex;
-    do {
-        std::cout << "Enter the index of the display you want to use (0-" << displayCount - 1
-                  << "): ";
-        std::cin >> selectedIndex;
-    } while (selectedIndex >= displayCount);
-
-    _display = displayProperties[selectedIndex].display;
-
     // Get the X11 display name for the selected Vulkan display
     PFN_vkGetRandROutputDisplayEXT vkGetRandROutputDisplayEXT
         = reinterpret_cast<PFN_vkGetRandROutputDisplayEXT>(
@@ -116,6 +89,8 @@ void VulkanEngine::initDisplay()
     ASSERT(xDisplay);
 
     int screenCount = ScreenCount(xDisplay);
+    std::vector<VkDisplayKHR> displays;
+    std::vector<std::string> displayNames;
     for (int i = 0; i < screenCount; ++i) {
         Screen* screen = ScreenOfDisplay(xDisplay, i);
         Window root = RootWindowOfScreen(screen);
@@ -125,19 +100,35 @@ void VulkanEngine::initDisplay()
             RROutput output = resources->outputs[j];
             VkDisplayKHR display;
             VkResult result = vkGetRandROutputDisplayEXT(device, xDisplay, output, &display);
-            if (result == VK_SUCCESS && display == _display) {
-                // We found the X11 output that corresponds to our Vulkan display
-                goto found_display;
+            if (result == VK_SUCCESS) {
+                // display display properties
+                displays.push_back(display);
+                XRROutputInfo* outputInfo = XRRGetOutputInfo(xDisplay, resources, output);
+                displayNames.push_back(outputInfo->name);
+                XRRFreeOutputInfo(outputInfo);
             }
         }
 
         XRRFreeScreenResources(resources);
     }
 
-    // If we get here, we didn't find a matching display
-    throw std::runtime_error("Couldn't find matching X11 display for Vulkan display");
+    for (size_t i = 0; i < displays.size(); ++i) {
+        VkDisplayPropertiesKHR displayProperties;
 
-found_display:
+        std::cout << "Display " << i << ":\n";
+        std::cout << "  Name: " << displayNames[i] << "\n";
+    }
+
+    // Prompt user for selection
+    size_t selectedIndex;
+    do {
+        std::cout << "Enter the index of the display you want to use (0-" << displays.size() - 1
+                  << "): ";
+        std::cin >> selectedIndex;
+    } while (selectedIndex >= displays.size());
+
+    _display = displays[selectedIndex];
+
     // Acquire the display
     PFN_vkAcquireXlibDisplayEXT vkAcquireXlibDisplayEXT
         = reinterpret_cast<PFN_vkAcquireXlibDisplayEXT>(
@@ -207,7 +198,6 @@ found_display:
 
     // Store the display properties for later use
     _displayExtent = modeProperties[selectedModeIndex].parameters.visibleRegion;
-
 
     // Close X11 display
     XCloseDisplay(xDisplay);
@@ -288,27 +278,29 @@ void VulkanEngine::Init(const VulkanEngine::InitOptions& options)
 #if __APPLE__
     MoltenVKConfig::Setup();
 #endif // __APPLE__
-    initGLFW(options);
-    { // Input Handling
-        auto keyCallback = [](GLFWwindow* window, int key, int scancode, int action, int mods) {
-            VulkanEngine* pThis = reinterpret_cast<VulkanEngine*>(glfwGetWindowUserPointer(window));
-            if (key == GLFW_KEY_P && action == GLFW_PRESS) {
-                pThis->_paused = !pThis->_paused;
-            }
-            pThis->_inputManager.OnKeyInput(window, key, scancode, action, mods);
-        };
-        glfwSetKeyCallback(this->_window, keyCallback);
-        // don't have a mouse input manager yet, so manually bind cursor pos
-        // callback
-        auto cursorPosCallback = [](GLFWwindow* window, double xpos, double ypos) {
-            VulkanEngine* pThis = reinterpret_cast<VulkanEngine*>(glfwGetWindowUserPointer(window));
-            pThis->cursorPosCallback(window, xpos, ypos);
-        };
-        glfwSetCursorPosCallback(this->_window, cursorPosCallback);
-        bindDefaultInputs();
-    }
+    // initGLFW(options);
+    // { // Input Handling
+    //     auto keyCallback = [](GLFWwindow* window, int key, int scancode, int action, int mods) {
+    //         VulkanEngine* pThis =
+    //         reinterpret_cast<VulkanEngine*>(glfwGetWindowUserPointer(window)); if (key ==
+    //         GLFW_KEY_P && action == GLFW_PRESS) {
+    //             pThis->_paused = !pThis->_paused;
+    //         }
+    //         pThis->_inputManager.OnKeyInput(window, key, scancode, action, mods);
+    //     };
+    //     glfwSetKeyCallback(this->_window, keyCallback);
+    //     // don't have a mouse input manager yet, so manually bind cursor pos
+    //     // callback
+    //     auto cursorPosCallback = [](GLFWwindow* window, double xpos, double ypos) {
+    //         VulkanEngine* pThis =
+    //         reinterpret_cast<VulkanEngine*>(glfwGetWindowUserPointer(window));
+    //         pThis->cursorPosCallback(window, xpos, ypos);
+    //     };
+    //     glfwSetCursorPosCallback(this->_window, cursorPosCallback);
+    //     bindDefaultInputs();
+    // }
 
-    glfwSetFramebufferSizeCallback(_window, this->framebufferResizeCallback);
+    // glfwSetFramebufferSizeCallback(_window, this->framebufferResizeCallback);
     this->initVulkan();
     _textureManager.Init(_device);
     this->_deletionStack.push([this]() { _textureManager.Cleanup(); });
@@ -361,8 +353,11 @@ void VulkanEngine::Init(const VulkanEngine::InitOptions& options)
 
 void VulkanEngine::Run()
 {
-    while (!glfwWindowShouldClose(_window)) {
-        glfwPollEvents();
+    // while (!glfwWindowShouldClose(_window)) {
+    //     glfwPollEvents();
+    //     Tick();
+    // }
+    while (1) {
         Tick();
     }
 }
@@ -467,6 +462,7 @@ void VulkanEngine::checkEvenOddFrameSupport()
         );
     }
     VK_CHECK_RESULT(func(_device->physicalDevice, _surface, &capabilities));
+    return;
     bool hasVerticalBlankingCounter
         = capabilities.supportedSurfaceCounters
           & VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_BIT_EXT;
@@ -572,13 +568,13 @@ void VulkanEngine::createInstance()
 
     std::vector<const char*> instanceExtensions = DEFAULT_INSTANCE_EXTENSIONS;
     // get glfw Extensions
-    {
-        uint32_t glfwExtensionCount = 0;
-        const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-        for (int i = 0; i < glfwExtensionCount; i++) {
-            instanceExtensions.push_back(glfwExtensions[i]);
-        }
-    }
+    // {
+    //     uint32_t glfwExtensionCount = 0;
+    //     const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+    //     for (int i = 0; i < glfwExtensionCount; i++) {
+    //         instanceExtensions.push_back(glfwExtensions[i]);
+    //     }
+    // }
 // https://stackoverflow.com/questions/72789012/why-does-vkcreateinstance-return-vk-error-incompatible-driver-on-macos-despite
 #if __APPLE__
     // enable extensions for apple vulkan translation
@@ -864,8 +860,6 @@ void VulkanEngine::createSwapChain()
     } else {
         createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
     }
-
-    createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
     createInfo.preTransform = swapChainSupport.capabilities.currentTransform;
     createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
@@ -1252,12 +1246,12 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     PROFILE_SCOPE(&_profiler, "Render Tick");
     vkWaitForFences(_device->logicalDevice, 1, &sync.fenceInFlight, VK_TRUE, UINT64_MAX);
 
-    VK_CHECK_RESULT(_pFNvkGetSwapchainCounterEXT(
+    auto res = _pFNvkGetSwapchainCounterEXT(
         _device->logicalDevice,
         _swapChain,
         VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_EXT,
         &_surfaceCounterValue
-    ));
+    );
 
     //  Acquire an image from the swap chain
     uint32_t imageIndex;
@@ -1397,9 +1391,8 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
         || this->_framebufferResized) {
         [[unlikely]] this->recreateSwapChain();
         this->_framebufferResized = false;
-    } else if (result != VK_SUCCESS) {
-        [[unlikely]] FATAL("Failed to present swap chain image!");
-    }
+    } 
+    VK_CHECK_RESULT(result);
 }
 
 void VulkanEngine::initSwapChain()
