@@ -144,6 +144,8 @@ void VulkanEngine::cursorPosCallback(GLFWwindow* window, double xpos, double ypo
 
 void VulkanEngine::Init(const VulkanEngine::InitOptions& options)
 {
+    // populate static config fields
+    _evenOddMode = options.evenOddMode;
 #if __APPLE__
     MoltenVKConfig::Setup();
 #endif // __APPLE__
@@ -216,7 +218,6 @@ void VulkanEngine::Init(const VulkanEngine::InitOptions& options)
         // register lil cow
         _renderer.AddEntity(spot);
     }
-    _evenOddMode = options.evenOddMode;
 }
 
 void VulkanEngine::Run()
@@ -278,9 +279,12 @@ void VulkanEngine::createDevice()
 }
 
 // check for hardware and software support for even-odd frame rendering.
+// specifically, the GPU must provide a surface counter support --
+// the counter ticks every time a vertical blanking period occurs,
+// which we use to decide whether the next frame to present should be
+// even or odd.
 void VulkanEngine::checkEvenOddFrameSupport()
 {
-    bool success = true;
     // check instance extensions
     uint32_t numExtensions = 0;
     VkResult result = VK_SUCCESS;
@@ -303,20 +307,34 @@ void VulkanEngine::checkEvenOddFrameSupport()
         for (const std::string& extension : evenOddExtensions) {
             ERROR(extension);
         }
-        success = false;
-    }
-
-    if (!success) {
         PANIC("Even-odd frame not supported!");
     }
+
+    VkSurfaceCapabilities2EXT capabilities{
+        .sType = VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES_2_EXT, .pNext = VK_NULL_HANDLE
+    };
+
+    auto func = (PFN_vkGetPhysicalDeviceSurfaceCapabilities2EXT
+    )vkGetInstanceProcAddr(_instance, "vkGetPhysicalDeviceSurfaceCapabilities2EXT");
+    if (!func) {
+        PANIC(
+            "Failed to find function pointer to {}", "vkGetPhysicalDeviceSurfaceCapabilities2EXT"
+        );
+    }
+    VK_CHECK_RESULT(func(_device->physicalDevice, _surface, &capabilities));
+    bool hasVerticalBlankingCounter
+        = capabilities.supportedSurfaceCounters
+          & VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_BIT_EXT;
+    if (hasVerticalBlankingCounter) {
+        PANIC("Even-odd frame not supported!");
+    }
+
+    DEBUG("Even-odd frame support check passed!");
 }
 
 void VulkanEngine::initVulkan()
 {
     INFO("Initializing Vulkan...");
-    if (_evenOddMode) {
-        checkEvenOddFrameSupport();
-    }
     this->createInstance();
     this->createSurface();
     this->createDevice();
@@ -339,6 +357,9 @@ void VulkanEngine::initVulkan()
             _device->graphicsQueue,
             _swapChainData.frameBuffer.size()
         );
+    }
+    if (_evenOddMode) {
+        checkEvenOddFrameSupport();
     }
     this->_deletionStack.push([this]() { this->_imguiManager.Cleanup(_device->logicalDevice); });
     INFO("Vulkan initialized.");
