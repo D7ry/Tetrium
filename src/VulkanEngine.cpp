@@ -149,7 +149,7 @@ void VulkanEngine::Init(const VulkanEngine::InitOptions& options)
 #if __APPLE__
     MoltenVKConfig::Setup();
 #endif // __APPLE__
-    initGLFW(options);
+    //initGLFW(options);
     { // Input Handling
         auto keyCallback = [](GLFWwindow* window, int key, int scancode, int action, int mods) {
             VulkanEngine* pThis = reinterpret_cast<VulkanEngine*>(glfwGetWindowUserPointer(window));
@@ -430,11 +430,7 @@ void VulkanEngine::createInstance()
     createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     createInfo.pApplicationInfo = &appInfo;
 
-    std::vector<const char*> instanceExtensions = {
-#ifndef NDEBUG
-        VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
-#endif // NDEBUG
-    };
+    std::vector<const char*> instanceExtensions = DEFAULT_INSTANCE_EXTENSIONS;
     // get glfw Extensions
     {
         uint32_t glfwExtensionCount = 0;
@@ -731,7 +727,7 @@ void VulkanEngine::createSwapChain()
         .pNext = NULL,
         .surfaceCounters = VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_BIT_EXT
     };
-    
+
     if (_evenOddMode) {
         DEBUG("swapchain created with counter support!");
         swapChainCounterCreateInfo.pNext = createInfo.pNext;

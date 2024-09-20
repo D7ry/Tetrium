@@ -12,6 +12,12 @@
 #include <vulkan/vulkan_beta.h> // VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME, for molten-vk support
 #endif
 
+// linux
+// #include "X11/Xlib.h"
+// #include <X11/extensions/Xrandr.h>
+// #include "vulkan/vulkan_xlib.h"
+// #include "vulkan/vulkan_xlib_xrandr.h"
+
 // vq library
 #include "lib/VQBuffer.h"
 #include "lib/VQDevice.h"
@@ -40,6 +46,13 @@ class VulkanEngine
   private:
     /* ---------- constants ---------- */
 
+    static inline const std::vector<const char*> DEFAULT_INSTANCE_EXTENSIONS = {
+#ifndef NDEBUG
+        VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
+#endif // NDEBUG
+        // VK_EXT_DIRECT_MODE_DISPLAY_EXTENSION_NAME,
+        // VK_EXT_ACQUIRE_XLIB_DISPLAY_EXTENSION_NAME
+    };
     // required device extensions
     static inline const std::vector<const char*> DEFAULT_DEVICE_EXTENSIONS = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
@@ -66,7 +79,7 @@ class VulkanEngine
     // only tested on NVIDIA GPUs
     static inline const std::vector<char*> EVEN_ODD_DEVICE_EXTENSIONS = {
         // https://registry.khronos.org/VulkanSC/specs/1.0-extensions/man/html/VK_EXT_display_control.html
-        VK_EXT_DISPLAY_CONTROL_EXTENSION_NAME
+        VK_EXT_DISPLAY_CONTROL_EXTENSION_NAME,
     };
 
   public:
@@ -123,7 +136,6 @@ class VulkanEngine
     /* ---------- Even-Odd frame ---------- */
     void checkEvenOddFrameSupport(); // checks hw support for even-odd rendering
     void setUpEvenOddFrame();        // set up resources for even-odd frame
-
 
     /* ---------- Physical Device Selection ---------- */
     QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
