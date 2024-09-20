@@ -13,7 +13,7 @@
 #include <vulkan/vulkan_beta.h> // VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME, for molten-vk support
 #endif
 
-#ifdef __LINUX__
+#ifdef __linux__
 // linux
 #include "X11/Xlib.h"
 #include <X11/extensions/Xrandr.h>
