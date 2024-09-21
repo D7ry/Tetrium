@@ -142,6 +142,7 @@ class VulkanEngine
     GLFWmonitor* cliMonitorSelection();
     void initGLFW(const InitOptions& options);
     void initDisplayDRM();
+    void initDisplayXlib();
     void initDisplay();
     void initVulkan();
     void createInstance();

@@ -161,74 +161,77 @@ void VulkanEngine::initDisplayDRM()
     close(drmFd);
 }
 
+void VulkanEngine::initDisplayXlib()
+{
+    auto device = _device->physicalDevice;
+    // Get the X11 display name for the selected Vulkan display
+    PFN_vkGetRandROutputDisplayEXT vkGetRandROutputDisplayEXT
+        = reinterpret_cast<PFN_vkGetRandROutputDisplayEXT>(
+            vkGetInstanceProcAddr(_instance, "vkGetRandROutputDisplayEXT")
+        );
+    ASSERT(vkGetRandROutputDisplayEXT);
+
+    Display* xDisplay = XOpenDisplay(NULL);
+    ASSERT(xDisplay);
+
+    int screenCount = ScreenCount(xDisplay);
+    std::vector<VkDisplayKHR> displays;
+    std::vector<std::string> displayNames;
+    for (int i = 0; i < screenCount; ++i) {
+        Screen* screen = ScreenOfDisplay(xDisplay, i);
+        Window root = RootWindowOfScreen(screen);
+        XRRScreenResources* resources = XRRGetScreenResources(xDisplay, root);
+
+        for (int j = 0; j < resources->noutput; ++j) {
+            RROutput output = resources->outputs[j];
+            VkDisplayKHR display;
+            VkResult result = vkGetRandROutputDisplayEXT(device, xDisplay, output, &display);
+            if (result == VK_SUCCESS) {
+                // display display properties
+                displays.push_back(display);
+                XRROutputInfo* outputInfo = XRRGetOutputInfo(xDisplay, resources, output);
+                displayNames.push_back(outputInfo->name);
+                XRRFreeOutputInfo(outputInfo);
+            }
+        }
+
+        XRRFreeScreenResources(resources);
+    }
+
+    for (size_t i = 0; i < displays.size(); ++i) {
+        VkDisplayPropertiesKHR displayProperties;
+
+        std::cout << "Display " << i << ":\n";
+        std::cout << "  Name: " << displayNames[i] << "\n";
+    }
+
+    // Prompt user for selection
+    size_t selectedIndex = 0; // defaults to 1 for vulkan configurator
+    do {
+        std::cout << "Enter the index of the display you want to use (0-" << displays.size() - 1
+                  << "): ";
+        std::cin >> selectedIndex;
+    } while (selectedIndex >= displays.size());
+
+    _display = displays[selectedIndex];
+    if (1) { // acquire exclusive display access
+        DEBUG("Acquiring exclusive access to display...");
+        // Acquire the display
+        PFN_vkAcquireXlibDisplayEXT vkAcquireXlibDisplayEXT
+            = reinterpret_cast<PFN_vkAcquireXlibDisplayEXT>(
+                vkGetInstanceProcAddr(_instance, "vkAcquireXlibDisplayEXT")
+            );
+        ASSERT(vkAcquireXlibDisplayEXT);
+
+        VK_CHECK_RESULT(vkAcquireXlibDisplayEXT(device, xDisplay, _display));
+    }
+}
+
 void VulkanEngine::initDisplay()
 {
-    initDisplayDRM();
-    // return;
-    // auto device = _device->physicalDevice;
-    //
-    // // Get the X11 display name for the selected Vulkan display
-    // PFN_vkGetRandROutputDisplayEXT vkGetRandROutputDisplayEXT
-    //     = reinterpret_cast<PFN_vkGetRandROutputDisplayEXT>(
-    //         vkGetInstanceProcAddr(_instance, "vkGetRandROutputDisplayEXT")
-    //     );
-    // ASSERT(vkGetRandROutputDisplayEXT);
-    //
-    // Display* xDisplay = XOpenDisplay(NULL);
-    // ASSERT(xDisplay);
-    //
-    // int screenCount = ScreenCount(xDisplay);
-    // std::vector<VkDisplayKHR> displays;
-    // std::vector<std::string> displayNames;
-    // for (int i = 0; i < screenCount; ++i) {
-    //     Screen* screen = ScreenOfDisplay(xDisplay, i);
-    //     Window root = RootWindowOfScreen(screen);
-    //     XRRScreenResources* resources = XRRGetScreenResources(xDisplay, root);
-    //
-    //     for (int j = 0; j < resources->noutput; ++j) {
-    //         RROutput output = resources->outputs[j];
-    //         VkDisplayKHR display;
-    //         VkResult result = vkGetRandROutputDisplayEXT(device, xDisplay, output, &display);
-    //         if (result == VK_SUCCESS) {
-    //             // display display properties
-    //             displays.push_back(display);
-    //             XRROutputInfo* outputInfo = XRRGetOutputInfo(xDisplay, resources, output);
-    //             displayNames.push_back(outputInfo->name);
-    //             XRRFreeOutputInfo(outputInfo);
-    //         }
-    //     }
-    //
-    //     XRRFreeScreenResources(resources);
-    // }
-    //
-    // for (size_t i = 0; i < displays.size(); ++i) {
-    //     VkDisplayPropertiesKHR displayProperties;
-    //
-    //     std::cout << "Display " << i << ":\n";
-    //     std::cout << "  Name: " << displayNames[i] << "\n";
-    // }
-    //
-    // // Prompt user for selection
-    // size_t selectedIndex = 0; // defaults to 1 for vulkan configurator
-    // do {
-    //     std::cout << "Enter the index of the display you want to use (0-" << displays.size() - 1
-    //               << "): ";
-    //     std::cin >> selectedIndex;
-    // } while (selectedIndex >= displays.size());
-    //
-    // _display = displays[selectedIndex];
-    // if (1) { // acquire exclusive display access
-    //     DEBUG("Acquiring exclusive access to display...");
-    //     // Acquire the display
-    //     PFN_vkAcquireXlibDisplayEXT vkAcquireXlibDisplayEXT
-    //         = reinterpret_cast<PFN_vkAcquireXlibDisplayEXT>(
-    //             vkGetInstanceProcAddr(_instance, "vkAcquireXlibDisplayEXT")
-    //         );
-    //     ASSERT(vkAcquireXlibDisplayEXT);
-    //
-    //     VK_CHECK_RESULT(vkAcquireXlibDisplayEXT(device, xDisplay, _display));
-    // }
-    // Get display mode properties
+    //initDisplayDRM();
+    initDisplayXlib();
+
     auto device = _device->physicalDevice;
     uint32_t modeCount = 0;
     vkGetDisplayModePropertiesKHR(device, _display, &modeCount, nullptr);
