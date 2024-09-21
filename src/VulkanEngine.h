@@ -40,7 +40,6 @@
 #include "components/imgui_widgets/ImGuiWidget.h"
 
 // ecs
-#include "ecs/entity/Entity.h"
 #include "ecs/system/SimpleRenderSystem.h"
 
 class TickContext;
@@ -51,7 +50,7 @@ class TickContext;
 class VulkanEngine
 {
   private:
-    /* ---------- constants ---------- */
+    /* ---------- Extension Configurations ---------- */
 
     static inline const std::vector<const char*> DEFAULT_INSTANCE_EXTENSIONS = {
 #ifndef NDEBUG
@@ -124,7 +123,7 @@ class VulkanEngine
     void Cleanup();
 
   private:
-
+    /* ---------- Packed Structs ---------- */
     // context for a single swapchain; 
     // each window & display manages their separate
     // swapchain context
@@ -166,9 +165,6 @@ class VulkanEngine
     void createMainRenderPass(VulkanEngine::SwapChainContext& ctx); // create main render pass
     void createSynchronizationObjects();
 
-    /* ---------- Even-Odd frame ---------- */
-    void checkHardwareEvenOddFrameSupport(); // checks hw support for even-odd rendering
-    void setUpEvenOddFrame();        // set up resources for even-odd frame
 
     /* ---------- Physical Device Selection ---------- */
     bool checkDeviceExtensionSupport(VkPhysicalDevice device);
@@ -192,9 +188,9 @@ class VulkanEngine
     void createImageViews(SwapChainContext& ctx);
     void createDepthBuffer(SwapChainContext& ctx);
     void createFramebuffers(SwapChainContext& ctx);
-    bool checkValidationLayerSupport();
 
     /* ---------- Debug Utilities ---------- */
+    bool checkValidationLayerSupport();
     void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo);
     void setupDebugMessenger(); // unused for now
     static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
@@ -210,31 +206,25 @@ class VulkanEngine
     void bindDefaultInputs();
 
     /* ---------- Render-Time Functions ---------- */
-    void getMainProjectionMatrix(glm::mat4& projectionMatrix);
-    void flushEngineUBOStatic(uint8_t frame);
-    void drawImGui();
     void drawFrame(TickContext* tickData, uint8_t frame);
+    void drawImGui();
+    void flushEngineUBOStatic(uint8_t frame);
+    void getMainProjectionMatrix(glm::mat4& projectionMatrix);
 
-    // record command buffer to perform some example GPU
-    // operations. currently not used anymore
-    void recordCommandBuffer(
-        VkCommandBuffer commandBuffer,
-        uint32_t imageIndex,
-        TickContext* tickData
-    );
+    /* ---------- Even-Odd frame ---------- */
+    void checkHardwareEvenOddFrameSupport(); // checks hw support for even-odd rendering
+    void setUpEvenOddFrame();        // set up resources for even-odd frame
 
     /* ---------- Top-level data ---------- */
-
     VkInstance _instance;
     VkDebugUtilsMessengerEXT _debugMessenger;
+    std::shared_ptr<VQDevice> _device;
 
     /* ---------- Prensentation ---------- */
-
     GLFWwindow* _window;
     DisplayContext _mainProjectorDisplay;
 
     /* ---------- swapchain ---------- */
-
     SwapChainContext _mainProjectorSwapchain;
     SwapChainContext _auxWindowSwapchain;
 
@@ -248,8 +238,6 @@ class VulkanEngine
 
     std::array<EngineSynchronizationPrimitives, NUM_FRAME_IN_FLIGHT> _synchronizationPrimitives;
 
-    /* ---------- Depth Buffer ---------- */
-
     /* ---------- Render Passes ---------- */
     // main render pass, and currently the only render pass
     VkRenderPass _mainRenderPass = VK_NULL_HANDLE;
@@ -260,15 +248,16 @@ class VulkanEngine
     /* ---------- Tick-dynamic Data ---------- */
     bool _framebufferResized = false;
     uint8_t _currentFrame = 0;
+
     // whether we are locking the cursor within the glfw window
     bool _lockCursor = false;
+
     // whether we want to draw imgui, set to false disables
     // all imgui windows
     bool _wantToDrawImGui = true;
     // engine level pause, toggle with P key
     bool _paused = false;
 
-    std::shared_ptr<VQDevice> _device;
 
     // static ubo for each frame
     // each buffer stores a `EngineUBOStatic`
