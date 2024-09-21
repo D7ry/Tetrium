@@ -65,6 +65,11 @@ class VulkanEngine
     static inline const std::vector<const char*> DEFAULT_DEVICE_EXTENSIONS = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME,
+
+        // debug
+        VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME,
+        VK_NV_DEVICE_DIAGNOSTIC_CHECKPOINTS_EXTENSION_NAME,
+        VK_NV_DEVICE_DIAGNOSTICS_CONFIG_EXTENSION_NAME,
         //https://forums.developer.nvidia.com/t/vk-khr-display-swapchain-not-present-on-linux/70781
         // VK_KHR_DISPLAY_SWAPCHAIN_EXTENSION_NAME,
 #if __APPLE__ // molten vk support

@@ -120,12 +120,12 @@ void VulkanEngine::initDisplay()
     }
 
     // Prompt user for selection
-    size_t selectedIndex;
-    do {
-        std::cout << "Enter the index of the display you want to use (0-" << displays.size() - 1
-                  << "): ";
-        std::cin >> selectedIndex;
-    } while (selectedIndex >= displays.size());
+    size_t selectedIndex = 1; // defaults to 1 for vulkan configurator
+    // do {
+    //     std::cout << "Enter the index of the display you want to use (0-" << displays.size() - 1
+    //               << "): ";
+    //     std::cin >> selectedIndex;
+    // } while (selectedIndex >= displays.size());
 
     _display = displays[selectedIndex];
 
@@ -155,11 +155,11 @@ void VulkanEngine::initDisplay()
     }
 
     // Get user input for mode selection
-    uint32_t selectedModeIndex;
-    do {
-        std::cout << "Enter the index of the mode you want to use (0-" << modeCount - 1 << "): ";
-        std::cin >> selectedModeIndex;
-    } while (selectedModeIndex >= modeCount);
+    uint32_t selectedModeIndex = 0;
+    // do {
+    //     std::cout << "Enter the index of the mode you want to use (0-" << modeCount - 1 << "): ";
+    //     std::cin >> selectedModeIndex;
+    // } while (selectedModeIndex >= modeCount);
 
     VkDisplayModeKHR displayMode = modeProperties[selectedModeIndex].displayMode;
 
@@ -193,6 +193,7 @@ void VulkanEngine::initDisplay()
     VK_CHECK_RESULT(
         vkCreateDisplayPlaneSurfaceKHR(_instance, &surfaceCreateInfo, nullptr, &_displaySurface)
     );
+    ASSERT(_displaySurface != VK_NULL_HANDLE);
 
     _surface = _displaySurface;
 
@@ -462,11 +463,10 @@ void VulkanEngine::checkEvenOddFrameSupport()
         );
     }
     VK_CHECK_RESULT(func(_device->physicalDevice, _surface, &capabilities));
-    return;
     bool hasVerticalBlankingCounter
-        = capabilities.supportedSurfaceCounters
-          & VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_BIT_EXT;
-    if (hasVerticalBlankingCounter) {
+        = (capabilities.supportedSurfaceCounters
+          & VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_BIT_EXT) != 0;
+    if (!hasVerticalBlankingCounter) {
         PANIC("Even-odd frame not supported!");
     }
 
@@ -480,7 +480,7 @@ void VulkanEngine::initVulkan()
     // this->createSurface();
     this->createDevice();
     this->initDisplay();
-    this->_device->InitQueueFamilyIndices(this->_surface);
+    this->_device->InitQueueFamilyIndices(this->_displaySurface);
     this->_device->CreateLogicalDeviceAndQueue(getRequiredDeviceExtensions());
     this->_device->CreateGraphicsCommandPool();
     this->_device->CreateGraphicsCommandBuffer(NUM_FRAME_IN_FLIGHT);
@@ -505,6 +505,7 @@ void VulkanEngine::initVulkan()
         );
     }
     if (_evenOddMode) {
+        DEBUG("Checking eve-odd frame device support...");
         checkEvenOddFrameSupport();
         setUpEvenOddFrame();
     }
@@ -1103,6 +1104,7 @@ void VulkanEngine::createRenderPass()
     colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     // colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
     colorAttachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL; // for imgui
+    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
     VkAttachmentReference colorAttachmentRef{};
     colorAttachmentRef.attachment = 0;
@@ -1240,6 +1242,7 @@ void VulkanEngine::flushEngineUBOStatic(uint8_t frame)
 
 void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
 {
+    DEBUG("being draw frame");
     EngineSynchronizationPrimitives& sync = _synchronizationPrimitives[frame];
 
     //  Wait for the previous frame to finish
@@ -1330,7 +1333,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
         CB.endRenderPass();
     }
 
-    _imguiManager.RecordCommandBuffer(ctx);
+    // _imguiManager.RecordCommandBuffer(ctx);
 
     // end command buffer
     CB.end();
@@ -1362,6 +1365,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
         // the submission does not start until vkAcquireNextImageKHR
         // returns, and downs the corresponding _semaRenderFinished
         // semapohre once it's done.
+        DEBUG("submitting to render queue");
         if (vkQueueSubmit(_device->graphicsQueue, 1, &submitInfo, sync.fenceInFlight)
             != VK_SUCCESS) {
             FATAL("Failed to submit draw command buffer!");
@@ -1372,10 +1376,9 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     VkPresentInfoKHR presentInfo{};
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 
-    // set up semaphore, so that  after submitting to the queue, we wait for
-    // the
+    // wait for sync.semaRenderFinished upped by the previous render command
     presentInfo.waitSemaphoreCount = 1;
-    presentInfo.pWaitSemaphores = signalSemaphores; // wait for render to finish before presenting
+    presentInfo.pWaitSemaphores = signalSemaphores;
 
     VkSwapchainKHR swapChains[] = {_swapChain};
     presentInfo.swapchainCount = 1;
@@ -1392,6 +1395,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
         [[unlikely]] this->recreateSwapChain();
         this->_framebufferResized = false;
     } 
+    // DEBUG("tick");
     VK_CHECK_RESULT(result);
 }
 
