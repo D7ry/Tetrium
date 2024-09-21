@@ -129,6 +129,7 @@ void VulkanEngine::initDisplay()
 
     _display = displays[selectedIndex];
 
+    DEBUG("Acquiring exclusive access to display...");
     // Acquire the display
     PFN_vkAcquireXlibDisplayEXT vkAcquireXlibDisplayEXT
         = reinterpret_cast<PFN_vkAcquireXlibDisplayEXT>(
@@ -136,8 +137,7 @@ void VulkanEngine::initDisplay()
         );
     ASSERT(vkAcquireXlibDisplayEXT);
 
-    VkResult result = vkAcquireXlibDisplayEXT(device, xDisplay, _display);
-    VK_CHECK_RESULT(result);
+    VK_CHECK_RESULT(vkAcquireXlibDisplayEXT(device, xDisplay, _display));
     // Get display mode properties
     uint32_t modeCount = 0;
     vkGetDisplayModePropertiesKHR(device, _display, &modeCount, nullptr);
