@@ -181,6 +181,7 @@ void VulkanEngine::selectDisplayDRM(DisplayContext& ctx)
 // select exclusive display using xlib
 void VulkanEngine::selectDisplayXlib(DisplayContext& ctx)
 {
+    using namespace fmt;
     auto device = _device->physicalDevice;
     // Get the X11 display name for the selected Vulkan display
     PFN_vkGetRandROutputDisplayEXT vkGetRandROutputDisplayEXT
@@ -216,18 +217,17 @@ void VulkanEngine::selectDisplayXlib(DisplayContext& ctx)
         XRRFreeScreenResources(resources);
     }
 
+    println("============== Choose Display ===============");
+
     for (size_t i = 0; i < displays.size(); ++i) {
         VkDisplayPropertiesKHR displayProperties;
-
-        std::cout << "Display " << i << ":\n";
-        std::cout << "  Name: " << displayNames[i] << "\n";
+        println("[{}] {}", i, displayNames[i]);
     }
 
     // Prompt user for selection
     size_t selectedIndex = 0; // defaults to 1 for vulkan configurator
     do {
-        std::cout << "Enter the index of the display you want to use (0-" << displays.size() - 1
-                  << "): ";
+        print("Display({}-{}):", 0, displays.size() - 1);
         std::cin >> selectedIndex;
     } while (selectedIndex >= displays.size());
 
@@ -257,21 +257,32 @@ void VulkanEngine::initExclusiveDisplay(VulkanEngine::DisplayContext& ctx)
     std::vector<VkDisplayModePropertiesKHR> modeProperties(modeCount);
     vkGetDisplayModePropertiesKHR(device, ctx.display, &modeCount, modeProperties.data());
 
+    using namespace fmt;
     // List all modes for the selected display
-    std::cout << "Available Modes for selected display:\n";
+    println("\n============== Available Display Modes ==============");
+    println("{:<6} {:<20} {:<15}", "Index", "Resolution", "Refresh Rate");
+    println("{:<6} {:<20} {:<15}", "-----", "----------", "------------");
+
     for (uint32_t i = 0; i < modeCount; ++i) {
-        std::cout << "Index: " << i
-                  << ", Resolution: " << modeProperties[i].parameters.visibleRegion.width << "x"
-                  << modeProperties[i].parameters.visibleRegion.height
-                  << ", Refresh Rate: " << modeProperties[i].parameters.refreshRate << " Hz"
-                  << std::endl;
+        const auto& mode = modeProperties[i].parameters;
+        println(
+            "{:<6} {:<20} {:<15.2f} Hz",
+            i,
+            fmt::format("{}x{}", mode.visibleRegion.width, mode.visibleRegion.height),
+            static_cast<float>(mode.refreshRate) / 1000.0f
+        );
     }
 
     // Get user input for mode selection
     uint32_t selectedModeIndex = 0;
     do {
-        std::cout << "Enter the index of the mode you want to use (0-" << modeCount - 1 << "): ";
+        println("\nPlease enter the index of the mode you want to use (0-{}):", modeCount - 1);
+        print("> ");
         std::cin >> selectedModeIndex;
+
+        if (selectedModeIndex >= modeCount) {
+            println("Invalid selection. Please try again.");
+        }
     } while (selectedModeIndex >= modeCount);
 
     VkDisplayModeKHR displayMode = modeProperties[selectedModeIndex].displayMode;

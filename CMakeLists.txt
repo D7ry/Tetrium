@@ -96,19 +96,16 @@ if (UNIX)
 # linux
     find_package(Vulkan REQUIRED)
     find_package(X11 REQUIRED)
-    find_package(XCB REQUIRED)
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(DRM REQUIRED libdrm)
     include_directories(${DRM_INCLUDE_DIRS})
     target_link_libraries(${PROJECT_NAME} Vulkan::Vulkan
         ${X11_LIBRARIES}
-        ${XCB_LIBRARIES}
         ${DRM_LIBRARIES}
         Xrandr
     )
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DVK_USE_PLATFORM_XCB_KHR")
-    endif() # APPLE
 endif() # LINUX
+endif() # APPLE
 if (WIN32)
     set(VULKAN_SDK_PATH "C:/VulkanSDK/1.3.290.0")
     set(Vulkan_LIBRARY "${VULKAN_SDK_PATH}/Lib/vulkan-1.lib")
