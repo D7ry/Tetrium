@@ -596,7 +596,7 @@ void VulkanEngine::initVulkan()
     this->createImageViews(_mainProjectorSwapchain);
     this->createMainRenderPass(_mainProjectorSwapchain);
     this->createDepthBuffer(_mainProjectorSwapchain);
-    this->createSynchronizationObjects();
+    this->createSynchronizationObjects(_syncProjector);
     this->_imguiManager.InitializeRenderPass(
         this->_device->logicalDevice, _mainProjectorSwapchain.imageFormat
     );
@@ -1102,10 +1102,10 @@ void VulkanEngine::createImageViews(SwapChainContext& ctx)
     DEBUG("Image views created.");
 }
 
-void VulkanEngine::createSynchronizationObjects()
+void VulkanEngine::createSynchronizationObjects(std::array<EngineSynchronizationPrimitives, NUM_FRAME_IN_FLIGHT>& primitives)
 {
     DEBUG("Creating synchronization objects...");
-    ASSERT(_synchronizationPrimitives.size() == NUM_FRAME_IN_FLIGHT);
+    ASSERT(primitives.size() == NUM_FRAME_IN_FLIGHT);
 
     VkSemaphoreCreateInfo semaphoreInfo{};
     semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -1115,7 +1115,7 @@ void VulkanEngine::createSynchronizationObjects()
                                                     // bit so that the 1st frame
                                                     // can start right away
     for (size_t i = 0; i < NUM_FRAME_IN_FLIGHT; i++) {
-        EngineSynchronizationPrimitives& primitive = _synchronizationPrimitives[i];
+        EngineSynchronizationPrimitives& primitive = primitives[i];
         if (vkCreateSemaphore(
                 _device->logicalDevice, &semaphoreInfo, nullptr, &primitive.semaImageAvailable
             ) != VK_SUCCESS
@@ -1127,9 +1127,9 @@ void VulkanEngine::createSynchronizationObjects()
             FATAL("Failed to create synchronization objects for a frame!");
         }
     }
-    this->_deletionStack.push([this]() {
+    this->_deletionStack.push([this, primitives]() {
         for (size_t i = 0; i < NUM_FRAME_IN_FLIGHT; i++) {
-            EngineSynchronizationPrimitives& primitive = _synchronizationPrimitives[i];
+            const EngineSynchronizationPrimitives& primitive = primitives[i];
             vkDestroySemaphore(this->_device->logicalDevice, primitive.semaRenderFinished, nullptr);
             vkDestroySemaphore(this->_device->logicalDevice, primitive.semaImageAvailable, nullptr);
             vkDestroyFence(this->_device->logicalDevice, primitive.fenceInFlight, nullptr);
@@ -1299,9 +1299,10 @@ void VulkanEngine::flushEngineUBOStatic(uint8_t frame)
     memcpy(buf.bufferAddress, &ubo, sizeof(ubo));
 }
 
+#define POWER_ON_DISPLAY 0
 void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
 {
-
+#if POWER_ON_DISPLAY
     static bool poweredOn = false;
     if (false && !poweredOn) { // power display on, seems unnecessary
         poweredOn = true;
@@ -1318,7 +1319,8 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
         VK_CHECK_RESULT(fnPtr(_device->logicalDevice, _mainProjectorDisplay.display, &powerInfo));
         std::this_thread::sleep_for(std::chrono::seconds(5));
     }
-    EngineSynchronizationPrimitives& sync = _synchronizationPrimitives[frame];
+#endif // POWER_ON_DISPLAY
+    EngineSynchronizationPrimitives& sync = _syncProjector[frame];
 
     //  Wait for the previous frame to finish
     PROFILE_SCOPE(&_profiler, "Render Tick");
