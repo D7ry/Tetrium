@@ -141,12 +141,12 @@ class VulkanEngine
     /* ---------- Initialization Subroutines ---------- */
     GLFWmonitor* cliMonitorSelection();
     void initGLFW(const InitOptions& options);
-    void initDisplayDRM();
-    void initDisplayXlib();
-    void initDisplay();
+    void selectDisplayDRM();
+    void selectDisplayXlib();
+    void initExclusiveDisplay();
     void initVulkan();
     void createInstance();
-    void createSurface();
+    void createGlfwWindowSurface();
     void createDevice();
     void createRenderPass(); // create main render pass
     void createFramebuffers();
@@ -211,28 +211,36 @@ class VulkanEngine
     );
 
     /* ---------- Top-level data ---------- */
+
+    VkDebugUtilsMessengerEXT _debugMessenger;
+
+    /* ---------- Prensentation ---------- */
+
     GLFWwindow* _window;
     VkInstance _instance;
-    VkSurfaceKHR _surface;
-    VkDebugUtilsMessengerEXT _debugMessenger;
+    [[maybe_unused]] VkSurfaceKHR _surface;
+
+    // device surface resources
+    VkExtent2D _displayExtent;
+    VkDisplayKHR _display;
+    VkSurfaceKHR _displaySurface;
+    uint32_t _displayPlaneIndex;
 
     /* ---------- swapchain ---------- */
     VkSwapchainKHR _swapChain = VK_NULL_HANDLE;
     VkFormat _swapChainImageFormat;
     VkExtent2D _swapChainExtent; // resolution of the swapchain images
 
-    /* ---------- display ---------- */
-    VkExtent2D _displayExtent;
-    VkDisplayKHR _display;
-    VkSurfaceKHR _displaySurface;
-    uint32_t _displayPlaneIndex;
-
-    struct
+    // each element corresponds to one image in the swap chain
+    struct SwapChainData
     {
         std::vector<VkFramebuffer> frameBuffer;
         std::vector<VkImage> image;
         std::vector<VkImageView> imageView;
-    } _swapChainData; // each element corresponds to one image in the swap chain
+    };
+
+    SwapChainData _projectorSwapchainData;
+    SwapChainData _controllerSwapchainData;
 
     /* ---------- Synchronization Primivites ---------- */
     struct EngineSynchronizationPrimitives

@@ -78,7 +78,7 @@ GLFWmonitor* VulkanEngine::cliMonitorSelection()
     return monitors[monitorIdx];
 }
 
-void VulkanEngine::initDisplayDRM()
+void VulkanEngine::selectDisplayDRM()
 {
     int drmFd = open("/dev/dri/card0", O_RDWR);
     if (drmFd < 0) {
@@ -161,7 +161,7 @@ void VulkanEngine::initDisplayDRM()
     close(drmFd);
 }
 
-void VulkanEngine::initDisplayXlib()
+void VulkanEngine::selectDisplayXlib()
 {
     auto device = _device->physicalDevice;
     // Get the X11 display name for the selected Vulkan display
@@ -214,23 +214,24 @@ void VulkanEngine::initDisplayXlib()
     } while (selectedIndex >= displays.size());
 
     _display = displays[selectedIndex];
-    if (1) { // acquire exclusive display access
-        DEBUG("Acquiring exclusive access to display...");
-        // Acquire the display
-        PFN_vkAcquireXlibDisplayEXT vkAcquireXlibDisplayEXT
-            = reinterpret_cast<PFN_vkAcquireXlibDisplayEXT>(
-                vkGetInstanceProcAddr(_instance, "vkAcquireXlibDisplayEXT")
-            );
-        ASSERT(vkAcquireXlibDisplayEXT);
 
-        VK_CHECK_RESULT(vkAcquireXlibDisplayEXT(device, xDisplay, _display));
-    }
+    DEBUG("Acquiring exclusive access to display...");
+    // Acquire the display
+    PFN_vkAcquireXlibDisplayEXT vkAcquireXlibDisplayEXT
+        = reinterpret_cast<PFN_vkAcquireXlibDisplayEXT>(
+            vkGetInstanceProcAddr(_instance, "vkAcquireXlibDisplayEXT")
+        );
+    ASSERT(vkAcquireXlibDisplayEXT);
+
+    VK_CHECK_RESULT(vkAcquireXlibDisplayEXT(device, xDisplay, _display));
 }
 
-void VulkanEngine::initDisplay()
+// take complete control over a physical display
+// the display must be directly connected to the GPU through x11
+// prompts the user to select the display and resolution in an ImGui window
+void VulkanEngine::initExclusiveDisplay()
 {
-    //initDisplayDRM();
-    initDisplayXlib();
+    selectDisplayXlib();
 
     auto device = _device->physicalDevice;
     uint32_t modeCount = 0;
@@ -299,7 +300,7 @@ void VulkanEngine::initDisplay()
     );
     ASSERT(_displaySurface != VK_NULL_HANDLE);
 
-    _surface = _displaySurface;
+    _deletionStack.push([this]() { vkDestroySurfaceKHR(_instance, _displaySurface, nullptr); });
 
     // Store the display properties for later use
     _displayExtent = modeProperties[selectedModeIndex].parameters.visibleRegion;
@@ -381,28 +382,27 @@ void VulkanEngine::Init(const VulkanEngine::InitOptions& options)
 #if __APPLE__
     MoltenVKConfig::Setup();
 #endif // __APPLE__
-    // initGLFW(options);
-    // { // Input Handling
-    //     auto keyCallback = [](GLFWwindow* window, int key, int scancode, int action, int mods) {
-    //         VulkanEngine* pThis =
-    //         reinterpret_cast<VulkanEngine*>(glfwGetWindowUserPointer(window)); if (key ==
-    //         GLFW_KEY_P && action == GLFW_PRESS) {
-    //             pThis->_paused = !pThis->_paused;
-    //         }
-    //         pThis->_inputManager.OnKeyInput(window, key, scancode, action, mods);
-    //     };
-    //     glfwSetKeyCallback(this->_window, keyCallback);
-    //     // don't have a mouse input manager yet, so manually bind cursor pos
-    //     // callback
-    //     auto cursorPosCallback = [](GLFWwindow* window, double xpos, double ypos) {
-    //         VulkanEngine* pThis =
-    //         reinterpret_cast<VulkanEngine*>(glfwGetWindowUserPointer(window));
-    //         pThis->cursorPosCallback(window, xpos, ypos);
-    //     };
-    //     glfwSetCursorPosCallback(this->_window, cursorPosCallback);
-    //     bindDefaultInputs();
-    // }
+    initGLFW(options);
+    { // Input Handling
+        auto keyCallback = [](GLFWwindow* window, int key, int scancode, int action, int mods) {
+            VulkanEngine* pThis = reinterpret_cast<VulkanEngine*>(glfwGetWindowUserPointer(window));
+            if (key == GLFW_KEY_P && action == GLFW_PRESS) {
+                pThis->_paused = !pThis->_paused;
+            }
+            pThis->_inputManager.OnKeyInput(window, key, scancode, action, mods);
+        };
+        glfwSetKeyCallback(this->_window, keyCallback);
+        // don't have a mouse input manager yet, so manually bind cursor pos
+        // callback
+        auto cursorPosCallback = [](GLFWwindow* window, double xpos, double ypos) {
+            VulkanEngine* pThis = reinterpret_cast<VulkanEngine*>(glfwGetWindowUserPointer(window));
+            pThis->cursorPosCallback(window, xpos, ypos);
+        };
+        glfwSetCursorPosCallback(this->_window, cursorPosCallback);
+        bindDefaultInputs();
+    }
 
+    // frame buffer never resizes, so no need for callback
     // glfwSetFramebufferSizeCallback(_window, this->framebufferResizeCallback);
     this->initVulkan();
     _textureManager.Init(_device);
@@ -456,11 +456,8 @@ void VulkanEngine::Init(const VulkanEngine::InitOptions& options)
 
 void VulkanEngine::Run()
 {
-    // while (!glfwWindowShouldClose(_window)) {
-    //     glfwPollEvents();
-    //     Tick();
-    // }
-    while (1) {
+    while (!glfwWindowShouldClose(_window)) {
+        glfwPollEvents();
         Tick();
     }
 }
@@ -581,7 +578,7 @@ void VulkanEngine::initVulkan()
     this->createInstance();
     // this->createSurface();
     this->createDevice();
-    this->initDisplay();
+    this->initExclusiveDisplay();
     this->_device->InitQueueFamilyIndices(this->_displaySurface);
     this->_device->CreateLogicalDeviceAndQueue(getRequiredDeviceExtensions());
     this->_device->CreateGraphicsCommandPool();
@@ -604,7 +601,7 @@ void VulkanEngine::initVulkan()
             _device->logicalDevice,
             _device->queueFamilyIndices.graphicsFamily.value(),
             _device->graphicsQueue,
-            _swapChainData.frameBuffer.size()
+            _projectorSwapchainData.frameBuffer.size()
         );
     }
     if (_evenOddMode) {
@@ -673,13 +670,13 @@ void VulkanEngine::createInstance()
 
     std::vector<const char*> instanceExtensions = DEFAULT_INSTANCE_EXTENSIONS;
     // get glfw Extensions
-    // {
-    //     uint32_t glfwExtensionCount = 0;
-    //     const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-    //     for (int i = 0; i < glfwExtensionCount; i++) {
-    //         instanceExtensions.push_back(glfwExtensions[i]);
-    //     }
-    // }
+    {
+        uint32_t glfwExtensionCount = 0;
+        const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+        for (int i = 0; i < glfwExtensionCount; i++) {
+            instanceExtensions.push_back(glfwExtensions[i]);
+        }
+    }
 // https://stackoverflow.com/questions/72789012/why-does-vkcreateinstance-return-vk-error-incompatible-driver-on-macos-despite
 #if __APPLE__
     // enable extensions for apple vulkan translation
@@ -740,8 +737,9 @@ void VulkanEngine::createInstance()
     INFO("Vulkan instance created.");
 }
 
-void VulkanEngine::createSurface()
+void VulkanEngine::createGlfwWindowSurface()
 {
+    NEEDS_IMPLEMENTATION();
     VkResult result
         = glfwCreateWindowSurface(this->_instance, this->_window, nullptr, &this->_surface);
     if (result != VK_SUCCESS) {
@@ -974,29 +972,29 @@ void VulkanEngine::createSwapChain()
     createInfo.clipped = VK_TRUE;
 
     createInfo.oldSwapchain = VK_NULL_HANDLE;
-    //
-    // VkSwapchainCounterCreateInfoEXT swapChainCounterCreateInfo{
-    //     .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_COUNTER_CREATE_INFO_EXT,
-    //     .pNext = NULL,
-    //     .surfaceCounters = VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_BIT_EXT};
-    //
-    // if (_evenOddMode) {
-    //     DEBUG("swapchain created with counter support!");
-    //     swapChainCounterCreateInfo.pNext = createInfo.pNext;
-    //     createInfo.pNext = &swapChainCounterCreateInfo;
-    // }
+
+    VkSwapchainCounterCreateInfoEXT swapChainCounterCreateInfo{
+        .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_COUNTER_CREATE_INFO_EXT,
+        .pNext = NULL,
+        .surfaceCounters = VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_BIT_EXT};
+
+    if (_evenOddMode) {
+        DEBUG("swapchain created with counter support!");
+        swapChainCounterCreateInfo.pNext = createInfo.pNext;
+        createInfo.pNext = &swapChainCounterCreateInfo;
+    }
 
     VK_CHECK_RESULT(
         vkCreateSwapchainKHR(this->_device->logicalDevice, &createInfo, nullptr, &_swapChain)
     );
 
     vkGetSwapchainImagesKHR(this->_device->logicalDevice, _swapChain, &imageCount, nullptr);
-    _swapChainData.image.resize(imageCount);
-    _swapChainData.imageView.resize(imageCount);
-    _swapChainData.frameBuffer.resize(imageCount);
+    _projectorSwapchainData.image.resize(imageCount);
+    _projectorSwapchainData.imageView.resize(imageCount);
+    _projectorSwapchainData.frameBuffer.resize(imageCount);
 
     vkGetSwapchainImagesKHR(
-        this->_device->logicalDevice, _swapChain, &imageCount, _swapChainData.image.data()
+        this->_device->logicalDevice, _swapChain, &imageCount, _projectorSwapchainData.image.data()
     );
 
     _swapChainImageFormat = surfaceFormat.format;
@@ -1012,10 +1010,10 @@ void VulkanEngine::cleanupSwapChain()
     vkFreeMemory(_device->logicalDevice, _depthImageMemory, nullptr);
 
     _imguiManager.DestroyFrameBuffers(_device->logicalDevice);
-    for (VkFramebuffer framebuffer : this->_swapChainData.frameBuffer) {
+    for (VkFramebuffer framebuffer : this->_projectorSwapchainData.frameBuffer) {
         vkDestroyFramebuffer(this->_device->logicalDevice, framebuffer, nullptr);
     }
-    for (VkImageView imageView : this->_swapChainData.imageView) {
+    for (VkImageView imageView : this->_projectorSwapchainData.imageView) {
         vkDestroyImageView(this->_device->logicalDevice, imageView, nullptr);
     }
     vkDestroySwapchainKHR(this->_device->logicalDevice, this->_swapChain, nullptr);
@@ -1128,10 +1126,10 @@ VkExtent2D VulkanEngine::chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabi
 
 void VulkanEngine::createImageViews()
 {
-    for (size_t i = 0; i < this->_swapChainData.image.size(); i++) {
+    for (size_t i = 0; i < this->_projectorSwapchainData.image.size(); i++) {
         VkImageViewCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        createInfo.image = _swapChainData.image[i];
+        createInfo.image = _projectorSwapchainData.image[i];
         createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
         createInfo.format = _swapChainImageFormat;
         createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -1144,7 +1142,10 @@ void VulkanEngine::createImageViews()
         createInfo.subresourceRange.baseArrayLayer = 0;
         createInfo.subresourceRange.layerCount = 1;
         if (vkCreateImageView(
-                this->_device->logicalDevice, &createInfo, nullptr, &_swapChainData.imageView[i]
+                this->_device->logicalDevice,
+                &createInfo,
+                nullptr,
+                &_projectorSwapchainData.imageView[i]
             )
             != VK_SUCCESS) {
             FATAL("Failed to create image views!");
@@ -1212,7 +1213,6 @@ void VulkanEngine::createRenderPass()
     colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     // colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
     colorAttachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL; // for imgui
-    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
     VkAttachmentReference colorAttachmentRef{};
     colorAttachmentRef.attachment = 0;
@@ -1280,8 +1280,8 @@ void VulkanEngine::createFramebuffers()
     if (_mainRenderPass == VK_NULL_HANDLE) {
         FATAL("Render pass is null!");
     }
-    for (size_t i = 0; i < _swapChainData.image.size(); i++) {
-        VkImageView attachments[] = {_swapChainData.imageView[i], _depthImageView};
+    for (size_t i = 0; i < _projectorSwapchainData.image.size(); i++) {
+        VkImageView attachments[] = {_projectorSwapchainData.imageView[i], _depthImageView};
         VkFramebufferCreateInfo framebufferInfo{};
         framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         framebufferInfo.renderPass = _mainRenderPass; // each framebuffer is associated with a
@@ -1294,16 +1294,19 @@ void VulkanEngine::createFramebuffers()
         framebufferInfo.height = _swapChainExtent.height;
         framebufferInfo.layers = 1; // number of layers in image arrays
         if (vkCreateFramebuffer(
-                _device->logicalDevice, &framebufferInfo, nullptr, &_swapChainData.frameBuffer[i]
+                _device->logicalDevice,
+                &framebufferInfo,
+                nullptr,
+                &_projectorSwapchainData.frameBuffer[i]
             )
             != VK_SUCCESS) {
             FATAL("Failed to create framebuffer!");
         }
     }
     _imguiManager.InitializeFrameBuffer(
-        this->_swapChainData.image.size(),
+        this->_projectorSwapchainData.image.size(),
         _device->logicalDevice,
-        _swapChainData.imageView,
+        _projectorSwapchainData.imageView,
         _swapChainExtent
     );
 }
@@ -1352,7 +1355,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
 {
 
     static bool poweredOn = false;
-    if (false && !poweredOn) {
+    if (false && !poweredOn) { // power display on, seems unnecessary
         poweredOn = true;
         // power on display
         DEBUG("Turning display on...");
@@ -1367,7 +1370,6 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
         VK_CHECK_RESULT(fnPtr(_device->logicalDevice, _display, &powerInfo));
         std::this_thread::sleep_for(std::chrono::seconds(5));
     }
-    DEBUG("being draw frame");
     EngineSynchronizationPrimitives& sync = _synchronizationPrimitives[frame];
 
     //  Wait for the previous frame to finish
@@ -1380,6 +1382,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
         VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_EXT,
         &_surfaceCounterValue
     );
+    // DEBUG("{}", _surfaceCounterValue);
 
     //  Acquire an image from the swap chain
     uint32_t imageIndex;
@@ -1402,11 +1405,10 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
         PANIC("Failed to acquire swap chain image: {}", res);
     }
 
-    DEBUG("drawing image index {}", imageIndex);
     // lock the fence
     vkResetFences(this->_device->logicalDevice, 1, &sync.fenceInFlight);
 
-    VkFramebuffer FB = this->_swapChainData.frameBuffer[imageIndex];
+    VkFramebuffer FB = this->_projectorSwapchainData.frameBuffer[imageIndex];
     vk::CommandBuffer CB(_device->graphicsCommandBuffers[frame]);
     //  Record a command buffer which draws the scene onto that image
     CB.reset();
@@ -1462,7 +1464,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
         CB.endRenderPass();
     }
 
-    // _imguiManager.RecordCommandBuffer(ctx);
+    _imguiManager.RecordCommandBuffer(ctx);
 
     // end command buffer
     CB.end();
@@ -1494,12 +1496,10 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
         // the submission does not start until vkAcquireNextImageKHR
         // returns, and downs the corresponding _semaRenderFinished
         // semapohre once it's done.
-        DEBUG("submitting to render queue");
         if (vkQueueSubmit(_device->graphicsQueue, 1, &submitInfo, sync.fenceInFlight)
             != VK_SUCCESS) {
             FATAL("Failed to submit draw command buffer!");
         }
-        DEBUG("submitted!");
     }
 
     //  Present the swap chain image
@@ -1525,7 +1525,6 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
         [[unlikely]] this->recreateSwapChain();
         this->_framebufferResized = false;
     }
-    // DEBUG("tick");
     VK_CHECK_RESULT(result);
 }
 
@@ -1542,6 +1541,7 @@ void VulkanEngine::drawImGui()
     }
     PROFILE_SCOPE(&_profiler, "ImGui Draw");
     _imguiManager.BeginImGuiContext();
+    ImGui::SetNextWindowPos({0, 0});
     if (ImGui::Begin("Vulkan Engine")) {
         if (ImGui::BeginTabBar("Engine Tab")) {
             if (ImGui::BeginTabItem("General")) {
