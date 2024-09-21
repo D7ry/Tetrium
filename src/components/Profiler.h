@@ -7,7 +7,7 @@
 class Profiler
 {
   public:
-#if __LINUX__
+#ifdef __linux__
     using TimeUnit = std::chrono::time_point<
     std::chrono::system_clock,
     std::chrono::duration<long, std::ratio<1, 1000000000>>>;

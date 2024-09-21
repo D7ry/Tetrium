@@ -28,6 +28,10 @@
 
 #include "VulkanEngine.h"
 
+#include <fcntl.h>
+#include <xf86drm.h>
+#include <xf86drmMode.h>
+
 // in CLI pop up a monitor selection interface, that lists
 // monitor names and properties
 // the user would input a number to select the right monitor.
@@ -74,133 +78,233 @@ GLFWmonitor* VulkanEngine::cliMonitorSelection()
     return monitors[monitorIdx];
 }
 
-void VulkanEngine::initDisplay()
+void VulkanEngine::selectDisplayDRM()
 {
-    //auto device = _device->physicalDevice;
+    int drmFd = open("/dev/dri/card0", O_RDWR);
+    if (drmFd < 0) {
+        PANIC("Failed to open DRM device");
+    }
 
-    //// Get the X11 display name for the selected Vulkan display
-    //PFN_vkGetRandROutputDisplayEXT vkGetRandROutputDisplayEXT
-    //    = reinterpret_cast<PFN_vkGetRandROutputDisplayEXT>(
-    //        vkGetInstanceProcAddr(_instance, "vkGetRandROutputDisplayEXT")
-    //    );
-    //ASSERT(vkGetRandROutputDisplayEXT);
+    ASSERT(drmSetMaster(drmFd) == 0);
 
-    //Display* xDisplay = XOpenDisplay(NULL);
-    //ASSERT(xDisplay);
+    drmModeRes* resources = drmModeGetResources(drmFd);
+    if (!resources) {
+        PANIC("Failed to get DRM resources");
+    }
 
-    //int screenCount = ScreenCount(xDisplay);
-    //std::vector<VkDisplayKHR> displays;
-    //std::vector<std::string> displayNames;
-    //for (int i = 0; i < screenCount; ++i) {
-    //    Screen* screen = ScreenOfDisplay(xDisplay, i);
-    //    Window root = RootWindowOfScreen(screen);
-    //    XRRScreenResources* resources = XRRGetScreenResources(xDisplay, root);
+    printf("Available displays:\n");
+    for (int i = 0; i < resources->count_connectors; i++) {
+        drmModeConnector* connector = drmModeGetConnector(drmFd, resources->connectors[i]);
+        if (connector) {
+            printf(
+                "%d: (ID: %d, Status: %s",
+                i + 1,
+                connector->connector_id,
+                (connector->connection == DRM_MODE_CONNECTED) ? "Connected" : "Disconnected"
+            );
 
-    //    for (int j = 0; j < resources->noutput; ++j) {
-    //        RROutput output = resources->outputs[j];
-    //        VkDisplayKHR display;
-    //        VkResult result = vkGetRandROutputDisplayEXT(device, xDisplay, output, &display);
-    //        if (result == VK_SUCCESS) {
-    //            // display display properties
-    //            displays.push_back(display);
-    //            XRROutputInfo* outputInfo = XRRGetOutputInfo(xDisplay, resources, output);
-    //            displayNames.push_back(outputInfo->name);
-    //            XRRFreeOutputInfo(outputInfo);
-    //        }
-    //    }
+            if (connector->connection == DRM_MODE_CONNECTED && connector->count_modes > 0) {
+                drmModeModeInfo mode = connector->modes[0]; // Using the first mode
+                printf(", Size: %dx%d", mode.hdisplay, mode.vdisplay);
+            }
+            printf(")\n");
 
-    //    XRRFreeScreenResources(resources);
-    //}
+            drmModeFreeConnector(connector);
+        }
+    }
 
-    //for (size_t i = 0; i < displays.size(); ++i) {
-    //    VkDisplayPropertiesKHR displayProperties;
+    int choice;
+    do {
+        printf("Enter the number of the display you want to use: ");
+        if (scanf("%d", &choice) != 1 || choice < 1 || choice > resources->count_connectors) {
+            printf("Invalid input. Please try again.\n");
+            while (getchar() != '\n')
+                ; // Clear input buffer
+        } else {
+            break;
+        }
+    } while (1);
 
-    //    std::cout << "Display " << i << ":\n";
-    //    std::cout << "  Name: " << displayNames[i] << "\n";
-    //}
+    drmModeConnector* selectedConnector
+        = drmModeGetConnector(drmFd, resources->connectors[choice - 1]);
+    if (!selectedConnector) {
+        PANIC("Failed to get selected connector");
+        drmModeFreeResources(resources);
+        close(drmFd);
+    }
 
-    //// Prompt user for selection
-    //size_t selectedIndex;
-    //do {
-    //    std::cout << "Enter the index of the display you want to use (0-" << displays.size() - 1
-    //              << "): ";
-    //    std::cin >> selectedIndex;
-    //} while (selectedIndex >= displays.size());
+    uint32_t connectorId = selectedConnector->connector_id;
+    printf("Selected display: (ID: %d", connectorId);
 
-    //_display = displays[selectedIndex];
+    if (selectedConnector->connection == DRM_MODE_CONNECTED && selectedConnector->count_modes > 0) {
+        drmModeModeInfo mode = selectedConnector->modes[0]; // Using the first mode
+        printf(", Size: %dx%d", mode.hdisplay, mode.vdisplay);
+    }
+    printf(")\n");
 
-    //// Acquire the display
-    //PFN_vkAcquireXlibDisplayEXT vkAcquireXlibDisplayEXT
-    //    = reinterpret_cast<PFN_vkAcquireXlibDisplayEXT>(
-    //        vkGetInstanceProcAddr(_instance, "vkAcquireXlibDisplayEXT")
-    //    );
-    //ASSERT(vkAcquireXlibDisplayEXT);
+    // get the VkDisplayKHR object from drm display
+    PFN_vkGetDrmDisplayEXT fnPtr = reinterpret_cast<PFN_vkGetDrmDisplayEXT>(
+        vkGetInstanceProcAddr(_instance, "vkGetDrmDisplayEXT")
+    );
+    ASSERT(fnPtr);
+    VK_CHECK_RESULT(fnPtr(_device->physicalDevice, drmFd, connectorId, &_display));
+    ASSERT(_display);
 
-    //VkResult result = vkAcquireXlibDisplayEXT(device, xDisplay, _display);
-    //VK_CHECK_RESULT(result);
-    //// Get display mode properties
-    //uint32_t modeCount = 0;
-    //vkGetDisplayModePropertiesKHR(device, _display, &modeCount, nullptr);
-    //std::vector<VkDisplayModePropertiesKHR> modeProperties(modeCount);
-    //vkGetDisplayModePropertiesKHR(device, _display, &modeCount, modeProperties.data());
+    PFN_vkAcquireDrmDisplayEXT fnPtr2 = reinterpret_cast<PFN_vkAcquireDrmDisplayEXT>(
+        vkGetInstanceProcAddr(_instance, "vkAcquireDrmDisplayEXT")
+    );
+    ASSERT(fnPtr2);
+    VK_CHECK_RESULT(fnPtr2(_device->physicalDevice, drmFd, _display));
 
-    //// List all modes for the selected display
-    //std::cout << "Available Modes for selected display:\n";
-    //for (uint32_t i = 0; i < modeCount; ++i) {
-    //    std::cout << "Index: " << i
-    //              << ", Resolution: " << modeProperties[i].parameters.visibleRegion.width << "x"
-    //              << modeProperties[i].parameters.visibleRegion.height
-    //              << ", Refresh Rate: " << modeProperties[i].parameters.refreshRate << " Hz"
-    //              << std::endl;
-    //}
+    drmModeFreeConnector(selectedConnector);
+    drmModeFreeResources(resources);
+    close(drmFd);
+}
 
-    //// Get user input for mode selection
-    //uint32_t selectedModeIndex;
-    //do {
-    //    std::cout << "Enter the index of the mode you want to use (0-" << modeCount - 1 << "): ";
-    //    std::cin >> selectedModeIndex;
-    //} while (selectedModeIndex >= modeCount);
+void VulkanEngine::selectDisplayXlib()
+{
+    auto device = _device->physicalDevice;
+    // Get the X11 display name for the selected Vulkan display
+    PFN_vkGetRandROutputDisplayEXT vkGetRandROutputDisplayEXT
+        = reinterpret_cast<PFN_vkGetRandROutputDisplayEXT>(
+            vkGetInstanceProcAddr(_instance, "vkGetRandROutputDisplayEXT")
+        );
+    ASSERT(vkGetRandROutputDisplayEXT);
 
-    //VkDisplayModeKHR displayMode = modeProperties[selectedModeIndex].displayMode;
+    Display* xDisplay = XOpenDisplay(NULL);
+    ASSERT(xDisplay);
 
-    //// Find a compatible plane
-    //uint32_t planeCount = 0;
-    //vkGetPhysicalDeviceDisplayPlanePropertiesKHR(device, &planeCount, nullptr);
-    //for (uint32_t i = 0; i < planeCount; i++) {
-    //    uint32_t displayCount = 0;
-    //    vkGetDisplayPlaneSupportedDisplaysKHR(device, i, &displayCount, nullptr);
-    //    if (displayCount > 0) {
-    //        std::vector<VkDisplayKHR> displays(displayCount);
-    //        vkGetDisplayPlaneSupportedDisplaysKHR(device, i, &displayCount, displays.data());
-    //        if (std::find(displays.begin(), displays.end(), _display) != displays.end()) {
-    //            _displayPlaneIndex = i;
-    //            break;
-    //        }
-    //    }
-    //}
+    int screenCount = ScreenCount(xDisplay);
+    std::vector<VkDisplayKHR> displays;
+    std::vector<std::string> displayNames;
+    for (int i = 0; i < screenCount; ++i) {
+        Screen* screen = ScreenOfDisplay(xDisplay, i);
+        Window root = RootWindowOfScreen(screen);
+        XRRScreenResources* resources = XRRGetScreenResources(xDisplay, root);
 
-    //// Create display surface
-    //VkDisplaySurfaceCreateInfoKHR surfaceCreateInfo = {};
-    //surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_DISPLAY_SURFACE_CREATE_INFO_KHR;
-    //surfaceCreateInfo.displayMode = displayMode;
-    //surfaceCreateInfo.planeIndex = _displayPlaneIndex;
-    //surfaceCreateInfo.planeStackIndex = 0;
-    //surfaceCreateInfo.transform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
-    //surfaceCreateInfo.globalAlpha = 1.0f;
-    //surfaceCreateInfo.alphaMode = VK_DISPLAY_PLANE_ALPHA_OPAQUE_BIT_KHR;
-    //surfaceCreateInfo.imageExtent = modeProperties[selectedModeIndex].parameters.visibleRegion;
+        for (int j = 0; j < resources->noutput; ++j) {
+            RROutput output = resources->outputs[j];
+            VkDisplayKHR display;
+            VkResult result = vkGetRandROutputDisplayEXT(device, xDisplay, output, &display);
+            if (result == VK_SUCCESS) {
+                // display display properties
+                displays.push_back(display);
+                XRROutputInfo* outputInfo = XRRGetOutputInfo(xDisplay, resources, output);
+                displayNames.push_back(outputInfo->name);
+                XRRFreeOutputInfo(outputInfo);
+            }
+        }
 
-    //VK_CHECK_RESULT(
-    //    vkCreateDisplayPlaneSurfaceKHR(_instance, &surfaceCreateInfo, nullptr, &_displaySurface)
-    //);
+        XRRFreeScreenResources(resources);
+    }
 
-    //_surface = _displaySurface;
+    for (size_t i = 0; i < displays.size(); ++i) {
+        VkDisplayPropertiesKHR displayProperties;
 
-    //// Store the display properties for later use
-    //_displayExtent = modeProperties[selectedModeIndex].parameters.visibleRegion;
+        std::cout << "Display " << i << ":\n";
+        std::cout << "  Name: " << displayNames[i] << "\n";
+    }
 
-    //// Close X11 display
-    //XCloseDisplay(xDisplay);
+    // Prompt user for selection
+    size_t selectedIndex = 0; // defaults to 1 for vulkan configurator
+    do {
+        std::cout << "Enter the index of the display you want to use (0-" << displays.size() - 1
+                  << "): ";
+        std::cin >> selectedIndex;
+    } while (selectedIndex >= displays.size());
+
+    _display = displays[selectedIndex];
+
+    DEBUG("Acquiring exclusive access to display...");
+    // Acquire the display
+    PFN_vkAcquireXlibDisplayEXT vkAcquireXlibDisplayEXT
+        = reinterpret_cast<PFN_vkAcquireXlibDisplayEXT>(
+            vkGetInstanceProcAddr(_instance, "vkAcquireXlibDisplayEXT")
+        );
+    ASSERT(vkAcquireXlibDisplayEXT);
+
+    VK_CHECK_RESULT(vkAcquireXlibDisplayEXT(device, xDisplay, _display));
+}
+
+// take complete control over a physical display
+// the display must be directly connected to the GPU through x11
+// prompts the user to select the display and resolution in an ImGui window
+void VulkanEngine::initExclusiveDisplay()
+{
+    selectDisplayXlib();
+
+    auto device = _device->physicalDevice;
+    uint32_t modeCount = 0;
+    vkGetDisplayModePropertiesKHR(device, _display, &modeCount, nullptr);
+    std::vector<VkDisplayModePropertiesKHR> modeProperties(modeCount);
+    vkGetDisplayModePropertiesKHR(device, _display, &modeCount, modeProperties.data());
+
+    // List all modes for the selected display
+    std::cout << "Available Modes for selected display:\n";
+    for (uint32_t i = 0; i < modeCount; ++i) {
+        std::cout << "Index: " << i
+                  << ", Resolution: " << modeProperties[i].parameters.visibleRegion.width << "x"
+                  << modeProperties[i].parameters.visibleRegion.height
+                  << ", Refresh Rate: " << modeProperties[i].parameters.refreshRate << " Hz"
+                  << std::endl;
+    }
+
+    // Get user input for mode selection
+    uint32_t selectedModeIndex = 0;
+    do {
+        std::cout << "Enter the index of the mode you want to use (0-" << modeCount - 1 << "): ";
+        std::cin >> selectedModeIndex;
+    } while (selectedModeIndex >= modeCount);
+
+    VkDisplayModeKHR displayMode = modeProperties[selectedModeIndex].displayMode;
+
+    // Find a compatible plane
+    bool foundPlaneIndex = false;
+    uint32_t planeCount = 0;
+    uint32_t stackIndex = 0;
+    vkGetPhysicalDeviceDisplayPlanePropertiesKHR(device, &planeCount, nullptr);
+    std::vector<VkDisplayPlanePropertiesKHR> planeProperties(planeCount);
+    vkGetPhysicalDeviceDisplayPlanePropertiesKHR(device, &planeCount, planeProperties.data());
+
+    for (uint32_t i = 0; i < planeCount; i++) {
+        uint32_t displayCount = 0;
+        const VkDisplayPlanePropertiesKHR& planeProperty = planeProperties[i];
+        vkGetDisplayPlaneSupportedDisplaysKHR(device, i, &displayCount, nullptr);
+        if (displayCount > 0) {
+            std::vector<VkDisplayKHR> displays(displayCount);
+            vkGetDisplayPlaneSupportedDisplaysKHR(device, i, &displayCount, displays.data());
+            if (std::find(displays.begin(), displays.end(), _display) != displays.end()) {
+                _displayPlaneIndex = i;
+                stackIndex = planeProperty.currentStackIndex;
+                foundPlaneIndex = true;
+                break;
+            }
+        }
+    }
+    ASSERT(foundPlaneIndex);
+    DEBUG("plane index: {}; stack index: {}", _displayPlaneIndex, stackIndex);
+
+    // Create display surface
+    VkDisplaySurfaceCreateInfoKHR surfaceCreateInfo = {};
+    surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_DISPLAY_SURFACE_CREATE_INFO_KHR;
+    surfaceCreateInfo.displayMode = displayMode;
+    surfaceCreateInfo.planeIndex = _displayPlaneIndex;
+    surfaceCreateInfo.planeStackIndex = stackIndex;
+    surfaceCreateInfo.transform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+    surfaceCreateInfo.globalAlpha = 1.0f;
+    surfaceCreateInfo.alphaMode = VK_DISPLAY_PLANE_ALPHA_OPAQUE_BIT_KHR;
+    surfaceCreateInfo.imageExtent = modeProperties[selectedModeIndex].parameters.visibleRegion;
+
+    VK_CHECK_RESULT(
+        vkCreateDisplayPlaneSurfaceKHR(_instance, &surfaceCreateInfo, nullptr, &_displaySurface)
+    );
+    ASSERT(_displaySurface != VK_NULL_HANDLE);
+
+    _deletionStack.push([this]() { vkDestroySurfaceKHR(_instance, _displaySurface, nullptr); });
+
+    // Store the display properties for later use
+    _displayExtent = modeProperties[selectedModeIndex].parameters.visibleRegion;
+    DEBUG("display extent: {} {}", _displayExtent.width, _displayExtent.height);
 }
 
 void VulkanEngine::initGLFW(const InitOptions& options)
@@ -278,28 +382,27 @@ void VulkanEngine::Init(const VulkanEngine::InitOptions& options)
 #if __APPLE__
     MoltenVKConfig::Setup();
 #endif // __APPLE__
-    // initGLFW(options);
-    // { // Input Handling
-    //     auto keyCallback = [](GLFWwindow* window, int key, int scancode, int action, int mods) {
-    //         VulkanEngine* pThis =
-    //         reinterpret_cast<VulkanEngine*>(glfwGetWindowUserPointer(window)); if (key ==
-    //         GLFW_KEY_P && action == GLFW_PRESS) {
-    //             pThis->_paused = !pThis->_paused;
-    //         }
-    //         pThis->_inputManager.OnKeyInput(window, key, scancode, action, mods);
-    //     };
-    //     glfwSetKeyCallback(this->_window, keyCallback);
-    //     // don't have a mouse input manager yet, so manually bind cursor pos
-    //     // callback
-    //     auto cursorPosCallback = [](GLFWwindow* window, double xpos, double ypos) {
-    //         VulkanEngine* pThis =
-    //         reinterpret_cast<VulkanEngine*>(glfwGetWindowUserPointer(window));
-    //         pThis->cursorPosCallback(window, xpos, ypos);
-    //     };
-    //     glfwSetCursorPosCallback(this->_window, cursorPosCallback);
-    //     bindDefaultInputs();
-    // }
+    initGLFW(options);
+    { // Input Handling
+        auto keyCallback = [](GLFWwindow* window, int key, int scancode, int action, int mods) {
+            VulkanEngine* pThis = reinterpret_cast<VulkanEngine*>(glfwGetWindowUserPointer(window));
+            if (key == GLFW_KEY_P && action == GLFW_PRESS) {
+                pThis->_paused = !pThis->_paused;
+            }
+            pThis->_inputManager.OnKeyInput(window, key, scancode, action, mods);
+        };
+        glfwSetKeyCallback(this->_window, keyCallback);
+        // don't have a mouse input manager yet, so manually bind cursor pos
+        // callback
+        auto cursorPosCallback = [](GLFWwindow* window, double xpos, double ypos) {
+            VulkanEngine* pThis = reinterpret_cast<VulkanEngine*>(glfwGetWindowUserPointer(window));
+            pThis->cursorPosCallback(window, xpos, ypos);
+        };
+        glfwSetCursorPosCallback(this->_window, cursorPosCallback);
+        bindDefaultInputs();
+    }
 
+    // frame buffer never resizes, so no need for callback
     // glfwSetFramebufferSizeCallback(_window, this->framebufferResizeCallback);
     this->initVulkan();
     _textureManager.Init(_device);
@@ -353,11 +456,8 @@ void VulkanEngine::Init(const VulkanEngine::InitOptions& options)
 
 void VulkanEngine::Run()
 {
-    // while (!glfwWindowShouldClose(_window)) {
-    //     glfwPollEvents();
-    //     Tick();
-    // }
-    while (1) {
+    while (!glfwWindowShouldClose(_window)) {
+        glfwPollEvents();
         Tick();
     }
 }
@@ -451,8 +551,7 @@ void VulkanEngine::checkEvenOddFrameSupport()
     }
 
     VkSurfaceCapabilities2EXT capabilities{
-        .sType = VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES_2_EXT, .pNext = VK_NULL_HANDLE
-    };
+        .sType = VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES_2_EXT, .pNext = VK_NULL_HANDLE};
 
     auto func = (PFN_vkGetPhysicalDeviceSurfaceCapabilities2EXT
     )vkGetInstanceProcAddr(_instance, "vkGetPhysicalDeviceSurfaceCapabilities2EXT");
@@ -461,12 +560,12 @@ void VulkanEngine::checkEvenOddFrameSupport()
             "Failed to find function pointer to {}", "vkGetPhysicalDeviceSurfaceCapabilities2EXT"
         );
     }
-    VK_CHECK_RESULT(func(_device->physicalDevice, _surface, &capabilities));
-    return;
+    VK_CHECK_RESULT(func(_device->physicalDevice, _displaySurface, &capabilities));
     bool hasVerticalBlankingCounter
-        = capabilities.supportedSurfaceCounters
-          & VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_BIT_EXT;
-    if (hasVerticalBlankingCounter) {
+        = (capabilities.supportedSurfaceCounters
+           & VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_BIT_EXT)
+          != 0;
+    if (!hasVerticalBlankingCounter) {
         PANIC("Even-odd frame not supported!");
     }
 
@@ -479,11 +578,12 @@ void VulkanEngine::initVulkan()
     this->createInstance();
     // this->createSurface();
     this->createDevice();
-    this->initDisplay();
-    this->_device->InitQueueFamilyIndices(this->_surface);
+    this->initExclusiveDisplay();
+    this->_device->InitQueueFamilyIndices(this->_displaySurface);
     this->_device->CreateLogicalDeviceAndQueue(getRequiredDeviceExtensions());
     this->_device->CreateGraphicsCommandPool();
     this->_device->CreateGraphicsCommandBuffer(NUM_FRAME_IN_FLIGHT);
+
     this->initSwapChain();
     this->createImageViews();
     this->createRenderPass();
@@ -501,14 +601,16 @@ void VulkanEngine::initVulkan()
             _device->logicalDevice,
             _device->queueFamilyIndices.graphicsFamily.value(),
             _device->graphicsQueue,
-            _swapChainData.frameBuffer.size()
+            _projectorSwapchainData.frameBuffer.size()
         );
     }
     if (_evenOddMode) {
+        DEBUG("Checking eve-odd frame device support...");
         checkEvenOddFrameSupport();
         setUpEvenOddFrame();
     }
     this->_deletionStack.push([this]() { this->_imguiManager.Cleanup(_device->logicalDevice); });
+
     INFO("Vulkan initialized.");
 }
 
@@ -568,13 +670,13 @@ void VulkanEngine::createInstance()
 
     std::vector<const char*> instanceExtensions = DEFAULT_INSTANCE_EXTENSIONS;
     // get glfw Extensions
-    // {
-    //     uint32_t glfwExtensionCount = 0;
-    //     const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-    //     for (int i = 0; i < glfwExtensionCount; i++) {
-    //         instanceExtensions.push_back(glfwExtensions[i]);
-    //     }
-    // }
+    {
+        uint32_t glfwExtensionCount = 0;
+        const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+        for (int i = 0; i < glfwExtensionCount; i++) {
+            instanceExtensions.push_back(glfwExtensions[i]);
+        }
+    }
 // https://stackoverflow.com/questions/72789012/why-does-vkcreateinstance-return-vk-error-incompatible-driver-on-macos-despite
 #if __APPLE__
     // enable extensions for apple vulkan translation
@@ -614,7 +716,7 @@ void VulkanEngine::createInstance()
 #ifndef NDEBUG
     // enable debug printing
     // VkValidationFeatureEnableEXT enabled[] = {VK_VALIDATION_FEATURE_ENABLE_DEBUG_PRINTF_EXT};
-    //VkValidationFeatureEnableEXT enabled[] = {};
+    // VkValidationFeatureEnableEXT enabled[] = {};
     VkValidationFeaturesEXT features{VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT};
     features.disabledValidationFeatureCount = 0;
     features.enabledValidationFeatureCount = 0;
@@ -635,8 +737,9 @@ void VulkanEngine::createInstance()
     INFO("Vulkan instance created.");
 }
 
-void VulkanEngine::createSurface()
+void VulkanEngine::createGlfwWindowSurface()
 {
+    NEEDS_IMPLEMENTATION();
     VkResult result
         = glfwCreateWindowSurface(this->_instance, this->_window, nullptr, &this->_surface);
     if (result != VK_SUCCESS) {
@@ -715,7 +818,9 @@ VulkanEngine::QueueFamilyIndices VulkanEngine::findQueueFamilies(VkPhysicalDevic
             indices.graphicsFamily = i;
             DEBUG("Graphics family found at {}", i);
         }
-        vkGetPhysicalDeviceSurfaceSupportKHR(device, i, this->_surface, &presentationSupport);
+        vkGetPhysicalDeviceSurfaceSupportKHR(
+            device, i, this->_displaySurface, &presentationSupport
+        );
         if (presentationSupport) {
             indices.presentationFamily = i;
             DEBUG("Presentation family found at {}", i);
@@ -871,8 +976,7 @@ void VulkanEngine::createSwapChain()
     VkSwapchainCounterCreateInfoEXT swapChainCounterCreateInfo{
         .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_COUNTER_CREATE_INFO_EXT,
         .pNext = NULL,
-        .surfaceCounters = VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_BIT_EXT
-    };
+        .surfaceCounters = VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_BIT_EXT};
 
     if (_evenOddMode) {
         DEBUG("swapchain created with counter support!");
@@ -885,12 +989,12 @@ void VulkanEngine::createSwapChain()
     );
 
     vkGetSwapchainImagesKHR(this->_device->logicalDevice, _swapChain, &imageCount, nullptr);
-    _swapChainData.image.resize(imageCount);
-    _swapChainData.imageView.resize(imageCount);
-    _swapChainData.frameBuffer.resize(imageCount);
+    _projectorSwapchainData.image.resize(imageCount);
+    _projectorSwapchainData.imageView.resize(imageCount);
+    _projectorSwapchainData.frameBuffer.resize(imageCount);
 
     vkGetSwapchainImagesKHR(
-        this->_device->logicalDevice, _swapChain, &imageCount, _swapChainData.image.data()
+        this->_device->logicalDevice, _swapChain, &imageCount, _projectorSwapchainData.image.data()
     );
 
     _swapChainImageFormat = surfaceFormat.format;
@@ -906,10 +1010,10 @@ void VulkanEngine::cleanupSwapChain()
     vkFreeMemory(_device->logicalDevice, _depthImageMemory, nullptr);
 
     _imguiManager.DestroyFrameBuffers(_device->logicalDevice);
-    for (VkFramebuffer framebuffer : this->_swapChainData.frameBuffer) {
+    for (VkFramebuffer framebuffer : this->_projectorSwapchainData.frameBuffer) {
         vkDestroyFramebuffer(this->_device->logicalDevice, framebuffer, nullptr);
     }
-    for (VkImageView imageView : this->_swapChainData.imageView) {
+    for (VkImageView imageView : this->_projectorSwapchainData.imageView) {
         vkDestroyImageView(this->_device->logicalDevice, imageView, nullptr);
     }
     vkDestroySwapchainKHR(this->_device->logicalDevice, this->_swapChain, nullptr);
@@ -956,6 +1060,7 @@ VulkanEngine::SwapChainSupportDetails VulkanEngine::querySwapChainSupport(VkPhys
 
     uint32_t presentModeCount;
     vkGetPhysicalDeviceSurfacePresentModesKHR(device, _displaySurface, &presentModeCount, nullptr);
+    DEBUG("present mode count: {}", presentModeCount);
 
     if (presentModeCount != 0) {
         details.presentModes.resize(presentModeCount);
@@ -985,7 +1090,9 @@ VkPresentModeKHR VulkanEngine::chooseSwapPresentMode(
     const std::vector<VkPresentModeKHR>& availablePresentModes
 )
 {
+    DEBUG("available present modes: ");
     for (const auto& availablePresentMode : availablePresentModes) {
+        DEBUG("{}", string_VkPresentModeKHR(availablePresentMode));
         if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
             return availablePresentMode;
         }
@@ -1019,10 +1126,10 @@ VkExtent2D VulkanEngine::chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabi
 
 void VulkanEngine::createImageViews()
 {
-    for (size_t i = 0; i < this->_swapChainData.image.size(); i++) {
+    for (size_t i = 0; i < this->_projectorSwapchainData.image.size(); i++) {
         VkImageViewCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        createInfo.image = _swapChainData.image[i];
+        createInfo.image = _projectorSwapchainData.image[i];
         createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
         createInfo.format = _swapChainImageFormat;
         createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -1035,7 +1142,10 @@ void VulkanEngine::createImageViews()
         createInfo.subresourceRange.baseArrayLayer = 0;
         createInfo.subresourceRange.layerCount = 1;
         if (vkCreateImageView(
-                this->_device->logicalDevice, &createInfo, nullptr, &_swapChainData.imageView[i]
+                this->_device->logicalDevice,
+                &createInfo,
+                nullptr,
+                &_projectorSwapchainData.imageView[i]
             )
             != VK_SUCCESS) {
             FATAL("Failed to create image views!");
@@ -1170,8 +1280,8 @@ void VulkanEngine::createFramebuffers()
     if (_mainRenderPass == VK_NULL_HANDLE) {
         FATAL("Render pass is null!");
     }
-    for (size_t i = 0; i < _swapChainData.image.size(); i++) {
-        VkImageView attachments[] = {_swapChainData.imageView[i], _depthImageView};
+    for (size_t i = 0; i < _projectorSwapchainData.image.size(); i++) {
+        VkImageView attachments[] = {_projectorSwapchainData.imageView[i], _depthImageView};
         VkFramebufferCreateInfo framebufferInfo{};
         framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         framebufferInfo.renderPass = _mainRenderPass; // each framebuffer is associated with a
@@ -1184,16 +1294,19 @@ void VulkanEngine::createFramebuffers()
         framebufferInfo.height = _swapChainExtent.height;
         framebufferInfo.layers = 1; // number of layers in image arrays
         if (vkCreateFramebuffer(
-                _device->logicalDevice, &framebufferInfo, nullptr, &_swapChainData.frameBuffer[i]
+                _device->logicalDevice,
+                &framebufferInfo,
+                nullptr,
+                &_projectorSwapchainData.frameBuffer[i]
             )
             != VK_SUCCESS) {
             FATAL("Failed to create framebuffer!");
         }
     }
     _imguiManager.InitializeFrameBuffer(
-        this->_swapChainData.image.size(),
+        this->_projectorSwapchainData.image.size(),
         _device->logicalDevice,
-        _swapChainData.imageView,
+        _projectorSwapchainData.imageView,
         _swapChainExtent
     );
 }
@@ -1240,6 +1353,23 @@ void VulkanEngine::flushEngineUBOStatic(uint8_t frame)
 
 void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
 {
+
+    static bool poweredOn = false;
+    if (false && !poweredOn) { // power display on, seems unnecessary
+        poweredOn = true;
+        // power on display
+        DEBUG("Turning display on...");
+        VkDisplayPowerInfoEXT powerInfo{
+            .sType = VK_STRUCTURE_TYPE_DISPLAY_POWER_INFO_EXT,
+            .pNext = VK_NULL_HANDLE,
+            .powerState = VkDisplayPowerStateEXT::VK_DISPLAY_POWER_STATE_ON_EXT};
+        PFN_vkDisplayPowerControlEXT fnPtr = reinterpret_cast<PFN_vkDisplayPowerControlEXT>(
+            vkGetInstanceProcAddr(_instance, "vkDisplayPowerControlEXT")
+        );
+        ASSERT(fnPtr);
+        VK_CHECK_RESULT(fnPtr(_device->logicalDevice, _display, &powerInfo));
+        std::this_thread::sleep_for(std::chrono::seconds(5));
+    }
     EngineSynchronizationPrimitives& sync = _synchronizationPrimitives[frame];
 
     //  Wait for the previous frame to finish
@@ -1252,6 +1382,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
         VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_EXT,
         &_surfaceCounterValue
     );
+    // DEBUG("{}", _surfaceCounterValue);
 
     //  Acquire an image from the swap chain
     uint32_t imageIndex;
@@ -1263,10 +1394,13 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
         VK_NULL_HANDLE,
         &imageIndex
     );
-    [[unlikely]] if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+    [[unlikely]] if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
+    {
         this->recreateSwapChain();
         return;
-    } else [[unlikely]] if (result != VK_SUCCESS) {
+    }
+    else [[unlikely]] if (result != VK_SUCCESS)
+    {
         const char* res = string_VkResult(result);
         PANIC("Failed to acquire swap chain image: {}", res);
     }
@@ -1274,7 +1408,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     // lock the fence
     vkResetFences(this->_device->logicalDevice, 1, &sync.fenceInFlight);
 
-    VkFramebuffer FB = this->_swapChainData.frameBuffer[imageIndex];
+    VkFramebuffer FB = this->_projectorSwapchainData.frameBuffer[imageIndex];
     vk::CommandBuffer CB(_device->graphicsCommandBuffers[frame]);
     //  Record a command buffer which draws the scene onto that image
     CB.reset();
@@ -1372,10 +1506,9 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     VkPresentInfoKHR presentInfo{};
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 
-    // set up semaphore, so that  after submitting to the queue, we wait for
-    // the
+    // wait for sync.semaRenderFinished upped by the previous render command
     presentInfo.waitSemaphoreCount = 1;
-    presentInfo.pWaitSemaphores = signalSemaphores; // wait for render to finish before presenting
+    presentInfo.pWaitSemaphores = signalSemaphores;
 
     VkSwapchainKHR swapChains[] = {_swapChain};
     presentInfo.swapchainCount = 1;
@@ -1391,7 +1524,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
         || this->_framebufferResized) {
         [[unlikely]] this->recreateSwapChain();
         this->_framebufferResized = false;
-    } 
+    }
     VK_CHECK_RESULT(result);
 }
 
@@ -1408,6 +1541,7 @@ void VulkanEngine::drawImGui()
     }
     PROFILE_SCOPE(&_profiler, "ImGui Draw");
     _imguiManager.BeginImGuiContext();
+    ImGui::SetNextWindowPos({0, 0});
     if (ImGui::Begin("Vulkan Engine")) {
         if (ImGui::BeginTabBar("Engine Tab")) {
             if (ImGui::BeginTabItem("General")) {

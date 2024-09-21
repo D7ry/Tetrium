@@ -36,6 +36,9 @@ set(GLM_INCLUDE extern/glm)
 # tinyobjloader
 set(TINY_OBJ_LOADER_INCLUDE extern/tinyobjloader)
 
+# modules
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+
 project(quarkolor)
 
 add_executable(${PROJECT_NAME}
@@ -78,21 +81,33 @@ target_include_directories(${PROJECT_NAME}
 target_precompile_headers(${PROJECT_NAME} PUBLIC src/PCH.h)
 
 # vulkan
-if(APPLE)
-    set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)
-    set(VULKAN_LIB_PATH $ENV{HOME}/lib/VulkanSDK/1.3.290.1/macOS/lib/libvulkan.1.3.290.dylib)
-    set(MOLTENVK_LIB_PATH $ENV{HOME}/lib/VulkanSDK/1.3.290.1/macOS/lib/libMoltenVK.dylib)
-    include_directories(~/lib/VulkanSDK/1.3.290.1/macOS/include)
-    target_link_libraries(${PROJECT_NAME} 
-        ${VULKAN_LIB_PATH}
-        ${MOLTENVK_LIB_PATH}
-    )
-    target_compile_definitions(${PROJECT_NAME} PRIVATE VK_USE_PLATFORM_MACOS_MVK)
-endif() # APPLE
-if (LINUX)
+if (UNIX)
+    if(APPLE)
+        set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)
+        set(VULKAN_LIB_PATH $ENV{HOME}/lib/VulkanSDK/1.3.290.1/macOS/lib/libvulkan.1.3.290.dylib)
+        set(MOLTENVK_LIB_PATH $ENV{HOME}/lib/VulkanSDK/1.3.290.1/macOS/lib/libMoltenVK.dylib)
+        include_directories(~/lib/VulkanSDK/1.3.290.1/macOS/include)
+        target_link_libraries(${PROJECT_NAME} 
+            ${VULKAN_LIB_PATH}
+            ${MOLTENVK_LIB_PATH}
+        )
+        target_compile_definitions(${PROJECT_NAME} PRIVATE VK_USE_PLATFORM_MACOS_MVK)
+    else()
+# linux
     find_package(Vulkan REQUIRED)
     find_package(X11 REQUIRED)
-    target_link_libraries(${PROJECT_NAME} Vulkan::Vulkan)
+    find_package(XCB REQUIRED)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(DRM REQUIRED libdrm)
+    include_directories(${DRM_INCLUDE_DIRS})
+    target_link_libraries(${PROJECT_NAME} Vulkan::Vulkan
+        ${X11_LIBRARIES}
+        ${XCB_LIBRARIES}
+        ${DRM_LIBRARIES}
+        Xrandr
+    )
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DVK_USE_PLATFORM_XCB_KHR")
+    endif() # APPLE
 endif() # LINUX
 if (WIN32)
     set(VULKAN_SDK_PATH "C:/VulkanSDK/1.3.290.0")
@@ -110,7 +125,6 @@ endif() # WIN32
 target_link_libraries(${PROJECT_NAME} 
     spdlog::spdlog 
     glfw
-
 )
 
 # debug flag for unix

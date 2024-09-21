@@ -6,3 +6,8 @@ https://forums.developer.nvidia.com/t/how-do-i-use-vkregisterdisplayeventext-to-
 
 maybe this is also helpful...
 https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_EXT_display_control.html
+
+## Requirements
+
+- NVIDIA GPU with support for `VK_EXT_display_surface_counter`
+- xcb
