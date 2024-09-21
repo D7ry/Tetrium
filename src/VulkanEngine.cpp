@@ -943,8 +943,8 @@ VkPhysicalDevice VulkanEngine::pickPhysicalDevice()
 void VulkanEngine::createSwapChain(VulkanEngine::SwapChainContext& ctx, const VkSurfaceKHR surface)
 {
     DEBUG("creating swapchain...");
-    SwapChainSupportDetails swapChainSupport
-        = queryPhysicalDeviceSwapchainSupportForSurface(surface);
+    ASSERT(_device);
+    VQDevice::SwapChainSupport swapChainSupport = _device->GetSwapChainSupportForSurface(surface);
     VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
     VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
     DEBUG("present mode: {}", string_VkPresentModeKHR(presentMode));
@@ -1054,39 +1054,6 @@ void VulkanEngine::recreateSwapChain(SwapChainContext& ctx)
     this->createDepthBuffer(ctx);
     this->createFramebuffers(ctx);
     DEBUG("Swap chain recreated.");
-}
-
-VulkanEngine::SwapChainSupportDetails VulkanEngine::queryPhysicalDeviceSwapchainSupportForSurface(
-    VkSurfaceKHR surface
-)
-{
-    VkPhysicalDevice device = _device->physicalDevice;
-    ASSERT(device);
-
-    SwapChainSupportDetails details;
-
-    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &details.capabilities);
-
-    uint32_t formatCount;
-    vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, nullptr);
-
-    if (formatCount != 0) {
-        details.formats.resize(formatCount);
-        vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, details.formats.data());
-    }
-
-    uint32_t presentModeCount;
-    vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, nullptr);
-    DEBUG("present mode count: {}", presentModeCount);
-
-    if (presentModeCount != 0) {
-        details.presentModes.resize(presentModeCount);
-        vkGetPhysicalDeviceSurfacePresentModesKHR(
-            device, surface, &presentModeCount, details.presentModes.data()
-        );
-    }
-
-    return details;
 }
 
 VkSurfaceFormatKHR VulkanEngine::chooseSwapSurfaceFormat(

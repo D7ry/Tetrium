@@ -127,12 +127,6 @@ class VulkanEngine
         std::optional<uint32_t> presentationFamily;
     };
 
-    struct SwapChainSupportDetails
-    {
-        VkSurfaceCapabilitiesKHR capabilities;
-        std::vector<VkSurfaceFormatKHR> formats;
-        std::vector<VkPresentModeKHR> presentModes;
-    };
 
     struct SwapChainContext
     {
@@ -156,6 +150,7 @@ class VulkanEngine
     };
 
     /* ---------- Initialization Subroutines ---------- */
+    [[deprecated]]
     GLFWmonitor* cliMonitorSelection();
     void initGLFW(const InitOptions& options);
 
@@ -182,7 +177,6 @@ class VulkanEngine
     const std::vector<const char*> getRequiredDeviceExtensions() const;
 
     /* ---------- Swapchain ---------- */
-    SwapChainSupportDetails queryPhysicalDeviceSwapchainSupportForSurface(VkSurfaceKHR surface);
     VkSurfaceFormatKHR chooseSwapSurfaceFormat(
         const std::vector<VkSurfaceFormatKHR>& availableFormats
     );
