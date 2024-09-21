@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <memory>
 #include <optional>
+#include <initializer_list>
 
 // vulkan
 #include <vulkan/vulkan.h>
@@ -12,11 +13,13 @@
 #include <vulkan/vulkan_beta.h> // VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME, for molten-vk support
 #endif
 
+#ifdef __LINUX__
 // linux
 #include "X11/Xlib.h"
 #include <X11/extensions/Xrandr.h>
 #include "vulkan/vulkan_xlib.h"
 #include "vulkan/vulkan_xlib_xrandr.h"
+#endif
 
 // vq library
 #include "lib/VQBuffer.h"
@@ -51,8 +54,10 @@ class VulkanEngine
         VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
 #endif // NDEBUG
         VK_EXT_DIRECT_MODE_DISPLAY_EXTENSION_NAME,
+#if __LINUX__
         VK_EXT_ACQUIRE_XLIB_DISPLAY_EXTENSION_NAME,
         VK_KHR_XLIB_SURFACE_EXTENSION_NAME,
+#endif // __LINUX__
         VK_KHR_SURFACE_EXTENSION_NAME,
         VK_KHR_DISPLAY_EXTENSION_NAME,
     };
@@ -80,7 +85,7 @@ class VulkanEngine
 
     // device extensions required for even-odd rendering
     // only tested on NVIDIA GPUs
-    static inline const std::vector<char*> EVEN_ODD_DEVICE_EXTENSIONS = {
+    static inline const std::vector<const char*> EVEN_ODD_DEVICE_EXTENSIONS = {
         // https://registry.khronos.org/VulkanSC/specs/1.0-extensions/man/html/VK_EXT_display_control.html
         VK_EXT_DISPLAY_CONTROL_EXTENSION_NAME,
     };

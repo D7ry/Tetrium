@@ -1,7 +1,6 @@
 #include "lib/VQBuffer.h"
 #include "TextureManager.h"
 #include "VulkanUtils.h"
-#include "lib/VQDevice.h"
 #include <stb_image.h>
 #include <vulkan/vulkan_core.h>
 

@@ -7,15 +7,15 @@
 class Profiler
 {
   public:
-#if __APPLE__
+#if __LINUX__
     using TimeUnit = std::chrono::time_point<
-        std::chrono::steady_clock,
-        std::chrono::duration<long, std::ratio<1, 1000000000>>>;
-#else
+    std::chrono::system_clock,
+    std::chrono::duration<long, std::ratio<1, 1000000000>>>;
+#else 
     using TimeUnit = std::chrono::time_point<
-        std::chrono::system_clock,
-        std::chrono::duration<long, std::ratio<1, 1000000000>>>;
-#endif // __APPLE__
+    std::chrono::steady_clock,
+    std::chrono::duration<long, std::ratio<1, 1000000000>>>;
+#endif
 
     struct Profling
     {

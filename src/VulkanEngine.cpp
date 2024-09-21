@@ -76,131 +76,131 @@ GLFWmonitor* VulkanEngine::cliMonitorSelection()
 
 void VulkanEngine::initDisplay()
 {
-    auto device = _device->physicalDevice;
+    //auto device = _device->physicalDevice;
 
-    // Get the X11 display name for the selected Vulkan display
-    PFN_vkGetRandROutputDisplayEXT vkGetRandROutputDisplayEXT
-        = reinterpret_cast<PFN_vkGetRandROutputDisplayEXT>(
-            vkGetInstanceProcAddr(_instance, "vkGetRandROutputDisplayEXT")
-        );
-    ASSERT(vkGetRandROutputDisplayEXT);
+    //// Get the X11 display name for the selected Vulkan display
+    //PFN_vkGetRandROutputDisplayEXT vkGetRandROutputDisplayEXT
+    //    = reinterpret_cast<PFN_vkGetRandROutputDisplayEXT>(
+    //        vkGetInstanceProcAddr(_instance, "vkGetRandROutputDisplayEXT")
+    //    );
+    //ASSERT(vkGetRandROutputDisplayEXT);
 
-    Display* xDisplay = XOpenDisplay(NULL);
-    ASSERT(xDisplay);
+    //Display* xDisplay = XOpenDisplay(NULL);
+    //ASSERT(xDisplay);
 
-    int screenCount = ScreenCount(xDisplay);
-    std::vector<VkDisplayKHR> displays;
-    std::vector<std::string> displayNames;
-    for (int i = 0; i < screenCount; ++i) {
-        Screen* screen = ScreenOfDisplay(xDisplay, i);
-        Window root = RootWindowOfScreen(screen);
-        XRRScreenResources* resources = XRRGetScreenResources(xDisplay, root);
+    //int screenCount = ScreenCount(xDisplay);
+    //std::vector<VkDisplayKHR> displays;
+    //std::vector<std::string> displayNames;
+    //for (int i = 0; i < screenCount; ++i) {
+    //    Screen* screen = ScreenOfDisplay(xDisplay, i);
+    //    Window root = RootWindowOfScreen(screen);
+    //    XRRScreenResources* resources = XRRGetScreenResources(xDisplay, root);
 
-        for (int j = 0; j < resources->noutput; ++j) {
-            RROutput output = resources->outputs[j];
-            VkDisplayKHR display;
-            VkResult result = vkGetRandROutputDisplayEXT(device, xDisplay, output, &display);
-            if (result == VK_SUCCESS) {
-                // display display properties
-                displays.push_back(display);
-                XRROutputInfo* outputInfo = XRRGetOutputInfo(xDisplay, resources, output);
-                displayNames.push_back(outputInfo->name);
-                XRRFreeOutputInfo(outputInfo);
-            }
-        }
+    //    for (int j = 0; j < resources->noutput; ++j) {
+    //        RROutput output = resources->outputs[j];
+    //        VkDisplayKHR display;
+    //        VkResult result = vkGetRandROutputDisplayEXT(device, xDisplay, output, &display);
+    //        if (result == VK_SUCCESS) {
+    //            // display display properties
+    //            displays.push_back(display);
+    //            XRROutputInfo* outputInfo = XRRGetOutputInfo(xDisplay, resources, output);
+    //            displayNames.push_back(outputInfo->name);
+    //            XRRFreeOutputInfo(outputInfo);
+    //        }
+    //    }
 
-        XRRFreeScreenResources(resources);
-    }
+    //    XRRFreeScreenResources(resources);
+    //}
 
-    for (size_t i = 0; i < displays.size(); ++i) {
-        VkDisplayPropertiesKHR displayProperties;
+    //for (size_t i = 0; i < displays.size(); ++i) {
+    //    VkDisplayPropertiesKHR displayProperties;
 
-        std::cout << "Display " << i << ":\n";
-        std::cout << "  Name: " << displayNames[i] << "\n";
-    }
+    //    std::cout << "Display " << i << ":\n";
+    //    std::cout << "  Name: " << displayNames[i] << "\n";
+    //}
 
-    // Prompt user for selection
-    size_t selectedIndex;
-    do {
-        std::cout << "Enter the index of the display you want to use (0-" << displays.size() - 1
-                  << "): ";
-        std::cin >> selectedIndex;
-    } while (selectedIndex >= displays.size());
+    //// Prompt user for selection
+    //size_t selectedIndex;
+    //do {
+    //    std::cout << "Enter the index of the display you want to use (0-" << displays.size() - 1
+    //              << "): ";
+    //    std::cin >> selectedIndex;
+    //} while (selectedIndex >= displays.size());
 
-    _display = displays[selectedIndex];
+    //_display = displays[selectedIndex];
 
-    // Acquire the display
-    PFN_vkAcquireXlibDisplayEXT vkAcquireXlibDisplayEXT
-        = reinterpret_cast<PFN_vkAcquireXlibDisplayEXT>(
-            vkGetInstanceProcAddr(_instance, "vkAcquireXlibDisplayEXT")
-        );
-    ASSERT(vkAcquireXlibDisplayEXT);
+    //// Acquire the display
+    //PFN_vkAcquireXlibDisplayEXT vkAcquireXlibDisplayEXT
+    //    = reinterpret_cast<PFN_vkAcquireXlibDisplayEXT>(
+    //        vkGetInstanceProcAddr(_instance, "vkAcquireXlibDisplayEXT")
+    //    );
+    //ASSERT(vkAcquireXlibDisplayEXT);
 
-    VkResult result = vkAcquireXlibDisplayEXT(device, xDisplay, _display);
-    VK_CHECK_RESULT(result);
-    // Get display mode properties
-    uint32_t modeCount = 0;
-    vkGetDisplayModePropertiesKHR(device, _display, &modeCount, nullptr);
-    std::vector<VkDisplayModePropertiesKHR> modeProperties(modeCount);
-    vkGetDisplayModePropertiesKHR(device, _display, &modeCount, modeProperties.data());
+    //VkResult result = vkAcquireXlibDisplayEXT(device, xDisplay, _display);
+    //VK_CHECK_RESULT(result);
+    //// Get display mode properties
+    //uint32_t modeCount = 0;
+    //vkGetDisplayModePropertiesKHR(device, _display, &modeCount, nullptr);
+    //std::vector<VkDisplayModePropertiesKHR> modeProperties(modeCount);
+    //vkGetDisplayModePropertiesKHR(device, _display, &modeCount, modeProperties.data());
 
-    // List all modes for the selected display
-    std::cout << "Available Modes for selected display:\n";
-    for (uint32_t i = 0; i < modeCount; ++i) {
-        std::cout << "Index: " << i
-                  << ", Resolution: " << modeProperties[i].parameters.visibleRegion.width << "x"
-                  << modeProperties[i].parameters.visibleRegion.height
-                  << ", Refresh Rate: " << modeProperties[i].parameters.refreshRate << " Hz"
-                  << std::endl;
-    }
+    //// List all modes for the selected display
+    //std::cout << "Available Modes for selected display:\n";
+    //for (uint32_t i = 0; i < modeCount; ++i) {
+    //    std::cout << "Index: " << i
+    //              << ", Resolution: " << modeProperties[i].parameters.visibleRegion.width << "x"
+    //              << modeProperties[i].parameters.visibleRegion.height
+    //              << ", Refresh Rate: " << modeProperties[i].parameters.refreshRate << " Hz"
+    //              << std::endl;
+    //}
 
-    // Get user input for mode selection
-    uint32_t selectedModeIndex;
-    do {
-        std::cout << "Enter the index of the mode you want to use (0-" << modeCount - 1 << "): ";
-        std::cin >> selectedModeIndex;
-    } while (selectedModeIndex >= modeCount);
+    //// Get user input for mode selection
+    //uint32_t selectedModeIndex;
+    //do {
+    //    std::cout << "Enter the index of the mode you want to use (0-" << modeCount - 1 << "): ";
+    //    std::cin >> selectedModeIndex;
+    //} while (selectedModeIndex >= modeCount);
 
-    VkDisplayModeKHR displayMode = modeProperties[selectedModeIndex].displayMode;
+    //VkDisplayModeKHR displayMode = modeProperties[selectedModeIndex].displayMode;
 
-    // Find a compatible plane
-    uint32_t planeCount = 0;
-    vkGetPhysicalDeviceDisplayPlanePropertiesKHR(device, &planeCount, nullptr);
-    for (uint32_t i = 0; i < planeCount; i++) {
-        uint32_t displayCount = 0;
-        vkGetDisplayPlaneSupportedDisplaysKHR(device, i, &displayCount, nullptr);
-        if (displayCount > 0) {
-            std::vector<VkDisplayKHR> displays(displayCount);
-            vkGetDisplayPlaneSupportedDisplaysKHR(device, i, &displayCount, displays.data());
-            if (std::find(displays.begin(), displays.end(), _display) != displays.end()) {
-                _displayPlaneIndex = i;
-                break;
-            }
-        }
-    }
+    //// Find a compatible plane
+    //uint32_t planeCount = 0;
+    //vkGetPhysicalDeviceDisplayPlanePropertiesKHR(device, &planeCount, nullptr);
+    //for (uint32_t i = 0; i < planeCount; i++) {
+    //    uint32_t displayCount = 0;
+    //    vkGetDisplayPlaneSupportedDisplaysKHR(device, i, &displayCount, nullptr);
+    //    if (displayCount > 0) {
+    //        std::vector<VkDisplayKHR> displays(displayCount);
+    //        vkGetDisplayPlaneSupportedDisplaysKHR(device, i, &displayCount, displays.data());
+    //        if (std::find(displays.begin(), displays.end(), _display) != displays.end()) {
+    //            _displayPlaneIndex = i;
+    //            break;
+    //        }
+    //    }
+    //}
 
-    // Create display surface
-    VkDisplaySurfaceCreateInfoKHR surfaceCreateInfo = {};
-    surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_DISPLAY_SURFACE_CREATE_INFO_KHR;
-    surfaceCreateInfo.displayMode = displayMode;
-    surfaceCreateInfo.planeIndex = _displayPlaneIndex;
-    surfaceCreateInfo.planeStackIndex = 0;
-    surfaceCreateInfo.transform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
-    surfaceCreateInfo.globalAlpha = 1.0f;
-    surfaceCreateInfo.alphaMode = VK_DISPLAY_PLANE_ALPHA_OPAQUE_BIT_KHR;
-    surfaceCreateInfo.imageExtent = modeProperties[selectedModeIndex].parameters.visibleRegion;
+    //// Create display surface
+    //VkDisplaySurfaceCreateInfoKHR surfaceCreateInfo = {};
+    //surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_DISPLAY_SURFACE_CREATE_INFO_KHR;
+    //surfaceCreateInfo.displayMode = displayMode;
+    //surfaceCreateInfo.planeIndex = _displayPlaneIndex;
+    //surfaceCreateInfo.planeStackIndex = 0;
+    //surfaceCreateInfo.transform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+    //surfaceCreateInfo.globalAlpha = 1.0f;
+    //surfaceCreateInfo.alphaMode = VK_DISPLAY_PLANE_ALPHA_OPAQUE_BIT_KHR;
+    //surfaceCreateInfo.imageExtent = modeProperties[selectedModeIndex].parameters.visibleRegion;
 
-    VK_CHECK_RESULT(
-        vkCreateDisplayPlaneSurfaceKHR(_instance, &surfaceCreateInfo, nullptr, &_displaySurface)
-    );
+    //VK_CHECK_RESULT(
+    //    vkCreateDisplayPlaneSurfaceKHR(_instance, &surfaceCreateInfo, nullptr, &_displaySurface)
+    //);
 
-    _surface = _displaySurface;
+    //_surface = _displaySurface;
 
-    // Store the display properties for later use
-    _displayExtent = modeProperties[selectedModeIndex].parameters.visibleRegion;
+    //// Store the display properties for later use
+    //_displayExtent = modeProperties[selectedModeIndex].parameters.visibleRegion;
 
-    // Close X11 display
-    XCloseDisplay(xDisplay);
+    //// Close X11 display
+    //XCloseDisplay(xDisplay);
 }
 
 void VulkanEngine::initGLFW(const InitOptions& options)
@@ -614,12 +614,12 @@ void VulkanEngine::createInstance()
 #ifndef NDEBUG
     // enable debug printing
     // VkValidationFeatureEnableEXT enabled[] = {VK_VALIDATION_FEATURE_ENABLE_DEBUG_PRINTF_EXT};
-    VkValidationFeatureEnableEXT enabled[] = {};
+    //VkValidationFeatureEnableEXT enabled[] = {};
     VkValidationFeaturesEXT features{VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT};
     features.disabledValidationFeatureCount = 0;
-    features.enabledValidationFeatureCount = sizeof(enabled) / sizeof(enabled[0]);
+    features.enabledValidationFeatureCount = 0;
     features.pDisabledValidationFeatures = nullptr;
-    features.pEnabledValidationFeatures = enabled;
+    features.pEnabledValidationFeatures = nullptr;
 
     features.pNext = createInfo.pNext;
     createInfo.pNext = &features;

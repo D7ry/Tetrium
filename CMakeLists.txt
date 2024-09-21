@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.22)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
  
 # imgui
 set(IMPLOT_INCLUDE extern/implot)
@@ -88,17 +88,29 @@ if(APPLE)
         ${MOLTENVK_LIB_PATH}
     )
     target_compile_definitions(${PROJECT_NAME} PRIVATE VK_USE_PLATFORM_MACOS_MVK)
-else() # ~APPLE
+endif() # APPLE
+if (LINUX)
     find_package(Vulkan REQUIRED)
     find_package(X11 REQUIRED)
     target_link_libraries(${PROJECT_NAME} Vulkan::Vulkan)
-endif() # APPLE
+endif() # LINUX
+if (WIN32)
+    set(VULKAN_SDK_PATH "C:/VulkanSDK/1.3.290.0")
+    set(Vulkan_LIBRARY "${VULKAN_SDK_PATH}/Lib/vulkan-1.lib")
+    set(Vulkan_INCLUDE_DIR "${VULKAN_SDK_PATH}/Include")
+    find_package(Vulkan REQUIRED)
+    include_directories(${Vulkan_INCLUDE_DIRS})
+    target_link_libraries(${PROJECT_NAME} ${Vulkan_LIBRARIES})
+    target_compile_definitions(${PROJECT_NAME} PRIVATE VK_USE_PLATFORM_WIN32_KHR)
+    if(MSVC)
+        add_compile_options(/W4 /wd4100 /wd4201)
+    endif()
+endif() # WIN32
 
 target_link_libraries(${PROJECT_NAME} 
     spdlog::spdlog 
     glfw
-    ${X11_LIBRARIES}
-    Xrandr
+
 )
 
 # debug flag for unix

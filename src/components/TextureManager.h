@@ -1,5 +1,7 @@
 #pragma once
 #include <vulkan/vulkan_core.h>
+#include "lib/VQDevice.h"
+
 class VQDevice;
 
 // TODO: use a single command buffe for higher throughput; may implement our own command buffer "buffer".
