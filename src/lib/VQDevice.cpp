@@ -215,7 +215,7 @@ size_t VQDevice::GetDynamicUBOAlignedSize(size_t dynamicUBOSize) {
     return dynamicAlignment;
 }
 
-VQDevice::SwapChainSupport VQDevice::GetSwapChainSupportForSurface(VkSurfaceKHR surface)
+VQDevice::SwapChainSupport VQDevice::GetSwapChainSupportForSurface(const VkSurfaceKHR surface)
 {
     VkPhysicalDevice device = physicalDevice;
     ASSERT(device);

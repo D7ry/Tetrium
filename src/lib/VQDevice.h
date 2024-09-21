@@ -5,6 +5,14 @@
 #include <optional>
 #include <vulkan/vulkan_core.h>
 
+struct VQBuffer;
+
+/**
+ * @brief Vulkan device representation.Call InitQueueFamilyIndices() with the right surface, then
+ * call CreateLogicalDeviceAndQueue() with the right extensions.
+ *
+ */
+
 struct QueueFamilyIndices
 {
     std::optional<uint32_t> graphicsFamily;
@@ -17,13 +25,6 @@ struct QueueFamilyIndices
                && computeFamily.has_value();
     }
 };
-struct VQBuffer;
-
-/**
- * @brief Vulkan device representation.Call InitQueueFamilyIndices() with the right surface, then
- * call CreateLogicalDeviceAndQueue() with the right extensions.
- *
- */
 struct VQDevice
 {
     struct SwapChainSupport
@@ -102,7 +103,7 @@ struct VQDevice
      */
     void CreateGraphicsCommandBuffer(uint32_t commandBufferCount);
 
-    SwapChainSupport GetSwapChainSupportForSurface(VkSurfaceKHR surface);
+    SwapChainSupport GetSwapChainSupportForSurface(const VkSurfaceKHR surface);
 
     /**
      * @brief Create a VQBuffer from this device.

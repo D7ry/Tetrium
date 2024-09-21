@@ -45,6 +45,9 @@
 
 class TickContext;
 
+// TODO: implement even-odd for non-nvidia GPUs
+// may be much less accurate but useful for testing
+
 class VulkanEngine
 {
   private:
@@ -121,13 +124,10 @@ class VulkanEngine
     void Cleanup();
 
   private:
-    struct QueueFamilyIndices
-    {
-        std::optional<uint32_t> graphicsFamily;
-        std::optional<uint32_t> presentationFamily;
-    };
 
-
+    // context for a single swapchain; 
+    // each window & display manages their separate
+    // swapchain context
     struct SwapChainContext
     {
         VkSwapchainKHR chain = VK_NULL_HANDLE;
@@ -142,6 +142,7 @@ class VulkanEngine
         VkSurfaceKHR surface;
     };
 
+    // context for a dedicated display
     struct DisplayContext {
         VkExtent2D extent;
         VkDisplayKHR display;
@@ -170,7 +171,6 @@ class VulkanEngine
     void setUpEvenOddFrame();        // set up resources for even-odd frame
 
     /* ---------- Physical Device Selection ---------- */
-    QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
     bool checkDeviceExtensionSupport(VkPhysicalDevice device);
     bool isDeviceSuitable(VkPhysicalDevice device);
     VkPhysicalDevice pickPhysicalDevice();
@@ -183,8 +183,9 @@ class VulkanEngine
     VkPresentModeKHR chooseSwapPresentMode(
         const std::vector<VkPresentModeKHR>& availablePresentModes
     );
+
+    void initSwapchains();
     VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
-    void initSwapChain();
     void createSwapChain(VulkanEngine::SwapChainContext& ctx, const VkSurfaceKHR surface);
     void recreateSwapChain(SwapChainContext& ctx);
     void cleanupSwapChain(SwapChainContext& ctx);
@@ -224,19 +225,18 @@ class VulkanEngine
 
     /* ---------- Top-level data ---------- */
 
+    VkInstance _instance;
     VkDebugUtilsMessengerEXT _debugMessenger;
 
     /* ---------- Prensentation ---------- */
 
     GLFWwindow* _window;
-    VkInstance _instance;
-
     DisplayContext _mainProjectorDisplay;
 
     /* ---------- swapchain ---------- */
 
     SwapChainContext _mainProjectorSwapchain;
-    SwapChainContext _controllerSwapchainCtx;
+    SwapChainContext _auxWindowSwapchain;
 
     /* ---------- Synchronization Primivites ---------- */
     struct EngineSynchronizationPrimitives

@@ -592,7 +592,7 @@ void VulkanEngine::initVulkan()
     this->_device->CreateGraphicsCommandPool();
     this->_device->CreateGraphicsCommandBuffer(NUM_FRAME_IN_FLIGHT);
 
-    this->initSwapChain();
+    this->initSwapchains();
     this->createImageViews(_mainProjectorSwapchain);
     this->createMainRenderPass(_mainProjectorSwapchain);
     this->createDepthBuffer(_mainProjectorSwapchain);
@@ -814,38 +814,6 @@ VKAPI_ATTR VkBool32 VKAPI_CALL VulkanEngine::debugCallback(
     return VK_FALSE;
 }
 
-VulkanEngine::QueueFamilyIndices VulkanEngine::findQueueFamilies(VkPhysicalDevice device)
-{
-    DEBUG("Finding graphics and presentation queue families...");
-
-    QueueFamilyIndices indices;
-    uint32_t queueFamilyCount = 0;
-    vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
-    std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount
-    ); // initialize vector to store queue familieis
-    vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
-    int i = 0;
-    for (const auto& queueFamily : queueFamilies) {
-        VkBool32 presentationSupport = false;
-        if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-            indices.graphicsFamily = i;
-            DEBUG("Graphics family found at {}", i);
-        }
-        vkGetPhysicalDeviceSurfaceSupportKHR(
-            device, i, _mainProjectorDisplay.surface, &presentationSupport
-        );
-        if (presentationSupport) {
-            indices.presentationFamily = i;
-            DEBUG("Presentation family found at {}", i);
-        }
-        if (indices.presentationFamily.has_value() && indices.graphicsFamily.has_value()) {
-            break;
-        }
-        i++;
-    }
-    return indices;
-}
-
 bool VulkanEngine::checkDeviceExtensionSupport(VkPhysicalDevice device)
 {
     DEBUG("checking device extension support");
@@ -893,11 +861,7 @@ bool VulkanEngine::isDeviceSuitable(VkPhysicalDevice device)
         if (!suitable) {
             DEBUG("failed extension requirements");
         }
-        return suitable;
-        // do not check for queue families, trust jensen
-        // QueueFamilyIndices indices = this->findQueueFamilies(device); // look for queue familieis
-        // return indices.graphicsFamily.has_value() && indices.presentationFamily.has_value()
-        //        && checkDeviceExtensionSupport(device); // found graphics queue
+        return true;
     } else {
         DEBUG("failed platform requirements");
         return false;
@@ -967,7 +931,7 @@ void VulkanEngine::createSwapChain(VulkanEngine::SwapChainContext& ctx, const Vk
     createInfo.imageArrayLayers = 1;
     createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
-    QueueFamilyIndices indices = findQueueFamilies(_device->physicalDevice);
+    auto indices = _device->queueFamilyIndices;
     uint32_t queueFamilyIndices[]
         = {indices.graphicsFamily.value(), indices.presentationFamily.value()};
 
@@ -1511,7 +1475,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     VK_CHECK_RESULT(result);
 }
 
-void VulkanEngine::initSwapChain()
+void VulkanEngine::initSwapchains()
 {
     createSwapChain(_mainProjectorSwapchain, _mainProjectorDisplay.surface);
     this->_deletionStack.push([this]() { this->cleanupSwapChain(_mainProjectorSwapchain); });
