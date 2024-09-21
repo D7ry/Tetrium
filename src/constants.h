@@ -48,7 +48,7 @@ const bool ENABLE_VALIDATION_LAYERS = true;
 
 const std::array<const char*, 1> VALIDATION_LAYERS = {"VK_LAYER_KHRONOS_validation"};
 
-const char* const APPLICATION_NAME = "Vulkan Application";
+const char* const APPLICATION_NAME = "quarkolor";
 
 const struct
 {

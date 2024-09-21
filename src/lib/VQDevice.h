@@ -1,8 +1,17 @@
 #pragma once
+#include "VQBuffer.h"
 #include "vulkan/vulkan.h"
+#include "vulkan/vulkan.hpp"
 #include <optional>
 #include <vulkan/vulkan_core.h>
-#include "VQBuffer.h"
+
+struct VQBuffer;
+
+/**
+ * @brief Vulkan device representation.Call InitQueueFamilyIndices() with the right surface, then
+ * call CreateLogicalDeviceAndQueue() with the right extensions.
+ *
+ */
 
 struct QueueFamilyIndices
 {
@@ -10,24 +19,30 @@ struct QueueFamilyIndices
     std::optional<uint32_t> presentationFamily;
     std::optional<uint32_t> computeFamily;
 
-    inline bool isComplete() { return graphicsFamily.has_value() && presentationFamily.has_value() && computeFamily.has_value(); }
+    inline bool isComplete()
+    {
+        return graphicsFamily.has_value() && presentationFamily.has_value()
+               && computeFamily.has_value();
+    }
 };
-struct VQBuffer;
-
-/**
- * @brief Vulkan device representation.Call InitQueueFamilyIndices() with the right surface, then call
- * CreateLogicalDeviceAndQueue() with the right extensions.
- *
- */
 struct VQDevice
 {
+    struct SwapChainSupport
+    {
+        VkSurfaceCapabilitiesKHR capabilities;
+        std::vector<VkSurfaceFormatKHR> formats;
+        std::vector<VkPresentModeKHR> presentModes;
+    };
+
     /** @brief Physical device representation */
     VkPhysicalDevice physicalDevice;
     /** @brief Logical device representation (application's view of the device) */
     VkDevice logicalDevice;
-    /** @brief Properties of the physical device including limits that the application can check against */
+    /** @brief Properties of the physical device including limits that the application can check
+     * against */
     VkPhysicalDeviceProperties properties;
-    /** @brief Features of the physical device that an application can use to check if a feature is supported */
+    /** @brief Features of the physical device that an application can use to check if a feature is
+     * supported */
     VkPhysicalDeviceFeatures features;
     /** @brief Features that have been enabled for use on the physical device */
     VkPhysicalDeviceFeatures enabledFeatures;
@@ -61,7 +76,8 @@ struct VQDevice
     size_t GetDynamicUBOAlignedSize(size_t dynamicUBOSize);
 
     /**
-     * @brief Query Vulkan API to find the queue family indices that support graphics and presentation.
+     * @brief Query Vulkan API to find the queue family indices that support graphics and
+     * presentation.
      *
      * @param surface The surface on which the presentation queue will present to.
      */
@@ -80,12 +96,14 @@ struct VQDevice
     void CreateGraphicsCommandPool();
 
     /**
-     * @brief Populate a graphicsCommandBuffers with the given command buffer count. The command buffers can be
-     * used to submit to the graphics command queue.
+     * @brief Populate a graphicsCommandBuffers with the given command buffer count. The command
+     * buffers can be used to submit to the graphics command queue.
      *
      * @param commandBufferCount    the number of command buffers to create
      */
     void CreateGraphicsCommandBuffer(uint32_t commandBufferCount);
+
+    SwapChainSupport GetSwapChainSupportForSurface(const VkSurfaceKHR surface);
 
     /**
      * @brief Create a VQBuffer from this device.
@@ -95,8 +113,17 @@ struct VQDevice
      * @param properties
      * @return VQBuffer
      */
-    VQBuffer CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties);
-    void CreateBufferInPlace(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VQBuffer& buffer);
+    VQBuffer CreateBuffer(
+        VkDeviceSize size,
+        VkBufferUsageFlags usage,
+        VkMemoryPropertyFlags properties
+    );
+    void CreateBufferInPlace(
+        VkDeviceSize size,
+        VkBufferUsageFlags usage,
+        VkMemoryPropertyFlags properties,
+        VQBuffer& buffer
+    );
 
     void Cleanup();
 };

@@ -214,3 +214,34 @@ size_t VQDevice::GetDynamicUBOAlignedSize(size_t dynamicUBOSize) {
     }
     return dynamicAlignment;
 }
+
+VQDevice::SwapChainSupport VQDevice::GetSwapChainSupportForSurface(const VkSurfaceKHR surface)
+{
+    VkPhysicalDevice device = physicalDevice;
+    ASSERT(device);
+
+    SwapChainSupport details;
+
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &details.capabilities);
+
+    uint32_t formatCount;
+    vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, nullptr);
+
+    if (formatCount != 0) {
+        details.formats.resize(formatCount);
+        vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, details.formats.data());
+    }
+
+    uint32_t presentModeCount;
+    vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, nullptr);
+    DEBUG("present mode count: {}", presentModeCount);
+
+    if (presentModeCount != 0) {
+        details.presentModes.resize(presentModeCount);
+        vkGetPhysicalDeviceSurfacePresentModesKHR(
+            device, surface, &presentModeCount, details.presentModes.data()
+        );
+    }
+
+    return details;
+}

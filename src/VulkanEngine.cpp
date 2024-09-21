@@ -32,6 +32,22 @@
 #include <xf86drm.h>
 #include <xf86drmMode.h>
 
+// creates a cow for now
+void VulkanEngine::createFunnyObjects()
+{
+    // lil cow
+    Entity* spot = new Entity("Spot");
+    auto meshInstance = _renderer.MakeMeshInstanceComponent(
+        DIRECTORIES::ASSETS + "models/spot.obj", DIRECTORIES::ASSETS + "textures/spot.png"
+    );
+    // give the lil cow a mesh
+    spot->AddComponent(meshInstance);
+    // give the lil cow a transform
+    spot->AddComponent(new TransformComponent());
+    // register lil cow
+    _renderer.AddEntity(spot);
+}
+
 // in CLI pop up a monitor selection interface, that lists
 // monitor names and properties
 // the user would input a number to select the right monitor.
@@ -78,7 +94,8 @@ GLFWmonitor* VulkanEngine::cliMonitorSelection()
     return monitors[monitorIdx];
 }
 
-void VulkanEngine::selectDisplayDRM()
+// select exclusive display using DRM
+void VulkanEngine::selectDisplayDRM(DisplayContext& ctx)
 {
     int drmFd = open("/dev/dri/card0", O_RDWR);
     if (drmFd < 0) {
@@ -147,21 +164,22 @@ void VulkanEngine::selectDisplayDRM()
         vkGetInstanceProcAddr(_instance, "vkGetDrmDisplayEXT")
     );
     ASSERT(fnPtr);
-    VK_CHECK_RESULT(fnPtr(_device->physicalDevice, drmFd, connectorId, &_display));
-    ASSERT(_display);
+    VK_CHECK_RESULT(fnPtr(_device->physicalDevice, drmFd, connectorId, &ctx.display));
+    ASSERT(ctx.display);
 
     PFN_vkAcquireDrmDisplayEXT fnPtr2 = reinterpret_cast<PFN_vkAcquireDrmDisplayEXT>(
         vkGetInstanceProcAddr(_instance, "vkAcquireDrmDisplayEXT")
     );
     ASSERT(fnPtr2);
-    VK_CHECK_RESULT(fnPtr2(_device->physicalDevice, drmFd, _display));
+    VK_CHECK_RESULT(fnPtr2(_device->physicalDevice, drmFd, ctx.display));
 
     drmModeFreeConnector(selectedConnector);
     drmModeFreeResources(resources);
     close(drmFd);
 }
 
-void VulkanEngine::selectDisplayXlib()
+// select exclusive display using xlib
+void VulkanEngine::selectDisplayXlib(DisplayContext& ctx)
 {
     auto device = _device->physicalDevice;
     // Get the X11 display name for the selected Vulkan display
@@ -213,7 +231,7 @@ void VulkanEngine::selectDisplayXlib()
         std::cin >> selectedIndex;
     } while (selectedIndex >= displays.size());
 
-    _display = displays[selectedIndex];
+    ctx.display = displays[selectedIndex];
 
     DEBUG("Acquiring exclusive access to display...");
     // Acquire the display
@@ -223,21 +241,21 @@ void VulkanEngine::selectDisplayXlib()
         );
     ASSERT(vkAcquireXlibDisplayEXT);
 
-    VK_CHECK_RESULT(vkAcquireXlibDisplayEXT(device, xDisplay, _display));
+    VK_CHECK_RESULT(vkAcquireXlibDisplayEXT(device, xDisplay, ctx.display));
 }
 
 // take complete control over a physical display
 // the display must be directly connected to the GPU through x11
 // prompts the user to select the display and resolution in an ImGui window
-void VulkanEngine::initExclusiveDisplay()
+void VulkanEngine::initExclusiveDisplay(VulkanEngine::DisplayContext& ctx)
 {
-    selectDisplayXlib();
+    selectDisplayXlib(ctx);
 
     auto device = _device->physicalDevice;
     uint32_t modeCount = 0;
-    vkGetDisplayModePropertiesKHR(device, _display, &modeCount, nullptr);
+    vkGetDisplayModePropertiesKHR(device, ctx.display, &modeCount, nullptr);
     std::vector<VkDisplayModePropertiesKHR> modeProperties(modeCount);
-    vkGetDisplayModePropertiesKHR(device, _display, &modeCount, modeProperties.data());
+    vkGetDisplayModePropertiesKHR(device, ctx.display, &modeCount, modeProperties.data());
 
     // List all modes for the selected display
     std::cout << "Available Modes for selected display:\n";
@@ -273,8 +291,8 @@ void VulkanEngine::initExclusiveDisplay()
         if (displayCount > 0) {
             std::vector<VkDisplayKHR> displays(displayCount);
             vkGetDisplayPlaneSupportedDisplaysKHR(device, i, &displayCount, displays.data());
-            if (std::find(displays.begin(), displays.end(), _display) != displays.end()) {
-                _displayPlaneIndex = i;
+            if (std::find(displays.begin(), displays.end(), ctx.display) != displays.end()) {
+                ctx.planeIndex = i;
                 stackIndex = planeProperty.currentStackIndex;
                 foundPlaneIndex = true;
                 break;
@@ -282,13 +300,13 @@ void VulkanEngine::initExclusiveDisplay()
         }
     }
     ASSERT(foundPlaneIndex);
-    DEBUG("plane index: {}; stack index: {}", _displayPlaneIndex, stackIndex);
+    DEBUG("plane index: {}; stack index: {}", ctx.planeIndex, stackIndex);
 
     // Create display surface
     VkDisplaySurfaceCreateInfoKHR surfaceCreateInfo = {};
     surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_DISPLAY_SURFACE_CREATE_INFO_KHR;
     surfaceCreateInfo.displayMode = displayMode;
-    surfaceCreateInfo.planeIndex = _displayPlaneIndex;
+    surfaceCreateInfo.planeIndex = ctx.planeIndex;
     surfaceCreateInfo.planeStackIndex = stackIndex;
     surfaceCreateInfo.transform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
     surfaceCreateInfo.globalAlpha = 1.0f;
@@ -296,20 +314,21 @@ void VulkanEngine::initExclusiveDisplay()
     surfaceCreateInfo.imageExtent = modeProperties[selectedModeIndex].parameters.visibleRegion;
 
     VK_CHECK_RESULT(
-        vkCreateDisplayPlaneSurfaceKHR(_instance, &surfaceCreateInfo, nullptr, &_displaySurface)
+        vkCreateDisplayPlaneSurfaceKHR(_instance, &surfaceCreateInfo, nullptr, &ctx.surface)
     );
-    ASSERT(_displaySurface != VK_NULL_HANDLE);
+    ASSERT(ctx.surface != VK_NULL_HANDLE);
 
-    _deletionStack.push([this]() { vkDestroySurfaceKHR(_instance, _displaySurface, nullptr); });
+    _deletionStack.push([this, ctx]() { vkDestroySurfaceKHR(_instance, ctx.surface, nullptr); });
 
     // Store the display properties for later use
-    _displayExtent = modeProperties[selectedModeIndex].parameters.visibleRegion;
-    DEBUG("display extent: {} {}", _displayExtent.width, _displayExtent.height);
+    ctx.extent = modeProperties[selectedModeIndex].parameters.visibleRegion;
+    DEBUG("display extent: {} {}", ctx.extent.width, ctx.extent.height);
 }
 
 void VulkanEngine::initGLFW(const InitOptions& options)
 {
     glfwInit();
+    glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE); // hide window at beginning
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
     if (!glfwVulkanSupported()) {
@@ -320,6 +339,7 @@ void VulkanEngine::initGLFW(const InitOptions& options)
     // having monitor as nullptr initializes a windowed window
     GLFWmonitor* monitor = nullptr;
     if (options.fullScreen) {
+        NEEDS_IMPLEMENTATION();
         monitor = glfwGetPrimaryMonitor();
         if (options.manualMonitorSelection) {
             monitor = cliMonitorSelection();
@@ -342,7 +362,8 @@ void VulkanEngine::initGLFW(const InitOptions& options)
 #endif // __APPLE__
     }
 
-    this->_window = glfwCreateWindow(width, height, "Vulkan Engine", monitor, nullptr);
+    this->_window
+        = glfwCreateWindow(width, height, DEFAULTS::Engine::APPLICATION_NAME, monitor, nullptr);
     if (this->_window == nullptr) {
         FATAL("Failed to initialize GLFW windlw!");
     }
@@ -379,10 +400,15 @@ void VulkanEngine::Init(const VulkanEngine::InitOptions& options)
 {
     // populate static config fields
     _evenOddMode = options.evenOddMode;
+    if (!_evenOddMode) {
+        // none-even odd needs dual-display + dual-fb implementation
+        NEEDS_IMPLEMENTATION();
+    }
 #if __APPLE__
     MoltenVKConfig::Setup();
 #endif // __APPLE__
     initGLFW(options);
+    ASSERT(_window);
     { // Input Handling
         auto keyCallback = [](GLFWwindow* window, int key, int scancode, int action, int mods) {
             VulkanEngine* pThis = reinterpret_cast<VulkanEngine*>(glfwGetWindowUserPointer(window));
@@ -401,7 +427,6 @@ void VulkanEngine::Init(const VulkanEngine::InitOptions& options)
         glfwSetCursorPosCallback(this->_window, cursorPosCallback);
         bindDefaultInputs();
     }
-
     // frame buffer never resizes, so no need for callback
     // glfwSetFramebufferSizeCallback(_window, this->framebufferResizeCallback);
     this->initVulkan();
@@ -427,7 +452,7 @@ void VulkanEngine::Init(const VulkanEngine::InitOptions& options)
     { // populate initData
         initCtx.device = this->_device.get();
         initCtx.textureManager = &_textureManager;
-        initCtx.swapChainImageFormat = this->_swapChainImageFormat;
+        initCtx.swapChainImageFormat = this->_mainProjectorSwapchain.imageFormat;
         initCtx.renderPass.mainPass = _mainRenderPass;
         for (int i = 0; i < _engineUBOStatic.size(); i++) {
             initCtx.engineUBOStaticDescriptorBufferInfo[i].range = sizeof(EngineUBOStatic);
@@ -438,20 +463,12 @@ void VulkanEngine::Init(const VulkanEngine::InitOptions& options)
 
     _renderer.Init(&initCtx);
     _deletionStack.push([this]() { _renderer.Cleanup(); });
-    // create example mesh
-    {
-        // lil cow
-        Entity* spot = new Entity("Spot");
-        auto meshInstance = _renderer.MakeMeshInstanceComponent(
-            DIRECTORIES::ASSETS + "models/spot.obj", DIRECTORIES::ASSETS + "textures/spot.png"
-        );
-        // give the lil cow a mesh
-        spot->AddComponent(meshInstance);
-        // give the lil cow a transform
-        spot->AddComponent(new TransformComponent());
-        // register lil cow
-        _renderer.AddEntity(spot);
-    }
+
+    createFunnyObjects();
+
+    // show glfw window at very end
+    ASSERT(_window);
+    glfwShowWindow(_window);
 }
 
 void VulkanEngine::Run()
@@ -523,7 +540,7 @@ void VulkanEngine::setUpEvenOddFrame()
 // the counter ticks every time a vertical blanking period occurs,
 // which we use to decide whether the next frame to present should be
 // even or odd.
-void VulkanEngine::checkEvenOddFrameSupport()
+void VulkanEngine::checkHardwareEvenOddFrameSupport()
 {
     // check instance extensions
     uint32_t numExtensions = 0;
@@ -560,7 +577,9 @@ void VulkanEngine::checkEvenOddFrameSupport()
             "Failed to find function pointer to {}", "vkGetPhysicalDeviceSurfaceCapabilities2EXT"
         );
     }
-    VK_CHECK_RESULT(func(_device->physicalDevice, _displaySurface, &capabilities));
+    ASSERT(_mainProjectorDisplay.surface && _mainProjectorDisplay.display);
+    VK_CHECK_RESULT(func(_device->physicalDevice, _mainProjectorDisplay.surface, &capabilities));
+
     bool hasVerticalBlankingCounter
         = (capabilities.supportedSurfaceCounters
            & VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_BIT_EXT)
@@ -578,19 +597,24 @@ void VulkanEngine::initVulkan()
     this->createInstance();
     // this->createSurface();
     this->createDevice();
-    this->initExclusiveDisplay();
-    this->_device->InitQueueFamilyIndices(this->_displaySurface);
+    this->initExclusiveDisplay(_mainProjectorDisplay);
+    this->_device->InitQueueFamilyIndices(_mainProjectorDisplay.surface);
     this->_device->CreateLogicalDeviceAndQueue(getRequiredDeviceExtensions());
     this->_device->CreateGraphicsCommandPool();
     this->_device->CreateGraphicsCommandBuffer(NUM_FRAME_IN_FLIGHT);
 
-    this->initSwapChain();
-    this->createImageViews();
-    this->createRenderPass();
-    this->createDepthBuffer();
-    this->createSynchronizationObjects();
-    this->_imguiManager.InitializeRenderPass(this->_device->logicalDevice, _swapChainImageFormat);
-    this->createFramebuffers();
+    this->initSwapchains();
+    this->createImageViews(_mainProjectorSwapchain);
+    this->createMainRenderPass(_mainProjectorSwapchain);
+    this->createDepthBuffer(_mainProjectorSwapchain);
+    this->createSynchronizationObjects(_syncProjector);
+    this->_imguiManager.InitializeRenderPass(
+        this->_device->logicalDevice, _mainProjectorSwapchain.imageFormat
+    );
+    // NOTE: this has to go after ImGuiManager::InitializeRenderPass
+    // because the function also creates imgui's frame buffer
+    // TODO: maybe separate them?
+    this->createFramebuffers(_mainProjectorSwapchain);
     { // init misc imgui resources
         this->_imguiManager.InitializeImgui();
         this->_imguiManager.InitializeDescriptorPool(NUM_FRAME_IN_FLIGHT, _device->logicalDevice);
@@ -601,12 +625,12 @@ void VulkanEngine::initVulkan()
             _device->logicalDevice,
             _device->queueFamilyIndices.graphicsFamily.value(),
             _device->graphicsQueue,
-            _projectorSwapchainData.frameBuffer.size()
+            _mainProjectorSwapchain.frameBuffer.size()
         );
     }
     if (_evenOddMode) {
         DEBUG("Checking eve-odd frame device support...");
-        checkEvenOddFrameSupport();
+        checkHardwareEvenOddFrameSupport();
         setUpEvenOddFrame();
     }
     this->_deletionStack.push([this]() { this->_imguiManager.Cleanup(_device->logicalDevice); });
@@ -740,13 +764,14 @@ void VulkanEngine::createInstance()
 void VulkanEngine::createGlfwWindowSurface()
 {
     NEEDS_IMPLEMENTATION();
-    VkResult result
-        = glfwCreateWindowSurface(this->_instance, this->_window, nullptr, &this->_surface);
-    if (result != VK_SUCCESS) {
-        FATAL("Failed to create window surface.");
-    }
-    _deletionStack.push([this]() { vkDestroySurfaceKHR(this->_instance, this->_surface, nullptr); }
-    );
+    // VkResult result
+    //     = glfwCreateWindowSurface(this->_instance, this->_window, nullptr, &this->_surface);
+    // if (result != VK_SUCCESS) {
+    //     FATAL("Failed to create window surface.");
+    // }
+    // _deletionStack.push([this]() { vkDestroySurfaceKHR(this->_instance, this->_surface, nullptr);
+    // }
+    // );
 }
 
 void VulkanEngine::populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo)
@@ -801,38 +826,6 @@ VKAPI_ATTR VkBool32 VKAPI_CALL VulkanEngine::debugCallback(
     return VK_FALSE;
 }
 
-VulkanEngine::QueueFamilyIndices VulkanEngine::findQueueFamilies(VkPhysicalDevice device)
-{
-    DEBUG("Finding graphics and presentation queue families...");
-
-    QueueFamilyIndices indices;
-    uint32_t queueFamilyCount = 0;
-    vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
-    std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount
-    ); // initialize vector to store queue familieis
-    vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
-    int i = 0;
-    for (const auto& queueFamily : queueFamilies) {
-        VkBool32 presentationSupport = false;
-        if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-            indices.graphicsFamily = i;
-            DEBUG("Graphics family found at {}", i);
-        }
-        vkGetPhysicalDeviceSurfaceSupportKHR(
-            device, i, this->_displaySurface, &presentationSupport
-        );
-        if (presentationSupport) {
-            indices.presentationFamily = i;
-            DEBUG("Presentation family found at {}", i);
-        }
-        if (indices.presentationFamily.has_value() && indices.graphicsFamily.has_value()) {
-            break;
-        }
-        i++;
-    }
-    return indices;
-}
-
 bool VulkanEngine::checkDeviceExtensionSupport(VkPhysicalDevice device)
 {
     DEBUG("checking device extension support");
@@ -880,11 +873,7 @@ bool VulkanEngine::isDeviceSuitable(VkPhysicalDevice device)
         if (!suitable) {
             DEBUG("failed extension requirements");
         }
-        return suitable;
-        // do not check for queue families, trust jensen
-        // QueueFamilyIndices indices = this->findQueueFamilies(device); // look for queue familieis
-        // return indices.graphicsFamily.has_value() && indices.presentationFamily.has_value()
-        //        && checkDeviceExtensionSupport(device); // found graphics queue
+        return true;
     } else {
         DEBUG("failed platform requirements");
         return false;
@@ -927,15 +916,15 @@ VkPhysicalDevice VulkanEngine::pickPhysicalDevice()
     return physicalDevice;
 }
 
-void VulkanEngine::createSwapChain()
+void VulkanEngine::createSwapChain(VulkanEngine::SwapChainContext& ctx, const VkSurfaceKHR surface)
 {
     DEBUG("creating swapchain...");
-    SwapChainSupportDetails swapChainSupport = querySwapChainSupport(_device->physicalDevice);
+    ASSERT(_device);
+    VQDevice::SwapChainSupport swapChainSupport = _device->GetSwapChainSupportForSurface(surface);
     VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
     VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
     DEBUG("present mode: {}", string_VkPresentModeKHR(presentMode));
     VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities);
-    extent = _displayExtent;
     uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
     if (swapChainSupport.capabilities.maxImageCount > 0
         && imageCount > swapChainSupport.capabilities.maxImageCount) {
@@ -945,7 +934,7 @@ void VulkanEngine::createSwapChain()
     VkSwapchainCreateInfoKHR createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
     // createInfo.surface = _surface;
-    createInfo.surface = _displaySurface;
+    createInfo.surface = surface;
 
     createInfo.minImageCount = imageCount;
     createInfo.imageFormat = surfaceFormat.format;
@@ -954,7 +943,7 @@ void VulkanEngine::createSwapChain()
     createInfo.imageArrayLayers = 1;
     createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
-    QueueFamilyIndices indices = findQueueFamilies(_device->physicalDevice);
+    auto indices = _device->queueFamilyIndices;
     uint32_t queueFamilyIndices[]
         = {indices.graphicsFamily.value(), indices.presentationFamily.value()};
 
@@ -984,42 +973,41 @@ void VulkanEngine::createSwapChain()
         createInfo.pNext = &swapChainCounterCreateInfo;
     }
 
+    VkSwapchainKHR swapChain = VK_NULL_HANDLE;
     VK_CHECK_RESULT(
-        vkCreateSwapchainKHR(this->_device->logicalDevice, &createInfo, nullptr, &_swapChain)
+        vkCreateSwapchainKHR(this->_device->logicalDevice, &createInfo, nullptr, &swapChain)
     );
 
-    vkGetSwapchainImagesKHR(this->_device->logicalDevice, _swapChain, &imageCount, nullptr);
-    _projectorSwapchainData.image.resize(imageCount);
-    _projectorSwapchainData.imageView.resize(imageCount);
-    _projectorSwapchainData.frameBuffer.resize(imageCount);
-
-    vkGetSwapchainImagesKHR(
-        this->_device->logicalDevice, _swapChain, &imageCount, _projectorSwapchainData.image.data()
-    );
-
-    _swapChainImageFormat = surfaceFormat.format;
-    _swapChainExtent = extent;
+    ctx.chain = swapChain;
+    ctx.surface = surface;
+    ctx.extent = extent;
+    vkGetSwapchainImagesKHR(this->_device->logicalDevice, ctx.chain, &imageCount, nullptr);
+    ctx.image.resize(imageCount);
+    ctx.imageView.resize(imageCount);
+    ctx.frameBuffer.resize(imageCount);
+    vkGetSwapchainImagesKHR(this->_device->logicalDevice, ctx.chain, &imageCount, ctx.image.data());
+    ctx.imageFormat = surfaceFormat.format;
     DEBUG("Swap chain created!");
 }
 
-void VulkanEngine::cleanupSwapChain()
+void VulkanEngine::cleanupSwapChain(SwapChainContext& ctx)
 {
     DEBUG("Cleaning up swap chain...");
-    vkDestroyImageView(_device->logicalDevice, _depthImageView, nullptr);
-    vkDestroyImage(_device->logicalDevice, _depthImage, nullptr);
-    vkFreeMemory(_device->logicalDevice, _depthImageMemory, nullptr);
+    vkDestroyImageView(_device->logicalDevice, ctx.depthImageView, nullptr);
+    vkDestroyImage(_device->logicalDevice, ctx.depthImage, nullptr);
+    vkFreeMemory(_device->logicalDevice, ctx.depthImageMemory, nullptr);
 
     _imguiManager.DestroyFrameBuffers(_device->logicalDevice);
-    for (VkFramebuffer framebuffer : this->_projectorSwapchainData.frameBuffer) {
+    for (VkFramebuffer framebuffer : ctx.frameBuffer) {
         vkDestroyFramebuffer(this->_device->logicalDevice, framebuffer, nullptr);
     }
-    for (VkImageView imageView : this->_projectorSwapchainData.imageView) {
+    for (VkImageView imageView : ctx.imageView) {
         vkDestroyImageView(this->_device->logicalDevice, imageView, nullptr);
     }
-    vkDestroySwapchainKHR(this->_device->logicalDevice, this->_swapChain, nullptr);
+    vkDestroySwapchainKHR(this->_device->logicalDevice, ctx.chain, nullptr);
 }
 
-void VulkanEngine::recreateSwapChain()
+void VulkanEngine::recreateSwapChain(SwapChainContext& ctx)
 {
     // need to recreate render pass for HDR changing, we're not doing that
     // for now
@@ -1033,43 +1021,13 @@ void VulkanEngine::recreateSwapChain()
     }
     // wait for device to be idle
     vkDeviceWaitIdle(_device->logicalDevice);
-    this->cleanupSwapChain();
+    this->cleanupSwapChain(ctx);
 
-    this->createSwapChain();
-    this->createImageViews();
-    this->createDepthBuffer();
-    this->createFramebuffers();
+    this->createSwapChain(ctx, ctx.surface);
+    this->createImageViews(ctx);
+    this->createDepthBuffer(ctx);
+    this->createFramebuffers(ctx);
     DEBUG("Swap chain recreated.");
-}
-
-VulkanEngine::SwapChainSupportDetails VulkanEngine::querySwapChainSupport(VkPhysicalDevice device)
-{
-    SwapChainSupportDetails details;
-
-    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, _displaySurface, &details.capabilities);
-
-    uint32_t formatCount;
-    vkGetPhysicalDeviceSurfaceFormatsKHR(device, _displaySurface, &formatCount, nullptr);
-
-    if (formatCount != 0) {
-        details.formats.resize(formatCount);
-        vkGetPhysicalDeviceSurfaceFormatsKHR(
-            device, _displaySurface, &formatCount, details.formats.data()
-        );
-    }
-
-    uint32_t presentModeCount;
-    vkGetPhysicalDeviceSurfacePresentModesKHR(device, _displaySurface, &presentModeCount, nullptr);
-    DEBUG("present mode count: {}", presentModeCount);
-
-    if (presentModeCount != 0) {
-        details.presentModes.resize(presentModeCount);
-        vkGetPhysicalDeviceSurfacePresentModesKHR(
-            device, _displaySurface, &presentModeCount, details.presentModes.data()
-        );
-    }
-
-    return details;
 }
 
 VkSurfaceFormatKHR VulkanEngine::chooseSwapSurfaceFormat(
@@ -1124,14 +1082,14 @@ VkExtent2D VulkanEngine::chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabi
     }
 }
 
-void VulkanEngine::createImageViews()
+void VulkanEngine::createImageViews(SwapChainContext& ctx)
 {
-    for (size_t i = 0; i < this->_projectorSwapchainData.image.size(); i++) {
+    for (size_t i = 0; i < ctx.image.size(); i++) {
         VkImageViewCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        createInfo.image = _projectorSwapchainData.image[i];
+        createInfo.image = _mainProjectorSwapchain.image[i];
         createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        createInfo.format = _swapChainImageFormat;
+        createInfo.format = _mainProjectorSwapchain.imageFormat;
         createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
         createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
         createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -1145,7 +1103,7 @@ void VulkanEngine::createImageViews()
                 this->_device->logicalDevice,
                 &createInfo,
                 nullptr,
-                &_projectorSwapchainData.imageView[i]
+                &_mainProjectorSwapchain.imageView[i]
             )
             != VK_SUCCESS) {
             FATAL("Failed to create image views!");
@@ -1154,10 +1112,12 @@ void VulkanEngine::createImageViews()
     DEBUG("Image views created.");
 }
 
-void VulkanEngine::createSynchronizationObjects()
+void VulkanEngine::createSynchronizationObjects(
+    std::array<SyncPrimitives, NUM_FRAME_IN_FLIGHT>& primitives
+)
 {
     DEBUG("Creating synchronization objects...");
-    ASSERT(_synchronizationPrimitives.size() == NUM_FRAME_IN_FLIGHT);
+    ASSERT(primitives.size() == NUM_FRAME_IN_FLIGHT);
 
     VkSemaphoreCreateInfo semaphoreInfo{};
     semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -1167,7 +1127,7 @@ void VulkanEngine::createSynchronizationObjects()
                                                     // bit so that the 1st frame
                                                     // can start right away
     for (size_t i = 0; i < NUM_FRAME_IN_FLIGHT; i++) {
-        EngineSynchronizationPrimitives& primitive = _synchronizationPrimitives[i];
+        SyncPrimitives& primitive = primitives[i];
         if (vkCreateSemaphore(
                 _device->logicalDevice, &semaphoreInfo, nullptr, &primitive.semaImageAvailable
             ) != VK_SUCCESS
@@ -1179,9 +1139,9 @@ void VulkanEngine::createSynchronizationObjects()
             FATAL("Failed to create synchronization objects for a frame!");
         }
     }
-    this->_deletionStack.push([this]() {
+    this->_deletionStack.push([this, primitives]() {
         for (size_t i = 0; i < NUM_FRAME_IN_FLIGHT; i++) {
-            EngineSynchronizationPrimitives& primitive = _synchronizationPrimitives[i];
+            const SyncPrimitives& primitive = primitives[i];
             vkDestroySemaphore(this->_device->logicalDevice, primitive.semaRenderFinished, nullptr);
             vkDestroySemaphore(this->_device->logicalDevice, primitive.semaImageAvailable, nullptr);
             vkDestroyFence(this->_device->logicalDevice, primitive.fenceInFlight, nullptr);
@@ -1196,11 +1156,11 @@ void VulkanEngine::Cleanup()
     INFO("Resource cleaned up.");
 }
 
-void VulkanEngine::createRenderPass()
+void VulkanEngine::createMainRenderPass(VulkanEngine::SwapChainContext& ctx)
 {
     DEBUG("Creating render pass...");
     VkAttachmentDescription colorAttachment{};
-    colorAttachment.format = this->_swapChainImageFormat;
+    colorAttachment.format = ctx.imageFormat;
     colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
 
     colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
@@ -1273,15 +1233,15 @@ void VulkanEngine::createRenderPass()
     });
 }
 
-void VulkanEngine::createFramebuffers()
+void VulkanEngine::createFramebuffers(SwapChainContext& ctx)
 {
     DEBUG("Creating framebuffers..");
     // iterate through image views and create framebuffers
     if (_mainRenderPass == VK_NULL_HANDLE) {
         FATAL("Render pass is null!");
     }
-    for (size_t i = 0; i < _projectorSwapchainData.image.size(); i++) {
-        VkImageView attachments[] = {_projectorSwapchainData.imageView[i], _depthImageView};
+    for (size_t i = 0; i < ctx.image.size(); i++) {
+        VkImageView attachments[] = {ctx.imageView[i], ctx.depthImageView};
         VkFramebufferCreateInfo framebufferInfo{};
         framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         framebufferInfo.renderPass = _mainRenderPass; // each framebuffer is associated with a
@@ -1290,28 +1250,28 @@ void VulkanEngine::createFramebuffers()
                                                       // same formats
         framebufferInfo.attachmentCount = sizeof(attachments) / sizeof(VkImageView);
         framebufferInfo.pAttachments = attachments;
-        framebufferInfo.width = _swapChainExtent.width;
-        framebufferInfo.height = _swapChainExtent.height;
+        framebufferInfo.width = ctx.extent.width;
+        framebufferInfo.height = ctx.extent.height;
         framebufferInfo.layers = 1; // number of layers in image arrays
         if (vkCreateFramebuffer(
                 _device->logicalDevice,
                 &framebufferInfo,
                 nullptr,
-                &_projectorSwapchainData.frameBuffer[i]
+                &_mainProjectorSwapchain.frameBuffer[i]
             )
             != VK_SUCCESS) {
             FATAL("Failed to create framebuffer!");
         }
     }
     _imguiManager.InitializeFrameBuffer(
-        this->_projectorSwapchainData.image.size(),
+        this->_mainProjectorSwapchain.image.size(),
         _device->logicalDevice,
-        _projectorSwapchainData.imageView,
-        _swapChainExtent
+        _mainProjectorSwapchain.imageView,
+        _mainProjectorSwapchain.extent
     );
 }
 
-void VulkanEngine::createDepthBuffer()
+void VulkanEngine::createDepthBuffer(SwapChainContext& ctx)
 {
     DEBUG("Creating depth buffer...");
     VkFormat depthFormat = VulkanUtils::findBestFormat(
@@ -1321,19 +1281,19 @@ void VulkanEngine::createDepthBuffer()
         _device->physicalDevice
     );
     VulkanUtils::createImage(
-        _swapChainExtent.width,
-        _swapChainExtent.height,
+        ctx.extent.width,
+        ctx.extent.height,
         depthFormat,
         VK_IMAGE_TILING_OPTIMAL,
         VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        _depthImage,
-        _depthImageMemory,
+        ctx.depthImage,
+        ctx.depthImageMemory,
         _device->physicalDevice,
         _device->logicalDevice
     );
-    _depthImageView = VulkanUtils::createImageView(
-        _depthImage, _device->logicalDevice, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT
+    ctx.depthImageView = VulkanUtils::createImageView(
+        ctx.depthImage, _device->logicalDevice, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT
     );
 }
 
@@ -1351,9 +1311,11 @@ void VulkanEngine::flushEngineUBOStatic(uint8_t frame)
     memcpy(buf.bufferAddress, &ubo, sizeof(ubo));
 }
 
+#define POWER_ON_DISPLAY 0
+
 void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
 {
-
+#if POWER_ON_DISPLAY
     static bool poweredOn = false;
     if (false && !poweredOn) { // power display on, seems unnecessary
         poweredOn = true;
@@ -1367,10 +1329,11 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
             vkGetInstanceProcAddr(_instance, "vkDisplayPowerControlEXT")
         );
         ASSERT(fnPtr);
-        VK_CHECK_RESULT(fnPtr(_device->logicalDevice, _display, &powerInfo));
+        VK_CHECK_RESULT(fnPtr(_device->logicalDevice, _mainProjectorDisplay.display, &powerInfo));
         std::this_thread::sleep_for(std::chrono::seconds(5));
     }
-    EngineSynchronizationPrimitives& sync = _synchronizationPrimitives[frame];
+#endif // POWER_ON_DISPLAY
+    SyncPrimitives& sync = _syncProjector[frame];
 
     //  Wait for the previous frame to finish
     PROFILE_SCOPE(&_profiler, "Render Tick");
@@ -1378,17 +1341,16 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
 
     auto res = _pFNvkGetSwapchainCounterEXT(
         _device->logicalDevice,
-        _swapChain,
+        _mainProjectorSwapchain.chain,
         VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_EXT,
         &_surfaceCounterValue
     );
-    // DEBUG("{}", _surfaceCounterValue);
 
     //  Acquire an image from the swap chain
     uint32_t imageIndex;
     VkResult result = vkAcquireNextImageKHR(
         this->_device->logicalDevice,
-        _swapChain,
+        _mainProjectorSwapchain.chain,
         UINT64_MAX,
         sync.semaImageAvailable,
         VK_NULL_HANDLE,
@@ -1396,7 +1358,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     );
     [[unlikely]] if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
     {
-        this->recreateSwapChain();
+        this->recreateSwapChain(_mainProjectorSwapchain);
         return;
     }
     else [[unlikely]] if (result != VK_SUCCESS)
@@ -1408,7 +1370,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     // lock the fence
     vkResetFences(this->_device->logicalDevice, 1, &sync.fenceInFlight);
 
-    VkFramebuffer FB = this->_projectorSwapchainData.frameBuffer[imageIndex];
+    VkFramebuffer FB = this->_mainProjectorSwapchain.frameBuffer[imageIndex];
     vk::CommandBuffer CB(_device->graphicsCommandBuffers[frame]);
     //  Record a command buffer which draws the scene onto that image
     CB.reset();
@@ -1417,7 +1379,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
         ctx->graphics.currentSwapchainImageIndex = imageIndex;
         ctx->graphics.CB = CB;
         ctx->graphics.currentFB = FB;
-        ctx->graphics.currentFBextend = this->_swapChainExtent;
+        ctx->graphics.currentFBextend = _mainProjectorSwapchain.extent;
         getMainProjectionMatrix(ctx->graphics.mainProjectionMatrix);
     }
 
@@ -1430,9 +1392,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     }
 
     { // main render pass
-        vk::Extent2D extend
-            = vk::Extent2D(_swapChainExtent.width * 0.5, _swapChainExtent.height * 0.5);
-        extend = _swapChainExtent;
+        vk::Extent2D extend = _mainProjectorSwapchain.extent;
         // the main render pass renders the actual graphics of the game.
         { // begin main render pass
             vk::Rect2D renderArea(VkOffset2D{0, 0}, extend);
@@ -1510,7 +1470,8 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     presentInfo.waitSemaphoreCount = 1;
     presentInfo.pWaitSemaphores = signalSemaphores;
 
-    VkSwapchainKHR swapChains[] = {_swapChain};
+    VkSwapchainKHR swapChains[] = {_mainProjectorSwapchain.chain};
+
     presentInfo.swapchainCount = 1;
     presentInfo.pSwapchains = swapChains;
     presentInfo.pImageIndices = &imageIndex; // specify which image to present
@@ -1522,16 +1483,16 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     result = vkQueuePresentKHR(_device->presentationQueue, &presentInfo);
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR
         || this->_framebufferResized) {
-        [[unlikely]] this->recreateSwapChain();
+        [[unlikely]] this->recreateSwapChain(_mainProjectorSwapchain);
         this->_framebufferResized = false;
     }
     VK_CHECK_RESULT(result);
 }
 
-void VulkanEngine::initSwapChain()
+void VulkanEngine::initSwapchains()
 {
-    createSwapChain();
-    this->_deletionStack.push([this]() { this->cleanupSwapChain(); });
+    createSwapChain(_mainProjectorSwapchain, _mainProjectorDisplay.surface);
+    this->_deletionStack.push([this]() { this->cleanupSwapChain(_mainProjectorSwapchain); });
 }
 
 void VulkanEngine::drawImGui()
@@ -1542,7 +1503,7 @@ void VulkanEngine::drawImGui()
     PROFILE_SCOPE(&_profiler, "ImGui Draw");
     _imguiManager.BeginImGuiContext();
     ImGui::SetNextWindowPos({0, 0});
-    if (ImGui::Begin("Vulkan Engine")) {
+    if (ImGui::Begin(DEFAULTS::Engine::APPLICATION_NAME)) {
         if (ImGui::BeginTabBar("Engine Tab")) {
             if (ImGui::BeginTabItem("General")) {
                 ImGui::Text("Surface counter: %lu", _surfaceCounterValue);
@@ -1653,9 +1614,10 @@ void VulkanEngine::bindDefaultInputs()
 
 void VulkanEngine::getMainProjectionMatrix(glm::mat4& projectionMatrix)
 {
+    auto& extent = _mainProjectorSwapchain.extent;
     projectionMatrix = glm::perspective(
         glm::radians(_FOV),
-        _swapChainExtent.width / (float)_swapChainExtent.height,
+        extent.width / static_cast<float>(extent.height),
         DEFAULTS::ZNEAR,
         DEFAULTS::ZFAR
     );
