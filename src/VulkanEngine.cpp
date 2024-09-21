@@ -32,6 +32,22 @@
 #include <xf86drm.h>
 #include <xf86drmMode.h>
 
+// creates a cow for now
+void VulkanEngine::createFunnyObjects()
+{
+    // lil cow
+    Entity* spot = new Entity("Spot");
+    auto meshInstance = _renderer.MakeMeshInstanceComponent(
+        DIRECTORIES::ASSETS + "models/spot.obj", DIRECTORIES::ASSETS + "textures/spot.png"
+    );
+    // give the lil cow a mesh
+    spot->AddComponent(meshInstance);
+    // give the lil cow a transform
+    spot->AddComponent(new TransformComponent());
+    // register lil cow
+    _renderer.AddEntity(spot);
+}
+
 // in CLI pop up a monitor selection interface, that lists
 // monitor names and properties
 // the user would input a number to select the right monitor.
@@ -312,6 +328,7 @@ void VulkanEngine::initExclusiveDisplay(VulkanEngine::DisplayContext& ctx)
 void VulkanEngine::initGLFW(const InitOptions& options)
 {
     glfwInit();
+    glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE); // hide window at beginning
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
     if (!glfwVulkanSupported()) {
@@ -345,7 +362,8 @@ void VulkanEngine::initGLFW(const InitOptions& options)
 #endif // __APPLE__
     }
 
-    this->_window = glfwCreateWindow(width, height, DEFAULTS::Engine::APPLICATION_NAME, monitor, nullptr);
+    this->_window
+        = glfwCreateWindow(width, height, DEFAULTS::Engine::APPLICATION_NAME, monitor, nullptr);
     if (this->_window == nullptr) {
         FATAL("Failed to initialize GLFW windlw!");
     }
@@ -390,6 +408,7 @@ void VulkanEngine::Init(const VulkanEngine::InitOptions& options)
     MoltenVKConfig::Setup();
 #endif // __APPLE__
     initGLFW(options);
+    ASSERT(_window);
     { // Input Handling
         auto keyCallback = [](GLFWwindow* window, int key, int scancode, int action, int mods) {
             VulkanEngine* pThis = reinterpret_cast<VulkanEngine*>(glfwGetWindowUserPointer(window));
@@ -408,7 +427,6 @@ void VulkanEngine::Init(const VulkanEngine::InitOptions& options)
         glfwSetCursorPosCallback(this->_window, cursorPosCallback);
         bindDefaultInputs();
     }
-
     // frame buffer never resizes, so no need for callback
     // glfwSetFramebufferSizeCallback(_window, this->framebufferResizeCallback);
     this->initVulkan();
@@ -445,20 +463,12 @@ void VulkanEngine::Init(const VulkanEngine::InitOptions& options)
 
     _renderer.Init(&initCtx);
     _deletionStack.push([this]() { _renderer.Cleanup(); });
-    // create example mesh
-    {
-        // lil cow
-        Entity* spot = new Entity("Spot");
-        auto meshInstance = _renderer.MakeMeshInstanceComponent(
-            DIRECTORIES::ASSETS + "models/spot.obj", DIRECTORIES::ASSETS + "textures/spot.png"
-        );
-        // give the lil cow a mesh
-        spot->AddComponent(meshInstance);
-        // give the lil cow a transform
-        spot->AddComponent(new TransformComponent());
-        // register lil cow
-        _renderer.AddEntity(spot);
-    }
+
+    createFunnyObjects();
+
+    // show glfw window at very end
+    ASSERT(_window);
+    glfwShowWindow(_window);
 }
 
 void VulkanEngine::Run()
@@ -759,7 +769,8 @@ void VulkanEngine::createGlfwWindowSurface()
     // if (result != VK_SUCCESS) {
     //     FATAL("Failed to create window surface.");
     // }
-    // _deletionStack.push([this]() { vkDestroySurfaceKHR(this->_instance, this->_surface, nullptr); }
+    // _deletionStack.push([this]() { vkDestroySurfaceKHR(this->_instance, this->_surface, nullptr);
+    // }
     // );
 }
 
@@ -974,9 +985,7 @@ void VulkanEngine::createSwapChain(VulkanEngine::SwapChainContext& ctx, const Vk
     ctx.image.resize(imageCount);
     ctx.imageView.resize(imageCount);
     ctx.frameBuffer.resize(imageCount);
-    vkGetSwapchainImagesKHR(
-        this->_device->logicalDevice, ctx.chain, &imageCount, ctx.image.data()
-    );
+    vkGetSwapchainImagesKHR(this->_device->logicalDevice, ctx.chain, &imageCount, ctx.image.data());
     ctx.imageFormat = surfaceFormat.format;
     DEBUG("Swap chain created!");
 }
@@ -1103,7 +1112,9 @@ void VulkanEngine::createImageViews(SwapChainContext& ctx)
     DEBUG("Image views created.");
 }
 
-void VulkanEngine::createSynchronizationObjects(std::array<SyncPrimitives, NUM_FRAME_IN_FLIGHT>& primitives)
+void VulkanEngine::createSynchronizationObjects(
+    std::array<SyncPrimitives, NUM_FRAME_IN_FLIGHT>& primitives
+)
 {
     DEBUG("Creating synchronization objects...");
     ASSERT(primitives.size() == NUM_FRAME_IN_FLIGHT);
@@ -1301,6 +1312,7 @@ void VulkanEngine::flushEngineUBOStatic(uint8_t frame)
 }
 
 #define POWER_ON_DISPLAY 0
+
 void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
 {
 #if POWER_ON_DISPLAY

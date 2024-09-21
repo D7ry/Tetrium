@@ -171,6 +171,7 @@ class VulkanEngine
     void createDevice();
     void createMainRenderPass(VulkanEngine::SwapChainContext& ctx); // create main render pass
     void createSynchronizationObjects(std::array<SyncPrimitives, NUM_FRAME_IN_FLIGHT>& primitives);
+    void createFunnyObjects();
 
 
     /* ---------- Physical Device Selection ---------- */
