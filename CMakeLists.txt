@@ -36,6 +36,9 @@ set(GLM_INCLUDE extern/glm)
 # tinyobjloader
 set(TINY_OBJ_LOADER_INCLUDE extern/tinyobjloader)
 
+# modules
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+
 project(quarkolor)
 
 add_executable(${PROJECT_NAME}
@@ -92,11 +95,13 @@ if (UNIX)
     else()
     find_package(Vulkan REQUIRED)
     find_package(X11 REQUIRED)
+    find_package(XCB REQUIRED)
     target_link_libraries(${PROJECT_NAME} Vulkan::Vulkan
         ${X11_LIBRARIES}
+        ${XCB_LIBRARIES}
         Xrandr
     )
-
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DVK_USE_PLATFORM_XCB_KHR")
     endif() # APPLE
 endif() # LINUX
 if (WIN32)

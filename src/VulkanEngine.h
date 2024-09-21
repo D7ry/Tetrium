@@ -17,6 +17,7 @@
 // linux
 #include "X11/Xlib.h"
 #include <X11/extensions/Xrandr.h>
+#include "vulkan/vulkan_xcb.h"
 #include "vulkan/vulkan_xlib.h"
 #include "vulkan/vulkan_xlib_xrandr.h"
 #endif
@@ -53,20 +54,21 @@ class VulkanEngine
 #ifndef NDEBUG
         VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
 #endif // NDEBUG
-        VK_EXT_DIRECT_MODE_DISPLAY_EXTENSION_NAME,
 #if __linux__
         VK_EXT_ACQUIRE_XLIB_DISPLAY_EXTENSION_NAME,
         VK_KHR_XLIB_SURFACE_EXTENSION_NAME,
 #endif // __LINUX__
         VK_KHR_SURFACE_EXTENSION_NAME,
         VK_KHR_DISPLAY_EXTENSION_NAME,
+        // https://github.com/nvpro-samples/vk_video_samples/blob/main/common/libs/VkShell/Shell.cpp#L181
+        VK_EXT_DIRECT_MODE_DISPLAY_EXTENSION_NAME,
     };
     // required device extensions
     static inline const std::vector<const char*> DEFAULT_DEVICE_EXTENSIONS = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME,
 
-        // debug
+        // debug extensions
         VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME,
         VK_NV_DEVICE_DIAGNOSTIC_CHECKPOINTS_EXTENSION_NAME,
         VK_NV_DEVICE_DIAGNOSTICS_CONFIG_EXTENSION_NAME,
@@ -92,7 +94,7 @@ class VulkanEngine
     // only tested on NVIDIA GPUs
     static inline const std::vector<const char*> EVEN_ODD_DEVICE_EXTENSIONS = {
         // https://registry.khronos.org/VulkanSC/specs/1.0-extensions/man/html/VK_EXT_display_control.html
-        VK_EXT_DISPLAY_CONTROL_EXTENSION_NAME,
+        VK_EXT_DISPLAY_CONTROL_EXTENSION_NAME, // to wake up display
     };
 
   public:

@@ -76,6 +76,133 @@ GLFWmonitor* VulkanEngine::cliMonitorSelection()
 
 void VulkanEngine::initDisplay()
 {
+
+    /* if (false){
+        int width = 1920;
+        int height = 1080;
+        uint32_t displayPropertyCount;
+        auto physicalDevice = _device->physicalDevice;
+
+        // Get display property
+        vkGetPhysicalDeviceDisplayPropertiesKHR(physicalDevice, &displayPropertyCount, NULL);
+        VkDisplayPropertiesKHR* pDisplayProperties
+            = new VkDisplayPropertiesKHR[displayPropertyCount];
+        vkGetPhysicalDeviceDisplayPropertiesKHR(
+            physicalDevice, &displayPropertyCount, pDisplayProperties
+        );
+
+        // Get plane property
+        uint32_t planePropertyCount;
+        vkGetPhysicalDeviceDisplayPlanePropertiesKHR(physicalDevice, &planePropertyCount, NULL);
+        VkDisplayPlanePropertiesKHR* pPlaneProperties
+            = new VkDisplayPlanePropertiesKHR[planePropertyCount];
+        vkGetPhysicalDeviceDisplayPlanePropertiesKHR(
+            physicalDevice, &planePropertyCount, pPlaneProperties
+        );
+
+        VkDisplayKHR display = VK_NULL_HANDLE;
+        VkDisplayModeKHR displayMode;
+        VkDisplayModePropertiesKHR* pModeProperties;
+        bool foundMode = false;
+
+        for (uint32_t i = 0; i < displayPropertyCount; ++i) {
+            display = pDisplayProperties[i].display;
+            uint32_t modeCount;
+            vkGetDisplayModePropertiesKHR(physicalDevice, display, &modeCount, NULL);
+            pModeProperties = new VkDisplayModePropertiesKHR[modeCount];
+            vkGetDisplayModePropertiesKHR(physicalDevice, display, &modeCount, pModeProperties);
+
+            for (uint32_t j = 0; j < modeCount; ++j) {
+                const VkDisplayModePropertiesKHR* mode = &pModeProperties[j];
+
+                if (mode->parameters.visibleRegion.width == width
+                    && mode->parameters.visibleRegion.height == height) {
+                    displayMode = mode->displayMode;
+                    foundMode = true;
+                    break;
+                }
+            }
+            if (foundMode) {
+                break;
+            }
+            delete[] pModeProperties;
+        }
+
+        if (!foundMode) {
+            FATAL("Can't find a display and a display mode!");
+        }
+
+        // Search for a best plane we can use
+        uint32_t bestPlaneIndex = UINT32_MAX;
+        VkDisplayKHR* pDisplays = NULL;
+        for (uint32_t i = 0; i < planePropertyCount; i++) {
+            uint32_t planeIndex = i;
+            uint32_t displayCount;
+            vkGetDisplayPlaneSupportedDisplaysKHR(physicalDevice, planeIndex, &displayCount, NULL);
+            if (pDisplays) {
+                delete[] pDisplays;
+            }
+            pDisplays = new VkDisplayKHR[displayCount];
+            vkGetDisplayPlaneSupportedDisplaysKHR(
+                physicalDevice, planeIndex, &displayCount, pDisplays
+            );
+
+            // Find a display that matches the current plane
+            bestPlaneIndex = UINT32_MAX;
+            for (uint32_t j = 0; j < displayCount; j++) {
+                if (display == pDisplays[j]) {
+                    bestPlaneIndex = i;
+                    break;
+                }
+            }
+            if (bestPlaneIndex != UINT32_MAX) {
+                break;
+            }
+        }
+
+        if (bestPlaneIndex == UINT32_MAX) {
+            FATAL("Can't find a plane for displaying!");
+        }
+
+        VkDisplayPlaneCapabilitiesKHR planeCap;
+        vkGetDisplayPlaneCapabilitiesKHR(physicalDevice, displayMode, bestPlaneIndex, &planeCap);
+        VkDisplayPlaneAlphaFlagBitsKHR alphaMode = (VkDisplayPlaneAlphaFlagBitsKHR)0;
+
+        if (planeCap.supportedAlpha & VK_DISPLAY_PLANE_ALPHA_PER_PIXEL_PREMULTIPLIED_BIT_KHR) {
+            alphaMode = VK_DISPLAY_PLANE_ALPHA_PER_PIXEL_PREMULTIPLIED_BIT_KHR;
+        } else if (planeCap.supportedAlpha & VK_DISPLAY_PLANE_ALPHA_PER_PIXEL_BIT_KHR) {
+            alphaMode = VK_DISPLAY_PLANE_ALPHA_PER_PIXEL_BIT_KHR;
+        } else if (planeCap.supportedAlpha & VK_DISPLAY_PLANE_ALPHA_GLOBAL_BIT_KHR) {
+            alphaMode = VK_DISPLAY_PLANE_ALPHA_GLOBAL_BIT_KHR;
+        } else if (planeCap.supportedAlpha & VK_DISPLAY_PLANE_ALPHA_OPAQUE_BIT_KHR) {
+            alphaMode = VK_DISPLAY_PLANE_ALPHA_OPAQUE_BIT_KHR;
+        }
+
+        VkDisplaySurfaceCreateInfoKHR surfaceInfo{};
+        surfaceInfo.sType = VK_STRUCTURE_TYPE_DISPLAY_SURFACE_CREATE_INFO_KHR;
+        surfaceInfo.pNext = NULL;
+        surfaceInfo.flags = 0;
+        surfaceInfo.displayMode = displayMode;
+        surfaceInfo.planeIndex = bestPlaneIndex;
+        surfaceInfo.planeStackIndex = pPlaneProperties[bestPlaneIndex].currentStackIndex;
+        surfaceInfo.transform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+        surfaceInfo.globalAlpha = 1.0;
+        surfaceInfo.alphaMode = alphaMode;
+        surfaceInfo.imageExtent.width = width;
+        surfaceInfo.imageExtent.height = height;
+
+        VkResult result = vkCreateDisplayPlaneSurfaceKHR(_instance, &surfaceInfo, NULL, &_displaySurface);
+        _surface = _displaySurface;
+        if (result != VK_SUCCESS) {
+            FATAL("Failed to create surface!");
+        }
+        DEBUG("created display surface");
+
+        delete[] pDisplays;
+        delete[] pModeProperties;
+        delete[] pDisplayProperties;
+        delete[] pPlaneProperties;
+    } */
     auto device = _device->physicalDevice;
 
     // Get the X11 display name for the selected Vulkan display
@@ -120,24 +247,25 @@ void VulkanEngine::initDisplay()
     }
 
     // Prompt user for selection
-    size_t selectedIndex = 1; // defaults to 1 for vulkan configurator
-    // do {
-    //     std::cout << "Enter the index of the display you want to use (0-" << displays.size() - 1
-    //               << "): ";
-    //     std::cin >> selectedIndex;
-    // } while (selectedIndex >= displays.size());
+    size_t selectedIndex = 0; // defaults to 1 for vulkan configurator
+    do {
+        std::cout << "Enter the index of the display you want to use (0-" << displays.size() - 1
+                  << "): ";
+        std::cin >> selectedIndex;
+    } while (selectedIndex >= displays.size());
 
     _display = displays[selectedIndex];
+    if (1) { // acquire exclusive display access
+        DEBUG("Acquiring exclusive access to display...");
+        // Acquire the display
+        PFN_vkAcquireXlibDisplayEXT vkAcquireXlibDisplayEXT
+            = reinterpret_cast<PFN_vkAcquireXlibDisplayEXT>(
+                vkGetInstanceProcAddr(_instance, "vkAcquireXlibDisplayEXT")
+            );
+        ASSERT(vkAcquireXlibDisplayEXT);
 
-    DEBUG("Acquiring exclusive access to display...");
-    // Acquire the display
-    PFN_vkAcquireXlibDisplayEXT vkAcquireXlibDisplayEXT
-        = reinterpret_cast<PFN_vkAcquireXlibDisplayEXT>(
-            vkGetInstanceProcAddr(_instance, "vkAcquireXlibDisplayEXT")
-        );
-    ASSERT(vkAcquireXlibDisplayEXT);
-
-    VK_CHECK_RESULT(vkAcquireXlibDisplayEXT(device, xDisplay, _display));
+        VK_CHECK_RESULT(vkAcquireXlibDisplayEXT(device, xDisplay, _display));
+    }
     // Get display mode properties
     uint32_t modeCount = 0;
     vkGetDisplayModePropertiesKHR(device, _display, &modeCount, nullptr);
@@ -156,35 +284,45 @@ void VulkanEngine::initDisplay()
 
     // Get user input for mode selection
     uint32_t selectedModeIndex = 0;
-    // do {
-    //     std::cout << "Enter the index of the mode you want to use (0-" << modeCount - 1 << "): ";
-    //     std::cin >> selectedModeIndex;
-    // } while (selectedModeIndex >= modeCount);
+    do {
+        std::cout << "Enter the index of the mode you want to use (0-" << modeCount - 1 << "): ";
+        std::cin >> selectedModeIndex;
+    } while (selectedModeIndex >= modeCount);
 
     VkDisplayModeKHR displayMode = modeProperties[selectedModeIndex].displayMode;
 
     // Find a compatible plane
+    bool foundPlaneIndex = false;
     uint32_t planeCount = 0;
+    uint32_t stackIndex = 0;
     vkGetPhysicalDeviceDisplayPlanePropertiesKHR(device, &planeCount, nullptr);
+    std::vector<VkDisplayPlanePropertiesKHR> planeProperties(planeCount);
+    vkGetPhysicalDeviceDisplayPlanePropertiesKHR(device, &planeCount, planeProperties.data());
+
     for (uint32_t i = 0; i < planeCount; i++) {
         uint32_t displayCount = 0;
+        const VkDisplayPlanePropertiesKHR& planeProperty = planeProperties[i];
         vkGetDisplayPlaneSupportedDisplaysKHR(device, i, &displayCount, nullptr);
         if (displayCount > 0) {
             std::vector<VkDisplayKHR> displays(displayCount);
             vkGetDisplayPlaneSupportedDisplaysKHR(device, i, &displayCount, displays.data());
             if (std::find(displays.begin(), displays.end(), _display) != displays.end()) {
                 _displayPlaneIndex = i;
+                stackIndex = planeProperty.currentStackIndex;
+                foundPlaneIndex = true;
                 break;
             }
         }
     }
+    ASSERT(foundPlaneIndex);
+    DEBUG("plane index: {}; stack index: {}", _displayPlaneIndex, stackIndex);
 
     // Create display surface
     VkDisplaySurfaceCreateInfoKHR surfaceCreateInfo = {};
     surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_DISPLAY_SURFACE_CREATE_INFO_KHR;
     surfaceCreateInfo.displayMode = displayMode;
     surfaceCreateInfo.planeIndex = _displayPlaneIndex;
-    surfaceCreateInfo.planeStackIndex = 0;
+    surfaceCreateInfo.planeStackIndex = stackIndex;
     surfaceCreateInfo.transform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
     surfaceCreateInfo.globalAlpha = 1.0f;
     surfaceCreateInfo.alphaMode = VK_DISPLAY_PLANE_ALPHA_OPAQUE_BIT_KHR;
@@ -199,6 +337,7 @@ void VulkanEngine::initDisplay()
 
     // Store the display properties for later use
     _displayExtent = modeProperties[selectedModeIndex].parameters.visibleRegion;
+    DEBUG("display extent: {} {}", _displayExtent.width, _displayExtent.height);
 
     // Close X11 display
     XCloseDisplay(xDisplay);
@@ -452,8 +591,7 @@ void VulkanEngine::checkEvenOddFrameSupport()
     }
 
     VkSurfaceCapabilities2EXT capabilities{
-        .sType = VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES_2_EXT, .pNext = VK_NULL_HANDLE
-    };
+        .sType = VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES_2_EXT, .pNext = VK_NULL_HANDLE};
 
     auto func = (PFN_vkGetPhysicalDeviceSurfaceCapabilities2EXT
     )vkGetInstanceProcAddr(_instance, "vkGetPhysicalDeviceSurfaceCapabilities2EXT");
@@ -462,10 +600,11 @@ void VulkanEngine::checkEvenOddFrameSupport()
             "Failed to find function pointer to {}", "vkGetPhysicalDeviceSurfaceCapabilities2EXT"
         );
     }
-    VK_CHECK_RESULT(func(_device->physicalDevice, _surface, &capabilities));
+    VK_CHECK_RESULT(func(_device->physicalDevice, _displaySurface, &capabilities));
     bool hasVerticalBlankingCounter
         = (capabilities.supportedSurfaceCounters
-          & VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_BIT_EXT) != 0;
+           & VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_BIT_EXT)
+          != 0;
     if (!hasVerticalBlankingCounter) {
         PANIC("Even-odd frame not supported!");
     }
@@ -484,6 +623,7 @@ void VulkanEngine::initVulkan()
     this->_device->CreateLogicalDeviceAndQueue(getRequiredDeviceExtensions());
     this->_device->CreateGraphicsCommandPool();
     this->_device->CreateGraphicsCommandBuffer(NUM_FRAME_IN_FLIGHT);
+
     this->initSwapChain();
     this->createImageViews();
     this->createRenderPass();
@@ -510,6 +650,7 @@ void VulkanEngine::initVulkan()
         setUpEvenOddFrame();
     }
     this->_deletionStack.push([this]() { this->_imguiManager.Cleanup(_device->logicalDevice); });
+
     INFO("Vulkan initialized.");
 }
 
@@ -615,7 +756,7 @@ void VulkanEngine::createInstance()
 #ifndef NDEBUG
     // enable debug printing
     // VkValidationFeatureEnableEXT enabled[] = {VK_VALIDATION_FEATURE_ENABLE_DEBUG_PRINTF_EXT};
-    //VkValidationFeatureEnableEXT enabled[] = {};
+    // VkValidationFeatureEnableEXT enabled[] = {};
     VkValidationFeaturesEXT features{VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT};
     features.disabledValidationFeatureCount = 0;
     features.enabledValidationFeatureCount = 0;
@@ -716,7 +857,9 @@ VulkanEngine::QueueFamilyIndices VulkanEngine::findQueueFamilies(VkPhysicalDevic
             indices.graphicsFamily = i;
             DEBUG("Graphics family found at {}", i);
         }
-        vkGetPhysicalDeviceSurfaceSupportKHR(device, i, this->_surface, &presentationSupport);
+        vkGetPhysicalDeviceSurfaceSupportKHR(
+            device, i, this->_displaySurface, &presentationSupport
+        );
         if (presentationSupport) {
             indices.presentationFamily = i;
             DEBUG("Presentation family found at {}", i);
@@ -868,18 +1011,17 @@ void VulkanEngine::createSwapChain()
     createInfo.clipped = VK_TRUE;
 
     createInfo.oldSwapchain = VK_NULL_HANDLE;
-
-    VkSwapchainCounterCreateInfoEXT swapChainCounterCreateInfo{
-        .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_COUNTER_CREATE_INFO_EXT,
-        .pNext = NULL,
-        .surfaceCounters = VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_BIT_EXT
-    };
-
-    if (_evenOddMode) {
-        DEBUG("swapchain created with counter support!");
-        swapChainCounterCreateInfo.pNext = createInfo.pNext;
-        createInfo.pNext = &swapChainCounterCreateInfo;
-    }
+    //
+    // VkSwapchainCounterCreateInfoEXT swapChainCounterCreateInfo{
+    //     .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_COUNTER_CREATE_INFO_EXT,
+    //     .pNext = NULL,
+    //     .surfaceCounters = VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_BIT_EXT};
+    //
+    // if (_evenOddMode) {
+    //     DEBUG("swapchain created with counter support!");
+    //     swapChainCounterCreateInfo.pNext = createInfo.pNext;
+    //     createInfo.pNext = &swapChainCounterCreateInfo;
+    // }
 
     VK_CHECK_RESULT(
         vkCreateSwapchainKHR(this->_device->logicalDevice, &createInfo, nullptr, &_swapChain)
@@ -957,6 +1099,7 @@ VulkanEngine::SwapChainSupportDetails VulkanEngine::querySwapChainSupport(VkPhys
 
     uint32_t presentModeCount;
     vkGetPhysicalDeviceSurfacePresentModesKHR(device, _displaySurface, &presentModeCount, nullptr);
+    DEBUG("present mode count: {}", presentModeCount);
 
     if (presentModeCount != 0) {
         details.presentModes.resize(presentModeCount);
@@ -986,7 +1129,9 @@ VkPresentModeKHR VulkanEngine::chooseSwapPresentMode(
     const std::vector<VkPresentModeKHR>& availablePresentModes
 )
 {
+    DEBUG("available present modes: ");
     for (const auto& availablePresentMode : availablePresentModes) {
+        DEBUG("{}", string_VkPresentModeKHR(availablePresentMode));
         if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
             return availablePresentMode;
         }
@@ -1242,6 +1387,23 @@ void VulkanEngine::flushEngineUBOStatic(uint8_t frame)
 
 void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
 {
+
+    static bool poweredOn = false;
+    if (false && !poweredOn) {
+        poweredOn = true;
+        // power on display
+        DEBUG("Turning display on...");
+        VkDisplayPowerInfoEXT powerInfo{
+            .sType = VK_STRUCTURE_TYPE_DISPLAY_POWER_INFO_EXT,
+            .pNext = VK_NULL_HANDLE,
+            .powerState = VkDisplayPowerStateEXT::VK_DISPLAY_POWER_STATE_ON_EXT};
+        PFN_vkDisplayPowerControlEXT fnPtr = reinterpret_cast<PFN_vkDisplayPowerControlEXT>(
+            vkGetInstanceProcAddr(_instance, "vkDisplayPowerControlEXT")
+        );
+        ASSERT(fnPtr);
+        VK_CHECK_RESULT(fnPtr(_device->logicalDevice, _display, &powerInfo));
+        std::this_thread::sleep_for(std::chrono::seconds(5));
+    }
     DEBUG("being draw frame");
     EngineSynchronizationPrimitives& sync = _synchronizationPrimitives[frame];
 
@@ -1266,14 +1428,18 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
         VK_NULL_HANDLE,
         &imageIndex
     );
-    [[unlikely]] if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+    [[unlikely]] if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
+    {
         this->recreateSwapChain();
         return;
-    } else [[unlikely]] if (result != VK_SUCCESS) {
+    }
+    else [[unlikely]] if (result != VK_SUCCESS)
+    {
         const char* res = string_VkResult(result);
         PANIC("Failed to acquire swap chain image: {}", res);
     }
 
+    DEBUG("drawing image index {}", imageIndex);
     // lock the fence
     vkResetFences(this->_device->logicalDevice, 1, &sync.fenceInFlight);
 
@@ -1370,6 +1536,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
             != VK_SUCCESS) {
             FATAL("Failed to submit draw command buffer!");
         }
+        DEBUG("submitted!");
     }
 
     //  Present the swap chain image
@@ -1394,7 +1561,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
         || this->_framebufferResized) {
         [[unlikely]] this->recreateSwapChain();
         this->_framebufferResized = false;
-    } 
+    }
     // DEBUG("tick");
     VK_CHECK_RESULT(result);
 }
