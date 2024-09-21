@@ -1,10 +1,9 @@
 #pragma once
 // stl
 #include <cstdint>
-#include <filesystem>
+#include <initializer_list>
 #include <memory>
 #include <optional>
-#include <initializer_list>
 
 // vulkan
 #include <vulkan/vulkan.h>
@@ -14,12 +13,13 @@
 #endif
 
 #ifdef __linux__
-// linux
+// clang-format off
+// direct display utilities
 #include "X11/Xlib.h"
 #include <X11/extensions/Xrandr.h>
-#include "vulkan/vulkan_xcb.h"
 #include "vulkan/vulkan_xlib.h"
 #include "vulkan/vulkan_xlib_xrandr.h"
+// clang-foramt on
 #endif
 
 // vq library
@@ -54,11 +54,6 @@ class VulkanEngine
 #ifndef NDEBUG
         VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
 #endif // NDEBUG
-#if __linux__
-        VK_EXT_ACQUIRE_XLIB_DISPLAY_EXTENSION_NAME,
-        VK_EXT_ACQUIRE_DRM_DISPLAY_EXTENSION_NAME,
-        VK_KHR_XLIB_SURFACE_EXTENSION_NAME,
-#endif // __LINUX__
         VK_KHR_SURFACE_EXTENSION_NAME,
         VK_KHR_DISPLAY_EXTENSION_NAME,
         // https://github.com/nvpro-samples/vk_video_samples/blob/main/common/libs/VkShell/Shell.cpp#L181
@@ -68,13 +63,9 @@ class VulkanEngine
     static inline const std::vector<const char*> DEFAULT_DEVICE_EXTENSIONS = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME,
-
-        // debug extensions
-        VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME,
-        VK_NV_DEVICE_DIAGNOSTIC_CHECKPOINTS_EXTENSION_NAME,
-        VK_NV_DEVICE_DIAGNOSTICS_CONFIG_EXTENSION_NAME,
         //https://forums.developer.nvidia.com/t/vk-khr-display-swapchain-not-present-on-linux/70781
-        // VK_KHR_DISPLAY_SWAPCHAIN_EXTENSION_NAME,
+        // VK_KHR_DISPLAY_SWAPCHAIN_EXTENSION_NAME, // NOTE: we don't need the display-swapchain extension,
+                                                    // instead use VK_EXT_ACQUIRE_XLIB_DISPLAY_EXTENSION
 #if __APPLE__ // molten vk support
         VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME,
     // VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME
@@ -89,6 +80,11 @@ class VulkanEngine
     std::unordered_set<std::string> EVEN_ODD_INSTANCE_EXTENSIONS = {
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_EXT_display_surface_counter.html
         VK_EXT_DISPLAY_SURFACE_COUNTER_EXTENSION_NAME,
+#if __linux__
+        VK_EXT_ACQUIRE_XLIB_DISPLAY_EXTENSION_NAME,
+        // VK_EXT_ACQUIRE_DRM_DISPLAY_EXTENSION_NAME,
+        VK_KHR_XLIB_SURFACE_EXTENSION_NAME,
+#endif // __LINUX__
     };
 
     // device extensions required for even-odd rendering
@@ -101,7 +97,7 @@ class VulkanEngine
   public:
     struct InitOptions
     {
-        bool evenOddMode = true;
+        bool evenOddMode = true;             // enable even-odd mode
         bool fullScreen = false;             // full screen mode
         bool manualMonitorSelection = false; // the user may select a monitor that's not the primary
                                              // monitor through CLI
@@ -138,22 +134,44 @@ class VulkanEngine
         std::vector<VkPresentModeKHR> presentModes;
     };
 
+    struct SwapChainContext
+    {
+        VkSwapchainKHR swapChain = VK_NULL_HANDLE;
+        VkFormat swapChainImageFormat;
+        VkExtent2D swapChainExtent; // resolution of the swapchain images
+        std::vector<VkFramebuffer> frameBuffer;
+        std::vector<VkImage> image;
+        std::vector<VkImageView> imageView;
+        VkImage depthImage;
+        VkDeviceMemory depthImageMemory;
+        VkImageView depthImageView;
+        VkSurfaceKHR surface;
+    };
+
+    struct DisplayContext {
+        VkExtent2D extent;
+        VkDisplayKHR display;
+        VkSurfaceKHR surface;
+        uint32_t planeIndex;
+    };
+
     /* ---------- Initialization Subroutines ---------- */
     GLFWmonitor* cliMonitorSelection();
     void initGLFW(const InitOptions& options);
-    void selectDisplayDRM();
-    void selectDisplayXlib();
-    void initExclusiveDisplay();
+
+    [[deprecated("Use selectDisplayXlib")]]
+    void selectDisplayDRM(DisplayContext& ctx);
+    void selectDisplayXlib(DisplayContext& ctx);
+    void initExclusiveDisplay(DisplayContext& ctx);
     void initVulkan();
     void createInstance();
     void createGlfwWindowSurface();
     void createDevice();
-    void createRenderPass(); // create main render pass
-    void createFramebuffers();
+    void createMainRenderPass(VulkanEngine::SwapChainContext& ctx); // create main render pass
     void createSynchronizationObjects();
 
     /* ---------- Even-Odd frame ---------- */
-    void checkEvenOddFrameSupport(); // checks hw support for even-odd rendering
+    void checkHardwareEvenOddFrameSupport(); // checks hw support for even-odd rendering
     void setUpEvenOddFrame();        // set up resources for even-odd frame
 
     /* ---------- Physical Device Selection ---------- */
@@ -164,7 +182,7 @@ class VulkanEngine
     const std::vector<const char*> getRequiredDeviceExtensions() const;
 
     /* ---------- Swapchain ---------- */
-    SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device);
+    SwapChainSupportDetails queryPhysicalDeviceSwapchainSupportForSurface(VkSurfaceKHR surface);
     VkSurfaceFormatKHR chooseSwapSurfaceFormat(
         const std::vector<VkSurfaceFormatKHR>& availableFormats
     );
@@ -173,12 +191,12 @@ class VulkanEngine
     );
     VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
     void initSwapChain();
-    void createSwapChain();
-    void recreateSwapChain();
-    void cleanupSwapChain();
-    void createImageViews();
-    void createDepthBuffer();
-
+    void createSwapChain(VulkanEngine::SwapChainContext& ctx, const VkSurfaceKHR surface);
+    void recreateSwapChain(SwapChainContext& ctx);
+    void cleanupSwapChain(SwapChainContext& ctx);
+    void createImageViews(SwapChainContext& ctx);
+    void createDepthBuffer(SwapChainContext& ctx);
+    void createFramebuffers(SwapChainContext& ctx);
     bool checkValidationLayerSupport();
 
     /* ---------- Debug Utilities ---------- */
@@ -218,29 +236,13 @@ class VulkanEngine
 
     GLFWwindow* _window;
     VkInstance _instance;
-    [[maybe_unused]] VkSurfaceKHR _surface;
 
-    // device surface resources
-    VkExtent2D _displayExtent;
-    VkDisplayKHR _display;
-    VkSurfaceKHR _displaySurface;
-    uint32_t _displayPlaneIndex;
+    DisplayContext _mainProjectorDisplay;
 
     /* ---------- swapchain ---------- */
-    VkSwapchainKHR _swapChain = VK_NULL_HANDLE;
-    VkFormat _swapChainImageFormat;
-    VkExtent2D _swapChainExtent; // resolution of the swapchain images
 
-    // each element corresponds to one image in the swap chain
-    struct SwapChainData
-    {
-        std::vector<VkFramebuffer> frameBuffer;
-        std::vector<VkImage> image;
-        std::vector<VkImageView> imageView;
-    };
-
-    SwapChainData _projectorSwapchainData;
-    SwapChainData _controllerSwapchainData;
+    SwapChainContext _mainProjectorSwapchain;
+    SwapChainContext _controllerSwapchainCtx;
 
     /* ---------- Synchronization Primivites ---------- */
     struct EngineSynchronizationPrimitives
@@ -253,9 +255,6 @@ class VulkanEngine
     std::array<EngineSynchronizationPrimitives, NUM_FRAME_IN_FLIGHT> _synchronizationPrimitives;
 
     /* ---------- Depth Buffer ---------- */
-    VkImage _depthImage;
-    VkDeviceMemory _depthImageMemory;
-    VkImageView _depthImageView;
 
     /* ---------- Render Passes ---------- */
     // main render pass, and currently the only render pass
