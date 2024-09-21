@@ -433,7 +433,7 @@ void VulkanEngine::Init(const VulkanEngine::InitOptions& options)
     { // populate initData
         initCtx.device = this->_device.get();
         initCtx.textureManager = &_textureManager;
-        initCtx.swapChainImageFormat = this->_mainProjectorSwapchain.swapChainImageFormat;
+        initCtx.swapChainImageFormat = this->_mainProjectorSwapchain.imageFormat;
         initCtx.renderPass.mainPass = _mainRenderPass;
         for (int i = 0; i < _engineUBOStatic.size(); i++) {
             initCtx.engineUBOStaticDescriptorBufferInfo[i].range = sizeof(EngineUBOStatic);
@@ -598,7 +598,7 @@ void VulkanEngine::initVulkan()
     this->createDepthBuffer(_mainProjectorSwapchain);
     this->createSynchronizationObjects();
     this->_imguiManager.InitializeRenderPass(
-        this->_device->logicalDevice, _mainProjectorSwapchain.swapChainImageFormat
+        this->_device->logicalDevice, _mainProjectorSwapchain.imageFormat
     );
     // NOTE: this has to go after ImGuiManager::InitializeRenderPass
     // because the function also creates imgui's frame buffer
@@ -1002,17 +1002,17 @@ void VulkanEngine::createSwapChain(VulkanEngine::SwapChainContext& ctx, const Vk
         vkCreateSwapchainKHR(this->_device->logicalDevice, &createInfo, nullptr, &swapChain)
     );
 
-    ctx.swapChain = swapChain;
+    ctx.chain = swapChain;
     ctx.surface = surface;
-    ctx.swapChainExtent = extent;
-    vkGetSwapchainImagesKHR(this->_device->logicalDevice, ctx.swapChain, &imageCount, nullptr);
+    ctx.extent = extent;
+    vkGetSwapchainImagesKHR(this->_device->logicalDevice, ctx.chain, &imageCount, nullptr);
     ctx.image.resize(imageCount);
     ctx.imageView.resize(imageCount);
     ctx.frameBuffer.resize(imageCount);
     vkGetSwapchainImagesKHR(
-        this->_device->logicalDevice, ctx.swapChain, &imageCount, ctx.image.data()
+        this->_device->logicalDevice, ctx.chain, &imageCount, ctx.image.data()
     );
-    ctx.swapChainImageFormat = surfaceFormat.format;
+    ctx.imageFormat = surfaceFormat.format;
     DEBUG("Swap chain created!");
 }
 
@@ -1030,7 +1030,7 @@ void VulkanEngine::cleanupSwapChain(SwapChainContext& ctx)
     for (VkImageView imageView : ctx.imageView) {
         vkDestroyImageView(this->_device->logicalDevice, imageView, nullptr);
     }
-    vkDestroySwapchainKHR(this->_device->logicalDevice, ctx.swapChain, nullptr);
+    vkDestroySwapchainKHR(this->_device->logicalDevice, ctx.chain, nullptr);
 }
 
 void VulkanEngine::recreateSwapChain(SwapChainContext& ctx)
@@ -1148,7 +1148,7 @@ void VulkanEngine::createImageViews(SwapChainContext& ctx)
         createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
         createInfo.image = _mainProjectorSwapchain.image[i];
         createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        createInfo.format = _mainProjectorSwapchain.swapChainImageFormat;
+        createInfo.format = _mainProjectorSwapchain.imageFormat;
         createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
         createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
         createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -1217,7 +1217,7 @@ void VulkanEngine::createMainRenderPass(VulkanEngine::SwapChainContext& ctx)
 {
     DEBUG("Creating render pass...");
     VkAttachmentDescription colorAttachment{};
-    colorAttachment.format = ctx.swapChainImageFormat;
+    colorAttachment.format = ctx.imageFormat;
     colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
 
     colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
@@ -1307,8 +1307,8 @@ void VulkanEngine::createFramebuffers(SwapChainContext& ctx)
                                                       // same formats
         framebufferInfo.attachmentCount = sizeof(attachments) / sizeof(VkImageView);
         framebufferInfo.pAttachments = attachments;
-        framebufferInfo.width = ctx.swapChainExtent.width;
-        framebufferInfo.height = ctx.swapChainExtent.height;
+        framebufferInfo.width = ctx.extent.width;
+        framebufferInfo.height = ctx.extent.height;
         framebufferInfo.layers = 1; // number of layers in image arrays
         if (vkCreateFramebuffer(
                 _device->logicalDevice,
@@ -1324,7 +1324,7 @@ void VulkanEngine::createFramebuffers(SwapChainContext& ctx)
         this->_mainProjectorSwapchain.image.size(),
         _device->logicalDevice,
         _mainProjectorSwapchain.imageView,
-        _mainProjectorSwapchain.swapChainExtent
+        _mainProjectorSwapchain.extent
     );
 }
 
@@ -1338,8 +1338,8 @@ void VulkanEngine::createDepthBuffer(SwapChainContext& ctx)
         _device->physicalDevice
     );
     VulkanUtils::createImage(
-        ctx.swapChainExtent.width,
-        ctx.swapChainExtent.height,
+        ctx.extent.width,
+        ctx.extent.height,
         depthFormat,
         VK_IMAGE_TILING_OPTIMAL,
         VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
@@ -1395,7 +1395,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
 
     auto res = _pFNvkGetSwapchainCounterEXT(
         _device->logicalDevice,
-        _mainProjectorSwapchain.swapChain,
+        _mainProjectorSwapchain.chain,
         VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_EXT,
         &_surfaceCounterValue
     );
@@ -1405,7 +1405,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     uint32_t imageIndex;
     VkResult result = vkAcquireNextImageKHR(
         this->_device->logicalDevice,
-        _mainProjectorSwapchain.swapChain,
+        _mainProjectorSwapchain.chain,
         UINT64_MAX,
         sync.semaImageAvailable,
         VK_NULL_HANDLE,
@@ -1434,7 +1434,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
         ctx->graphics.currentSwapchainImageIndex = imageIndex;
         ctx->graphics.CB = CB;
         ctx->graphics.currentFB = FB;
-        ctx->graphics.currentFBextend = _mainProjectorSwapchain.swapChainExtent;
+        ctx->graphics.currentFBextend = _mainProjectorSwapchain.extent;
         getMainProjectionMatrix(ctx->graphics.mainProjectionMatrix);
     }
 
@@ -1447,7 +1447,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     }
 
     { // main render pass
-        vk::Extent2D extend = _mainProjectorSwapchain.swapChainExtent;
+        vk::Extent2D extend = _mainProjectorSwapchain.extent;
         // the main render pass renders the actual graphics of the game.
         { // begin main render pass
             vk::Rect2D renderArea(VkOffset2D{0, 0}, extend);
@@ -1525,7 +1525,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     presentInfo.waitSemaphoreCount = 1;
     presentInfo.pWaitSemaphores = signalSemaphores;
 
-    VkSwapchainKHR swapChains[] = {_mainProjectorSwapchain.swapChain};
+    VkSwapchainKHR swapChains[] = {_mainProjectorSwapchain.chain};
 
     presentInfo.swapchainCount = 1;
     presentInfo.pSwapchains = swapChains;
@@ -1669,7 +1669,7 @@ void VulkanEngine::bindDefaultInputs()
 
 void VulkanEngine::getMainProjectionMatrix(glm::mat4& projectionMatrix)
 {
-    auto& extent = _mainProjectorSwapchain.swapChainExtent;
+    auto& extent = _mainProjectorSwapchain.extent;
     projectionMatrix = glm::perspective(
         glm::radians(_FOV),
         extent.width / static_cast<float>(extent.height),

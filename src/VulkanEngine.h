@@ -136,9 +136,9 @@ class VulkanEngine
 
     struct SwapChainContext
     {
-        VkSwapchainKHR swapChain = VK_NULL_HANDLE;
-        VkFormat swapChainImageFormat;
-        VkExtent2D swapChainExtent; // resolution of the swapchain images
+        VkSwapchainKHR chain = VK_NULL_HANDLE;
+        VkFormat imageFormat;
+        VkExtent2D extent; // resolution of the swapchain images
         std::vector<VkFramebuffer> frameBuffer;
         std::vector<VkImage> image;
         std::vector<VkImageView> imageView;
