@@ -222,6 +222,7 @@ class VulkanEngine
     /* ---------- Even-Odd frame ---------- */
     void checkHardwareEvenOddFrameSupport(); // checks hw support for even-odd rendering
     void setUpEvenOddFrame();        // set up resources for even-odd frame
+    bool isEvenFrame();
 
     /* ---------- Top-level data ---------- */
     VkInstance _instance;
@@ -271,6 +272,8 @@ class VulkanEngine
     float _timeSinceStartSeconds; // seconds in time since engine start
     unsigned long int _numTicks;  // how many ticks has happened so far
 
+    // even-odd frame
+    bool _flipEvenOdd = false; // whether to flip even-odd frame
     uint64_t _surfaceCounterValue = 0;
     PFN_vkGetSwapchainCounterEXT _pFNvkGetSwapchainCounterEXT = nullptr;
 
@@ -291,6 +294,8 @@ class VulkanEngine
     ImGuiWidgetPerfPlot _widgetPerfPlot;
     friend class ImGuiWidgetUBOViewer;
     ImGuiWidgetUBOViewer _widgetUBOViewer;
+    friend class ImGuiWidgetEvenOdd;
+    ImGuiWidgetEvenOdd _widgetEvenOdd;
 
     // ecs Systems
     SimpleRenderSystem _renderer;

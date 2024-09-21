@@ -1526,7 +1526,6 @@ void VulkanEngine::drawImGui()
     if (ImGui::Begin(DEFAULTS::Engine::APPLICATION_NAME)) {
         if (ImGui::BeginTabBar("Engine Tab")) {
             if (ImGui::BeginTabItem("General")) {
-                ImGui::Text("Surface counter: %lu", _surfaceCounterValue);
                 ImGui::SeparatorText("Camera");
                 {
                     ImGui::Text(
@@ -1569,6 +1568,11 @@ void VulkanEngine::drawImGui()
 
             if (ImGui::BeginTabItem("Device")) {
                 _widgetDeviceInfo.Draw(this);
+                ImGui::EndTabItem();
+            }
+
+            if (ImGui::BeginTabItem("Even-Odd")) {
+                _widgetEvenOdd.Draw(this);
                 ImGui::EndTabItem();
             }
 
@@ -1655,4 +1659,13 @@ void VulkanEngine::getMainProjectionMatrix(glm::mat4& projectionMatrix)
         DEFAULTS::ZFAR
     );
     projectionMatrix[1][1] *= -1; // invert for vulkan coord system
+}
+
+bool VulkanEngine::isEvenFrame()
+{
+    bool isEven = _surfaceCounterValue % 2 == 0;
+    if (_flipEvenOdd) {
+        isEven = !isEven;
+    }
+    return isEven;
 }

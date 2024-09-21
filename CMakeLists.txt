@@ -55,6 +55,7 @@ add_executable(${PROJECT_NAME}
         src/components/imgui_widgets/ImGuiWidgetPerfPlot.cpp
         src/components/imgui_widgets/ImGuiWidgetDeviceInfo.cpp
         src/components/imgui_widgets/ImGuiWidgetUBOViewer.cpp
+        src/components/imgui_widgets/ImGuiWidgetEvenOdd.cpp
         src/lib/VQDevice.cpp
         src/lib/VQUtils.cpp
         src/structs/Vertex.cpp

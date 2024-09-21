@@ -9,8 +9,15 @@ class VulkanEngine;
 class ImGuiWidget
 {
   public:
-    ImGuiWidget() {};
+    ImGuiWidget(){};
     virtual void Draw(const VulkanEngine* engine) = 0;
+};
+
+class ImGuiWidgetMut
+{
+  public:
+    ImGuiWidgetMut(){};
+    virtual void Draw(VulkanEngine* engine) = 0;
 };
 
 class ImGuiWidgetDeviceInfo : public ImGuiWidget
@@ -34,8 +41,7 @@ class ImGuiWidgetPerfPlot : public ImGuiWidget
 
         // need as many frame to hold the points
         ScrollingBuffer(
-            int max_size
-            = DEFAULTS::PROFILER_PERF_PLOT_RANGE_SECONDS * DEFAULTS::MAX_FPS
+            int max_size = DEFAULTS::PROFILER_PERF_PLOT_RANGE_SECONDS * DEFAULTS::MAX_FPS
         );
 
         void AddPoint(float x, float y);
@@ -56,4 +62,11 @@ class ImGuiWidgetUBOViewer : public ImGuiWidget
 {
   public:
     virtual void Draw(const VulkanEngine* engine) override;
+};
+
+// even-odd frame
+class ImGuiWidgetEvenOdd : public ImGuiWidgetMut
+{
+  public:
+    virtual void Draw(VulkanEngine* engine) override;
 };
