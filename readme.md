@@ -11,3 +11,4 @@ https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_EXT_display
 
 - NVIDIA GPU with support for `VK_EXT_display_surface_counter`
 - xcb
+-`libdrm-dev`

@@ -55,7 +55,8 @@ class VulkanEngine
         VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
 #endif // NDEBUG
 #if __linux__
-        VK_EXT_ACQUIRE_XLIB_DISPLAY_EXTENSION_NAME,
+        //VK_EXT_ACQUIRE_XLIB_DISPLAY_EXTENSION_NAME,
+        VK_EXT_ACQUIRE_DRM_DISPLAY_EXTENSION_NAME,
         VK_KHR_XLIB_SURFACE_EXTENSION_NAME,
 #endif // __LINUX__
         VK_KHR_SURFACE_EXTENSION_NAME,
@@ -140,6 +141,7 @@ class VulkanEngine
     /* ---------- Initialization Subroutines ---------- */
     GLFWmonitor* cliMonitorSelection();
     void initGLFW(const InitOptions& options);
+    void initDisplayDRM();
     void initDisplay();
     void initVulkan();
     void createInstance();

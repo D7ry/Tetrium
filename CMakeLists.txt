@@ -93,12 +93,17 @@ if (UNIX)
         )
         target_compile_definitions(${PROJECT_NAME} PRIVATE VK_USE_PLATFORM_MACOS_MVK)
     else()
+# linux
     find_package(Vulkan REQUIRED)
     find_package(X11 REQUIRED)
     find_package(XCB REQUIRED)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(DRM REQUIRED libdrm)
+    include_directories(${DRM_INCLUDE_DIRS})
     target_link_libraries(${PROJECT_NAME} Vulkan::Vulkan
         ${X11_LIBRARIES}
         ${XCB_LIBRARIES}
+        ${DRM_LIBRARIES}
         Xrandr
     )
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DVK_USE_PLATFORM_XCB_KHR")
