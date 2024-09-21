@@ -252,6 +252,9 @@ class VulkanEngine
 
     // whether we are locking the cursor within the glfw window
     bool _lockCursor = false;
+    // UI mode: ImGui processes user inputs,
+    // and movement / camera inputs disables
+    bool _uiMode = true;
 
     // whether we want to draw imgui, set to false disables
     // all imgui windows

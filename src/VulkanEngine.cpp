@@ -400,7 +400,7 @@ void VulkanEngine::cursorPosCallback(GLFWwindow* window, double xpos, double ypo
     // handle camera movement
     deltaX *= 0.3;
     deltaY *= 0.3; // make movement slower
-    if (_lockCursor) {
+    if (_lockCursor && !_uiMode) {
         _mainCamera.ModRotation(deltaX, deltaY, 0);
     }
     prevX = xpos;
@@ -1513,7 +1513,16 @@ void VulkanEngine::drawImGui()
     }
     PROFILE_SCOPE(&_profiler, "ImGui Draw");
     _imguiManager.BeginImGuiContext();
-    ImGui::SetNextWindowPos({0, 0});
+    if (_uiMode) {
+        // draw a lil cursor in full-screen
+        ImGuiIO& io = ImGui::GetIO();
+        ImDrawList* drawList = ImGui::GetForegroundDrawList();
+
+        ImVec2 mousePos = io.MousePos;
+
+        ImU32 color = IM_COL32(255, 255, 0, 200);
+        drawList->AddCircleFilled(mousePos, 10, color);
+    }
     if (ImGui::Begin(DEFAULTS::Engine::APPLICATION_NAME)) {
         if (ImGui::BeginTabBar("Engine Tab")) {
             if (ImGui::BeginTabItem("General")) {
@@ -1542,6 +1551,11 @@ void VulkanEngine::drawImGui()
                     ImGui::Text("Cursor Lock: Active");
                 } else {
                     ImGui::Text("Cursor Lock: Deactive");
+                }
+                if (_uiMode) {
+                    ImGui::Text("UI Mode: Active");
+                } else {
+                    ImGui::Text("UI Mode: Deactive");
                 }
                 ImGui::SeparatorText("Engine UBO");
                 _widgetUBOViewer.Draw(this);
@@ -1597,14 +1611,22 @@ void VulkanEngine::bindDefaultInputs()
             _lockCursor = !_lockCursor;
             if (_lockCursor) {
                 glfwSetInputMode(_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-                ImGui::GetIO().ConfigFlags
-                    |= (ImGuiConfigFlags_NoMouse | ImGuiConfigFlags_NoKeyboard);
             } else {
+
                 glfwSetInputMode(_window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-                ImGui::GetIO().ConfigFlags &= ~ImGuiConfigFlags_NoMouse;
-                ImGui::GetIO().ConfigFlags &= ~ImGuiConfigFlags_NoKeyboard;
             }
         });
+    // ui mode toggle
+    _inputManager.RegisterCallback(GLFW_KEY_U, InputManager::KeyCallbackCondition::PRESS, [this]() {
+        _uiMode = !_uiMode;
+        if (_uiMode) {
+            ImGui::GetIO().ConfigFlags &= ~ImGuiConfigFlags_NoMouse;
+            ImGui::GetIO().ConfigFlags &= ~ImGuiConfigFlags_NoKeyboard;
+        } else {
+            ImGui::GetIO().ConfigFlags |= (ImGuiConfigFlags_NoMouse | ImGuiConfigFlags_NoKeyboard);
+        }
+        // io.WantSetMousePos = _uiMode;
+    });
     _inputManager.RegisterCallback(
         GLFW_KEY_ESCAPE,
         InputManager::KeyCallbackCondition::PRESS,
