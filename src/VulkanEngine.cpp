@@ -322,6 +322,7 @@ void VulkanEngine::initGLFW(const InitOptions& options)
     // having monitor as nullptr initializes a windowed window
     GLFWmonitor* monitor = nullptr;
     if (options.fullScreen) {
+        NEEDS_IMPLEMENTATION();
         monitor = glfwGetPrimaryMonitor();
         if (options.manualMonitorSelection) {
             monitor = cliMonitorSelection();
@@ -344,7 +345,7 @@ void VulkanEngine::initGLFW(const InitOptions& options)
 #endif // __APPLE__
     }
 
-    this->_window = glfwCreateWindow(width, height, "Vulkan Engine", monitor, nullptr);
+    this->_window = glfwCreateWindow(width, height, DEFAULTS::Engine::APPLICATION_NAME, monitor, nullptr);
     if (this->_window == nullptr) {
         FATAL("Failed to initialize GLFW windlw!");
     }
@@ -1332,7 +1333,6 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
         VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_EXT,
         &_surfaceCounterValue
     );
-    // DEBUG("{}", _surfaceCounterValue);
 
     //  Acquire an image from the swap chain
     uint32_t imageIndex;
@@ -1491,7 +1491,7 @@ void VulkanEngine::drawImGui()
     PROFILE_SCOPE(&_profiler, "ImGui Draw");
     _imguiManager.BeginImGuiContext();
     ImGui::SetNextWindowPos({0, 0});
-    if (ImGui::Begin("Vulkan Engine")) {
+    if (ImGui::Begin(DEFAULTS::Engine::APPLICATION_NAME)) {
         if (ImGui::BeginTabBar("Engine Tab")) {
             if (ImGui::BeginTabItem("General")) {
                 ImGui::Text("Surface counter: %lu", _surfaceCounterValue);
