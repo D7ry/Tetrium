@@ -149,7 +149,7 @@ class VulkanEngine
         uint32_t planeIndex;
     };
 
-    struct EngineSynchronizationPrimitives
+    struct SyncPrimitives
     {
         VkSemaphore semaImageAvailable;
         VkSemaphore semaRenderFinished;
@@ -170,7 +170,7 @@ class VulkanEngine
     void createGlfwWindowSurface();
     void createDevice();
     void createMainRenderPass(VulkanEngine::SwapChainContext& ctx); // create main render pass
-    void createSynchronizationObjects(std::array<EngineSynchronizationPrimitives, NUM_FRAME_IN_FLIGHT>& primitives);
+    void createSynchronizationObjects(std::array<SyncPrimitives, NUM_FRAME_IN_FLIGHT>& primitives);
 
 
     /* ---------- Physical Device Selection ---------- */
@@ -236,8 +236,7 @@ class VulkanEngine
     SwapChainContext _auxWindowSwapchain;
 
     /* ---------- Synchronization Primivites ---------- */
-    std::array<EngineSynchronizationPrimitives, NUM_FRAME_IN_FLIGHT> _syncProjector;
-    std::array<EngineSynchronizationPrimitives, NUM_FRAME_IN_FLIGHT> _syncAuxDisplay;
+    std::array<SyncPrimitives, NUM_FRAME_IN_FLIGHT> _syncProjector;
 
     /* ---------- Render Passes ---------- */
     // main render pass, and currently the only render pass

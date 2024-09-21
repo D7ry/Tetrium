@@ -1102,7 +1102,7 @@ void VulkanEngine::createImageViews(SwapChainContext& ctx)
     DEBUG("Image views created.");
 }
 
-void VulkanEngine::createSynchronizationObjects(std::array<EngineSynchronizationPrimitives, NUM_FRAME_IN_FLIGHT>& primitives)
+void VulkanEngine::createSynchronizationObjects(std::array<SyncPrimitives, NUM_FRAME_IN_FLIGHT>& primitives)
 {
     DEBUG("Creating synchronization objects...");
     ASSERT(primitives.size() == NUM_FRAME_IN_FLIGHT);
@@ -1115,7 +1115,7 @@ void VulkanEngine::createSynchronizationObjects(std::array<EngineSynchronization
                                                     // bit so that the 1st frame
                                                     // can start right away
     for (size_t i = 0; i < NUM_FRAME_IN_FLIGHT; i++) {
-        EngineSynchronizationPrimitives& primitive = primitives[i];
+        SyncPrimitives& primitive = primitives[i];
         if (vkCreateSemaphore(
                 _device->logicalDevice, &semaphoreInfo, nullptr, &primitive.semaImageAvailable
             ) != VK_SUCCESS
@@ -1129,7 +1129,7 @@ void VulkanEngine::createSynchronizationObjects(std::array<EngineSynchronization
     }
     this->_deletionStack.push([this, primitives]() {
         for (size_t i = 0; i < NUM_FRAME_IN_FLIGHT; i++) {
-            const EngineSynchronizationPrimitives& primitive = primitives[i];
+            const SyncPrimitives& primitive = primitives[i];
             vkDestroySemaphore(this->_device->logicalDevice, primitive.semaRenderFinished, nullptr);
             vkDestroySemaphore(this->_device->logicalDevice, primitive.semaImageAvailable, nullptr);
             vkDestroyFence(this->_device->logicalDevice, primitive.fenceInFlight, nullptr);
@@ -1320,7 +1320,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
         std::this_thread::sleep_for(std::chrono::seconds(5));
     }
 #endif // POWER_ON_DISPLAY
-    EngineSynchronizationPrimitives& sync = _syncProjector[frame];
+    SyncPrimitives& sync = _syncProjector[frame];
 
     //  Wait for the previous frame to finish
     PROFILE_SCOPE(&_profiler, "Render Tick");
