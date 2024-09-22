@@ -60,4 +60,9 @@ void InputManager::RegisterCallback(int key, KeyCallbackCondition callbackCondit
     }
 }
 
-void InputManager::SetActive(bool active) { _active = active; }
+void InputManager::SetActive(bool active) {
+    _active = active; 
+    if (!_active){
+        _heldKeys.clear();
+    }
+}

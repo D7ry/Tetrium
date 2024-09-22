@@ -8,6 +8,7 @@ void DrawCenteredText(const char* text)
 {
     ImGui::SetNextWindowPos(ImVec2(0, 0));
     ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
+    ImGui::SetNextWindowFocus();
     if (ImGui::Begin(
             "Fullscreen",
             nullptr,

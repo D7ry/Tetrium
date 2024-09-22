@@ -453,8 +453,8 @@ void VulkanEngine::initDefaultStates()
     _lockCursor = false;
     _inputManager.SetActive(_lockCursor);
     _uiMode = false;
-    ImGui::GetIO().ConfigFlags &= ImGuiConfigFlags_NoMouse;
-    ImGui::GetIO().ConfigFlags &= ImGuiConfigFlags_NoKeyboard;
+    ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoMouse;
+    ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoKeyboard;
 };
 
 void VulkanEngine::Init(const VulkanEngine::InitOptions& options)
@@ -1653,7 +1653,7 @@ void VulkanEngine::drawImGui()
 
         ImVec2 mousePos = io.MousePos;
 
-        ImU32 color = IM_COL32(255, 255, 0, 200);
+        ImU32 color = IM_COL32(255, 255, 255, 200);
         drawList->AddCircleFilled(mousePos, 10, color);
     }
 
