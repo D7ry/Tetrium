@@ -74,7 +74,7 @@ void SimpleRenderSystem::Tick(const TickContext* tickData)
                 _pipelineLayout,
                 0,
                 1,
-                &_descriptorSets[tickData->graphics.currentFrameInFlight],
+                &_descriptorSets[frameIdx],
                 1,
                 &dynamicUBOOffset
             );

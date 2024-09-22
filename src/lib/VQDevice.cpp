@@ -9,6 +9,17 @@ void VQDevice::CreateLogicalDeviceAndQueue(const std::vector<const char*>& exten
     if (!this->queueFamilyIndices.isComplete()) {
         FATAL("Queue family indices incomplete! Call InitQueueFamilyIndices().");
     }
+    // check extension support
+    std::unordered_set<std::string>extensionsNeeded(extensions.begin(), extensions.end());
+    for (auto extension : supportedExtensions) {
+        extensionsNeeded.erase(extension);
+    }
+    if (!extensionsNeeded.empty()) {
+        for (const std::string& extension : extensionsNeeded) {
+            ERROR("{} required but not supported", extension);
+        }
+        PANIC("device does not support all required extensions!");
+    }
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
     std::set<uint32_t> uniqueQueueFamilyIndices;
     uniqueQueueFamilyIndices.insert(this->queueFamilyIndices.graphicsFamily.value());
@@ -35,9 +46,7 @@ void VQDevice::CreateLogicalDeviceAndQueue(const std::vector<const char*>& exten
     createInfo.pEnabledFeatures = &deviceFeatures;
     createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
     createInfo.ppEnabledExtensionNames = extensions.data(); // enable swapchain extension
-    if (vkCreateDevice(this->physicalDevice, &createInfo, nullptr, &this->logicalDevice) != VK_SUCCESS) {
-        FATAL("Failed to create logical device!");
-    }
+    VK_CHECK_RESULT(vkCreateDevice(this->physicalDevice, &createInfo, nullptr, &this->logicalDevice));
     vkGetDeviceQueue(this->logicalDevice, queueFamilyIndices.graphicsFamily.value(), 0, &this->graphicsQueue);
     vkGetDeviceQueue(this->logicalDevice, queueFamilyIndices.presentationFamily.value(), 0, &this->presentationQueue);
     vkGetDeviceQueue(this->logicalDevice, queueFamilyIndices.computeFamily.value(), 0, &this->computeQueue);

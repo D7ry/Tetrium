@@ -67,13 +67,12 @@ class SimpleRenderSystem : public ISystem
 
     struct UBO
     {
-        VQBuffer staticUBO; // currently unused as we use engineUBO. may be
-                            // useful for sytem-scoped ubo
         VQBuffer dynamicUBO;
     };
 
-    size_t _numDynamicUBO;                         // how many dynamic UBOs do we have
-    size_t _currDynamicUBO;                        // dynamic ubo that is to be allocated
+    size_t _numDynamicUBO = 0;; // how many dynamic UBOs do we have
+    size_t _currDynamicUBO = 0;
+    ;                                              // dynamic ubo that is to be allocated
     std::vector<unsigned long> _freeDynamicUBOIdx; // free list for dynamic UBO
 
     size_t _dynamicUBOAlignmentSize; // actual size of the dynamic UBO that

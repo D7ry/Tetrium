@@ -3,7 +3,7 @@
 
 // absolute constants
 const int NUM_FRAME_IN_FLIGHT = 2;   // how many frames to pipeline
-const int TEXTURE_ARRAY_SIZE = 2048; // size of the texture array for bindless texture indexing
+const int TEXTURE_ARRAY_SIZE = 16; // size of the texture array for bindless texture indexing
 
 // default setting values.
 // Note taht values are only used on engine initialization
