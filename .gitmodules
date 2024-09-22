@@ -1,9 +1,6 @@
 [submodule "extern/spdlog"]
 	path = extern/spdlog
 	url = https://github.com/gabime/spdlog
-[submodule "extern/imgui"]
-	path = extern/imgui
-	url = https://github.com/ocornut/imgui
 [submodule "extern/implot"]
 	path = extern/implot
 	url = https://github.com/epezent/implot
@@ -16,3 +13,6 @@
 [submodule "extern/tinyobjloader"]
 	path = extern/tinyobjloader
 	url = git@github.com:tinyobjloader/tinyobjloader.git
+[submodule "extern/imgui"]
+	path = extern/imgui
+	url = git@github.com:D7ry/imgui.git
