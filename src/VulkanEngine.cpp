@@ -18,6 +18,7 @@
 
 // imgui
 #include "imgui.h"
+#include "lib/ImGuiUtils.h"
 
 // Molten VK Config
 #if __APPLE__
@@ -399,6 +400,30 @@ void VulkanEngine::initGLFW(const InitOptions& options)
     });
 }
 
+void VulkanEngine::keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
+{
+    VulkanEngine* pThis = reinterpret_cast<VulkanEngine*>(glfwGetWindowUserPointer(window));
+    if (key == GLFW_KEY_P && action == GLFW_PRESS) {
+        _paused = !_paused;
+    }
+    _inputManager.OnKeyInput(window, key, scancode, action, mods);
+
+    // toggle cursor lock
+    if (key == GLFW_KEY_TAB && action == GLFW_PRESS) {
+        _lockCursor = !_lockCursor;
+        if (_lockCursor) {
+            glfwSetInputMode(_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        } else {
+            glfwSetInputMode(_window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+        }
+        // only activate input on cursor lock
+        _inputManager.SetActive(_lockCursor);
+    }
+    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
+        glfwSetWindowShouldClose(_window, GLFW_TRUE);
+    }
+}
+
 void VulkanEngine::cursorPosCallback(GLFWwindow* window, double xpos, double ypos)
 {
     static bool updatedCursor = false;
@@ -436,14 +461,10 @@ void VulkanEngine::Init(const VulkanEngine::InitOptions& options)
     { // Input Handling
         auto keyCallback = [](GLFWwindow* window, int key, int scancode, int action, int mods) {
             VulkanEngine* pThis = reinterpret_cast<VulkanEngine*>(glfwGetWindowUserPointer(window));
-            if (key == GLFW_KEY_P && action == GLFW_PRESS) {
-                pThis->_paused = !pThis->_paused;
-            }
-            pThis->_inputManager.OnKeyInput(window, key, scancode, action, mods);
+            pThis->keyCallback(window, key, scancode, action, mods);
         };
         glfwSetKeyCallback(this->_window, keyCallback);
-        // don't have a mouse input manager yet, so manually bind cursor pos
-        // callback
+
         auto cursorPosCallback = [](GLFWwindow* window, double xpos, double ypos) {
             VulkanEngine* pThis = reinterpret_cast<VulkanEngine*>(glfwGetWindowUserPointer(window));
             pThis->cursorPosCallback(window, xpos, ypos);
@@ -493,6 +514,11 @@ void VulkanEngine::Init(const VulkanEngine::InitOptions& options)
     // show glfw window at very end
     ASSERT(_window);
     glfwShowWindow(_window);
+
+    // configure states
+    // by default, unlock cursor, disable imgui inputs, disable input handling
+    _lockCursor = false;
+    _inputManager.SetActive(_lockCursor);
 }
 
 void VulkanEngine::Run()
@@ -1603,8 +1629,9 @@ void VulkanEngine::drawImGui()
         _imguiManager.forceDisplaySize(projectorDisplaySize);
     }
 
-    if (_uiMode) {
-        // draw a lil cursor in full-screen
+    if (!_lockCursor) {
+        ImGuiU::DrawCenteredText("Press Tab to enable input");
+    } else if (_uiMode) {
         ImGuiIO& io = ImGui::GetIO();
         ImDrawList* drawList = ImGui::GetForegroundDrawList();
 
@@ -1613,6 +1640,7 @@ void VulkanEngine::drawImGui()
         ImU32 color = IM_COL32(255, 255, 0, 200);
         drawList->AddCircleFilled(mousePos, 10, color);
     }
+
     if (ImGui::Begin(DEFAULTS::Engine::APPLICATION_NAME)) {
         if (ImGui::BeginTabBar("Engine Tab")) {
             if (ImGui::BeginTabItem("General")) {
@@ -1699,17 +1727,6 @@ void VulkanEngine::bindDefaultInputs()
         InputManager::KeyCallbackCondition::HOLD,
         [this]() { _mainCamera.Move(0, 0, CAMERA_SPEED * _deltaTimer.GetDeltaTime()); }
     );
-
-    _inputManager
-        .RegisterCallback(GLFW_KEY_TAB, InputManager::KeyCallbackCondition::PRESS, [this]() {
-            _lockCursor = !_lockCursor;
-            if (_lockCursor) {
-                glfwSetInputMode(_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-            } else {
-
-                glfwSetInputMode(_window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-            }
-        });
     // ui mode toggle
     _inputManager.RegisterCallback(GLFW_KEY_U, InputManager::KeyCallbackCondition::PRESS, [this]() {
         _uiMode = !_uiMode;
@@ -1722,9 +1739,7 @@ void VulkanEngine::bindDefaultInputs()
         // io.WantSetMousePos = _uiMode;
     });
     _inputManager.RegisterCallback(
-        GLFW_KEY_ESCAPE,
-        InputManager::KeyCallbackCondition::PRESS,
-        [this]() { glfwSetWindowShouldClose(_window, GLFW_TRUE); }
+        GLFW_KEY_ESCAPE, InputManager::KeyCallbackCondition::PRESS, [this]() {}
     );
     // flip imgui draw with "`" key
     _inputManager.RegisterCallback(

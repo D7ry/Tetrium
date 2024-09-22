@@ -34,11 +34,22 @@ class InputManager
      * @param callbackCondition the condition of the input for the callback to dispatch
      * @param callback the callback function.
      */
-    void RegisterCallback(int key, KeyCallbackCondition callbackCondition, std::function<void()> callback);
+    void RegisterCallback(
+        int key,
+        KeyCallbackCondition callbackCondition,
+        std::function<void()> callback
+    );
 
-    void RegisterComboKeyCallback(int key, KeyCallbackCondition callbackCondition, std::function<void()> callback) {
+    void RegisterComboKeyCallback(
+        int key,
+        KeyCallbackCondition callbackCondition,
+        std::function<void()> callback
+    )
+    {
         FATAL("Not implemented yet");
     }
+
+    void SetActive(bool active);
 
   private:
     /**
@@ -61,4 +72,6 @@ class InputManager
     };
 
     std::vector<ComboKeyMap> _comboCallbacks;
+
+    bool _active = true;
 };

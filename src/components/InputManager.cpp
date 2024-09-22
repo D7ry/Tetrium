@@ -1,6 +1,9 @@
 #include "InputManager.h"
 
 void InputManager::OnKeyInput(GLFWwindow* window, int key, int scancode, int action, int mods) {
+    if (!_active) {
+        return;
+    }
     switch (action) {
     case GLFW_PRESS:
         _heldKeys.insert(key);
@@ -22,6 +25,9 @@ void InputManager::OnKeyInput(GLFWwindow* window, int key, int scancode, int act
 void InputManager::ClearHeldKeys() { _heldKeys.clear(); }
 
 void InputManager::Tick(float deltaTime) {
+    if (!_active) {
+        return;
+    }
     for (auto& key : _heldKeys) {
         for (auto& callback : _holdCallbacks[key]) {
             callback();
@@ -53,3 +59,5 @@ void InputManager::RegisterCallback(int key, KeyCallbackCondition callbackCondit
         break;
     }
 }
+
+void InputManager::SetActive(bool active) { _active = active; }

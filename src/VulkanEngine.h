@@ -221,6 +221,7 @@ class VulkanEngine
     /* ---------- Input ---------- */
     static void framebufferResizeCallback(GLFWwindow* window, int width, int height);
     void cursorPosCallback(GLFWwindow* window, double xpos, double ypos);
+    void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
     void bindDefaultInputs();
 
     /* ---------- Render-Time Functions ---------- */
