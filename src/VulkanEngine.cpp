@@ -654,7 +654,7 @@ void VulkanEngine::initVulkan()
 #endif
     VkSurfaceKHR mainWindowSurface;
 #if __linux__
-    surface = _mainProjectorDisplay.surface;
+    mainWindowSurface = _mainProjectorDisplay.surface;
 #elif __APPLE__
     ASSERT(_window);
     mainWindowSurface = createGlfwWindowSurface(_window);
