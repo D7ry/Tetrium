@@ -348,6 +348,7 @@ void VulkanEngine::initExclusiveDisplay(VulkanEngine::DisplayContext& ctx)
 
     // Store the display properties for later use
     ctx.extent = modeProperties[selectedModeIndex].parameters.visibleRegion;
+    ctx.refreshrate = modeProperties[selectedModeIndex].parameters.refreshRate;
     DEBUG("display extent: {} {}", ctx.extent.width, ctx.extent.height);
 }
 
@@ -445,6 +446,17 @@ void VulkanEngine::cursorPosCallback(GLFWwindow* window, double xpos, double ypo
     prevY = ypos;
 }
 
+void VulkanEngine::initDefaultStates()
+{
+    // configure states
+    // by default, unlock cursor, disable imgui inputs, disable input handling
+    _lockCursor = false;
+    _inputManager.SetActive(_lockCursor);
+    _uiMode = false;
+    ImGui::GetIO().ConfigFlags &= ImGuiConfigFlags_NoMouse;
+    ImGui::GetIO().ConfigFlags &= ImGuiConfigFlags_NoKeyboard;
+};
+
 void VulkanEngine::Init(const VulkanEngine::InitOptions& options)
 {
     // populate static config fields
@@ -508,20 +520,15 @@ void VulkanEngine::Init(const VulkanEngine::InitOptions& options)
     _renderer.Init(&initCtx);
     _deletionStack.push([this]() { _renderer.Cleanup(); });
 
+    initDefaultStates();
+
     createFunnyObjects();
-
-    // show glfw window at very end
-    ASSERT(_window);
-    glfwShowWindow(_window);
-
-    // configure states
-    // by default, unlock cursor, disable imgui inputs, disable input handling
-    _lockCursor = false;
-    _inputManager.SetActive(_lockCursor);
 }
 
 void VulkanEngine::Run()
 {
+    ASSERT(_window);
+    glfwShowWindow(_window);
     while (!glfwWindowShouldClose(_window)) {
         glfwPollEvents();
         Tick();

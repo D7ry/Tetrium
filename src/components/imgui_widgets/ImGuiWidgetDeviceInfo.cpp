@@ -3,7 +3,8 @@
 #include "ImGuiWidget.h"
 
 // current setup assumes single logical device
-void ImGuiWidgetDeviceInfo::Draw(const VulkanEngine* engine) {
+void ImGuiWidgetDeviceInfo::Draw(const VulkanEngine* engine)
+{
     const int INDENT = 20;
     { // GPU
         ImGui::SeparatorText("GPU");
@@ -19,6 +20,13 @@ void ImGuiWidgetDeviceInfo::Draw(const VulkanEngine* engine) {
     }
     { // Display
         ImGui::SeparatorText("Display");
+        if (engine->_tetraMode == VulkanEngine::TetraMode::kEvenOddHardwareSync) {
+            VulkanEngine::DisplayContext display = engine->_mainProjectorDisplay;
+            ASSERT(display.display);
+            ImGui::Text("Using Exclusive Display");
+            ImGui::Text("Size: %i x %i", display.extent.width, display.extent.height);
+            ImGui::Text("Refresh Rate: %i hz", static_cast<int>(display.refreshrate / 1000.0f));
+        }
         GLFWmonitor* monitor = glfwGetWindowMonitor(engine->_window);
         if (monitor) {
             ImGui::Text("Device: %s", glfwGetMonitorName(monitor));

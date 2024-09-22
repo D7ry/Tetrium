@@ -152,6 +152,7 @@ class VulkanEngine
 
     // context for a dedicated display
     struct DisplayContext {
+        uint32_t refreshrate;
         VkExtent2D extent = {};
         VkDisplayKHR display = {};
         VkSurfaceKHR surface = {};
@@ -175,6 +176,7 @@ class VulkanEngine
     void selectDisplayXlib(DisplayContext& ctx);
     void initExclusiveDisplay(DisplayContext& ctx);
     void initVulkan();
+    void initDefaultStates();
     void createInstance();
     void createGlfwWindowSurface();
     void createDevice();
