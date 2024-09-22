@@ -1,5 +1,7 @@
 # Quarkolor
 
+Vulkan-based tetrachromacy display engine.
+
 ## TODOs
 
 - [ ] dual-projector setup
@@ -11,14 +13,29 @@
 
 ## Requirements
 
-- NVIDIA GPU with support for `VK_EXT_display_surface_counter`
-- xcb
-- Vulkan SDK(MoltenVK for MacOS)
-- a custom-made projector
+### All Systems
+
+- `CMake`
+- [Vulkan SDK](https://vulkan.lunarg.com/)
+
+### Hardware Even-odd frame sync
+
+- NVIDIA GPU supporting `VK_EXT_display_surface_counter`
+- refer to [#Linux] for additional instructions
 
 ## Build
 
 ### Unix
+
+#### Apple
+
+set `VULKAN_LIB_PATH` in `CMakeLists.txt` to your own path after installing Vulkan SDK
+
+#### Linux
+
+install `X11` and `Xrandr` for direct display access, for hardware even-odd frame sync
+
+#### Commands
 ```bash
 git clone -recurse-submodules git@github.com:D7ry/quarkolor.git
 mkdir build
@@ -26,7 +43,6 @@ cd build
 cmake ../
 make
 ```
-
 
 ### Windows
 
