@@ -424,9 +424,8 @@ void VulkanEngine::cursorPosCallback(GLFWwindow* window, double xpos, double ypo
 void VulkanEngine::Init(const VulkanEngine::InitOptions& options)
 {
     // populate static config fields
-    _evenOddMode = options.evenOddMode;
-    if (!_evenOddMode) {
-        // none-even odd needs dual-display + dual-fb implementation
+    _tetraMode = options.tetraMode;
+    if (_tetraMode != TetraMode::kEvenOddHardwareSync) {
         NEEDS_IMPLEMENTATION();
     }
 #if __APPLE__
@@ -564,7 +563,7 @@ void VulkanEngine::createDevice()
     this->_deletionStack.push([this]() { this->_device->Cleanup(); });
 }
 
-void VulkanEngine::setUpEvenOddFrame()
+void VulkanEngine::setupHardwareEvenOddFrame()
 {
 #if WIN32
     NEEDS_IMPLEMENTATION();
@@ -604,7 +603,7 @@ void VulkanEngine::checkHardwareEvenOddFrameSupport()
         vkEnumerateInstanceExtensionProperties(nullptr, &numExtensions, extensions.data())
     );
 
-    std::unordered_set<std::string> evenOddExtensions = EVEN_ODD_INSTANCE_EXTENSIONS;
+    std::unordered_set<std::string> evenOddExtensions = EVEN_ODD_HARDWARE_INSTANCE_EXTENSIONS;
 
     for (VkExtensionProperties& property : extensions) {
         evenOddExtensions.erase(std::string(property.extensionName));
@@ -697,10 +696,13 @@ void VulkanEngine::initVulkan()
             _mainWindowSwapChain.frameBuffer.size()
         );
     }
-    if (_evenOddMode) {
-        DEBUG("Checking eve-odd frame device support...");
+    switch (_tetraMode) {
+    case TetraMode::kEvenOddHardwareSync:
         checkHardwareEvenOddFrameSupport();
-        setUpEvenOddFrame();
+        setupHardwareEvenOddFrame();
+        break;
+    default:
+        NEEDS_IMPLEMENTATION();
     }
     this->_deletionStack.push([this]() { this->_imguiManager.Cleanup(_device->logicalDevice); });
 
@@ -783,11 +785,16 @@ void VulkanEngine::createInstance()
         createInfo.pNext = &appleLayerSettings;
     }
 #endif // __APPLE__
-    if (_evenOddMode) {
-        for (const std::string& evenOddExtensionName : EVEN_ODD_INSTANCE_EXTENSIONS) {
+    switch (_tetraMode) {
+    case TetraMode::kEvenOddHardwareSync:
+        for (const std::string& evenOddExtensionName : EVEN_ODD_HARDWARE_INSTANCE_EXTENSIONS) {
             instanceExtensions.push_back(evenOddExtensionName.c_str());
         }
+        break;
+    default:
+        break;
     }
+
     createInfo.enabledExtensionCount = instanceExtensions.size();
     createInfo.ppEnabledExtensionNames = instanceExtensions.data();
 
@@ -952,8 +959,8 @@ bool VulkanEngine::isDeviceSuitable(VkPhysicalDevice device)
 const std::vector<const char*> VulkanEngine::getRequiredDeviceExtensions() const
 {
     std::vector<const char*> extensions = DEFAULT_DEVICE_EXTENSIONS;
-    if (_evenOddMode) {
-        for (auto extension : EVEN_ODD_DEVICE_EXTENSIONS) {
+    if (_tetraMode == TetraMode::kEvenOddHardwareSync) {
+        for (auto extension : EVEN_ODD_HARDWARE_DEVICE_EXTENSIONS) {
             extensions.push_back(extension);
         }
     }
@@ -1037,7 +1044,7 @@ void VulkanEngine::createSwapChain(VulkanEngine::SwapChainContext& ctx, const Vk
         .pNext = NULL,
         .surfaceCounters = VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_BIT_EXT};
 
-    if (_evenOddMode) {
+    if (_tetraMode == TetraMode::kEvenOddHardwareSync) {
 #if __linux__
         DEBUG("swapchain created with counter support!");
         swapChainCounterCreateInfo.pNext = createInfo.pNext;
@@ -1414,7 +1421,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     PROFILE_SCOPE(&_profiler, "Render Tick");
     vkWaitForFences(_device->logicalDevice, 1, &sync.fenceInFlight, VK_TRUE, UINT64_MAX);
 
-    if (_evenOddMode) {
+    if (_tetraMode == TetraMode::kEvenOddHardwareSync) {
 #if WIN32
         NEEDS_IMPLEMENTATION();
 #endif // WIN32
@@ -1588,7 +1595,7 @@ void VulkanEngine::drawImGui()
     // but its actual fb is associated with the projector display;
     // so we need to manually re-adjust the display size for the scissors/
     // viewports/clipping to be consistent
-    bool imguiDisplaySizeOverride = _evenOddMode && _mainProjectorDisplay.display;
+    bool imguiDisplaySizeOverride = _tetraMode == TetraMode::kEvenOddHardwareSync;
     if (imguiDisplaySizeOverride) {
         ImVec2 projectorDisplaySize{
             static_cast<float>(_mainProjectorDisplay.extent.width),

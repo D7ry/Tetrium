@@ -79,7 +79,7 @@ class VulkanEngine
     };
 
     // instance extensions required for even-odd rendering
-    std::unordered_set<std::string> EVEN_ODD_INSTANCE_EXTENSIONS = {
+    std::unordered_set<std::string> EVEN_ODD_HARDWARE_INSTANCE_EXTENSIONS = {
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_EXT_display_surface_counter.html
 #if __linux__
         VK_EXT_DISPLAY_SURFACE_COUNTER_EXTENSION_NAME,
@@ -91,7 +91,7 @@ class VulkanEngine
 
     // device extensions required for even-odd rendering
     // only tested on NVIDIA GPUs
-    static inline const std::vector<const char*> EVEN_ODD_DEVICE_EXTENSIONS = {
+    static inline const std::vector<const char*> EVEN_ODD_HARDWARE_DEVICE_EXTENSIONS = {
         // https://registry.khronos.org/VulkanSC/specs/1.0-extensions/man/html/VK_EXT_display_control.html
 #if __linux__
         VK_EXT_DISPLAY_CONTROL_EXTENSION_NAME, // to wake up display
@@ -99,9 +99,16 @@ class VulkanEngine
     };
 
   public:
+    enum class TetraMode
+    {
+        kEvenOddHardwareSync, // use NVIDIA gpu to hardware sync even-odd frames
+        kEvenOddSoftwareSync, // use a timer to software sync even-odd frames
+        kDualProjector // use two projetors, not implemented
+    };
+
     struct InitOptions
     {
-        bool evenOddMode = true;             // enable even-odd mode
+        TetraMode tetraMode = TetraMode::kEvenOddHardwareSync;
         bool fullScreen = false;             // full screen mode
         bool manualMonitorSelection = false; // the user may select a monitor that's not the primary
                                              // monitor through CLI
@@ -224,7 +231,7 @@ class VulkanEngine
 
     /* ---------- Even-Odd frame ---------- */
     void checkHardwareEvenOddFrameSupport(); // checks hw support for even-odd rendering
-    void setUpEvenOddFrame();        // set up resources for even-odd frame
+    void setupHardwareEvenOddFrame();        // set up resources for even-odd frame
     bool isEvenFrame();
 
     /* ---------- Top-level data ---------- */
@@ -248,7 +255,7 @@ class VulkanEngine
     VkRenderPass _mainRenderPass = VK_NULL_HANDLE;
 
     /* ---------- Instance-static Data ---------- */
-    bool _evenOddMode = false; // whether to render in even-odd frame mode
+    TetraMode _tetraMode;
 
     /* ---------- Tick-dynamic Data ---------- */
     bool _framebufferResized = false;

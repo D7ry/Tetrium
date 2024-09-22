@@ -6,8 +6,9 @@ int main(int argc, char** argv)
     INFO("Logger initialized.");
     DEBUG("running in debug mode");
     VulkanEngine::InitOptions options{
-        .evenOddMode = true, .fullScreen = false, .manualMonitorSelection = true
-    };
+        .tetraMode = VulkanEngine::TetraMode::kEvenOddHardwareSync,
+        .fullScreen = false,
+        .manualMonitorSelection = true};
     VulkanEngine engine;
     engine.Init(options);
     engine.Run();
