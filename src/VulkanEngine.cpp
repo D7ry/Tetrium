@@ -365,7 +365,6 @@ void VulkanEngine::initGLFW(const InitOptions& options)
     // having monitor as nullptr initializes a windowed window
     GLFWmonitor* monitor = nullptr;
     if (options.fullScreen) {
-        NEEDS_IMPLEMENTATION();
         monitor = glfwGetPrimaryMonitor();
         if (options.manualMonitorSelection) {
             monitor = cliMonitorSelection();
@@ -450,7 +449,7 @@ void VulkanEngine::Init(const VulkanEngine::InitOptions& options)
 {
     // populate static config fields
     _tetraMode = options.tetraMode;
-    if (_tetraMode != TetraMode::kEvenOddHardwareSync) {
+    if (_tetraMode == TetraMode::kDualProjector) {
         NEEDS_IMPLEMENTATION();
     }
 #if __APPLE__
@@ -670,19 +669,23 @@ void VulkanEngine::checkHardwareEvenOddFrameSupport()
 
 void VulkanEngine::initVulkan()
 {
+    VkSurfaceKHR mainWindowSurface = VK_NULL_HANDLE;
     INFO("Initializing Vulkan...");
     this->createInstance();
     this->createDevice();
-#if __linux__
-    this->initExclusiveDisplay(_mainProjectorDisplay);
-#endif
-    VkSurfaceKHR mainWindowSurface;
-#if __linux__
-    mainWindowSurface = _mainProjectorDisplay.surface;
-#elif __APPLE__
-    ASSERT(_window);
-    mainWindowSurface = createGlfwWindowSurface(_window);
-#endif
+    switch (_tetraMode) {
+    case TetraMode::kEvenOddHardwareSync:
+        this->initExclusiveDisplay(_mainProjectorDisplay);
+        mainWindowSurface = _mainProjectorDisplay.surface;
+        break;
+    case TetraMode::kEvenOddSoftwareSync:
+        mainWindowSurface = createGlfwWindowSurface(_window);
+        break;
+    default:
+        NEEDS_IMPLEMENTATION();
+    };
+
+    ASSERT(mainWindowSurface);
 
     this->_device->InitQueueFamilyIndices(mainWindowSurface);
     this->_device->CreateLogicalDeviceAndQueue(getRequiredDeviceExtensions());
@@ -722,10 +725,14 @@ void VulkanEngine::initVulkan()
             _mainWindowSwapChain.frameBuffer.size()
         );
     }
+
+    // even-odd specific resource checkup and setup
     switch (_tetraMode) {
     case TetraMode::kEvenOddHardwareSync:
         checkHardwareEvenOddFrameSupport();
         setupHardwareEvenOddFrame();
+        break;
+    case TetraMode::kEvenOddSoftwareSync:
         break;
     default:
         NEEDS_IMPLEMENTATION();
@@ -1601,10 +1608,12 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     result = vkQueuePresentKHR(_device->presentationQueue, &presentInfo);
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR
         || this->_framebufferResized) {
+        ASSERT(
+            _tetraMode != TetraMode::kEvenOddHardwareSync
+        ); // exclusive window does not resize its swapchain
         [[unlikely]] this->recreateSwapChain(_mainWindowSwapChain);
         this->_framebufferResized = false;
     }
-    VK_CHECK_RESULT(result);
 }
 
 void VulkanEngine::initSwapchains() {}
@@ -1768,7 +1777,18 @@ void VulkanEngine::getMainProjectionMatrix(glm::mat4& projectionMatrix)
 
 bool VulkanEngine::isEvenFrame()
 {
-    bool isEven = _surfaceCounterValue % 2 == 0;
+    bool isEven;
+    switch (_tetraMode) {
+    case TetraMode::kEvenOddSoftwareSync:
+        isEven = _currentFrame % 2 == 0;
+        break;
+    case TetraMode::kEvenOddHardwareSync:
+        isEven = _surfaceCounterValue % 2 == 0;
+        break;
+    default:
+        PANIC("invalid tetraMode when calling isEvenFrame()!");
+    }
+
     if (_flipEvenOdd) {
         isEven = !isEven;
     }

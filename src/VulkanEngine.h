@@ -280,7 +280,7 @@ class VulkanEngine
     std::array<VQBuffer, NUM_FRAME_IN_FLIGHT> _engineUBOStatic;
 
     float _FOV = 90;
-    float _timeSinceStartSeconds; // seconds in time since engine start
+    double _timeSinceStartSeconds; // seconds in time since engine start
     unsigned long int _numTicks;  // how many ticks has happened so far
 
     // even-odd frame
