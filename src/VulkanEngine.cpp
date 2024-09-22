@@ -1509,8 +1509,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
         CB.endRenderPass();
     }
 
-    bool forceImguiDisplaySize = _mainProjectorDisplay.display != VK_NULL_HANDLE;
-    _imguiManager.RecordCommandBuffer(ctx, forceImguiDisplaySize);
+    _imguiManager.RecordCommandBuffer(ctx);
 
     // end command buffer
     CB.end();
