@@ -57,9 +57,14 @@ class VulkanEngine
         VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
 #endif // NDEBUG
         VK_KHR_SURFACE_EXTENSION_NAME,
+#ifdef __linux__
         VK_KHR_DISPLAY_EXTENSION_NAME,
         // https://github.com/nvpro-samples/vk_video_samples/blob/main/common/libs/VkShell/Shell.cpp#L181
         VK_EXT_DIRECT_MODE_DISPLAY_EXTENSION_NAME,
+#endif // __linux__
+#if __APPLE__ // molten vk support
+        VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
+#endif // __APPLE__
     };
     // required device extensions
     static inline const std::vector<const char*> DEFAULT_DEVICE_EXTENSIONS = {
@@ -70,19 +75,14 @@ class VulkanEngine
                                                     // instead use VK_EXT_ACQUIRE_XLIB_DISPLAY_EXTENSION
 #if __APPLE__ // molten vk support
         VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME,
-    // VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME
 #endif // __APPLE__
     };
-    //  NOTE: appple M3 does not have
-    //  `VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME` which moltenVK
-    //  requires to enable for metal compatbility. disabling it leads to a
-    //  trivial validation layer error that may be safely ignored.
 
     // instance extensions required for even-odd rendering
     std::unordered_set<std::string> EVEN_ODD_INSTANCE_EXTENSIONS = {
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_EXT_display_surface_counter.html
-        VK_EXT_DISPLAY_SURFACE_COUNTER_EXTENSION_NAME,
 #if __linux__
+        VK_EXT_DISPLAY_SURFACE_COUNTER_EXTENSION_NAME,
         VK_EXT_ACQUIRE_XLIB_DISPLAY_EXTENSION_NAME,
         // VK_EXT_ACQUIRE_DRM_DISPLAY_EXTENSION_NAME,
         VK_KHR_XLIB_SURFACE_EXTENSION_NAME,
@@ -93,7 +93,9 @@ class VulkanEngine
     // only tested on NVIDIA GPUs
     static inline const std::vector<const char*> EVEN_ODD_DEVICE_EXTENSIONS = {
         // https://registry.khronos.org/VulkanSC/specs/1.0-extensions/man/html/VK_EXT_display_control.html
+#if __linux__
         VK_EXT_DISPLAY_CONTROL_EXTENSION_NAME, // to wake up display
+#endif // __linux__
     };
 
   public:
@@ -169,6 +171,7 @@ class VulkanEngine
     void createInstance();
     void createGlfwWindowSurface();
     void createDevice();
+    VkSurfaceKHR createGlfwWindowSurface(GLFWwindow* window);
     void createMainRenderPass(VulkanEngine::SwapChainContext& ctx); // create main render pass
     void createSynchronizationObjects(std::array<SyncPrimitives, NUM_FRAME_IN_FLIGHT>& primitives);
     void createFunnyObjects();
@@ -234,8 +237,8 @@ class VulkanEngine
     DisplayContext _mainProjectorDisplay;
 
     /* ---------- swapchain ---------- */
-    SwapChainContext _mainProjectorSwapchain;
-    SwapChainContext _auxWindowSwapchain;
+    SwapChainContext _mainWindowSwapChain;
+    SwapChainContext _auxWindowSwapchain; // unused for now
 
     /* ---------- Synchronization Primivites ---------- */
     std::array<SyncPrimitives, NUM_FRAME_IN_FLIGHT> _syncProjector;

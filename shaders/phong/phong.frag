@@ -2,7 +2,7 @@
 
 
 // binding = {0,1} reserved for UBOs
-layout(binding = 2) uniform sampler2D textureSampler[8];
+layout(binding = 2) uniform sampler2D textureSampler[16];
 
 
 layout(location = 0) in vec3 fragColor;

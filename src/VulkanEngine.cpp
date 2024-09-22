@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <fcntl.h>
 #include <functional>
 #include <iostream>
 #include <limits>
@@ -28,9 +29,10 @@
 
 #include "VulkanEngine.h"
 
-#include <fcntl.h>
+#if __linux__
 #include <xf86drm.h>
 #include <xf86drmMode.h>
+#endif // __linux__
 
 // creates a cow for now
 void VulkanEngine::createFunnyObjects()
@@ -94,6 +96,7 @@ GLFWmonitor* VulkanEngine::cliMonitorSelection()
     return monitors[monitorIdx];
 }
 
+#if __linux__
 // select exclusive display using DRM
 void VulkanEngine::selectDisplayDRM(DisplayContext& ctx)
 {
@@ -243,13 +246,24 @@ void VulkanEngine::selectDisplayXlib(DisplayContext& ctx)
 
     VK_CHECK_RESULT(vkAcquireXlibDisplayEXT(device, xDisplay, ctx.display));
 }
+#endif // __linux__
 
 // take complete control over a physical display
 // the display must be directly connected to the GPU through x11
 // prompts the user to select the display and resolution in an ImGui window
 void VulkanEngine::initExclusiveDisplay(VulkanEngine::DisplayContext& ctx)
 {
+#if __linux__
     selectDisplayXlib(ctx);
+#elif __APPLE__
+    NEEDS_IMPLEMENTATION();
+#elif WIN32
+    NEEDS_IMPLEMENTATION();
+#else
+    NEEDS_IMPLEMENTATION();
+#endif
+
+    ASSERT(ctx.display != VK_NULL_HANDLE);
 
     auto device = _device->physicalDevice;
     uint32_t modeCount = 0;
@@ -463,7 +477,7 @@ void VulkanEngine::Init(const VulkanEngine::InitOptions& options)
     { // populate initData
         initCtx.device = this->_device.get();
         initCtx.textureManager = &_textureManager;
-        initCtx.swapChainImageFormat = this->_mainProjectorSwapchain.imageFormat;
+        initCtx.swapChainImageFormat = this->_mainWindowSwapChain.imageFormat;
         initCtx.renderPass.mainPass = _mainRenderPass;
         for (int i = 0; i < _engineUBOStatic.size(); i++) {
             initCtx.engineUBOStaticDescriptorBufferInfo[i].range = sizeof(EngineUBOStatic);
@@ -529,6 +543,20 @@ void VulkanEngine::framebufferResizeCallback(GLFWwindow* window, int width, int 
     app->_framebufferResized = true;
 }
 
+VkSurfaceKHR VulkanEngine::createGlfwWindowSurface(GLFWwindow* window)
+{
+    VkSurfaceKHR surface;
+    VkResult result = glfwCreateWindowSurface(this->_instance, this->_window, nullptr, &surface);
+    if (result != VK_SUCCESS) {
+        FATAL("Failed to create window surface.");
+    }
+    _deletionStack.push([this, surface]() {
+        vkDestroySurfaceKHR(this->_instance, surface, nullptr);
+    });
+
+    return surface;
+}
+
 void VulkanEngine::createDevice()
 {
     VkPhysicalDevice physicalDevice = this->pickPhysicalDevice();
@@ -538,6 +566,13 @@ void VulkanEngine::createDevice()
 
 void VulkanEngine::setUpEvenOddFrame()
 {
+#if WIN32
+    NEEDS_IMPLEMENTATION();
+#endif
+#if __APPLE__
+    return;
+#endif
+    DEBUG("Setting up even-odd frame resources...");
     _pFNvkGetSwapchainCounterEXT = reinterpret_cast<PFN_vkGetSwapchainCounterEXT>(
         vkGetInstanceProcAddr(_instance, "vkGetSwapchainCounterEXT")
     );
@@ -553,6 +588,12 @@ void VulkanEngine::setUpEvenOddFrame()
 // even or odd.
 void VulkanEngine::checkHardwareEvenOddFrameSupport()
 {
+#ifdef WIN32
+    NEEDS_IMPLEMENTATION();
+#endif // WIN32
+#ifndef __linux__
+    return;
+#endif // __linux__
     // check instance extensions
     uint32_t numExtensions = 0;
     VkResult result = VK_SUCCESS;
@@ -579,7 +620,8 @@ void VulkanEngine::checkHardwareEvenOddFrameSupport()
     }
 
     VkSurfaceCapabilities2EXT capabilities{
-        .sType = VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES_2_EXT, .pNext = VK_NULL_HANDLE};
+        .sType = VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES_2_EXT, .pNext = VK_NULL_HANDLE
+    };
 
     auto func = (PFN_vkGetPhysicalDeviceSurfaceCapabilities2EXT
     )vkGetInstanceProcAddr(_instance, "vkGetPhysicalDeviceSurfaceCapabilities2EXT");
@@ -606,26 +648,37 @@ void VulkanEngine::initVulkan()
 {
     INFO("Initializing Vulkan...");
     this->createInstance();
-    // this->createSurface();
     this->createDevice();
+#if __linux__
     this->initExclusiveDisplay(_mainProjectorDisplay);
-    this->_device->InitQueueFamilyIndices(_mainProjectorDisplay.surface);
+#endif
+    VkSurfaceKHR mainWindowSurface;
+#if __linux__
+    surface = _mainProjectorDisplay.surface;
+#elif __APPLE__
+    ASSERT(_window);
+    mainWindowSurface = createGlfwWindowSurface(_window);
+#endif
+
+    this->_device->InitQueueFamilyIndices(mainWindowSurface);
     this->_device->CreateLogicalDeviceAndQueue(getRequiredDeviceExtensions());
     this->_device->CreateGraphicsCommandPool();
     this->_device->CreateGraphicsCommandBuffer(NUM_FRAME_IN_FLIGHT);
 
-    this->initSwapchains();
-    this->createImageViews(_mainProjectorSwapchain);
-    this->createMainRenderPass(_mainProjectorSwapchain);
-    this->createDepthBuffer(_mainProjectorSwapchain);
+    createSwapChain(_mainWindowSwapChain, mainWindowSurface);
+    this->_deletionStack.push([this]() { this->cleanupSwapChain(_mainWindowSwapChain); });
+
+    this->createImageViews(_mainWindowSwapChain);
+    this->createMainRenderPass(_mainWindowSwapChain);
+    this->createDepthBuffer(_mainWindowSwapChain);
     this->createSynchronizationObjects(_syncProjector);
     this->_imguiManager.InitializeRenderPass(
-        this->_device->logicalDevice, _mainProjectorSwapchain.imageFormat
+        this->_device->logicalDevice, _mainWindowSwapChain.imageFormat
     );
     // NOTE: this has to go after ImGuiManager::InitializeRenderPass
     // because the function also creates imgui's frame buffer
     // TODO: maybe separate them?
-    this->createFramebuffers(_mainProjectorSwapchain);
+    this->createFramebuffers(_mainWindowSwapChain);
     { // init misc imgui resources
         this->_imguiManager.InitializeImgui();
         this->_imguiManager.InitializeDescriptorPool(NUM_FRAME_IN_FLIGHT, _device->logicalDevice);
@@ -636,7 +689,7 @@ void VulkanEngine::initVulkan()
             _device->logicalDevice,
             _device->queueFamilyIndices.graphicsFamily.value(),
             _device->graphicsQueue,
-            _mainProjectorSwapchain.frameBuffer.size()
+            _mainWindowSwapChain.frameBuffer.size()
         );
     }
     if (_evenOddMode) {
@@ -976,12 +1029,18 @@ void VulkanEngine::createSwapChain(VulkanEngine::SwapChainContext& ctx, const Vk
     VkSwapchainCounterCreateInfoEXT swapChainCounterCreateInfo{
         .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_COUNTER_CREATE_INFO_EXT,
         .pNext = NULL,
-        .surfaceCounters = VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_BIT_EXT};
+        .surfaceCounters = VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_BIT_EXT
+    };
 
     if (_evenOddMode) {
+#if __linux__
         DEBUG("swapchain created with counter support!");
         swapChainCounterCreateInfo.pNext = createInfo.pNext;
         createInfo.pNext = &swapChainCounterCreateInfo;
+#endif // __linux__
+#if WIN32
+        NEEDS_IMPLEMENTATION();
+#endif // WIN32
     }
 
     VkSwapchainKHR swapChain = VK_NULL_HANDLE;
@@ -1098,9 +1157,9 @@ void VulkanEngine::createImageViews(SwapChainContext& ctx)
     for (size_t i = 0; i < ctx.image.size(); i++) {
         VkImageViewCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        createInfo.image = _mainProjectorSwapchain.image[i];
+        createInfo.image = _mainWindowSwapChain.image[i];
         createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        createInfo.format = _mainProjectorSwapchain.imageFormat;
+        createInfo.format = _mainWindowSwapChain.imageFormat;
         createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
         createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
         createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -1114,7 +1173,7 @@ void VulkanEngine::createImageViews(SwapChainContext& ctx)
                 this->_device->logicalDevice,
                 &createInfo,
                 nullptr,
-                &_mainProjectorSwapchain.imageView[i]
+                &_mainWindowSwapChain.imageView[i]
             )
             != VK_SUCCESS) {
             FATAL("Failed to create image views!");
@@ -1268,17 +1327,17 @@ void VulkanEngine::createFramebuffers(SwapChainContext& ctx)
                 _device->logicalDevice,
                 &framebufferInfo,
                 nullptr,
-                &_mainProjectorSwapchain.frameBuffer[i]
+                &_mainWindowSwapChain.frameBuffer[i]
             )
             != VK_SUCCESS) {
             FATAL("Failed to create framebuffer!");
         }
     }
     _imguiManager.InitializeFrameBuffer(
-        this->_mainProjectorSwapchain.image.size(),
+        this->_mainWindowSwapChain.image.size(),
         _device->logicalDevice,
-        _mainProjectorSwapchain.imageView,
-        _mainProjectorSwapchain.extent
+        _mainWindowSwapChain.imageView,
+        _mainWindowSwapChain.extent
     );
 }
 
@@ -1335,7 +1394,8 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
         VkDisplayPowerInfoEXT powerInfo{
             .sType = VK_STRUCTURE_TYPE_DISPLAY_POWER_INFO_EXT,
             .pNext = VK_NULL_HANDLE,
-            .powerState = VkDisplayPowerStateEXT::VK_DISPLAY_POWER_STATE_ON_EXT};
+            .powerState = VkDisplayPowerStateEXT::VK_DISPLAY_POWER_STATE_ON_EXT
+        };
         PFN_vkDisplayPowerControlEXT fnPtr = reinterpret_cast<PFN_vkDisplayPowerControlEXT>(
             vkGetInstanceProcAddr(_instance, "vkDisplayPowerControlEXT")
         );
@@ -1350,30 +1410,37 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     PROFILE_SCOPE(&_profiler, "Render Tick");
     vkWaitForFences(_device->logicalDevice, 1, &sync.fenceInFlight, VK_TRUE, UINT64_MAX);
 
-    auto res = _pFNvkGetSwapchainCounterEXT(
-        _device->logicalDevice,
-        _mainProjectorSwapchain.chain,
-        VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_EXT,
-        &_surfaceCounterValue
-    );
+    if (_evenOddMode) {
+#if WIN32
+        NEEDS_IMPLEMENTATION();
+#endif // WIN32
+#if __linux__
+        _pFNvkGetSwapchainCounterEXT(
+            _device->logicalDevice,
+            _mainWindowSwapChain.chain,
+            VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_EXT,
+            &_surfaceCounterValue
+        );
+#endif // __linux__
+#if __APPLE__
+
+#endif // __APPLE__
+    }
 
     //  Acquire an image from the swap chain
     uint32_t imageIndex;
     VkResult result = vkAcquireNextImageKHR(
         this->_device->logicalDevice,
-        _mainProjectorSwapchain.chain,
+        _mainWindowSwapChain.chain,
         UINT64_MAX,
         sync.semaImageAvailable,
         VK_NULL_HANDLE,
         &imageIndex
     );
-    [[unlikely]] if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
-    {
-        this->recreateSwapChain(_mainProjectorSwapchain);
+    [[unlikely]] if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+        this->recreateSwapChain(_mainWindowSwapChain);
         return;
-    }
-    else [[unlikely]] if (result != VK_SUCCESS)
-    {
+    } else [[unlikely]] if (result != VK_SUCCESS) {
         const char* res = string_VkResult(result);
         PANIC("Failed to acquire swap chain image: {}", res);
     }
@@ -1381,7 +1448,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     // lock the fence
     vkResetFences(this->_device->logicalDevice, 1, &sync.fenceInFlight);
 
-    VkFramebuffer FB = this->_mainProjectorSwapchain.frameBuffer[imageIndex];
+    VkFramebuffer FB = this->_mainWindowSwapChain.frameBuffer[imageIndex];
     vk::CommandBuffer CB(_device->graphicsCommandBuffers[frame]);
     //  Record a command buffer which draws the scene onto that image
     CB.reset();
@@ -1390,7 +1457,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
         ctx->graphics.currentSwapchainImageIndex = imageIndex;
         ctx->graphics.CB = CB;
         ctx->graphics.currentFB = FB;
-        ctx->graphics.currentFBextend = _mainProjectorSwapchain.extent;
+        ctx->graphics.currentFBextend = _mainWindowSwapChain.extent;
         getMainProjectionMatrix(ctx->graphics.mainProjectionMatrix);
     }
 
@@ -1403,7 +1470,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     }
 
     { // main render pass
-        vk::Extent2D extend = _mainProjectorSwapchain.extent;
+        vk::Extent2D extend = _mainWindowSwapChain.extent;
         // the main render pass renders the actual graphics of the game.
         { // begin main render pass
             vk::Rect2D renderArea(VkOffset2D{0, 0}, extend);
@@ -1481,7 +1548,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     presentInfo.waitSemaphoreCount = 1;
     presentInfo.pWaitSemaphores = signalSemaphores;
 
-    VkSwapchainKHR swapChains[] = {_mainProjectorSwapchain.chain};
+    VkSwapchainKHR swapChains[] = {_mainWindowSwapChain.chain};
 
     presentInfo.swapchainCount = 1;
     presentInfo.pSwapchains = swapChains;
@@ -1494,17 +1561,13 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     result = vkQueuePresentKHR(_device->presentationQueue, &presentInfo);
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR
         || this->_framebufferResized) {
-        [[unlikely]] this->recreateSwapChain(_mainProjectorSwapchain);
+        [[unlikely]] this->recreateSwapChain(_mainWindowSwapChain);
         this->_framebufferResized = false;
     }
     VK_CHECK_RESULT(result);
 }
 
-void VulkanEngine::initSwapchains()
-{
-    createSwapChain(_mainProjectorSwapchain, _mainProjectorDisplay.surface);
-    this->_deletionStack.push([this]() { this->cleanupSwapChain(_mainProjectorSwapchain); });
-}
+void VulkanEngine::initSwapchains() {}
 
 void VulkanEngine::drawImGui()
 {
@@ -1651,7 +1714,7 @@ void VulkanEngine::bindDefaultInputs()
 
 void VulkanEngine::getMainProjectionMatrix(glm::mat4& projectionMatrix)
 {
-    auto& extent = _mainProjectorSwapchain.extent;
+    auto& extent = _mainWindowSwapChain.extent;
     projectionMatrix = glm::perspective(
         glm::radians(_FOV),
         extent.width / static_cast<float>(extent.height),
