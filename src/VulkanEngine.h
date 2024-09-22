@@ -145,10 +145,10 @@ class VulkanEngine
 
     // context for a dedicated display
     struct DisplayContext {
-        VkExtent2D extent;
-        VkDisplayKHR display;
-        VkSurfaceKHR surface;
-        uint32_t planeIndex;
+        VkExtent2D extent = {};
+        VkDisplayKHR display = {};
+        VkSurfaceKHR surface = {};
+        uint32_t planeIndex = {};
     };
 
     struct SyncPrimitives

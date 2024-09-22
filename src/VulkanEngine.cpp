@@ -665,6 +665,12 @@ void VulkanEngine::initVulkan()
     this->_device->CreateGraphicsCommandBuffer(NUM_FRAME_IN_FLIGHT);
 
     createSwapChain(_mainWindowSwapChain, mainWindowSurface);
+    DEBUG(
+        "main window swapchain extent: {} {}",
+        _mainWindowSwapChain.extent.width,
+        _mainWindowSwapChain.extent.height
+    );
+
     this->_deletionStack.push([this]() { this->cleanupSwapChain(_mainWindowSwapChain); });
 
     this->createImageViews(_mainWindowSwapChain);
@@ -988,6 +994,7 @@ void VulkanEngine::createSwapChain(VulkanEngine::SwapChainContext& ctx, const Vk
     VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
     DEBUG("present mode: {}", string_VkPresentModeKHR(presentMode));
     VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities);
+    DEBUG("extent: {} {}", extent.width, extent.height);
     uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
     if (swapChainSupport.capabilities.maxImageCount > 0
         && imageCount > swapChainSupport.capabilities.maxImageCount) {
@@ -1502,7 +1509,8 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
         CB.endRenderPass();
     }
 
-    _imguiManager.RecordCommandBuffer(ctx);
+    bool forceImguiDisplaySize = _mainProjectorDisplay.display != VK_NULL_HANDLE;
+    _imguiManager.RecordCommandBuffer(ctx, forceImguiDisplaySize);
 
     // end command buffer
     CB.end();
@@ -1576,15 +1584,17 @@ void VulkanEngine::drawImGui()
     }
     PROFILE_SCOPE(&_profiler, "ImGui Draw");
     _imguiManager.BeginImGuiContext();
-    // manually set imgui's framebuffer dimension to
-    // match the main projector's dimension
-    if (_evenOddMode && _mainProjectorDisplay.display) {
-        DEBUG("forcing imgui io");
-        ImGuiIO& io = ImGui::GetIO();
-        io.DisplaySize = ImVec2{
+
+    // imgui is associated with the glfw window to handle inputs,
+    // but its actual fb is associated with the projector display;
+    // so we need to manually re-adjust the display size for the scissors/
+    // viewports/clipping to be consistent
+    bool imguiDisplaySizeOverride = _evenOddMode && _mainProjectorDisplay.display;
+    if (imguiDisplaySizeOverride) {
+        ImVec2 projectorDisplaySize{
             static_cast<float>(_mainProjectorDisplay.extent.width),
             static_cast<float>(_mainProjectorDisplay.extent.height)};
-        io.DisplayFramebufferScale = {1, 1};
+        _imguiManager.forceDisplaySize(projectorDisplaySize);
     }
 
     if (_uiMode) {

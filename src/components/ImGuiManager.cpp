@@ -262,6 +262,13 @@ void ImGuiManager::BeginImGuiContext()
     ImGui::NewFrame();
 }
 
+void ImGuiManager::forceDisplaySize(ImVec2 size)
+{
+    ImGuiIO& io = ImGui::GetIO();
+    io.DisplaySize = size;    io.DisplayFramebufferScale = {1, 1};
+    ImGui::GetMainViewport()->Size = size;
+}
+
 void ImGuiManager::EndImGuiContext() { ImGui::Render(); }
 
 void ImGuiManager::ClearImGuiElements()

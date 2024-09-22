@@ -47,6 +47,8 @@ class ImGuiManager
     // which pushes all draw calls to the CB.
     void BeginImGuiContext();
 
+    void forceDisplaySize(ImVec2 size);
+
     // end the `BeginImGuiContext` context
     void EndImGuiContext();
 
