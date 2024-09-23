@@ -33,7 +33,11 @@ void ImGuiWidgetPerfPlot::Draw(const VulkanEngine* engine) {
 
     bool showingPlot = false;
     if (_wantShowPerfPlot) {
-        showingPlot = ImPlot::BeginPlot("Profiler");
+        ImVec2 plotSize = {
+            ImGui::GetWindowWidth(),
+            ImGui::GetWindowHeight() / 2
+        };
+        showingPlot = ImPlot::BeginPlot("Profiler", plotSize);
     }
 
     if (showingPlot) { // set up x and y boundary
