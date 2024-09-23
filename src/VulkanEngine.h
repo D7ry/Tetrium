@@ -112,6 +112,9 @@ class VulkanEngine
         bool fullScreen = false;             // full screen mode
         bool manualMonitorSelection = false; // the user may select a monitor that's not the primary
                                              // monitor through CLI
+        float nanoSecondsPerFrame = 16666666.66666666666666666666; // expected # of nano seconds
+                                                                   // per frame on the projector,
+                                                                   // only used when TetraMode==kEvenOddSoftwareSync
     };
 
     // Engine-wide static UBO that gets updated every Tick()
@@ -260,6 +263,7 @@ class VulkanEngine
 
     /* ---------- Instance-static Data ---------- */
     TetraMode _tetraMode;
+    float _nanoSecondsPerFrame = 16666666.66666666666666666666;
 
     /* ---------- Tick-dynamic Data ---------- */
     bool _framebufferResized = false;
@@ -283,7 +287,8 @@ class VulkanEngine
     std::array<VQBuffer, NUM_FRAME_IN_FLIGHT> _engineUBOStatic;
 
     float _FOV = 90;
-    double _timeSinceStartSeconds; // seconds in time since engine start
+    double _timeSinceStartSeconds; // seconds in time since engine start, regardless of pause
+    unsigned long int _timeSinceStartNanoSeconds; // nanoseconds in time since engine start, regardless of pause
     unsigned long int _numTicks;  // how many ticks has happened so far
     std::chrono::time_point<std::chrono::steady_clock> _timeEngineStart;
 

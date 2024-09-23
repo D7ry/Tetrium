@@ -472,6 +472,7 @@ void VulkanEngine::Init(const VulkanEngine::InitOptions& options)
 {
     // populate static config fields
     _tetraMode = options.tetraMode;
+    _nanoSecondsPerFrame = options.nanoSecondsPerFrame;
     if (_tetraMode == TetraMode::kDualProjector) {
         NEEDS_IMPLEMENTATION();
     }
@@ -548,12 +549,11 @@ void VulkanEngine::Run()
 
 void VulkanEngine::Tick()
 {
-    _deltaTimer.Tick(); // tick deltaTimer regardless of pause,
-                        // for correct _timeSinceStartSeconds
     if (_paused) {
         std::this_thread::yield();
         return;
     }
+    _deltaTimer.Tick();
     {
         PROFILE_SCOPE(&_profiler, "Main Tick");
         {
@@ -561,6 +561,7 @@ void VulkanEngine::Tick()
             // CPU-exclusive workloads
             double deltaTime = _deltaTimer.GetDeltaTime();
             _timeSinceStartSeconds += deltaTime;
+            _timeSinceStartNanoSeconds += _deltaTimer.GetDeltaTimeNanoSeconds();
             _inputManager.Tick(deltaTime);
             TickContext tickData{&_mainCamera, deltaTime};
             tickData.profiler = &_profiler;
@@ -1734,6 +1735,8 @@ void VulkanEngine::drawImGui()
     _imguiManager.EndImGuiContext();
 }
 
+// FIXME: glfw calls from a differnt thread; may need to add critical sections
+// currently for perf reasons we're leaving it as is.
 void VulkanEngine::bindDefaultInputs()
 {
     const int CAMERA_SPEED = 3;
@@ -1766,7 +1769,7 @@ void VulkanEngine::bindDefaultInputs()
         if (_uiMode) {
             io.ConfigFlags &= ~ImGuiConfigFlags_NoMouse;
             io.ConfigFlags &= ~ImGuiConfigFlags_NoKeyboard;
-            io.MousePos =  ImVec2{
+            io.MousePos = ImVec2{
                 static_cast<float>(_mainWindowSwapChain.extent.width) / 2,
                 static_cast<float>(_mainWindowSwapChain.extent.height) / 2
             };
@@ -1809,9 +1812,8 @@ bool VulkanEngine::isEvenFrame()
     bool isEven;
     switch (_tetraMode) {
     case TetraMode::kEvenOddSoftwareSync:
-        // TODO: profile whether counting frame / counting time
-        // produces better error margin
-        isEven = _numTicks % 2 == 0;
+        isEven = static_cast<unsigned long>(_timeSinceStartNanoSeconds / _nanoSecondsPerFrame) % 2
+                 == 0;
         break;
     case TetraMode::kEvenOddHardwareSync:
         isEven = _surfaceCounterValue % 2 == 0;
