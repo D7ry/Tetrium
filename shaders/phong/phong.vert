@@ -19,23 +19,25 @@ layout(location = 3) in vec3 inNormal;
 layout(location = 0) out vec3 fragColor;
 layout(location = 1) out vec2 fragTexCoord;
 layout(location = 2) out vec3 fragNormal;
-layout(location = 3) out vec3 fragPos; // frag position in view space
-layout(location = 4) out vec3 fragGlobalLightPos; // light position in view space
-layout(location = 5) out int fragTexIndex; // texture index
+layout(location = 3) out vec4 fragPos; // frag position in world
+layout(location = 4) out vec4 fragGlobalLightPos; // light position in world
+layout(location = 5) flat out int fragTexIndex; // texture index
 
-vec3 globalLightPos = vec3(-6, -3, 0.0);
+const vec3 globalLightPos = vec3(-6, -3, 0.0);
 
 void main() {
+    // dw about optimization our superior compiler stack constant props all those
     mat4 model = uboDynamic.model;
-    gl_Position = uboStatic.proj * uboStatic.view * model * vec4(inPosition, 1.0);
+    mat4 view = uboStatic.view;
+    mat4 proj = uboStatic.proj;
+
+    vec4 world_pos = model * vec4(inPosition, 1.0);
+    gl_Position = proj * view * world_pos;
+
     fragColor = inColor;
     fragTexCoord = inTexCoord;
-
-    mat3 normalMatrix = transpose(inverse(mat3(model))); // Calculate the normal matrix
-    fragNormal = normalize(normalMatrix * inNormal); // Transform the normal and pass it to the fragment shader
-
-    fragPos = vec3(model * vec4(inPosition, 1.0)); // Transform the vertex position to world space
-    fragGlobalLightPos = globalLightPos; // Pass the light position in world space to the fragment shader
-
+    fragNormal = inNormal;
+    fragPos = world_pos;
+    fragGlobalLightPos = vec4(globalLightPos, 1.f);
     fragTexIndex = uboDynamic.textureId; // tell frag shader which texture from the texture array to sample from
 }

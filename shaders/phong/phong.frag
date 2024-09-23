@@ -8,8 +8,8 @@ layout(binding = 2) uniform sampler2D textureSampler[16];
 layout(location = 0) in vec3 fragColor;
 layout(location = 1) in vec2 fragTexCoord;
 layout(location = 2) in vec3 fragNormal;
-layout(location = 3) in vec3 fragPos;
-layout(location = 4) in vec3 fragGlobalLightPos;
+layout(location = 3) in vec4 fragPos;
+layout(location = 4) in vec4 fragGlobalLightPos;
 layout(location = 5) flat in int fragTexIndex;
 
 layout(location = 0) out vec4 outColor;
@@ -20,7 +20,7 @@ float lightSourceIntensity = 100;
 
 void main() {
     vec4 textureColor = texture(textureSampler[fragTexIndex], fragTexCoord);
-    vec3 diffToLight = fragGlobalLightPos - fragPos;
+    vec3 diffToLight = vec3(fragGlobalLightPos - fragPos);
     vec3 lightDir = normalize(diffToLight);
 
     float distToLight = length(diffToLight);
@@ -32,5 +32,5 @@ void main() {
 
     vec4 ambientColor = vec4(textureColor.rgb * ambientLighting.rgb, textureColor.a);
 
-    outColor = diffuseColor + ambientColor;
+    outColor = ambientColor;
 }
