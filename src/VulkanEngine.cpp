@@ -1189,7 +1189,7 @@ VkPresentModeKHR VulkanEngine::chooseSwapPresentMode(
     const std::vector<VkPresentModeKHR>& availablePresentModes
 )
 {
-    return VK_PRESENT_MODE_SHARED_DEMAND_REFRESH_KHR;
+    return VK_PRESENT_MODE_SHARED_CONTINUOUS_REFRESH_KHR;
     DEBUG("available present modes: ");
     for (const auto& availablePresentMode : availablePresentModes) {
         DEBUG("{}", string_VkPresentModeKHR(availablePresentMode));

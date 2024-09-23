@@ -86,6 +86,10 @@ class VulkanEngine
         VK_EXT_ACQUIRE_XLIB_DISPLAY_EXTENSION_NAME,
         // VK_EXT_ACQUIRE_DRM_DISPLAY_EXTENSION_NAME,
         VK_KHR_XLIB_SURFACE_EXTENSION_NAME,
+
+        // immediate mode rendernig
+        VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
+        VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME,
 #endif // __LINUX__
     };
 
@@ -95,7 +99,8 @@ class VulkanEngine
         // https://registry.khronos.org/VulkanSC/specs/1.0-extensions/man/html/VK_EXT_display_control.html
 #if __linux__
         VK_EXT_DISPLAY_CONTROL_EXTENSION_NAME, // to wake up display
-        VK_KHR_SHARED_PRESENTABLE_IMAGE_EXTENSION_NAME
+        // immediate rendering
+        VK_KHR_SHARED_PRESENTABLE_IMAGE_EXTENSION_NAME,
 #endif // __linux__
     };
 
