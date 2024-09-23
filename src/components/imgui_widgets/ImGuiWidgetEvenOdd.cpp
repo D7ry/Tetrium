@@ -29,6 +29,37 @@ void ImGuiWidgetEvenOdd::drawTestWindow(VulkanEngine* engine)
         ImGui::Text("Is odd frame!");
     }
 
+    bool drawCond[] = {true, true, true, true, true, true};
+
+    { // draw RGBCMY quads
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+        // RGBCMY
+        ImU32 colors[6] = {
+            IM_COL32(255, 0, 0, 255),   // Red
+            IM_COL32(0, 255, 0, 255),   // Green
+            IM_COL32(0, 0, 255, 255),   // Blue
+            IM_COL32(255, 255, 0, 255), // Yellow
+            IM_COL32(255, 0, 255, 255), // Magenta
+            IM_COL32(0, 255, 255, 255)  // Cyan
+        };
+
+        // Get the window size
+        ImVec2 windowSize = ImGui::GetWindowSize();
+
+        // Calculate the width of each quad
+        float quadWidth = windowSize.x / 6.0f;
+
+        // Draw 6 evenly spaced quads
+        for (int i = 0; i < 6; i++) {
+            if (!drawCond[i]) {
+                continue;
+            }
+            ImVec2 p0(i * quadWidth, windowSize.y * 0.2);
+            ImVec2 p1((i + 1) * quadWidth, windowSize.y * 0.8);
+            dl->AddRectFilled(p0, p1, colors[i]);
+        }
+    }
+
     ImGui::PopStyleColor();
     ImGui::End();
 }
