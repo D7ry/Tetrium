@@ -1762,11 +1762,17 @@ void VulkanEngine::bindDefaultInputs()
     // ui mode toggle
     _inputManager.RegisterCallback(GLFW_KEY_U, InputManager::KeyCallbackCondition::PRESS, [this]() {
         _uiMode = !_uiMode;
+        ImGuiIO& io = ImGui::GetIO();
         if (_uiMode) {
-            ImGui::GetIO().ConfigFlags &= ~ImGuiConfigFlags_NoMouse;
-            ImGui::GetIO().ConfigFlags &= ~ImGuiConfigFlags_NoKeyboard;
+            io.ConfigFlags &= ~ImGuiConfigFlags_NoMouse;
+            io.ConfigFlags &= ~ImGuiConfigFlags_NoKeyboard;
+            io.MousePos =  ImVec2{
+                static_cast<float>(_mainWindowSwapChain.extent.width) / 2,
+                static_cast<float>(_mainWindowSwapChain.extent.height) / 2
+            };
+            io.WantSetMousePos = true;
         } else {
-            ImGui::GetIO().ConfigFlags |= (ImGuiConfigFlags_NoMouse | ImGuiConfigFlags_NoKeyboard);
+            io.ConfigFlags |= (ImGuiConfigFlags_NoMouse | ImGuiConfigFlags_NoKeyboard);
         }
         // io.WantSetMousePos = _uiMode;
     });
