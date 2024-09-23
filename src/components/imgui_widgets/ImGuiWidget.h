@@ -69,6 +69,9 @@ class ImGuiWidgetEvenOdd : public ImGuiWidgetMut
 {
   public:
     virtual void Draw(VulkanEngine* engine) override;
+  private:
+    bool _drawTestWindow = false;
+    void drawTestWindow(VulkanEngine* engine);
 };
 
 

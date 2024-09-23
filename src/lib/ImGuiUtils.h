@@ -4,11 +4,13 @@
 // ImGui Utils library
 namespace ImGuiU
 {
-void DrawCenteredText(const char* text)
+void DrawCenteredText(const char* text, const ImVec4& windowBackground)
 {
     ImGui::SetNextWindowPos(ImVec2(0, 0));
     ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
     ImGui::SetNextWindowFocus();
+
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, windowBackground);
     if (ImGui::Begin(
             "Fullscreen",
             nullptr,
@@ -22,6 +24,7 @@ void DrawCenteredText(const char* text)
         ImGui::SetCursorPos(centerPos);
         ImGui::Text("%s", text);
     }
+    ImGui::PopStyleColor();
     ImGui::End();
 }
 
