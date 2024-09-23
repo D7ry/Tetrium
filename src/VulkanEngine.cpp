@@ -449,8 +449,13 @@ void VulkanEngine::cursorPosCallback(GLFWwindow* window, double xpos, double ypo
 void VulkanEngine::initDefaultStates()
 {
     // configure states
-    _mainRenderPassClearValues[0].color = {0.f, 0.f, 0.f, 1.f};
+
+    // clear color
+    _mainRenderPassClearValues[0].color = {0.5f, 0.3f, 0.1f, 1.f};
     _mainRenderPassClearValues[1].depthStencil = vk::ClearDepthStencilValue(1.f, 0.f);
+
+    // camera location
+    _mainCamera.SetPosition(-2, 0, 0);
 
     // input states
     // by default, unlock cursor, disable imgui inputs, disable input handling
