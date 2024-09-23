@@ -221,6 +221,10 @@ void VulkanEngine::selectDisplayXlib(DisplayContext& ctx)
         XRRFreeScreenResources(resources);
     }
 
+    if (displays.empty()) {
+        PANIC("No external display available!");
+    }
+
     println("============== Choose Display ===============");
 
     for (size_t i = 0; i < displays.size(); ++i) {
@@ -1060,6 +1064,7 @@ void VulkanEngine::createSwapChain(VulkanEngine::SwapChainContext& ctx, const Vk
         && imageCount > swapChainSupport.capabilities.maxImageCount) {
         imageCount = swapChainSupport.capabilities.maxImageCount;
     }
+    imageCount = 1;
 
     VkSwapchainCreateInfoKHR createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
@@ -1184,6 +1189,7 @@ VkPresentModeKHR VulkanEngine::chooseSwapPresentMode(
     const std::vector<VkPresentModeKHR>& availablePresentModes
 )
 {
+    return VK_PRESENT_MODE_SHARED_DEMAND_REFRESH_KHR;
     DEBUG("available present modes: ");
     for (const auto& availablePresentMode : availablePresentModes) {
         DEBUG("{}", string_VkPresentModeKHR(availablePresentMode));

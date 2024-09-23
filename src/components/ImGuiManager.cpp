@@ -91,7 +91,7 @@ void ImGuiManager::BindVulkanResources(
     initInfo.PipelineCache = VK_NULL_HANDLE;        // keeping it none is fine
     initInfo.DescriptorPool = _imguiDescriptorPool; // imgui custom descriptor pool
     initInfo.Allocator = VK_NULL_HANDLE;            // keeping it none is fine
-    initInfo.MinImageCount = 2;
+    initInfo.MinImageCount = 1;
     initInfo.ImageCount = imageCount;
     initInfo.CheckVkResultFn = nullptr;
     initInfo.RenderPass = this->_imGuiRenderPass;

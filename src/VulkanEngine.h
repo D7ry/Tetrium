@@ -95,6 +95,7 @@ class VulkanEngine
         // https://registry.khronos.org/VulkanSC/specs/1.0-extensions/man/html/VK_EXT_display_control.html
 #if __linux__
         VK_EXT_DISPLAY_CONTROL_EXTENSION_NAME, // to wake up display
+        VK_KHR_SHARED_PRESENTABLE_IMAGE_EXTENSION_NAME
 #endif // __linux__
     };
 
