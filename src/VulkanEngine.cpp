@@ -1449,6 +1449,15 @@ void VulkanEngine::flushEngineUBOStatic(uint8_t frame)
 
 #define POWER_ON_DISPLAY 0
 
+// TODO: another hack to reduce even-odd frame error,
+// is to minimize time gap between the GetIsEven(),
+// and the even-odd rendering subroutines. If the gap
+// is too long, we may be rendering to an even frame because GetIsEven()== true, while
+// when we commit, the display is demanding an odd frame.
+// The best solution to this would be to render to two separate frame buffers
+// for every draw call, and determine which one to commit,
+// at commit time, through GetIsEven().
+//
 void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
 {
 #if POWER_ON_DISPLAY
