@@ -449,12 +449,18 @@ void VulkanEngine::cursorPosCallback(GLFWwindow* window, double xpos, double ypo
 void VulkanEngine::initDefaultStates()
 {
     // configure states
+    _mainRenderPassClearValues[0].color = {0.f, 0.f, 0.f, 1.f};
+    _mainRenderPassClearValues[1].depthStencil = vk::ClearDepthStencilValue(1.f, 0.f);
+
+    // input states
     // by default, unlock cursor, disable imgui inputs, disable input handling
     _lockCursor = false;
     _inputManager.SetActive(_lockCursor);
     _uiMode = false;
     ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoMouse;
     ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoKeyboard;
+
+    _timeEngineStart = std::chrono::steady_clock::now();
 };
 
 void VulkanEngine::Init(const VulkanEngine::InitOptions& options)
@@ -651,7 +657,8 @@ void VulkanEngine::checkHardwareEvenOddFrameSupport()
     }
 
     VkSurfaceCapabilities2EXT capabilities{
-        .sType = VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES_2_EXT, .pNext = VK_NULL_HANDLE};
+        .sType = VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES_2_EXT, .pNext = VK_NULL_HANDLE
+    };
 
     auto func = (PFN_vkGetPhysicalDeviceSurfaceCapabilities2EXT
     )vkGetInstanceProcAddr(_instance, "vkGetPhysicalDeviceSurfaceCapabilities2EXT");
@@ -1082,7 +1089,8 @@ void VulkanEngine::createSwapChain(VulkanEngine::SwapChainContext& ctx, const Vk
     VkSwapchainCounterCreateInfoEXT swapChainCounterCreateInfo{
         .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_COUNTER_CREATE_INFO_EXT,
         .pNext = NULL,
-        .surfaceCounters = VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_BIT_EXT};
+        .surfaceCounters = VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_BIT_EXT
+    };
 
     if (_tetraMode == TetraMode::kEvenOddHardwareSync) {
 #if __linux__
@@ -1446,7 +1454,8 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
         VkDisplayPowerInfoEXT powerInfo{
             .sType = VK_STRUCTURE_TYPE_DISPLAY_POWER_INFO_EXT,
             .pNext = VK_NULL_HANDLE,
-            .powerState = VkDisplayPowerStateEXT::VK_DISPLAY_POWER_STATE_ON_EXT};
+            .powerState = VkDisplayPowerStateEXT::VK_DISPLAY_POWER_STATE_ON_EXT
+        };
         PFN_vkDisplayPowerControlEXT fnPtr = reinterpret_cast<PFN_vkDisplayPowerControlEXT>(
             vkGetInstanceProcAddr(_instance, "vkDisplayPowerControlEXT")
         );
@@ -1474,7 +1483,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
         );
 #endif // __linux__
 #if __APPLE__
-
+        NEEDS_IMPLEMENTATION()
 #endif // __APPLE__
     }
 
@@ -1488,13 +1497,10 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
         VK_NULL_HANDLE,
         &imageIndex
     );
-    [[unlikely]] if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
-    {
+    [[unlikely]] if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
         this->recreateSwapChain(_mainWindowSwapChain);
         return;
-    }
-    else [[unlikely]] if (result != VK_SUCCESS)
-    {
+    } else [[unlikely]] if (result != VK_SUCCESS) {
         const char* res = string_VkResult(result);
         PANIC("Failed to acquire swap chain image: {}", res);
     }
@@ -1528,11 +1534,13 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
         // the main render pass renders the actual graphics of the game.
         { // begin main render pass
             vk::Rect2D renderArea(VkOffset2D{0, 0}, extend);
-            std::array<vk::ClearValue, 2> clearValues{};
-            clearValues[0].color = {0.f, 0.f, 0.f, 1.f};
-            clearValues[1].depthStencil = vk::ClearDepthStencilValue(1.f, 0.f);
             vk::RenderPassBeginInfo renderPassBeginInfo(
-                _mainRenderPass, FB, renderArea, clearValues.size(), clearValues.data(), nullptr
+                _mainRenderPass,
+                FB,
+                renderArea,
+                _mainRenderPassClearValues.size(),
+                _mainRenderPassClearValues.data(),
+                nullptr
             );
 
             CB.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
@@ -1641,7 +1649,8 @@ void VulkanEngine::drawImGui()
     if (imguiDisplaySizeOverride) {
         ImVec2 projectorDisplaySize{
             static_cast<float>(_mainProjectorDisplay.extent.width),
-            static_cast<float>(_mainProjectorDisplay.extent.height)};
+            static_cast<float>(_mainProjectorDisplay.extent.height)
+        };
         _imguiManager.forceDisplaySize(projectorDisplaySize);
     }
 
@@ -1692,6 +1701,8 @@ void VulkanEngine::drawImGui()
                 }
                 ImGui::SeparatorText("Engine UBO");
                 _widgetUBOViewer.Draw(this);
+                ImGui::SeparatorText("Graphics Pipeline");
+                _widgetGraphicsPipeline.Draw(this);
                 ImGui::EndTabItem();
             }
 
@@ -1787,7 +1798,9 @@ bool VulkanEngine::isEvenFrame()
     bool isEven;
     switch (_tetraMode) {
     case TetraMode::kEvenOddSoftwareSync:
-        isEven = _currentFrame % 2 == 0;
+        // TODO: profile whether counting frame / counting time
+        // produces better error margin
+        isEven = _numTicks % 2 == 0;
         break;
     case TetraMode::kEvenOddHardwareSync:
         isEven = _surfaceCounterValue % 2 == 0;

@@ -16,9 +16,7 @@ void Init();
 #define ERROR(...) SPDLOG_ERROR(__VA_ARGS__)
 #define TRACE(...) SPDLOG_TRACE(__VA_ARGS__)
 #define DEBUG(...) SPDLOG_DEBUG(__VA_ARGS__)
-#define FATAL(...)                                                                                 \
-    SPDLOG_CRITICAL(__VA_ARGS__);                                                                  \
-    throw std::runtime_error("Fatal error: " + fmt::format(__VA_ARGS__))
+#define FATAL(...) PANIC(__VA_ARGS__)
 #define NEEDS_IMPLEMENTATION() FATAL("This method needs to be implemented")
 #define PANIC(...)                                                                                 \
     SPDLOG_CRITICAL(__VA_ARGS__);                                                                  \

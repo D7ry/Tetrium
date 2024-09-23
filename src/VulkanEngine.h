@@ -256,6 +256,7 @@ class VulkanEngine
     /* ---------- Render Passes ---------- */
     // main render pass, and currently the only render pass
     VkRenderPass _mainRenderPass = VK_NULL_HANDLE;
+    std::array<vk::ClearValue, 2> _mainRenderPassClearValues; // [color, depthStencil]
 
     /* ---------- Instance-static Data ---------- */
     TetraMode _tetraMode;
@@ -284,6 +285,7 @@ class VulkanEngine
     float _FOV = 90;
     double _timeSinceStartSeconds; // seconds in time since engine start
     unsigned long int _numTicks;  // how many ticks has happened so far
+    std::chrono::time_point<std::chrono::steady_clock> _timeEngineStart;
 
     // even-odd frame
     bool _flipEvenOdd = false; // whether to flip even-odd frame
@@ -309,6 +311,8 @@ class VulkanEngine
     ImGuiWidgetUBOViewer _widgetUBOViewer;
     friend class ImGuiWidgetEvenOdd;
     ImGuiWidgetEvenOdd _widgetEvenOdd;
+    friend class ImGuiWidgetGraphicsPipeline;
+    ImGuiWidgetGraphicsPipeline _widgetGraphicsPipeline;
 
     // ecs Systems
     SimpleRenderSystem _renderer;

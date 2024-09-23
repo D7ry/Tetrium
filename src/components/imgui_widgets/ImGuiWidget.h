@@ -70,3 +70,11 @@ class ImGuiWidgetEvenOdd : public ImGuiWidgetMut
   public:
     virtual void Draw(VulkanEngine* engine) override;
 };
+
+
+// clear values
+class ImGuiWidgetGraphicsPipeline : public ImGuiWidgetMut
+{
+  public:
+    virtual void Draw(VulkanEngine* engine) override;
+};
