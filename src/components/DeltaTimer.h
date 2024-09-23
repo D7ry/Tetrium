@@ -8,10 +8,10 @@ class DeltaTimer
     void Tick();
     double GetDeltaTime() const;
     double GetDeltaTimeSeconds() const;
-    double GetDeltaTimeMiliseconds() const;
+    double GetDeltaTimeNanoSeconds() const;
 
   private:
     std::chrono::time_point<std::chrono::high_resolution_clock> _prev;
-    double _delta = 0; // delta time in seconds
+    std::chrono::duration<uint64_t, std::nano> _deltaNano;
     bool _started = false;
 };
