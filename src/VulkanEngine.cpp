@@ -47,6 +47,8 @@ void VulkanEngine::createFunnyObjects()
     spot->AddComponent(meshInstance);
     // give the lil cow a transform
     spot->AddComponent(new TransformComponent());
+    spot->GetComponent<TransformComponent>()->rotation.x = 90;
+    spot->GetComponent<TransformComponent>()->rotation.y = 90;
     // register lil cow
     _renderer.AddEntity(spot);
 }
