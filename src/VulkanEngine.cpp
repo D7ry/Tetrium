@@ -580,6 +580,23 @@ void VulkanEngine::Tick()
     }
     _lastProfilerData = _profiler.NewProfile();
     _numTicks++;
+    // experimental stuff
+    static std::map<uint32_t, uint64_t> m;
+    // uint32_t imageCount;
+    // VK_CHECK_RESULT(vkGetPastPresentationTimingGOOGLE(_device->logicalDevice, _mainWindowSwapChain.chain, &imageCount, nullptr))
+    // std::vector<VkPastPresentationTimingGOOGLE> vec(imageCount);
+    // VK_CHECK_RESULT(vkGetPastPresentationTimingGOOGLE(_device->logicalDevice, _mainWindowSwapChain.chain, &imageCount, vec.data()))
+    // for (auto& elem : vec) {
+    //     auto it = m.insert({elem.presentID, static_cast<unsigned int>(elem.actualPresentTime)});
+    // }
+    // if (m.size() > 30) {
+    //     for (auto it = m.begin(); it != m.end(); it++) {
+    //         fmt::println("{} {}", it->first, it->second);
+    //     }
+    //     exit(0);
+    // } else {
+    //     fmt::println("{}", m.size());
+    // }
 }
 
 void VulkanEngine::framebufferResizeCallback(GLFWwindow* window, int width, int height)
