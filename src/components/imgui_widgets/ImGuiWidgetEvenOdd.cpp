@@ -77,23 +77,16 @@ void ImGuiWidgetEvenOdd::drawTestWindow(VulkanEngine* engine)
 void ImGuiWidgetEvenOdd::Draw(VulkanEngine* engine)
 {
     const char* evenOddMode = nullptr;
-    uint64_t numFrames = 0;
+    uint64_t numFrames = engine->getSurfaceCounterValue();
     switch (engine->_tetraMode) {
     case VulkanEngine::TetraMode::kEvenOddSoftwareSync: {
         evenOddMode = "Software Sync";
-        unsigned long long timeSinceStartNanoSeconds
-            = std::chrono::duration<double, std::chrono::nanoseconds::period>(
-                  std::chrono::steady_clock().now() - engine->_softwareEvenOddCtx.timeEngineStart
-            )
-                  .count();
-        long numFrame = timeSinceStartNanoSeconds / engine->_softwareEvenOddCtx.nanoSecondsPerFrame;
     } break;
     case VulkanEngine::TetraMode::kEvenOddHardwareSync:
         evenOddMode = "Hardware Sync";
-        numFrames = engine->_hardWareEvenOddCtx.surfaceCounterValue;
         break;
     case VulkanEngine::TetraMode::kDualProjector:
-        PANIC("shouldn't happen");
+        evenOddMode = "Dual Projector Does Not Use Even-Odd rendering";
         break;
     }
     ImGui::Text("Even odd mode: %s", evenOddMode);

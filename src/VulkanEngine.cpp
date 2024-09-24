@@ -633,9 +633,9 @@ void VulkanEngine::checkSoftwareEvenOddFrameSupport()
     DEBUG("Checking software even-odd frame support...");
 #if __APPLE__
 #if !NDEBUG
-    PANIC("MacOS software even-odd frame does not work in none-release mode,"
-          "MoltenVK's implementation`vkGetRefreshCycleDurationGOOGLE` is bugged"
-          "that it segfaults in debug-mode. To use software even-odd sync for macos,"
+    PANIC("\nMacOS software even-odd frame does not work in none-release mode,\n"
+          "MoltenVK's implementation`vkGetRefreshCycleDurationGOOGLE` is bugged\n"
+          "that it segfaults in debug-mode. To use software even-odd sync for macos,\n"
           "build in release mode.");
 #endif
 #endif
@@ -1522,23 +1522,6 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     PROFILE_SCOPE(&_profiler, "Render Tick");
     vkWaitForFences(_device->logicalDevice, 1, &sync.fenceInFlight, VK_TRUE, UINT64_MAX);
 
-    if (_tetraMode == TetraMode::kEvenOddHardwareSync) {
-#if WIN32
-        NEEDS_IMPLEMENTATION();
-#endif // WIN32
-#if __linux__
-        _hardWareEvenOddCtx.vkGetSwapchainCounterEXT(
-            _device->logicalDevice,
-            _mainWindowSwapChain.chain,
-            VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_EXT,
-            &_hardWareEvenOddCtx.surfaceCounterValue
-        );
-#endif // __linux__
-#if __APPLE__
-        NEEDS_IMPLEMENTATION()
-#endif // __APPLE__
-    }
-
     //  Acquire an image from the swap chain
     uint32_t imageIndex;
     VkResult result = vkAcquireNextImageKHR(
@@ -1867,7 +1850,20 @@ uint64_t VulkanEngine::getSurfaceCounterValue()
         surfaceCounter = timeSinceStartNanoSeconds / _softwareEvenOddCtx.nanoSecondsPerFrame;
     } break;
     case TetraMode::kEvenOddHardwareSync:
-        surfaceCounter = _hardWareEvenOddCtx.surfaceCounterValue;
+#if WIN32
+        NEEDS_IMPLEMENTATION();
+#endif // WIN32
+#if __APPLE__
+        NEEDS_IMPLEMENTATION();
+#endif
+#if __linux__
+        VK_CHECK_RESULT(_hardWareEvenOddCtx.vkGetSwapchainCounterEXT(
+            _device->logicalDevice,
+            _mainWindowSwapChain.chain,
+            VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_EXT,
+            &surfaceCounter
+        ))
+#endif
         break;
     default:
         surfaceCounter = 0;

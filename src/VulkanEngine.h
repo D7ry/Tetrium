@@ -297,7 +297,6 @@ class VulkanEngine
     // context for hardware-based even-odd frame sync
     struct {
         PFN_vkGetSwapchainCounterEXT vkGetSwapchainCounterEXT = nullptr;
-        uint64_t surfaceCounterValue = 0;
     } _hardWareEvenOddCtx;
 
     // context for software-based even-odd frame sync
