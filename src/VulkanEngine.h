@@ -305,12 +305,17 @@ class VulkanEngine
     // context for software-based even-odd frame sync
     struct {
         std::chrono::time_point<std::chrono::steady_clock> timeEngineStart;
-        uint64_t nanoSecondsPerFrame;
+        uint64_t nanoSecondsPerFrame; // how many nanoseconds in between frames?
+                                      // obtained through a precise vulkan API call
         int timeOffset = 0; // time offset added to the time that's used
-                             // to evaluate current frame.
-        long clockTimeBegin = 0; // obtained from clock_gettime
-        long mostRecentPresentFinish = 0;
-        uint32_t lastPresentedImageId = 0;
+                             // to evaluate current frame, used for the old counter method
+        long clockTimeBegin = 0; // obtained from clock_gettime, unused
+        long mostRecentPresentFinish = 0; // unused
+        uint32_t lastPresentedImageId = 0; // each image are tagged with an image id,
+                                           // image id corresponds to the tick # 
+                                           // when the images are presented
+                                           // tick # and image id are bijective and they
+                                           // strictly increase over time
     } _softwareEvenOddCtx;
 
     /* ---------- Engine Components ---------- */
