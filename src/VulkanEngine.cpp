@@ -1221,9 +1221,9 @@ VkPresentModeKHR VulkanEngine::chooseSwapPresentMode(
     const std::vector<VkPresentModeKHR>& availablePresentModes
 )
 {
-    DEBUG("available present modes: ");
+    INFO("available present modes: ");
     for (const auto& availablePresentMode : availablePresentModes) {
-        DEBUG("{}", string_VkPresentModeKHR(availablePresentMode));
+        INFO("{}", string_VkPresentModeKHR(availablePresentMode));
         if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
             return availablePresentMode;
         }
@@ -1845,8 +1845,9 @@ uint64_t VulkanEngine::getSurfaceCounterValue()
         unsigned long long timeSinceStartNanoSeconds
             = std::chrono::duration<double, std::chrono::nanoseconds::period>(
                   std::chrono::steady_clock().now() - _softwareEvenOddCtx.timeEngineStart
-            )
-                  .count();
+              )
+                  .count()
+              + _softwareEvenOddCtx.timeOffset;
         surfaceCounter = timeSinceStartNanoSeconds / _softwareEvenOddCtx.nanoSecondsPerFrame;
     } break;
     case TetraMode::kEvenOddHardwareSync:

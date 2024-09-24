@@ -76,6 +76,8 @@ class VulkanEngine
 #if __APPLE__ // molten vk support
         VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME,
 #endif // __APPLE__
+       //https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetRefreshCycleDurationGOOGLE.html
+       //https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPastPresentationTimingGOOGLE.html
         VK_GOOGLE_DISPLAY_TIMING_EXTENSION_NAME // for query refresh rate
     };
 
@@ -303,6 +305,8 @@ class VulkanEngine
     struct {
         std::chrono::time_point<std::chrono::steady_clock> timeEngineStart;
         uint64_t nanoSecondsPerFrame;
+        int timeOffset; // time offset added to the time that's used
+                             // to evaluate current frame.
     } _softwareEvenOddCtx;
 
     /* ---------- Engine Components ---------- */
