@@ -1884,7 +1884,6 @@ uint64_t VulkanEngine::getSurfaceCounterValue()
         );
         std::vector<VkPastPresentationTimingGOOGLE> images(imageCount);
 
-        INFO("{}", imageCount);
         vkGetPastPresentationTimingGOOGLE(
             _device->logicalDevice, _mainWindowSwapChain.chain, &imageCount, images.data()
         );
