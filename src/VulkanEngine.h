@@ -185,7 +185,7 @@ class VulkanEngine
     void createGlfwWindowSurface();
     void createDevice();
     VkSurfaceKHR createGlfwWindowSurface(GLFWwindow* window);
-    void createMainRenderPass(VulkanEngine::SwapChainContext& ctx); // create main render pass
+    void createMainRenderPass(const VkFormat imageFormat); // create main render pass
     void createSynchronizationObjects(std::array<SyncPrimitives, NUM_FRAME_IN_FLIGHT>& primitives);
     void createFunnyObjects();
 

@@ -762,7 +762,7 @@ void VulkanEngine::initVulkan()
     this->_deletionStack.push([this]() { this->cleanupSwapChain(_mainWindowSwapChain); });
 
     this->createImageViews(_mainWindowSwapChain);
-    this->createMainRenderPass(_mainWindowSwapChain);
+    this->createMainRenderPass(_mainWindowSwapChain.imageFormat);
     this->createDepthBuffer(_mainWindowSwapChain);
     this->createSynchronizationObjects(_syncProjector);
     this->_imguiManager.InitializeRenderPass(
@@ -1335,11 +1335,11 @@ void VulkanEngine::Cleanup()
     INFO("Resource cleaned up.");
 }
 
-void VulkanEngine::createMainRenderPass(VulkanEngine::SwapChainContext& ctx)
+void VulkanEngine::createMainRenderPass(const VkFormat imageFormat)
 {
     DEBUG("Creating render pass...");
     VkAttachmentDescription colorAttachment{};
-    colorAttachment.format = ctx.imageFormat;
+    colorAttachment.format = imageFormat;
     colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
 
     colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
