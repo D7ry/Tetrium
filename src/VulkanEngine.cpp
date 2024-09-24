@@ -473,7 +473,6 @@ void VulkanEngine::Init(const VulkanEngine::InitOptions& options)
 {
     // populate static config fields
     _tetraMode = options.tetraMode;
-    _nanoSecondsPerFrame = options.nanoSecondsPerFrame;
     if (_tetraMode == TetraMode::kDualProjector) {
         NEEDS_IMPLEMENTATION();
     }
@@ -625,9 +624,21 @@ void VulkanEngine::setupSoftwareEvenOddFrame()
     vkGetRefreshCycleDurationGOOGLE(
         _device->logicalDevice, _mainWindowSwapChain.chain, &refreshCycleDuration
     );
+    ctx.nanoSecondsPerFrame = refreshCycleDuration.refreshDuration;
+    ASSERT(ctx.nanoSecondsPerFrame != 0);
+}
 
-    ctx.refreshCycleDuration = refreshCycleDuration.refreshDuration;
-    DEBUG("refresh duration: {}", ctx.refreshCycleDuration);
+void VulkanEngine::checkSoftwareEvenOddFrameSupport()
+{
+    DEBUG("Checking software even-odd frame support...");
+#if __APPLE__
+#if !NDEBUG
+    PANIC("MacOS software even-odd frame does not work in none-release mode,"
+          "MoltenVK's implementation`vkGetRefreshCycleDurationGOOGLE` is bugged"
+          "that it segfaults in debug-mode. To use software even-odd sync for macos,"
+          "build in release mode.");
+#endif
+#endif
 }
 
 void VulkanEngine::setupHardwareEvenOddFrame()
@@ -777,6 +788,7 @@ void VulkanEngine::initVulkan()
         setupHardwareEvenOddFrame();
         break;
     case TetraMode::kEvenOddSoftwareSync:
+        checkSoftwareEvenOddFrameSupport();
         setupSoftwareEvenOddFrame();
         break;
     default:
@@ -1841,28 +1853,36 @@ void VulkanEngine::getMainProjectionMatrix(glm::mat4& projectionMatrix)
     projectionMatrix[1][1] *= -1; // invert for vulkan coord system
 }
 
-bool VulkanEngine::isEvenFrame()
+uint64_t VulkanEngine::getSurfaceCounterValue()
 {
-    bool isEven;
+    uint64_t surfaceCounter;
     switch (_tetraMode) {
     case TetraMode::kEvenOddSoftwareSync: {
+        // return a software-based surface counter
         unsigned long long timeSinceStartNanoSeconds
             = std::chrono::duration<double, std::chrono::nanoseconds::period>(
                   std::chrono::steady_clock().now() - _softwareEvenOddCtx.timeEngineStart
             )
                   .count();
-        long numFrame = timeSinceStartNanoSeconds / _nanoSecondsPerFrame;
-        isEven = numFrame % 2 == 0;
+        surfaceCounter = timeSinceStartNanoSeconds / _softwareEvenOddCtx.nanoSecondsPerFrame;
     } break;
     case TetraMode::kEvenOddHardwareSync:
-        isEven = _hardWareEvenOddCtx.surfaceCounterValue % 2 == 0;
+        surfaceCounter = _hardWareEvenOddCtx.surfaceCounterValue;
         break;
     default:
-        PANIC("invalid tetraMode when calling isEvenFrame()!");
+        surfaceCounter = 0;
     }
+
+    return surfaceCounter;
+}
+
+bool VulkanEngine::isEvenFrame()
+{
+    bool isEven = getSurfaceCounterValue() % 2 == 0;
 
     if (_flipEvenOdd) {
         isEven = !isEven;
     }
+
     return isEven;
 }

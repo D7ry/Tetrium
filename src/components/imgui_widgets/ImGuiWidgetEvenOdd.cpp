@@ -24,8 +24,10 @@ void ImGuiWidgetEvenOdd::drawTestWindow(VulkanEngine* engine)
     bool isEven = engine->isEvenFrame();
 
     if (isEven) {
+        DEBUG("even");
         ImGui::Text("Is even frame!");
     } else {
+        DEBUG("odd");
         ImGui::Text("Is odd frame!");
     }
 
@@ -51,7 +53,7 @@ void ImGuiWidgetEvenOdd::drawTestWindow(VulkanEngine* engine)
         // Calculate the width of each quad
         float quadWidth = windowSize.x / 6.0f;
 
-        int iBegin; 
+        int iBegin;
         int iEnd;
         if (engine->isEvenFrame()) {
             iBegin = 0;
@@ -75,15 +77,23 @@ void ImGuiWidgetEvenOdd::drawTestWindow(VulkanEngine* engine)
 void ImGuiWidgetEvenOdd::Draw(VulkanEngine* engine)
 {
     const char* evenOddMode = nullptr;
+    uint64_t numFrames = 0;
     switch (engine->_tetraMode) {
-    case VulkanEngine::TetraMode::kEvenOddSoftwareSync:
+    case VulkanEngine::TetraMode::kEvenOddSoftwareSync: {
         evenOddMode = "Software Sync";
-        break;
+        unsigned long long timeSinceStartNanoSeconds
+            = std::chrono::duration<double, std::chrono::nanoseconds::period>(
+                  std::chrono::steady_clock().now() - engine->_softwareEvenOddCtx.timeEngineStart
+            )
+                  .count();
+        long numFrame = timeSinceStartNanoSeconds / engine->_softwareEvenOddCtx.nanoSecondsPerFrame;
+    } break;
     case VulkanEngine::TetraMode::kEvenOddHardwareSync:
         evenOddMode = "Hardware Sync";
+        numFrames = engine->_hardWareEvenOddCtx.surfaceCounterValue;
         break;
     case VulkanEngine::TetraMode::kDualProjector:
-        evenOddMode = "Dual Projector";
+        PANIC("shouldn't happen");
         break;
     }
     ImGui::Text("Even odd mode: %s", evenOddMode);
@@ -96,7 +106,7 @@ void ImGuiWidgetEvenOdd::Draw(VulkanEngine* engine)
         ImGui::Text("Is odd frame!");
     }
 
-    ImGui::Text("Surface Counter: %llu", engine->_surfaceCounterValue);
+    ImGui::Text("Num Frame: %llu", engine->getSurfaceCounterValue());
 
     if (ImGui::Button("Draw Test Window")) {
         _drawTestWindow = true;

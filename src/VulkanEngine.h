@@ -113,9 +113,6 @@ class VulkanEngine
         bool fullScreen = false;             // full screen mode
         bool manualMonitorSelection = false; // the user may select a monitor that's not the primary
                                              // monitor through CLI
-        float nanoSecondsPerFrame = 16666666.66666666666666666666; // expected # of nano seconds
-                                                                   // per frame on the projector,
-                                                                   // only used when TetraMode==kEvenOddSoftwareSync
     };
 
     // Engine-wide static UBO that gets updated every Tick()
@@ -239,7 +236,9 @@ class VulkanEngine
     /* ---------- Even-Odd frame ---------- */
     void checkHardwareEvenOddFrameSupport(); // checks hw support for even-odd rendering
     void setupHardwareEvenOddFrame();        // set up resources for even-odd frame
+    void checkSoftwareEvenOddFrameSupport(); // checks sw support for even-odd rendering
     void setupSoftwareEvenOddFrame();        // set up resources for software-based even-odd frame
+    uint64_t getSurfaceCounterValue(); // get the number of frames requested so far from the display
     bool isEvenFrame();
 
     /* ---------- Top-level data ---------- */
@@ -265,7 +264,6 @@ class VulkanEngine
 
     /* ---------- Instance-static Data ---------- */
     TetraMode _tetraMode;
-    float _nanoSecondsPerFrame = 16666666.66666666666666666666;
 
     /* ---------- Tick-dynamic Data ---------- */
     bool _framebufferResized = false;
@@ -305,7 +303,7 @@ class VulkanEngine
     // context for software-based even-odd frame sync
     struct {
         std::chrono::time_point<std::chrono::steady_clock> timeEngineStart;
-        uint64_t refreshCycleDuration;
+        uint64_t nanoSecondsPerFrame;
     } _softwareEvenOddCtx;
 
     /* ---------- Engine Components ---------- */
