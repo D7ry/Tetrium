@@ -76,6 +76,7 @@ class VulkanEngine
 #if __APPLE__ // molten vk support
         VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME,
 #endif // __APPLE__
+        VK_GOOGLE_DISPLAY_TIMING_EXTENSION_NAME // for query refresh rate
     };
 
     // instance extensions required for even-odd rendering
@@ -126,7 +127,7 @@ class VulkanEngine
         glm::mat4 proj;              // proj matrix
         float timeSinceStartSeconds; // time in seconds since engine start
         float sinWave;               // a number interpolating between [0,1]
-        bool flip;                   // a switch that gets flipped every frame
+        bool isEvenFrame;                   // a switch that gets flipped every frame
     };
 
     void Init(const InitOptions& options);
@@ -238,6 +239,7 @@ class VulkanEngine
     /* ---------- Even-Odd frame ---------- */
     void checkHardwareEvenOddFrameSupport(); // checks hw support for even-odd rendering
     void setupHardwareEvenOddFrame();        // set up resources for even-odd frame
+    void setupSoftwareEvenOddFrame();        // set up resources for software-based even-odd frame
     bool isEvenFrame();
 
     /* ---------- Top-level data ---------- */
@@ -290,12 +292,21 @@ class VulkanEngine
     double _timeSinceStartSeconds; // seconds in time since engine start, regardless of pause
     unsigned long int _timeSinceStartNanoSeconds; // nanoseconds in time since engine start, regardless of pause
     unsigned long int _numTicks;  // how many ticks has happened so far
-    std::chrono::time_point<std::chrono::steady_clock> _timeEngineStart;
 
     // even-odd frame
     bool _flipEvenOdd = false; // whether to flip even-odd frame
-    uint64_t _surfaceCounterValue = 0;
-    PFN_vkGetSwapchainCounterEXT _pFNvkGetSwapchainCounterEXT = nullptr;
+
+    // context for hardware-based even-odd frame sync
+    struct {
+        PFN_vkGetSwapchainCounterEXT vkGetSwapchainCounterEXT = nullptr;
+        uint64_t surfaceCounterValue = 0;
+    } _hardWareEvenOddCtx;
+
+    // context for software-based even-odd frame sync
+    struct {
+        std::chrono::time_point<std::chrono::steady_clock> timeEngineStart;
+        uint64_t refreshCycleDuration;
+    } _softwareEvenOddCtx;
 
     /* ---------- Engine Components ---------- */
     DeletionStack _deletionStack;

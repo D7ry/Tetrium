@@ -467,8 +467,6 @@ void VulkanEngine::initDefaultStates()
     _uiMode = false;
     ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoMouse;
     ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoKeyboard;
-
-    _timeEngineStart = std::chrono::steady_clock::now();
 };
 
 void VulkanEngine::Init(const VulkanEngine::InitOptions& options)
@@ -478,6 +476,9 @@ void VulkanEngine::Init(const VulkanEngine::InitOptions& options)
     _nanoSecondsPerFrame = options.nanoSecondsPerFrame;
     if (_tetraMode == TetraMode::kDualProjector) {
         NEEDS_IMPLEMENTATION();
+    }
+    if (_tetraMode == TetraMode::kEvenOddSoftwareSync && options.fullScreen == false) {
+        PANIC("Even-odd software sync requires full-screen glfw window.! ");
     }
 #if __APPLE__
     MoltenVKConfig::Setup();
@@ -610,19 +611,39 @@ void VulkanEngine::createDevice()
     this->_deletionStack.push([this]() { this->_device->Cleanup(); });
 }
 
+void VulkanEngine::setupSoftwareEvenOddFrame()
+{
+    DEBUG("Setting up even-odd frame resources...");
+    auto& ctx = _softwareEvenOddCtx;
+    ctx.timeEngineStart = std::chrono::steady_clock::now();
+
+    // get refresh cycle
+    VkRefreshCycleDurationGOOGLE refreshCycleDuration;
+    ASSERT(_mainWindowSwapChain.chain);
+    ASSERT(_device->logicalDevice);
+
+    vkGetRefreshCycleDurationGOOGLE(
+        _device->logicalDevice, _mainWindowSwapChain.chain, &refreshCycleDuration
+    );
+
+    ctx.refreshCycleDuration = refreshCycleDuration.refreshDuration;
+    DEBUG("refresh duration: {}", ctx.refreshCycleDuration);
+}
+
 void VulkanEngine::setupHardwareEvenOddFrame()
 {
 #if WIN32
     NEEDS_IMPLEMENTATION();
 #endif
 #if __APPLE__
-    return;
+    NEEDS_IMPLEMENTATION();
 #endif
     DEBUG("Setting up even-odd frame resources...");
-    _pFNvkGetSwapchainCounterEXT = reinterpret_cast<PFN_vkGetSwapchainCounterEXT>(
+    auto& ctx = _hardWareEvenOddCtx;
+    ctx.vkGetSwapchainCounterEXT = reinterpret_cast<PFN_vkGetSwapchainCounterEXT>(
         vkGetInstanceProcAddr(_instance, "vkGetSwapchainCounterEXT")
     );
-    if (_pFNvkGetSwapchainCounterEXT == nullptr) {
+    if (ctx.vkGetSwapchainCounterEXT == nullptr) {
         PANIC("Failed to get function pointer to {}", "vkGetSwapchainCounterEXT");
     }
 }
@@ -666,7 +687,8 @@ void VulkanEngine::checkHardwareEvenOddFrameSupport()
     }
 
     VkSurfaceCapabilities2EXT capabilities{
-        .sType = VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES_2_EXT, .pNext = VK_NULL_HANDLE};
+        .sType = VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES_2_EXT, .pNext = VK_NULL_HANDLE
+    };
 
     auto func = (PFN_vkGetPhysicalDeviceSurfaceCapabilities2EXT
     )vkGetInstanceProcAddr(_instance, "vkGetPhysicalDeviceSurfaceCapabilities2EXT");
@@ -755,6 +777,7 @@ void VulkanEngine::initVulkan()
         setupHardwareEvenOddFrame();
         break;
     case TetraMode::kEvenOddSoftwareSync:
+        setupSoftwareEvenOddFrame();
         break;
     default:
         NEEDS_IMPLEMENTATION();
@@ -1097,7 +1120,8 @@ void VulkanEngine::createSwapChain(VulkanEngine::SwapChainContext& ctx, const Vk
     VkSwapchainCounterCreateInfoEXT swapChainCounterCreateInfo{
         .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_COUNTER_CREATE_INFO_EXT,
         .pNext = NULL,
-        .surfaceCounters = VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_BIT_EXT};
+        .surfaceCounters = VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_BIT_EXT
+    };
 
     if (_tetraMode == TetraMode::kEvenOddHardwareSync) {
 #if __linux__
@@ -1444,7 +1468,7 @@ void VulkanEngine::flushEngineUBOStatic(uint8_t frame)
     getMainProjectionMatrix(ubo.proj);
     ubo.timeSinceStartSeconds = _timeSinceStartSeconds;
     ubo.sinWave = (sin(_timeSinceStartSeconds) + 1) / 2.f; // offset to [0, 1]
-    ubo.flip = _numTicks % 2 == 0;
+    ubo.isEvenFrame = isEvenFrame();
     memcpy(buf.bufferAddress, &ubo, sizeof(ubo));
 }
 
@@ -1470,7 +1494,8 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
         VkDisplayPowerInfoEXT powerInfo{
             .sType = VK_STRUCTURE_TYPE_DISPLAY_POWER_INFO_EXT,
             .pNext = VK_NULL_HANDLE,
-            .powerState = VkDisplayPowerStateEXT::VK_DISPLAY_POWER_STATE_ON_EXT};
+            .powerState = VkDisplayPowerStateEXT::VK_DISPLAY_POWER_STATE_ON_EXT
+        };
         PFN_vkDisplayPowerControlEXT fnPtr = reinterpret_cast<PFN_vkDisplayPowerControlEXT>(
             vkGetInstanceProcAddr(_instance, "vkDisplayPowerControlEXT")
         );
@@ -1490,11 +1515,11 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
         NEEDS_IMPLEMENTATION();
 #endif // WIN32
 #if __linux__
-        _pFNvkGetSwapchainCounterEXT(
+        _hardWareEvenOddCtx.vkGetSwapchainCounterEXT(
             _device->logicalDevice,
             _mainWindowSwapChain.chain,
             VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_EXT,
-            &_surfaceCounterValue
+            &_hardWareEvenOddCtx.surfaceCounterValue
         );
 #endif // __linux__
 #if __APPLE__
@@ -1512,13 +1537,10 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
         VK_NULL_HANDLE,
         &imageIndex
     );
-    [[unlikely]] if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
-    {
+    [[unlikely]] if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
         this->recreateSwapChain(_mainWindowSwapChain);
         return;
-    }
-    else [[unlikely]] if (result != VK_SUCCESS)
-    {
+    } else [[unlikely]] if (result != VK_SUCCESS) {
         const char* res = string_VkResult(result);
         PANIC("Failed to acquire swap chain image: {}", res);
     }
@@ -1667,7 +1689,8 @@ void VulkanEngine::drawImGui()
     if (imguiDisplaySizeOverride) {
         ImVec2 projectorDisplaySize{
             static_cast<float>(_mainProjectorDisplay.extent.width),
-            static_cast<float>(_mainProjectorDisplay.extent.height)};
+            static_cast<float>(_mainProjectorDisplay.extent.height)
+        };
         _imguiManager.forceDisplaySize(projectorDisplaySize);
     }
 
@@ -1782,7 +1805,8 @@ void VulkanEngine::bindDefaultInputs()
             io.ConfigFlags &= ~ImGuiConfigFlags_NoKeyboard;
             io.MousePos = ImVec2{
                 static_cast<float>(_mainWindowSwapChain.extent.width) / 2,
-                static_cast<float>(_mainWindowSwapChain.extent.height) / 2};
+                static_cast<float>(_mainWindowSwapChain.extent.height) / 2
+            };
             io.WantSetMousePos = true;
         } else {
             io.ConfigFlags |= (ImGuiConfigFlags_NoMouse | ImGuiConfigFlags_NoKeyboard);
@@ -1824,14 +1848,14 @@ bool VulkanEngine::isEvenFrame()
     case TetraMode::kEvenOddSoftwareSync: {
         unsigned long long timeSinceStartNanoSeconds
             = std::chrono::duration<double, std::chrono::nanoseconds::period>(
-                std::chrono::steady_clock().now() - _timeEngineStart
+                  std::chrono::steady_clock().now() - _softwareEvenOddCtx.timeEngineStart
             )
                   .count();
         long numFrame = timeSinceStartNanoSeconds / _nanoSecondsPerFrame;
         isEven = numFrame % 2 == 0;
     } break;
     case TetraMode::kEvenOddHardwareSync:
-        isEven = _surfaceCounterValue % 2 == 0;
+        isEven = _hardWareEvenOddCtx.surfaceCounterValue % 2 == 0;
         break;
     default:
         PANIC("invalid tetraMode when calling isEvenFrame()!");
