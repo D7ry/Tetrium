@@ -1577,7 +1577,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
             vk::Rect2D renderArea(VkOffset2D{0, 0}, extend);
             vk::RenderPassBeginInfo renderPassBeginInfo(
                 _mainRenderPass,
-                FB,
+                FB, // which frame buffer in the swapchain do the pass i.e. all draw calls render to?
                 renderArea,
                 _mainRenderPassClearValues.size(),
                 _mainRenderPassClearValues.data(),
