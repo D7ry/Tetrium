@@ -1577,7 +1577,8 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
             vk::Rect2D renderArea(VkOffset2D{0, 0}, extend);
             vk::RenderPassBeginInfo renderPassBeginInfo(
                 _mainRenderPass,
-                FB, // which frame buffer in the swapchain do the pass i.e. all draw calls render to?
+                FB, // which frame buffer in the swapchain do the pass i.e. all draw calls render
+                    // to?
                 renderArea,
                 _mainRenderPassClearValues.size(),
                 _mainRenderPassClearValues.data(),
@@ -1894,7 +1895,8 @@ uint64_t VulkanEngine::getSurfaceCounterValue()
             _softwareEvenOddCtx.lastPresentedImageId
                 = std::max(_softwareEvenOddCtx.lastPresentedImageId, images.at(i).presentID);
         }
-#else 
+        surfaceCounter = _softwareEvenOddCtx.lastPresentedImageId;
+#else
         surfaceCounter = _softwareEvenOddCtx.lastPresentedImageId;
         // old method: count the time
         // return a software-based surface counter
