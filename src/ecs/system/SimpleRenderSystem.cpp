@@ -53,8 +53,6 @@ void SimpleRenderSystem::Cleanup()
 void SimpleRenderSystem::Tick(const TickContext* tickData)
 {
     VkCommandBuffer CB = tickData->graphics.CB;
-    VkFramebuffer FB = tickData->graphics.currentFB;
-    VkExtent2D FBExt = tickData->graphics.currentFBextend;
     int frameIdx = tickData->graphics.currentFrameInFlight;
 
     vkCmdBindPipeline(CB, VK_PIPELINE_BIND_POINT_GRAPHICS, _pipeline);

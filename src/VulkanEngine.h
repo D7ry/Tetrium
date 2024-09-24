@@ -78,6 +78,7 @@ class VulkanEngine
 #endif // __APPLE__
        //https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetRefreshCycleDurationGOOGLE.html
        //https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPastPresentationTimingGOOGLE.html
+       //https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPresentTimesInfoGOOGLE.html
         VK_GOOGLE_DISPLAY_TIMING_EXTENSION_NAME // for query refresh rate
     };
 
@@ -184,7 +185,7 @@ class VulkanEngine
     void createGlfwWindowSurface();
     void createDevice();
     VkSurfaceKHR createGlfwWindowSurface(GLFWwindow* window);
-    void createMainRenderPass(VulkanEngine::SwapChainContext& ctx); // create main render pass
+    void createMainRenderPass(const VkFormat imageFormat); // create main render pass
     void createSynchronizationObjects(std::array<SyncPrimitives, NUM_FRAME_IN_FLIGHT>& primitives);
     void createFunnyObjects();
 
@@ -291,7 +292,7 @@ class VulkanEngine
     float _FOV = 90;
     double _timeSinceStartSeconds; // seconds in time since engine start, regardless of pause
     unsigned long int _timeSinceStartNanoSeconds; // nanoseconds in time since engine start, regardless of pause
-    unsigned long int _numTicks;  // how many ticks has happened so far
+    unsigned long int _numTicks=0;  // how many ticks has happened so far
 
     // even-odd frame
     bool _flipEvenOdd = false; // whether to flip even-odd frame
@@ -304,9 +305,17 @@ class VulkanEngine
     // context for software-based even-odd frame sync
     struct {
         std::chrono::time_point<std::chrono::steady_clock> timeEngineStart;
-        uint64_t nanoSecondsPerFrame;
-        int timeOffset; // time offset added to the time that's used
-                             // to evaluate current frame.
+        uint64_t nanoSecondsPerFrame; // how many nanoseconds in between frames?
+                                      // obtained through a precise vulkan API call
+        int timeOffset = 0; // time offset added to the time that's used
+                             // to evaluate current frame, used for the old counter method
+        long clockTimeBegin = 0; // obtained from clock_gettime, unused
+        long mostRecentPresentFinish = 0; // unused
+        uint32_t lastPresentedImageId = 0; // each image are tagged with an image id,
+                                           // image id corresponds to the tick # 
+                                           // when the images are presented
+                                           // tick # and image id are bijective and they
+                                           // strictly increase over time
     } _softwareEvenOddCtx;
 
     /* ---------- Engine Components ---------- */

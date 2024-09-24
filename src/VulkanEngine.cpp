@@ -626,6 +626,11 @@ void VulkanEngine::setupSoftwareEvenOddFrame()
     );
     ctx.nanoSecondsPerFrame = refreshCycleDuration.refreshDuration;
     ASSERT(ctx.nanoSecondsPerFrame != 0);
+
+    timespec tp{};
+    clock_gettime(CLOCK_REALTIME, &tp);
+    ctx.clockTimeBegin = tp.tv_nsec;
+    INFO("clock begin: {}", ctx.clockTimeBegin);
 }
 
 void VulkanEngine::checkSoftwareEvenOddFrameSupport()
@@ -757,7 +762,7 @@ void VulkanEngine::initVulkan()
     this->_deletionStack.push([this]() { this->cleanupSwapChain(_mainWindowSwapChain); });
 
     this->createImageViews(_mainWindowSwapChain);
-    this->createMainRenderPass(_mainWindowSwapChain);
+    this->createMainRenderPass(_mainWindowSwapChain.imageFormat);
     this->createDepthBuffer(_mainWindowSwapChain);
     this->createSynchronizationObjects(_syncProjector);
     this->_imguiManager.InitializeRenderPass(
@@ -1221,6 +1226,7 @@ VkPresentModeKHR VulkanEngine::chooseSwapPresentMode(
     const std::vector<VkPresentModeKHR>& availablePresentModes
 )
 {
+    // return VK_PRESENT_MODE_IMMEDIATE_KHR; force immediate mode
     INFO("available present modes: ");
     for (const auto& availablePresentMode : availablePresentModes) {
         INFO("{}", string_VkPresentModeKHR(availablePresentMode));
@@ -1329,11 +1335,11 @@ void VulkanEngine::Cleanup()
     INFO("Resource cleaned up.");
 }
 
-void VulkanEngine::createMainRenderPass(VulkanEngine::SwapChainContext& ctx)
+void VulkanEngine::createMainRenderPass(const VkFormat imageFormat)
 {
     DEBUG("Creating render pass...");
     VkAttachmentDescription colorAttachment{};
-    colorAttachment.format = ctx.imageFormat;
+    colorAttachment.format = imageFormat;
     colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
 
     colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
@@ -1571,7 +1577,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
             vk::Rect2D renderArea(VkOffset2D{0, 0}, extend);
             vk::RenderPassBeginInfo renderPassBeginInfo(
                 _mainRenderPass,
-                FB,
+                FB, // which frame buffer in the swapchain do the pass i.e. all draw calls render to?
                 renderArea,
                 _mainRenderPassClearValues.size(),
                 _mainRenderPassClearValues.data(),
@@ -1652,6 +1658,34 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     presentInfo.pImageIndices = &imageIndex; // specify which image to present
     presentInfo.pResults = nullptr;          // Optional: can be used to check if
                                              // presentation was successful
+                                             //
+
+    // manual v-sync, disabled for now,
+    // manual v-sync is for circumventing the annoying FIFO queue that jams over time
+    // vk::PresentTimeGOOGLE presentTime(
+    //     _currentFrame,
+    //     std::chrono::duration<unsigned long long, std::chrono::nanoseconds::period>(
+    //         _softwareEvenOddCtx.timeEngineStart.time_since_epoch()
+    //     )
+    //             .count()
+    //         + _currentFrame * _softwareEvenOddCtx.nanoSecondsPerFrame
+    // );
+    // uint64_t time = (uint64_t)_softwareEvenOddCtx.mostRecentPresentFinish
+    //                 + (uint64_t)(_softwareEvenOddCtx.nanoSecondsPerFrame * _numTicks) * 100;
+
+    uint64_t time = 0; // no early time limit
+
+    // label each frame with the tick number
+    VkPresentTimeGOOGLE presentTime{(uint32_t)_numTicks, time};
+
+    VkPresentTimesInfoGOOGLE presentTimeInfo{
+        .sType = VK_STRUCTURE_TYPE_PRESENT_TIMES_INFO_GOOGLE,
+        .pNext = VK_NULL_HANDLE,
+        .swapchainCount = 1,
+        .pTimes = &presentTime
+    };
+
+    presentInfo.pNext = &presentTimeInfo;
 
     // the present doesn't happen until the render is finished, and the
     // semaphore is signaled(result of vkQueueSubimt)
@@ -1836,11 +1870,33 @@ void VulkanEngine::getMainProjectionMatrix(glm::mat4& projectionMatrix)
     projectionMatrix[1][1] *= -1; // invert for vulkan coord system
 }
 
+// whether to use the new virtual frame counter
+// the old counter uses a nanosecond-precision timer,
+// the new counter takes the max of the image id so far presented.
+// TODO: profile precision of the new counter vs. old counter
+#define NEW_VIRTUAL_FRAMECOUNTER 1
 uint64_t VulkanEngine::getSurfaceCounterValue()
 {
     uint64_t surfaceCounter;
     switch (_tetraMode) {
     case TetraMode::kEvenOddSoftwareSync: {
+        uint32_t imageCount;
+#if NEW_VIRTUAL_FRAMECOUNTER
+        vkGetPastPresentationTimingGOOGLE(
+            _device->logicalDevice, _mainWindowSwapChain.chain, &imageCount, nullptr
+        );
+        std::vector<VkPastPresentationTimingGOOGLE> images(imageCount);
+
+        vkGetPastPresentationTimingGOOGLE(
+            _device->logicalDevice, _mainWindowSwapChain.chain, &imageCount, images.data()
+        );
+        for (int i = 0; i < imageCount; i++) {
+            _softwareEvenOddCtx.lastPresentedImageId
+                = std::max(_softwareEvenOddCtx.lastPresentedImageId, images.at(i).presentID);
+        }
+#else 
+        surfaceCounter = _softwareEvenOddCtx.lastPresentedImageId;
+        // old method: count the time
         // return a software-based surface counter
         unsigned long long timeSinceStartNanoSeconds
             = std::chrono::duration<double, std::chrono::nanoseconds::period>(
@@ -1849,6 +1905,7 @@ uint64_t VulkanEngine::getSurfaceCounterValue()
                   .count()
               + _softwareEvenOddCtx.timeOffset;
         surfaceCounter = timeSinceStartNanoSeconds / _softwareEvenOddCtx.nanoSecondsPerFrame;
+#endif // NEW_VIRTUAL_FRAMECOUNTER
     } break;
     case TetraMode::kEvenOddHardwareSync:
 #if WIN32
