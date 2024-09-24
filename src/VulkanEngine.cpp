@@ -1226,7 +1226,7 @@ VkPresentModeKHR VulkanEngine::chooseSwapPresentMode(
     const std::vector<VkPresentModeKHR>& availablePresentModes
 )
 {
-    //return VK_PRESENT_MODE_IMMEDIATE_KHR; force immediate mode
+    // return VK_PRESENT_MODE_IMMEDIATE_KHR; force immediate mode
     INFO("available present modes: ");
     for (const auto& availablePresentMode : availablePresentModes) {
         INFO("{}", string_VkPresentModeKHR(availablePresentMode));
@@ -1676,9 +1676,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     uint64_t time = 0; // no early time limit
 
     // label each frame with the tick number
-    VkPresentTimeGOOGLE presentTime{
-        (uint32_t)_numTicks, time
-    };
+    VkPresentTimeGOOGLE presentTime{(uint32_t)_numTicks, time};
 
     VkPresentTimesInfoGOOGLE presentTimeInfo{
         .sType = VK_STRUCTURE_TYPE_PRESENT_TIMES_INFO_GOOGLE,
@@ -1884,7 +1882,7 @@ uint64_t VulkanEngine::getSurfaceCounterValue()
         VK_CHECK_RESULT(vkGetPastPresentationTimingGOOGLE(
             _device->logicalDevice, _mainWindowSwapChain.chain, &imageCount, nullptr
         ))
-        //std::vector<VkPastPresentationTimingGOOGLE> vec(imageCount);
+        // std::vector<VkPastPresentationTimingGOOGLE> vec(imageCount);
         const int IMAGE_BUFFER_SIZE = 2;
         std::array<VkPastPresentationTimingGOOGLE, IMAGE_BUFFER_SIZE> images;
 
@@ -1894,10 +1892,11 @@ uint64_t VulkanEngine::getSurfaceCounterValue()
             _device->logicalDevice, _mainWindowSwapChain.chain, &imageCount, images.data()
         ));
         for (int i = 0; i < imageCount; i++) {
-            _softwareEvenOddCtx.presentedImageIds.insert(images.at(i).presentID);
+            _softwareEvenOddCtx.lastPresentedImageId
+                = std::max(_softwareEvenOddCtx.lastPresentedImageId, images.at(i).presentID);
         }
 
-        surfaceCounter = _softwareEvenOddCtx.presentedImageIds.size();
+        surfaceCounter = _softwareEvenOddCtx.lastPresentedImageId;
         // old method: count the time
         // return a software-based surface counter
         // if (0) {
