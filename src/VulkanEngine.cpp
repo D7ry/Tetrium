@@ -582,13 +582,19 @@ void VulkanEngine::Tick()
     _numTicks++;
     // experimental stuff
     static std::map<uint32_t, uint64_t> m;
-    // uint32_t imageCount;
-    // VK_CHECK_RESULT(vkGetPastPresentationTimingGOOGLE(_device->logicalDevice, _mainWindowSwapChain.chain, &imageCount, nullptr))
-    // std::vector<VkPastPresentationTimingGOOGLE> vec(imageCount);
-    // VK_CHECK_RESULT(vkGetPastPresentationTimingGOOGLE(_device->logicalDevice, _mainWindowSwapChain.chain, &imageCount, vec.data()))
-    // for (auto& elem : vec) {
-    //     auto it = m.insert({elem.presentID, static_cast<unsigned int>(elem.actualPresentTime)});
-    // }
+    uint32_t imageCount;
+    VK_CHECK_RESULT(vkGetPastPresentationTimingGOOGLE(
+        _device->logicalDevice, _mainWindowSwapChain.chain, &imageCount, nullptr
+    ))
+    std::vector<VkPastPresentationTimingGOOGLE> vec(imageCount);
+    VK_CHECK_RESULT(vkGetPastPresentationTimingGOOGLE(
+        _device->logicalDevice, _mainWindowSwapChain.chain, &imageCount, vec.data()
+    ))
+
+    for (auto& elem : vec) {
+        INFO("{}|{} | {}", elem.presentID, elem.desiredPresentTime, elem.actualPresentTime);
+        INFO("============================");
+    }
     // if (m.size() > 30) {
     //     for (auto it = m.begin(); it != m.end(); it++) {
     //         fmt::println("{} {}", it->first, it->second);
@@ -643,6 +649,11 @@ void VulkanEngine::setupSoftwareEvenOddFrame()
     );
     ctx.nanoSecondsPerFrame = refreshCycleDuration.refreshDuration;
     ASSERT(ctx.nanoSecondsPerFrame != 0);
+
+    timespec tp{};
+    clock_gettime(CLOCK_REALTIME, &tp);
+    ctx.clockTimeBegin = tp.tv_nsec;
+    INFO("clock begin: {}", ctx.clockTimeBegin);
 }
 
 void VulkanEngine::checkSoftwareEvenOddFrameSupport()
@@ -1238,6 +1249,7 @@ VkPresentModeKHR VulkanEngine::chooseSwapPresentMode(
     const std::vector<VkPresentModeKHR>& availablePresentModes
 )
 {
+    return VK_PRESENT_MODE_IMMEDIATE_KHR;
     INFO("available present modes: ");
     for (const auto& availablePresentMode : availablePresentModes) {
         INFO("{}", string_VkPresentModeKHR(availablePresentMode));
@@ -1669,6 +1681,32 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     presentInfo.pImageIndices = &imageIndex; // specify which image to present
     presentInfo.pResults = nullptr;          // Optional: can be used to check if
                                              // presentation was successful
+                                             //
+
+    // vk::PresentTimeGOOGLE presentTime(
+    //     _currentFrame,
+    //     std::chrono::duration<unsigned long long, std::chrono::nanoseconds::period>(
+    //         _softwareEvenOddCtx.timeEngineStart.time_since_epoch()
+    //     )
+    //             .count()
+    //         + _currentFrame * _softwareEvenOddCtx.nanoSecondsPerFrame
+    // );
+    uint64_t time = (uint64_t)_softwareEvenOddCtx.mostRecentPresentFinish
+                    + (uint64_t)(_softwareEvenOddCtx.nanoSecondsPerFrame * _numTicks);
+
+    VkPresentTimeGOOGLE presentTime{
+        (uint32_t)_numTicks, time
+        //_softwareEvenOddCtx.nanoSecondsPerFrame * _numTicks
+    };
+
+    VkPresentTimesInfoGOOGLE presentTimeInfo{
+        .sType = VK_STRUCTURE_TYPE_PRESENT_TIMES_INFO_GOOGLE,
+        .pNext = VK_NULL_HANDLE,
+        .swapchainCount = 1,
+        .pTimes = &presentTime
+    };
+
+    presentInfo.pNext = &presentTimeInfo;
 
     // the present doesn't happen until the render is finished, and the
     // semaphore is signaled(result of vkQueueSubimt)

@@ -78,6 +78,7 @@ class VulkanEngine
 #endif // __APPLE__
        //https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetRefreshCycleDurationGOOGLE.html
        //https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPastPresentationTimingGOOGLE.html
+       //https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPresentTimesInfoGOOGLE.html
         VK_GOOGLE_DISPLAY_TIMING_EXTENSION_NAME // for query refresh rate
     };
 
@@ -291,7 +292,7 @@ class VulkanEngine
     float _FOV = 90;
     double _timeSinceStartSeconds; // seconds in time since engine start, regardless of pause
     unsigned long int _timeSinceStartNanoSeconds; // nanoseconds in time since engine start, regardless of pause
-    unsigned long int _numTicks;  // how many ticks has happened so far
+    unsigned long int _numTicks=0;  // how many ticks has happened so far
 
     // even-odd frame
     bool _flipEvenOdd = false; // whether to flip even-odd frame
@@ -305,8 +306,10 @@ class VulkanEngine
     struct {
         std::chrono::time_point<std::chrono::steady_clock> timeEngineStart;
         uint64_t nanoSecondsPerFrame;
-        int timeOffset; // time offset added to the time that's used
+        int timeOffset = 0; // time offset added to the time that's used
                              // to evaluate current frame.
+        long clockTimeBegin = 0; // obtained from clock_gettime
+        long mostRecentPresentFinish = 0;
     } _softwareEvenOddCtx;
 
     /* ---------- Engine Components ---------- */
