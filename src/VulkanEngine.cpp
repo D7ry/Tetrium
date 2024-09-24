@@ -1884,13 +1884,19 @@ uint64_t VulkanEngine::getSurfaceCounterValue()
         VK_CHECK_RESULT(vkGetPastPresentationTimingGOOGLE(
             _device->logicalDevice, _mainWindowSwapChain.chain, &imageCount, nullptr
         ))
-        std::vector<VkPastPresentationTimingGOOGLE> vec(imageCount);
+        //std::vector<VkPastPresentationTimingGOOGLE> vec(imageCount);
+        const int IMAGE_BUFFER_SIZE = 2;
+        std::array<VkPastPresentationTimingGOOGLE, IMAGE_BUFFER_SIZE> images;
+
+        ASSERT(imageCount <= IMAGE_BUFFER_SIZE);
+        INFO("{}", imageCount);
         VK_CHECK_RESULT(vkGetPastPresentationTimingGOOGLE(
-            _device->logicalDevice, _mainWindowSwapChain.chain, &imageCount, vec.data()
+            _device->logicalDevice, _mainWindowSwapChain.chain, &imageCount, images.data()
         ));
-        for (auto& elem : vec) {
-            _softwareEvenOddCtx.presentedImageIds.insert(elem.presentID);
+        for (int i = 0; i < imageCount; i++) {
+            _softwareEvenOddCtx.presentedImageIds.insert(images.at(i).presentID);
         }
+
         surfaceCounter = _softwareEvenOddCtx.presentedImageIds.size();
         // old method: count the time
         // return a software-based surface counter
