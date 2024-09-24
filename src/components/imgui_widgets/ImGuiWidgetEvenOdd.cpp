@@ -2,12 +2,12 @@
 
 #include "ImGuiWidget.h"
 
-void ImGuiWidgetEvenOdd::drawTestWindow(VulkanEngine* engine)
+void ImGuiWidgetEvenOdd::drawCalibrationWindow(VulkanEngine* engine)
 {
     ImGui::SetNextWindowPos(ImVec2(0, 0));
     ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
     ImGui::SetNextWindowFocus();
-
+    //
     ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0, 0, 0, 1));
 
     ImGui::Begin(
@@ -24,10 +24,8 @@ void ImGuiWidgetEvenOdd::drawTestWindow(VulkanEngine* engine)
     bool isEven = engine->isEvenFrame();
 
     if (isEven) {
-        DEBUG("even");
         ImGui::Text("Is even frame!");
     } else {
-        DEBUG("odd");
         ImGui::Text("Is odd frame!");
     }
 
@@ -70,6 +68,19 @@ void ImGuiWidgetEvenOdd::drawTestWindow(VulkanEngine* engine)
         }
     }
 
+    ImGui::Checkbox("Flip Even Odd", &engine->_flipEvenOdd);
+    if (engine->_tetraMode == VulkanEngine::TetraMode::kEvenOddSoftwareSync) {
+        ImGui::SliderInt(
+            "Software Sync Timing Offset (ns)",
+            &engine->_softwareEvenOddCtx.timeOffset,
+            0,
+            engine->_softwareEvenOddCtx.nanoSecondsPerFrame
+        );
+        ImGui::Text(
+            "Software Sync Frame Time (ns): %lu", engine->_softwareEvenOddCtx.nanoSecondsPerFrame
+        );
+    }
+
     ImGui::PopStyleColor();
     ImGui::End();
 }
@@ -90,22 +101,15 @@ void ImGuiWidgetEvenOdd::Draw(VulkanEngine* engine)
         break;
     }
     ImGui::Text("Even odd mode: %s", evenOddMode);
-    ImGui::Checkbox("Flip Even Odd", &engine->_flipEvenOdd);
     bool isEven = engine->isEvenFrame();
-
-    if (isEven) {
-        ImGui::Text("Is even frame!");
-    } else {
-        ImGui::Text("Is odd frame!");
-    }
 
     ImGui::Text("Num Frame: %llu", engine->getSurfaceCounterValue());
 
-    if (ImGui::Button("Draw Test Window")) {
+    if (ImGui::Button("Draw Calibration Window")) {
         _drawTestWindow = true;
     }
 
     if (_drawTestWindow) {
-        drawTestWindow(engine);
+        drawCalibrationWindow(engine);
     }
 }
