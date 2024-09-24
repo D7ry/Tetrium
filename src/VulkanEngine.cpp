@@ -1870,15 +1870,18 @@ void VulkanEngine::getMainProjectionMatrix(glm::mat4& projectionMatrix)
     projectionMatrix[1][1] *= -1; // invert for vulkan coord system
 }
 
+// whether to use the new virtual frame counter
+// the old counter uses a nanosecond-precision timer,
+// the new counter takes the max of the image id so far presented.
+// TODO: profile precision of the new counter vs. old counter
+#define NEW_VIRTUAL_FRAMECOUNTER 1
 uint64_t VulkanEngine::getSurfaceCounterValue()
 {
     uint64_t surfaceCounter;
     switch (_tetraMode) {
     case TetraMode::kEvenOddSoftwareSync: {
-        // new method: count the unique images that has been presented
-        // TODO: need to validate the delay,
-        // benchmark it against old software method
         uint32_t imageCount;
+#if NEW_VIRTUAL_FRAMECOUNTER
         vkGetPastPresentationTimingGOOGLE(
             _device->logicalDevice, _mainWindowSwapChain.chain, &imageCount, nullptr
         );
@@ -1891,19 +1894,18 @@ uint64_t VulkanEngine::getSurfaceCounterValue()
             _softwareEvenOddCtx.lastPresentedImageId
                 = std::max(_softwareEvenOddCtx.lastPresentedImageId, images.at(i).presentID);
         }
-
+#else 
         surfaceCounter = _softwareEvenOddCtx.lastPresentedImageId;
         // old method: count the time
         // return a software-based surface counter
-        // if (0) {
-        //     unsigned long long timeSinceStartNanoSeconds
-        //         = std::chrono::duration<double, std::chrono::nanoseconds::period>(
-        //               std::chrono::steady_clock().now() - _softwareEvenOddCtx.timeEngineStart
-        //           )
-        //               .count()
-        //           + _softwareEvenOddCtx.timeOffset;
-        //     surfaceCounter = timeSinceStartNanoSeconds / _softwareEvenOddCtx.nanoSecondsPerFrame;
-        // }
+        unsigned long long timeSinceStartNanoSeconds
+            = std::chrono::duration<double, std::chrono::nanoseconds::period>(
+                  std::chrono::steady_clock().now() - _softwareEvenOddCtx.timeEngineStart
+              )
+                  .count()
+              + _softwareEvenOddCtx.timeOffset;
+        surfaceCounter = timeSinceStartNanoSeconds / _softwareEvenOddCtx.nanoSecondsPerFrame;
+#endif // NEW_VIRTUAL_FRAMECOUNTER
     } break;
     case TetraMode::kEvenOddHardwareSync:
 #if WIN32
