@@ -310,7 +310,7 @@ class VulkanEngine
                              // to evaluate current frame.
         long clockTimeBegin = 0; // obtained from clock_gettime
         long mostRecentPresentFinish = 0;
-        uint32_t lastPresentedImageId;
+        uint32_t lastPresentedImageId = 0;
     } _softwareEvenOddCtx;
 
     /* ---------- Engine Components ---------- */

@@ -1879,18 +1879,15 @@ uint64_t VulkanEngine::getSurfaceCounterValue()
         // TODO: need to validate the delay,
         // benchmark it against old software method
         uint32_t imageCount;
-        VK_CHECK_RESULT(vkGetPastPresentationTimingGOOGLE(
+        vkGetPastPresentationTimingGOOGLE(
             _device->logicalDevice, _mainWindowSwapChain.chain, &imageCount, nullptr
-        ))
-        // std::vector<VkPastPresentationTimingGOOGLE> vec(imageCount);
-        const int IMAGE_BUFFER_SIZE = 2;
-        std::array<VkPastPresentationTimingGOOGLE, IMAGE_BUFFER_SIZE> images;
+        );
+        std::vector<VkPastPresentationTimingGOOGLE> images(imageCount);
 
-        ASSERT(imageCount <= IMAGE_BUFFER_SIZE);
         INFO("{}", imageCount);
-        VK_CHECK_RESULT(vkGetPastPresentationTimingGOOGLE(
+        vkGetPastPresentationTimingGOOGLE(
             _device->logicalDevice, _mainWindowSwapChain.chain, &imageCount, images.data()
-        ));
+        );
         for (int i = 0; i < imageCount; i++) {
             _softwareEvenOddCtx.lastPresentedImageId
                 = std::max(_softwareEvenOddCtx.lastPresentedImageId, images.at(i).presentID);
