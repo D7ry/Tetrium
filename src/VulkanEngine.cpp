@@ -580,29 +580,6 @@ void VulkanEngine::Tick()
     }
     _lastProfilerData = _profiler.NewProfile();
     _numTicks++;
-    // experimental stuff
-    static std::map<uint32_t, uint64_t> m;
-    uint32_t imageCount;
-    VK_CHECK_RESULT(vkGetPastPresentationTimingGOOGLE(
-        _device->logicalDevice, _mainWindowSwapChain.chain, &imageCount, nullptr
-    ))
-    std::vector<VkPastPresentationTimingGOOGLE> vec(imageCount);
-    VK_CHECK_RESULT(vkGetPastPresentationTimingGOOGLE(
-        _device->logicalDevice, _mainWindowSwapChain.chain, &imageCount, vec.data()
-    ))
-
-    for (auto& elem : vec) {
-        INFO("{}|{} | {}", elem.presentID, elem.desiredPresentTime, elem.actualPresentTime);
-        INFO("============================");
-    }
-    // if (m.size() > 30) {
-    //     for (auto it = m.begin(); it != m.end(); it++) {
-    //         fmt::println("{} {}", it->first, it->second);
-    //     }
-    //     exit(0);
-    // } else {
-    //     fmt::println("{}", m.size());
-    // }
 }
 
 void VulkanEngine::framebufferResizeCallback(GLFWwindow* window, int width, int height)
@@ -1249,7 +1226,7 @@ VkPresentModeKHR VulkanEngine::chooseSwapPresentMode(
     const std::vector<VkPresentModeKHR>& availablePresentModes
 )
 {
-    return VK_PRESENT_MODE_IMMEDIATE_KHR;
+    //return VK_PRESENT_MODE_IMMEDIATE_KHR; force immediate mode
     INFO("available present modes: ");
     for (const auto& availablePresentMode : availablePresentModes) {
         INFO("{}", string_VkPresentModeKHR(availablePresentMode));
@@ -1683,6 +1660,8 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
                                              // presentation was successful
                                              //
 
+    // manual v-sync, disabled for now,
+    // manual v-sync is for circumventing the annoying FIFO queue that jams over time
     // vk::PresentTimeGOOGLE presentTime(
     //     _currentFrame,
     //     std::chrono::duration<unsigned long long, std::chrono::nanoseconds::period>(
@@ -1691,12 +1670,14 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     //             .count()
     //         + _currentFrame * _softwareEvenOddCtx.nanoSecondsPerFrame
     // );
-    uint64_t time = (uint64_t)_softwareEvenOddCtx.mostRecentPresentFinish
-                    + (uint64_t)(_softwareEvenOddCtx.nanoSecondsPerFrame * _numTicks);
+    // uint64_t time = (uint64_t)_softwareEvenOddCtx.mostRecentPresentFinish
+    //                 + (uint64_t)(_softwareEvenOddCtx.nanoSecondsPerFrame * _numTicks) * 100;
 
+    uint64_t time = 0; // no early time limit
+
+    // label each frame with the tick number
     VkPresentTimeGOOGLE presentTime{
         (uint32_t)_numTicks, time
-        //_softwareEvenOddCtx.nanoSecondsPerFrame * _numTicks
     };
 
     VkPresentTimesInfoGOOGLE presentTimeInfo{
@@ -1896,14 +1877,32 @@ uint64_t VulkanEngine::getSurfaceCounterValue()
     uint64_t surfaceCounter;
     switch (_tetraMode) {
     case TetraMode::kEvenOddSoftwareSync: {
+        // new method: count the unique images that has been presented
+        // TODO: need to validate the delay,
+        // benchmark it against old software method
+        uint32_t imageCount;
+        VK_CHECK_RESULT(vkGetPastPresentationTimingGOOGLE(
+            _device->logicalDevice, _mainWindowSwapChain.chain, &imageCount, nullptr
+        ))
+        std::vector<VkPastPresentationTimingGOOGLE> vec(imageCount);
+        VK_CHECK_RESULT(vkGetPastPresentationTimingGOOGLE(
+            _device->logicalDevice, _mainWindowSwapChain.chain, &imageCount, vec.data()
+        ));
+        for (auto& elem : vec) {
+            _softwareEvenOddCtx.presentedImageIds.insert(elem.presentID);
+        }
+        surfaceCounter = _softwareEvenOddCtx.presentedImageIds.size();
+        // old method: count the time
         // return a software-based surface counter
-        unsigned long long timeSinceStartNanoSeconds
-            = std::chrono::duration<double, std::chrono::nanoseconds::period>(
-                  std::chrono::steady_clock().now() - _softwareEvenOddCtx.timeEngineStart
-              )
-                  .count()
-              + _softwareEvenOddCtx.timeOffset;
-        surfaceCounter = timeSinceStartNanoSeconds / _softwareEvenOddCtx.nanoSecondsPerFrame;
+        // if (0) {
+        //     unsigned long long timeSinceStartNanoSeconds
+        //         = std::chrono::duration<double, std::chrono::nanoseconds::period>(
+        //               std::chrono::steady_clock().now() - _softwareEvenOddCtx.timeEngineStart
+        //           )
+        //               .count()
+        //           + _softwareEvenOddCtx.timeOffset;
+        //     surfaceCounter = timeSinceStartNanoSeconds / _softwareEvenOddCtx.nanoSecondsPerFrame;
+        // }
     } break;
     case TetraMode::kEvenOddHardwareSync:
 #if WIN32
