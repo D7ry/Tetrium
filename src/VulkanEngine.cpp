@@ -803,7 +803,7 @@ void VulkanEngine::initVulkan()
             _device->logicalDevice,
             _device->queueFamilyIndices.graphicsFamily.value(),
             _device->graphicsQueue,
-            _renderContexts.RGB.frameBuffer.size() // doesn't matter if it's RGB or CNY
+            _renderContexts.RGB.virtualFrameBuffer.size() // doesn't matter if it's RGB or CNY
         );
     }
 
@@ -1465,7 +1465,7 @@ void VulkanEngine::createFramebuffers(RenderContext& ctx)
     }
     size_t numFrameBuffers = ctx.swapchain->image.size();
     ASSERT(numFrameBuffers != 0);
-    ctx.frameBuffer.resize(numFrameBuffers);
+    ctx.virtualFrameBuffer.resize(numFrameBuffers);
     ctx.image.resize(numFrameBuffers);
     ctx.imageView.resize(numFrameBuffers);
     ctx.imageMemory.resize(numFrameBuffers); // Add this line for image memory
@@ -1540,7 +1540,7 @@ void VulkanEngine::createFramebuffers(RenderContext& ctx)
         framebufferInfo.height = swapchainContext.extent.height;
         framebufferInfo.layers = 1; // number of layers in image arrays
         if (vkCreateFramebuffer(
-                _device->logicalDevice, &framebufferInfo, nullptr, &ctx.frameBuffer[i]
+                _device->logicalDevice, &framebufferInfo, nullptr, &ctx.virtualFrameBuffer[i]
             )
             != VK_SUCCESS) {
             FATAL("Failed to create framebuffer!");
@@ -1689,7 +1689,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
             renderPassBeginInfo.renderPass = _renderContexts.RGB.renderPass;
             renderPassBeginInfo.framebuffer
                 = _renderContexts.RGB
-                      .frameBuffer[swapchainImageIndex]; // which frame buffer in the swapchain do
+                      .virtualFrameBuffer[swapchainImageIndex]; // which frame buffer in the swapchain do
                                                          // the pass i.e. all draw calls render to?
             CB1.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
             vkCmdSetViewport(CB1, 0, 1, &viewport);
@@ -1701,7 +1701,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
             renderPassBeginInfo.renderPass = _renderContexts.CMY.renderPass;
             renderPassBeginInfo.framebuffer
                 = _renderContexts.CMY
-                      .frameBuffer[swapchainImageIndex]; // which frame buffer in the swapchain do
+                      .virtualFrameBuffer[swapchainImageIndex]; // which frame buffer in the swapchain do
                                                          // the pass i.e. all draw calls render to?
             CB1.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
             vkCmdSetViewport(CB1, 0, 1, &viewport);
@@ -1801,7 +1801,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     uint64_t time = 0;
     if (_softwareEvenOddCtx.mostRecentPresentFinish) {
         time
-            = _softwareEvenOddCtx.mostRecentPresentFinish + _softwareEvenOddCtx.nanoSecondsPerFrame * 1;
+            = _softwareEvenOddCtx.mostRecentPresentFinish + _softwareEvenOddCtx.nanoSecondsPerFrame;
     }
 
     // label each frame with the tick number

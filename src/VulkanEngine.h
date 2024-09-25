@@ -171,13 +171,17 @@ class VulkanEngine
         VkFence fenceInFlight;
     };
 
+    // render context for the dual-pass, virtual frame buffer rendering architecture.
+    // RGB and CMY channel each have their own render context,
+    // they are rendered in parallel for each tick; both's render results are written onto `RenderContext::virtualFrameBuffer`,
+    // associated with `RenderContext::imageView`, `RenderContext::imageMemory`, and `RenderContext::image`
+    //
+    // By the end of rendering, only one channel's render results from the "virtual frame buffer" gets
+    // copied to the actual frame buffer, stored in `SwapChainContext::frameBuffer`
     struct RenderContext {
         VkRenderPass renderPass;
         SwapChainContext* swapchain; // global swap chain
-        std::vector<VkFramebuffer> frameBuffer;
-        // image and image view that are not associated with swapchain
-        // they exist as a "virtual" swap chain for RGB and CMY passes 
-        // to write into.
+        std::vector<VkFramebuffer> virtualFrameBuffer;
         std::vector<VkImage> image;
         std::vector<VkImageView> imageView;
         std::vector<VkDeviceMemory> imageMemory; // memory to hold virtual swap chain
