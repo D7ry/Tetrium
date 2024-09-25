@@ -257,6 +257,16 @@ class VulkanEngine
     SwapChainContext _mainWindowSwapChain;
     SwapChainContext _auxWindowSwapchain; // unused for now
 
+    struct {
+        VkRenderPass odd;
+        VkRenderPass even;
+    } _renderPasses; // odd and even render passes
+
+    struct {
+        SwapChainContext odd;
+        SwapChainContext even;
+    } _swapchains; // odd and even swapchains
+
     /* ---------- Synchronization Primivites ---------- */
     std::array<SyncPrimitives, NUM_FRAME_IN_FLIGHT> _syncProjector;
 
