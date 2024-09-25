@@ -180,7 +180,7 @@ class VulkanEngine
         // to write into.
         std::vector<VkImage> image;
         std::vector<VkImageView> imageView;
-        std::vector<VkDeviceMemory> imageMemory;
+        std::vector<VkDeviceMemory> imageMemory; // memory to hold virtual swap chain
     };
 
     SwapChainContext _swapChain;
@@ -219,7 +219,6 @@ class VulkanEngine
         const std::vector<VkPresentModeKHR>& availablePresentModes
     );
 
-    void initSwapchains();
     VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
     void createSwapChain(VulkanEngine::SwapChainContext& ctx, const VkSurfaceKHR surface);
     void recreateSwapChain(SwapChainContext& ctx);
@@ -335,8 +334,7 @@ class VulkanEngine
                                       // obtained through a precise vulkan API call
         int timeOffset = 0; // time offset added to the time that's used
                              // to evaluate current frame, used for the old counter method
-        long clockTimeBegin = 0; // obtained from clock_gettime, unused
-        long mostRecentPresentFinish = 0; // unused
+        uint64_t mostRecentPresentFinish = 0;
         uint32_t lastPresentedImageId = 0; // each image are tagged with an image id,
                                            // image id corresponds to the tick # 
                                            // when the images are presented

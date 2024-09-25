@@ -634,10 +634,6 @@ void VulkanEngine::setupSoftwareEvenOddFrame()
     ctx.nanoSecondsPerFrame = refreshCycleDuration.refreshDuration;
     ASSERT(ctx.nanoSecondsPerFrame != 0);
 
-    timespec tp{};
-    clock_gettime(CLOCK_REALTIME, &tp);
-    ctx.clockTimeBegin = tp.tv_nsec;
-    INFO("clock begin: {}", ctx.clockTimeBegin);
 }
 
 void VulkanEngine::checkSoftwareEvenOddFrameSupport()
@@ -1254,7 +1250,7 @@ VkPresentModeKHR VulkanEngine::chooseSwapPresentMode(
     const std::vector<VkPresentModeKHR>& availablePresentModes
 )
 {
-    // return VK_PRESENT_MODE_IMMEDIATE_KHR; force immediate mode
+    return VK_PRESENT_MODE_IMMEDIATE_KHR; // force immediate mode
     INFO("available present modes: ");
     for (const auto& availablePresentMode : availablePresentModes) {
         INFO("{}", string_VkPresentModeKHR(availablePresentMode));
@@ -1802,20 +1798,11 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
                                                       // presentation was successful
                                                       //
 
-    // manual v-sync, disabled for now,
-    // manual v-sync is for circumventing the annoying FIFO queue that jams over time
-    // vk::PresentTimeGOOGLE presentTime(
-    //     _currentFrame,
-    //     std::chrono::duration<unsigned long long, std::chrono::nanoseconds::period>(
-    //         _softwareEvenOddCtx.timeEngineStart.time_since_epoch()
-    //     )
-    //             .count()
-    //         + _currentFrame * _softwareEvenOddCtx.nanoSecondsPerFrame
-    // );
-    // uint64_t time = (uint64_t)_softwareEvenOddCtx.mostRecentPresentFinish
-    //                 + (uint64_t)(_softwareEvenOddCtx.nanoSecondsPerFrame * _numTicks) * 100;
-
-    uint64_t time = 0; // no early time limit
+    uint64_t time = 0;
+    if (_softwareEvenOddCtx.mostRecentPresentFinish) {
+        time
+            = _softwareEvenOddCtx.mostRecentPresentFinish + _softwareEvenOddCtx.nanoSecondsPerFrame * 1;
+    }
 
     // label each frame with the tick number
     // this is useful for calculating the virtual frame counter,
@@ -1843,8 +1830,6 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
         this->_framebufferResized = false;
     }
 }
-
-void VulkanEngine::initSwapchains() {}
 
 void VulkanEngine::drawImGui()
 {
@@ -2038,6 +2023,11 @@ uint64_t VulkanEngine::getSurfaceCounterValue()
         for (int i = 0; i < imageCount; i++) {
             _softwareEvenOddCtx.lastPresentedImageId
                 = std::max(_softwareEvenOddCtx.lastPresentedImageId, images.at(i).presentID);
+            _softwareEvenOddCtx.mostRecentPresentFinish = std::max(
+                _softwareEvenOddCtx.mostRecentPresentFinish, images.at(i).actualPresentTime
+            );
+            auto& img = images.at(i);
+            INFO("{} : expected: {} actual: {}", img.presentID, img.desiredPresentTime, img.actualPresentTime);
         }
         surfaceCounter = _softwareEvenOddCtx.lastPresentedImageId;
 #else

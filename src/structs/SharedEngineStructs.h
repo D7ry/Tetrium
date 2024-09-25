@@ -11,9 +11,6 @@ struct GraphicsContext
     int currentFrameInFlight; // used to index into command buffer of render
                               // systems
     int currentSwapchainImageIndex;
-    VkFramebuffer
-        currentFB; // result of using `vkAcquireNextImageKHR` on engine
-                   // swapchain, to obtain the currently active fb
     vk::CommandBuffer
         CB; // a active command buffer.
                    // vkBeginCommandBuffer should've been called on it
