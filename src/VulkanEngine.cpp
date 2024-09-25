@@ -643,7 +643,7 @@ void VulkanEngine::checkSoftwareEvenOddFrameSupport()
           "that it segfaults in debug-mode. To use software even-odd sync for macos,\n"
           "build in release mode.");
 #endif
-#endif
+#endif // __APPLE__
 }
 
 void VulkanEngine::setupHardwareEvenOddFrame()
