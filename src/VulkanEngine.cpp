@@ -40,6 +40,7 @@ void VulkanEngine::createFunnyObjects()
 {
     // lil cow
     Entity* spot = new Entity("Spot");
+
     auto meshInstance = _renderer.MakeMeshInstanceComponent(
         DIRECTORIES::ASSETS + "models/spot.obj", DIRECTORIES::ASSETS + "textures/spot.png"
     );
@@ -47,11 +48,11 @@ void VulkanEngine::createFunnyObjects()
     spot->AddComponent(meshInstance);
     // give the lil cow a transform
     spot->AddComponent(new TransformComponent());
+    _renderer.AddEntity(spot);
     spot->GetComponent<TransformComponent>()->rotation.x = 90;
     spot->GetComponent<TransformComponent>()->rotation.y = 90;
     spot->GetComponent<TransformComponent>()->position.z = 0.05;
     // register lil cow
-    _renderer.AddEntity(spot);
 }
 
 // in CLI pop up a monitor selection interface, that lists
@@ -454,8 +455,8 @@ void VulkanEngine::initDefaultStates()
     // configure states
 
     // clear color
-    _mainRenderPassClearValues[0].color = {0.5f, 0.3f, 0.1f, 1.f};
-    _mainRenderPassClearValues[1].depthStencil = vk::ClearDepthStencilValue(1.f, 0.f);
+    _clearValues[0].color = {0.5f, 0.3f, 0.1f, 1.f};
+    _clearValues[1].depthStencil = vk::ClearDepthStencilValue(1.f, 0.f);
 
     // camera location
     _mainCamera.SetPosition(-2, 0, 0);
@@ -465,8 +466,10 @@ void VulkanEngine::initDefaultStates()
     _lockCursor = false;
     _inputManager.SetActive(_lockCursor);
     _uiMode = false;
-    ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoMouse;
-    ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoKeyboard;
+
+    // TODO:re-implement
+    //ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoMouse;
+    //ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoKeyboard;
 };
 
 void VulkanEngine::Init(const VulkanEngine::InitOptions& options)
@@ -523,8 +526,9 @@ void VulkanEngine::Init(const VulkanEngine::InitOptions& options)
     { // populate initData
         initCtx.device = this->_device.get();
         initCtx.textureManager = &_textureManager;
-        initCtx.swapChainImageFormat = this->_mainWindowSwapChain.imageFormat;
-        initCtx.renderPass.mainPass = _mainRenderPass;
+        initCtx.swapChainImageFormat = this->_renderContexts.RGB.swapchain->imageFormat;
+        initCtx.renderPass.RGB = _renderContexts.RGB.renderPass;
+        initCtx.renderPass.CMY = _renderContexts.CMY.renderPass;
         for (int i = 0; i < _engineUBOStatic.size(); i++) {
             initCtx.engineUBOStaticDescriptorBufferInfo[i].range = sizeof(EngineUBOStatic);
             initCtx.engineUBOStaticDescriptorBufferInfo[i].buffer = _engineUBOStatic[i].buffer;
@@ -568,7 +572,7 @@ void VulkanEngine::Tick()
             _inputManager.Tick(deltaTime);
             TickContext tickData{&_mainCamera, deltaTime};
             tickData.profiler = &_profiler;
-            drawImGui();
+            // drawImGui();
             flushEngineUBOStatic(_currentFrame);
             drawFrame(&tickData, _currentFrame);
             _currentFrame = (_currentFrame + 1) % NUM_FRAME_IN_FLIGHT;
@@ -618,11 +622,12 @@ void VulkanEngine::setupSoftwareEvenOddFrame()
 
     // get refresh cycle
     VkRefreshCycleDurationGOOGLE refreshCycleDuration;
-    ASSERT(_mainWindowSwapChain.chain);
+    ASSERT(_renderContexts.RGB.swapchain->chain);
+    ASSERT(_renderContexts.CMY.swapchain->chain);
     ASSERT(_device->logicalDevice);
 
     vkGetRefreshCycleDurationGOOGLE(
-        _device->logicalDevice, _mainWindowSwapChain.chain, &refreshCycleDuration
+        _device->logicalDevice, _renderContexts.RGB.swapchain->chain, &refreshCycleDuration
     );
     ctx.nanoSecondsPerFrame = refreshCycleDuration.refreshDuration;
     ASSERT(ctx.nanoSecondsPerFrame != 0);
@@ -752,38 +757,47 @@ void VulkanEngine::initVulkan()
     this->_device->CreateGraphicsCommandPool();
     this->_device->CreateGraphicsCommandBuffer(NUM_FRAME_IN_FLIGHT);
 
-    createSwapChain(_mainWindowSwapChain, mainWindowSurface);
-    DEBUG(
-        "main window swapchain extent: {} {}",
-        _mainWindowSwapChain.extent.width,
-        _mainWindowSwapChain.extent.height
-    );
+    createSwapChain(_swapChain, mainWindowSurface);
+    createImageViews(_swapChain);
+    ASSERT(_swapChain.imageFormat);
+    createDepthBuffer(_swapChain);
 
-    this->_deletionStack.push([this]() { this->cleanupSwapChain(_mainWindowSwapChain); });
+    // create swapchains for RGB and CNY
+    for (RenderContext* ctx : {&_renderContexts.RGB, &_renderContexts.CMY}) {
+        ctx->swapchain = &_swapChain;
+        ctx->renderPass = createRenderPass(ctx->swapchain->imageFormat);
+        createFramebuffers(*ctx);
+    }
 
-    this->createImageViews(_mainWindowSwapChain);
-    this->createMainRenderPass(_mainWindowSwapChain.imageFormat);
-    this->createDepthBuffer(_mainWindowSwapChain);
+    // createSwapChain(_mainWindowSwapChain, mainWindowSurface);
+    // this->_deletionStack.push([this]() { this->cleanupSwapChain(_mainWindowSwapChain); });
+    // this->createImageViews(_mainWindowSwapChain);
+    // _mainRenderPass = this->createRenderPass(_mainWindowSwapChain.imageFormat);
+    // this->createDepthBuffer(_mainWindowSwapChain);
+    //
     this->createSynchronizationObjects(_syncProjector);
-    this->_imguiManager.InitializeRenderPass(
-        this->_device->logicalDevice, _mainWindowSwapChain.imageFormat
-    );
+    // this->_imguiManager.InitializeRenderPass(
+    //     this->_device->logicalDevice, _mainWindowSwapChain.imageFormat
+    // );
     // NOTE: this has to go after ImGuiManager::InitializeRenderPass
     // because the function also creates imgui's frame buffer
     // TODO: maybe separate them?
-    this->createFramebuffers(_mainWindowSwapChain);
-    { // init misc imgui resources
-        this->_imguiManager.InitializeImgui();
-        this->_imguiManager.InitializeDescriptorPool(NUM_FRAME_IN_FLIGHT, _device->logicalDevice);
-        this->_imguiManager.BindVulkanResources(
-            _window,
-            _instance,
-            _device->physicalDevice,
-            _device->logicalDevice,
-            _device->queueFamilyIndices.graphicsFamily.value(),
-            _device->graphicsQueue,
-            _mainWindowSwapChain.frameBuffer.size()
-        );
+    // this->createFramebuffers(_mainWindowSwapChain);
+    //
+    // TODO: re-implement
+    if (0) { // init misc imgui resources
+        // this->_imguiManager.InitializeImgui();
+        // this->_imguiManager.InitializeDescriptorPool(NUM_FRAME_IN_FLIGHT,
+        // _device->logicalDevice); this->_imguiManager.BindVulkanResources(
+        //     _window,
+        //     _instance,
+        //     _device->physicalDevice,
+        //     _device->logicalDevice,
+        //     _device->queueFamilyIndices.graphicsFamily.value(),
+        //     _device->graphicsQueue,
+        //
+        //     _mainWindowSwapChain.frameBuffer.size()
+        // );
     }
 
     // even-odd specific resource checkup and setup
@@ -799,7 +813,8 @@ void VulkanEngine::initVulkan()
     default:
         NEEDS_IMPLEMENTATION();
     }
-    this->_deletionStack.push([this]() { this->_imguiManager.Cleanup(_device->logicalDevice); });
+    // TODO:re-implement
+    // this->_deletionStack.push([this]() { this->_imguiManager.Cleanup(_device->logicalDevice); });
 
     INFO("Vulkan initialized.");
 }
@@ -1162,7 +1177,7 @@ void VulkanEngine::createSwapChain(VulkanEngine::SwapChainContext& ctx, const Vk
     vkGetSwapchainImagesKHR(this->_device->logicalDevice, ctx.chain, &imageCount, nullptr);
     ctx.image.resize(imageCount);
     ctx.imageView.resize(imageCount);
-    ctx.frameBuffer.resize(imageCount);
+    // ctx.frameBuffer.resize(imageCount);
     vkGetSwapchainImagesKHR(this->_device->logicalDevice, ctx.chain, &imageCount, ctx.image.data());
     ctx.imageFormat = surfaceFormat.format;
     DEBUG("Swap chain created!");
@@ -1175,15 +1190,18 @@ void VulkanEngine::cleanupSwapChain(SwapChainContext& ctx)
     vkDestroyImage(_device->logicalDevice, ctx.depthImage, nullptr);
     vkFreeMemory(_device->logicalDevice, ctx.depthImageMemory, nullptr);
 
-    _imguiManager.DestroyFrameBuffers(_device->logicalDevice);
-    for (VkFramebuffer framebuffer : ctx.frameBuffer) {
-        vkDestroyFramebuffer(this->_device->logicalDevice, framebuffer, nullptr);
-    }
+    // TODO:re-implement
+    // _imguiManager.DestroyFrameBuffers(_device->logicalDevice);
+    // for (VkFramebuffer framebuffer : ctx.frameBuffer) {
+    //     vkDestroyFramebuffer(this->_device->logicalDevice, framebuffer, nullptr);
+    // }
     for (VkImageView imageView : ctx.imageView) {
         vkDestroyImageView(this->_device->logicalDevice, imageView, nullptr);
     }
     vkDestroySwapchainKHR(this->_device->logicalDevice, ctx.chain, nullptr);
 }
+
+void VulkanEngine::recreateFrameBuffers(RenderContext& ctx) { createFramebuffers(ctx); }
 
 void VulkanEngine::recreateSwapChain(SwapChainContext& ctx)
 {
@@ -1204,7 +1222,7 @@ void VulkanEngine::recreateSwapChain(SwapChainContext& ctx)
     this->createSwapChain(ctx, ctx.surface);
     this->createImageViews(ctx);
     this->createDepthBuffer(ctx);
-    this->createFramebuffers(ctx);
+    // this->createFramebuffers(ctx);
     DEBUG("Swap chain recreated.");
 }
 
@@ -1266,9 +1284,9 @@ void VulkanEngine::createImageViews(SwapChainContext& ctx)
     for (size_t i = 0; i < ctx.image.size(); i++) {
         VkImageViewCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        createInfo.image = _mainWindowSwapChain.image[i];
+        createInfo.image = ctx.image[i];
         createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        createInfo.format = _mainWindowSwapChain.imageFormat;
+        createInfo.format = ctx.imageFormat;
         createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
         createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
         createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -1278,12 +1296,7 @@ void VulkanEngine::createImageViews(SwapChainContext& ctx)
         createInfo.subresourceRange.levelCount = 1;
         createInfo.subresourceRange.baseArrayLayer = 0;
         createInfo.subresourceRange.layerCount = 1;
-        if (vkCreateImageView(
-                this->_device->logicalDevice,
-                &createInfo,
-                nullptr,
-                &_mainWindowSwapChain.imageView[i]
-            )
+        if (vkCreateImageView(this->_device->logicalDevice, &createInfo, nullptr, &ctx.imageView[i])
             != VK_SUCCESS) {
             FATAL("Failed to create image views!");
         }
@@ -1335,7 +1348,9 @@ void VulkanEngine::Cleanup()
     INFO("Resource cleaned up.");
 }
 
-void VulkanEngine::createMainRenderPass(const VkFormat imageFormat)
+// create a render pass. The render pass will be pushed onto
+// the deletion stack.
+vk::RenderPass VulkanEngine::createRenderPass(const VkFormat imageFormat)
 {
     DEBUG("Creating render pass...");
     VkAttachmentDescription colorAttachment{};
@@ -1402,52 +1417,54 @@ void VulkanEngine::createMainRenderPass(const VkFormat imageFormat)
     renderPassInfo.dependencyCount = 1;
     renderPassInfo.pDependencies = &dependency;
 
-    if (vkCreateRenderPass(_device->logicalDevice, &renderPassInfo, nullptr, &this->_mainRenderPass)
-        != VK_SUCCESS) {
-        FATAL("Failed to create render pass!");
-    }
+    VkRenderPass pass = VK_NULL_HANDLE;
+    VK_CHECK_RESULT(vkCreateRenderPass(_device->logicalDevice, &renderPassInfo, nullptr, &pass));
 
-    _deletionStack.push([this]() {
-        vkDestroyRenderPass(this->_device->logicalDevice, this->_mainRenderPass, nullptr);
+    _deletionStack.push([this, pass]() {
+        vkDestroyRenderPass(this->_device->logicalDevice, pass, nullptr);
     });
+    return vk::RenderPass(pass);
 }
 
-void VulkanEngine::createFramebuffers(SwapChainContext& ctx)
+void VulkanEngine::createFramebuffers(RenderContext& ctx)
 {
     DEBUG("Creating framebuffers..");
     // iterate through image views and create framebuffers
-    if (_mainRenderPass == VK_NULL_HANDLE) {
+    if (ctx.renderPass == VK_NULL_HANDLE) {
         FATAL("Render pass is null!");
     }
-    for (size_t i = 0; i < ctx.image.size(); i++) {
-        VkImageView attachments[] = {ctx.imageView[i], ctx.depthImageView};
+    size_t numFrameBuffers = ctx.swapchain->image.size();
+    ASSERT(numFrameBuffers != 0);
+    ctx.frameBuffer.resize(numFrameBuffers);
+    SwapChainContext& swapchainContext = *ctx.swapchain;
+    for (size_t i = 0; i < numFrameBuffers; i++) {
+        VkImageView attachments[]
+            = {swapchainContext.imageView[i], swapchainContext.depthImageView};
         VkFramebufferCreateInfo framebufferInfo{};
         framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        framebufferInfo.renderPass = _mainRenderPass; // each framebuffer is associated with a
-                                                      // render pass; they need to be compatible
-                                                      // i.e. having same number of attachments and
-                                                      // same formats
+        framebufferInfo.renderPass = ctx.renderPass; // each framebuffer is associated with a
+                                                     // render pass; they need to be compatible
+                                                     // i.e. having same number of attachments and
+                                                     // same formats
         framebufferInfo.attachmentCount = sizeof(attachments) / sizeof(VkImageView);
         framebufferInfo.pAttachments = attachments;
-        framebufferInfo.width = ctx.extent.width;
-        framebufferInfo.height = ctx.extent.height;
+        framebufferInfo.width = swapchainContext.extent.width;
+        framebufferInfo.height = swapchainContext.extent.height;
         framebufferInfo.layers = 1; // number of layers in image arrays
         if (vkCreateFramebuffer(
-                _device->logicalDevice,
-                &framebufferInfo,
-                nullptr,
-                &_mainWindowSwapChain.frameBuffer[i]
+                _device->logicalDevice, &framebufferInfo, nullptr, &ctx.frameBuffer[i]
             )
             != VK_SUCCESS) {
             FATAL("Failed to create framebuffer!");
         }
     }
-    _imguiManager.InitializeFrameBuffer(
-        this->_mainWindowSwapChain.image.size(),
-        _device->logicalDevice,
-        _mainWindowSwapChain.imageView,
-        _mainWindowSwapChain.extent
-    );
+    // TODO: re-implement
+    // _imguiManager.InitializeFrameBuffer(
+    //     swapchainContext.image.size(),
+    //     _device->logicalDevice,
+    //     swapchainContext.imageView,
+    //     swapchainContext.extent
+    // );
 }
 
 void VulkanEngine::createDepthBuffer(SwapChainContext& ctx)
@@ -1532,14 +1549,16 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     uint32_t imageIndex;
     VkResult result = vkAcquireNextImageKHR(
         this->_device->logicalDevice,
-        _mainWindowSwapChain.chain,
+        _swapChain.chain,
         UINT64_MAX,
         sync.semaImageAvailable,
         VK_NULL_HANDLE,
         &imageIndex
     );
     [[unlikely]] if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-        this->recreateSwapChain(_mainWindowSwapChain);
+        this->recreateSwapChain(_swapChain);
+        this->recreateFrameBuffers(_renderContexts.RGB);
+        this->recreateFrameBuffers(_renderContexts.CMY);
         return;
     } else [[unlikely]] if (result != VK_SUCCESS) {
         const char* res = string_VkResult(result);
@@ -1549,7 +1568,11 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     // lock the fence
     vkResetFences(this->_device->logicalDevice, 1, &sync.fenceInFlight);
 
-    VkFramebuffer FB = this->_mainWindowSwapChain.frameBuffer[imageIndex];
+    // VkFramebuffer FB = this->_mainWindowSwapChain.frameBuffer[imageIndex];
+
+    VkFramebuffer fbRGB = _renderContexts.RGB.frameBuffer[imageIndex];
+    VkFramebuffer fbCMY = _renderContexts.CMY.frameBuffer[imageIndex];
+
     vk::CommandBuffer CB(_device->graphicsCommandBuffers[frame]);
     //  Record a command buffer which draws the scene onto that image
     CB.reset();
@@ -1557,8 +1580,8 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
         ctx->graphics.currentFrameInFlight = frame;
         ctx->graphics.currentSwapchainImageIndex = imageIndex;
         ctx->graphics.CB = CB;
-        ctx->graphics.currentFB = FB;
-        ctx->graphics.currentFBextend = _mainWindowSwapChain.extent;
+        //ctx->graphics.currentFB = FB;
+        ctx->graphics.currentFBextend = _swapChain.extent;
         getMainProjectionMatrix(ctx->graphics.mainProjectionMatrix);
     }
 
@@ -1571,42 +1594,55 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     }
 
     { // main render pass
-        vk::Extent2D extend = _mainWindowSwapChain.extent;
+        vk::Extent2D extend = _swapChain.extent;
         // the main render pass renders the actual graphics of the game.
-        { // begin main render pass
-            vk::Rect2D renderArea(VkOffset2D{0, 0}, extend);
-            vk::RenderPassBeginInfo renderPassBeginInfo(
-                _mainRenderPass,
-                FB, // which frame buffer in the swapchain do the pass i.e. all draw calls render
-                    // to?
-                renderArea,
-                _mainRenderPassClearValues.size(),
-                _mainRenderPassClearValues.data(),
-                nullptr
-            );
+        // begin main render pass
+        vk::Rect2D renderArea(VkOffset2D{0, 0}, extend);
+        vk::RenderPassBeginInfo renderPassBeginInfo(
+            {}, {}, renderArea, _clearValues.size(), _clearValues.data(), nullptr
+        );
 
+        VkViewport viewport{};
+        viewport.x = 0.0f;
+        viewport.y = 0.0f;
+        viewport.width = static_cast<float>(extend.width);
+        viewport.height = static_cast<float>(extend.height);
+        viewport.minDepth = 0.0f;
+        viewport.maxDepth = 1.0f;
+
+        VkRect2D scissor{};
+        scissor.offset = {0, 0};
+        scissor.extent = extend;
+
+        // TODO: this so needs cleanup
+        {
+            renderPassBeginInfo.renderPass = _renderContexts.RGB.renderPass;
+            renderPassBeginInfo.framebuffer
+                = _renderContexts.RGB
+                      .frameBuffer[imageIndex]; // which frame buffer in the swapchain do the pass
+                                                // i.e. all draw calls render to?
             CB.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
-        }
-        { // set viewport and scissor
-            VkViewport viewport{};
-            viewport.x = 0.0f;
-            viewport.y = 0.0f;
-            viewport.width = static_cast<float>(extend.width);
-            viewport.height = static_cast<float>(extend.height);
-            viewport.minDepth = 0.0f;
-            viewport.maxDepth = 1.0f;
             vkCmdSetViewport(CB, 0, 1, &viewport);
-
-            VkRect2D scissor{};
-            scissor.offset = {0, 0};
-            scissor.extent = extend;
             vkCmdSetScissor(CB, 0, 1, &scissor);
+            _renderer.TickRGB(ctx);
+            CB.endRenderPass();
         }
-        _renderer.Tick(ctx);
-        CB.endRenderPass();
+        {
+            renderPassBeginInfo.renderPass = _renderContexts.CMY.renderPass;
+            renderPassBeginInfo.framebuffer
+                = _renderContexts.CMY
+                      .frameBuffer[imageIndex]; // which frame buffer in the swapchain do the pass
+                                                // i.e. all draw calls render to?
+            CB.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
+            vkCmdSetViewport(CB, 0, 1, &viewport);
+            vkCmdSetScissor(CB, 0, 1, &scissor);
+            _renderer.TickCMY(ctx);
+            CB.endRenderPass();
+        }
     }
 
-    _imguiManager.RecordCommandBuffer(ctx);
+    // TODO: re-implement
+    // _imguiManager.RecordCommandBuffer(ctx);
 
     // end command buffer
     CB.end();
@@ -1619,8 +1655,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
                                                               // to make sure that the image
                                                               // is available before drawing
     VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-    std::array<VkCommandBuffer, 1> submitCommandBuffers
-        = {this->_device->graphicsCommandBuffers[frame]};
+    std::array<VkCommandBuffer, 1> submitCommandBuffers = {CB};
 
     submitInfo.waitSemaphoreCount = 1;
     submitInfo.pWaitSemaphores = waitSemaphores;
@@ -1652,7 +1687,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     presentInfo.waitSemaphoreCount = 1;
     presentInfo.pWaitSemaphores = signalSemaphores;
 
-    VkSwapchainKHR swapChains[] = {_mainWindowSwapChain.chain};
+    VkSwapchainKHR swapChains[] = { _swapChain.chain};
 
     presentInfo.swapchainCount = 1;
     presentInfo.pSwapchains = swapChains;
@@ -1696,7 +1731,9 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
         ASSERT(
             _tetraMode != TetraMode::kEvenOddHardwareSync
         ); // exclusive window does not resize its swapchain
-        [[unlikely]] this->recreateSwapChain(_mainWindowSwapChain);
+        this->recreateSwapChain(_swapChain);
+        this->recreateFrameBuffers(_renderContexts.RGB);
+        this->recreateFrameBuffers(_renderContexts.CMY);
         this->_framebufferResized = false;
     }
 }
@@ -1834,8 +1871,8 @@ void VulkanEngine::bindDefaultInputs()
             io.ConfigFlags &= ~ImGuiConfigFlags_NoMouse;
             io.ConfigFlags &= ~ImGuiConfigFlags_NoKeyboard;
             io.MousePos = ImVec2{
-                static_cast<float>(_mainWindowSwapChain.extent.width) / 2,
-                static_cast<float>(_mainWindowSwapChain.extent.height) / 2
+                static_cast<float>(_swapChain.extent.width) / 2,
+                static_cast<float>(_swapChain.extent.height) / 2
             };
             io.WantSetMousePos = true;
         } else {
@@ -1861,7 +1898,7 @@ void VulkanEngine::bindDefaultInputs()
 
 void VulkanEngine::getMainProjectionMatrix(glm::mat4& projectionMatrix)
 {
-    auto& extent = _mainWindowSwapChain.extent;
+    auto& extent = _swapChain.extent;
     projectionMatrix = glm::perspective(
         glm::radians(_FOV),
         extent.width / static_cast<float>(extent.height),
@@ -1876,6 +1913,7 @@ void VulkanEngine::getMainProjectionMatrix(glm::mat4& projectionMatrix)
 // the new counter takes the max of the image id so far presented.
 // TODO: profile precision of the new counter vs. old counter
 #define NEW_VIRTUAL_FRAMECOUNTER 1
+
 uint64_t VulkanEngine::getSurfaceCounterValue()
 {
     uint64_t surfaceCounter;
@@ -1884,12 +1922,12 @@ uint64_t VulkanEngine::getSurfaceCounterValue()
         uint32_t imageCount;
 #if NEW_VIRTUAL_FRAMECOUNTER
         vkGetPastPresentationTimingGOOGLE(
-            _device->logicalDevice, _mainWindowSwapChain.chain, &imageCount, nullptr
+            _device->logicalDevice, _renderContexts.RGB.swapchain->chain, &imageCount, nullptr
         );
         std::vector<VkPastPresentationTimingGOOGLE> images(imageCount);
 
         vkGetPastPresentationTimingGOOGLE(
-            _device->logicalDevice, _mainWindowSwapChain.chain, &imageCount, images.data()
+            _device->logicalDevice, _renderContexts.RGB.swapchain->chain, &imageCount, images.data()
         );
         for (int i = 0; i < imageCount; i++) {
             _softwareEvenOddCtx.lastPresentedImageId

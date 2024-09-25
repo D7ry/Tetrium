@@ -47,8 +47,13 @@ class SimpleRenderSystem : public ISystem
     // `MakePhongMeshInstanceComponent` freeing the pointer
     void DestroyMeshComponent(MeshComponent*& component);
 
+    // TODO: clean up the OOP mess
     void Init(const InitContext* ctx) override;
-    void Tick(const TickContext* ctx) override;
+    void Tick(const TickContext* ctx) override {};
+
+    // TODO: clean up to make it more DOD
+    void TickRGB(const TickContext* ctx);
+    void TickCMY(const TickContext* ctx);
 
     void Cleanup() override;
 
@@ -57,20 +62,35 @@ class SimpleRenderSystem : public ISystem
     const char* VERTEX_SHADER_SRC = "../shaders/phong/phong.vert.spv";
     const char* FRAGMENT_SHADER_SRC = "../shaders/phong/phong.frag.spv";
 
-    // pipeline
-    VkPipeline _pipeline = VK_NULL_HANDLE;
-    VkPipelineLayout _pipelineLayout = VK_NULL_HANDLE;
-
-    // sysetm holds its own descriptor pool
-    VkDescriptorSetLayout _descriptorSetLayout = VK_NULL_HANDLE;
-    VkDescriptorPool _descriptorPool = VK_NULL_HANDLE;
-
     struct UBO
     {
         VQBuffer dynamicUBO;
     };
 
-    size_t _numDynamicUBO = 0;; // how many dynamic UBOs do we have
+    struct RenderSystemContext
+    {
+        std::array<VkDescriptorSet, NUM_FRAME_IN_FLIGHT> _descriptorSets;
+        std::array<UBO, NUM_FRAME_IN_FLIGHT> _UBO;
+        VkPipeline _pipeline = VK_NULL_HANDLE;
+        VkPipelineLayout _pipelineLayout = VK_NULL_HANDLE;
+    };
+
+    struct
+    {
+        RenderSystemContext RGB;
+        RenderSystemContext CMY;
+    } _renderSystemContexts;
+
+
+    void render(const TickContext* tickCtx, RenderSystemContext& renderCtx);
+
+
+    // sysetm holds its own descriptor pool
+    VkDescriptorSetLayout _descriptorSetLayout = VK_NULL_HANDLE;
+    VkDescriptorPool _descriptorPool = VK_NULL_HANDLE;
+
+    size_t _numDynamicUBO = 0;
+    ; // how many dynamic UBOs do we have
     size_t _currDynamicUBO = 0;
     ;                                              // dynamic ubo that is to be allocated
     std::vector<unsigned long> _freeDynamicUBOIdx; // free list for dynamic UBO
@@ -78,9 +98,7 @@ class SimpleRenderSystem : public ISystem
     size_t _dynamicUBOAlignmentSize; // actual size of the dynamic UBO that
                                      // satisfies device alignment
 
-    std::array<VkDescriptorSet, NUM_FRAME_IN_FLIGHT> _descriptorSets;
-    std::array<UBO, NUM_FRAME_IN_FLIGHT> _UBO;
-    void resizeDynamicUbo(size_t dynamicUboCount);
+    void resizeDynamicUbo(RenderSystemContext& ctx, size_t dynamicUboCount);
 
     VQDevice* _device = nullptr;
 
@@ -88,7 +106,17 @@ class SimpleRenderSystem : public ISystem
     // - shaders
     // - descriptors(pool, layout, sets)
     // and the pipeline itself
-    void createGraphicsPipeline(const VkRenderPass renderPass, const InitContext* initData);
+    void createGraphicsPipeline(
+        const VkRenderPass renderPassRGB,
+        const VkRenderPass renderPassCMY,
+        const InitContext* initData
+    );
+
+    void buildPipelineForContext(
+        const VkRenderPass pass,
+        const InitContext* initData,
+        RenderSystemContext& ctx
+    );
 
     // all phong meshes created
     std::unordered_map<std::string, Mesh> _meshes;

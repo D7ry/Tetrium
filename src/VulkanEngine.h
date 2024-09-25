@@ -145,7 +145,6 @@ class VulkanEngine
         VkSwapchainKHR chain = VK_NULL_HANDLE;
         VkFormat imageFormat;
         VkExtent2D extent; // resolution of the swapchain images
-        std::vector<VkFramebuffer> frameBuffer;
         std::vector<VkImage> image;
         std::vector<VkImageView> imageView;
         VkImage depthImage;
@@ -170,6 +169,14 @@ class VulkanEngine
         VkFence fenceInFlight;
     };
 
+    struct RenderContext {
+        VkRenderPass renderPass;
+        SwapChainContext* swapchain; // global swap chain
+        std::vector<VkFramebuffer> frameBuffer;
+    };
+
+    SwapChainContext _swapChain;
+
     /* ---------- Initialization Subroutines ---------- */
     [[deprecated]]
     GLFWmonitor* cliMonitorSelection();
@@ -185,7 +192,7 @@ class VulkanEngine
     void createGlfwWindowSurface();
     void createDevice();
     VkSurfaceKHR createGlfwWindowSurface(GLFWwindow* window);
-    void createMainRenderPass(const VkFormat imageFormat); // create main render pass
+    vk::RenderPass createRenderPass(const VkFormat imageFormat); // create main render pass
     void createSynchronizationObjects(std::array<SyncPrimitives, NUM_FRAME_IN_FLIGHT>& primitives);
     void createFunnyObjects();
 
@@ -211,7 +218,10 @@ class VulkanEngine
     void cleanupSwapChain(SwapChainContext& ctx);
     void createImageViews(SwapChainContext& ctx);
     void createDepthBuffer(SwapChainContext& ctx);
-    void createFramebuffers(SwapChainContext& ctx);
+
+    /* ---------- FrameBuffers ---------- */
+    void recreateFrameBuffers(RenderContext& ctx);
+    void createFramebuffers(RenderContext& ctx);
 
     /* ---------- Debug Utilities ---------- */
     bool checkValidationLayerSupport();
@@ -243,6 +253,7 @@ class VulkanEngine
     void setupSoftwareEvenOddFrame();        // set up resources for software-based even-odd frame
     uint64_t getSurfaceCounterValue(); // get the number of frames requested so far from the display
     bool isEvenFrame();
+    void setupEvenOddRenderContext(); // set up `_evenOddRenderContexts`
 
     /* ---------- Top-level data ---------- */
     VkInstance _instance;
@@ -257,15 +268,11 @@ class VulkanEngine
     SwapChainContext _mainWindowSwapChain;
     SwapChainContext _auxWindowSwapchain; // unused for now
 
-    struct {
-        VkRenderPass odd;
-        VkRenderPass even;
-    } _renderPasses; // odd and even render passes
 
     struct {
-        SwapChainContext odd;
-        SwapChainContext even;
-    } _swapchains; // odd and even swapchains
+        RenderContext RGB; // red, green, blue
+        RenderContext CMY; // cyan, magenta, yellow
+    } _renderContexts;
 
     /* ---------- Synchronization Primivites ---------- */
     std::array<SyncPrimitives, NUM_FRAME_IN_FLIGHT> _syncProjector;
@@ -273,7 +280,7 @@ class VulkanEngine
     /* ---------- Render Passes ---------- */
     // main render pass, and currently the only render pass
     VkRenderPass _mainRenderPass = VK_NULL_HANDLE;
-    std::array<vk::ClearValue, 2> _mainRenderPassClearValues; // [color, depthStencil]
+    std::array<vk::ClearValue, 2> _clearValues; // [color, depthStencil]
 
     /* ---------- Instance-static Data ---------- */
     TetraMode _tetraMode;
@@ -350,6 +357,6 @@ class VulkanEngine
     friend class ImGuiWidgetGraphicsPipeline;
     ImGuiWidgetGraphicsPipeline _widgetGraphicsPipeline;
 
-    // ecs Systems
     SimpleRenderSystem _renderer;
+
 };

@@ -15,9 +15,9 @@ void SimpleRenderSystem::Init(const InitContext* ctx)
     _device = ctx->device;
     _textureManager = ctx->textureManager;
     _dynamicUBOAlignmentSize = _device->GetDynamicUBOAlignedSize(sizeof(UBODynamic));
-    // create the phong render pass
-    // create graphics pipeline
-    this->createGraphicsPipeline(ctx->renderPass.mainPass, ctx);
+
+    buildPipelineForContext(ctx->renderPass.RGB, ctx, _renderSystemContexts.RGB);
+    buildPipelineForContext(ctx->renderPass.CMY, ctx, _renderSystemContexts.CMY);
 }
 
 void SimpleRenderSystem::Cleanup()
@@ -31,15 +31,15 @@ void SimpleRenderSystem::Cleanup()
         mesh.second.vertexBuffer.Cleanup();
     }
 
-    // clean up static UBO & dynamic UBO
-    for (UBO& ubo : _UBO) {
-        // ubo.staticUBO.Cleanup();
-        ubo.dynamicUBO.Cleanup();
+    for (auto& ctx : {&(_renderSystemContexts.RGB), &(_renderSystemContexts.CMY)}) {
+        // clean up static UBO & dynamic UBO
+        for (int i = 0; i < ctx->_UBO.size(); i++) {
+            ctx->_UBO[i].dynamicUBO.Cleanup();
+        }
+        // clean up pipeline
+        vkDestroyPipeline(_device->logicalDevice, ctx->_pipeline, nullptr);
+        vkDestroyPipelineLayout(_device->logicalDevice, ctx->_pipelineLayout, nullptr);
     }
-
-    // clean up pipeline
-    vkDestroyPipeline(_device->logicalDevice, _pipeline, nullptr);
-    vkDestroyPipelineLayout(_device->logicalDevice, _pipelineLayout, nullptr);
 
     // clean up descriptors
     vkDestroyDescriptorSetLayout(_device->logicalDevice, _descriptorSetLayout, nullptr);
@@ -50,12 +50,13 @@ void SimpleRenderSystem::Cleanup()
     // note: texture is handled by TextureManager so no need to clean that up
 }
 
-void SimpleRenderSystem::Tick(const TickContext* tickData)
+void SimpleRenderSystem::render(const TickContext* tickCtx, RenderSystemContext& renderCtx)
 {
-    VkCommandBuffer CB = tickData->graphics.CB;
-    int frameIdx = tickData->graphics.currentFrameInFlight;
 
-    vkCmdBindPipeline(CB, VK_PIPELINE_BIND_POINT_GRAPHICS, _pipeline);
+    VkCommandBuffer CB = tickCtx->graphics.CB;
+    int frameIdx = tickCtx->graphics.currentFrameInFlight;
+
+    vkCmdBindPipeline(CB, VK_PIPELINE_BIND_POINT_GRAPHICS, renderCtx._pipeline);
 
     for (Entity* entity : this->_entities) {
         MeshComponent* meshInstance = entity->GetComponent<MeshComponent>();
@@ -69,10 +70,10 @@ void SimpleRenderSystem::Tick(const TickContext* tickData)
             vkCmdBindDescriptorSets(
                 CB,
                 VK_PIPELINE_BIND_POINT_GRAPHICS,
-                _pipelineLayout,
+                renderCtx._pipelineLayout,
                 0,
                 1,
-                &_descriptorSets[frameIdx],
+                &renderCtx._descriptorSets[frameIdx],
                 1,
                 &dynamicUBOOffset
             );
@@ -84,7 +85,7 @@ void SimpleRenderSystem::Tick(const TickContext* tickData)
             // changes
             // memcpy here will stall the program
             void* dynamicUBOAddr = reinterpret_cast<void*>(
-                reinterpret_cast<uintptr_t>(_UBO[frameIdx].dynamicUBO.bufferAddress)
+                reinterpret_cast<uintptr_t>(renderCtx._UBO[frameIdx].dynamicUBO.bufferAddress)
                 + dynamicUBOOffset
             );
             UBODynamic dynamicUBO{transform->GetModelMatrix(), meshInstance->textureOffset};
@@ -105,9 +106,20 @@ void SimpleRenderSystem::Tick(const TickContext* tickData)
     }
 }
 
-void SimpleRenderSystem::createGraphicsPipeline(
-    const VkRenderPass renderPass,
-    const InitContext* initData
+void SimpleRenderSystem::TickRGB(const TickContext* tickData)
+{
+    render(tickData, _renderSystemContexts.RGB);
+}
+
+void SimpleRenderSystem::TickCMY(const TickContext* tickData)
+{
+    render(tickData, _renderSystemContexts.CMY);
+}
+
+void SimpleRenderSystem::buildPipelineForContext(
+    const VkRenderPass pass,
+    const InitContext* initData,
+    RenderSystemContext& ctx
 )
 {
     /////  ---------- descriptor ---------- /////
@@ -190,10 +202,10 @@ void SimpleRenderSystem::createGraphicsPipeline(
         allocInfo.descriptorSetCount = NUM_FRAME_IN_FLIGHT;
         allocInfo.pSetLayouts = layouts.data();
 
-        ASSERT(this->_descriptorSets.size() == NUM_FRAME_IN_FLIGHT);
+        ASSERT(ctx._descriptorSets.size() == NUM_FRAME_IN_FLIGHT);
 
         if (vkAllocateDescriptorSets(
-                this->_device->logicalDevice, &allocInfo, this->_descriptorSets.data()
+                this->_device->logicalDevice, &allocInfo, ctx._descriptorSets.data()
             )
             != VK_SUCCESS) {
             FATAL("Failed to allocate descriptor sets!");
@@ -201,8 +213,8 @@ void SimpleRenderSystem::createGraphicsPipeline(
     }
 
     // allocate for dynamic ubo, and write to descriptors
-    resizeDynamicUbo(10);
-
+    resizeDynamicUbo(ctx, 10);
+    _numDynamicUBO = 10;
     // update descriptor sets
     // note here we only update descripto sets for static ubo
     // dynamic ubo is updated through `resizeDynamicUbo`
@@ -211,7 +223,7 @@ void SimpleRenderSystem::createGraphicsPipeline(
 
         std::array<VkWriteDescriptorSet, 1> descriptorWrites{};
         descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[0].dstSet = this->_descriptorSets[i];
+        descriptorWrites[0].dstSet = ctx._descriptorSets[i];
         descriptorWrites[0].dstBinding = (int)BindingLocation::UBO_STATIC_ENGINE;
         descriptorWrites[0].dstArrayElement = 0;
         descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -330,8 +342,8 @@ void SimpleRenderSystem::createGraphicsPipeline(
     VkPipelineRasterizationStateCreateInfo rasterizer
         = {}; // does the actual rasterization and outputs fragments
     rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-    rasterizer.depthClampEnable = VK_FALSE; // if true, fragments beyond the near and far planes are
-                                            // clamped instead of discarded
+    rasterizer.depthClampEnable = VK_FALSE; // if true, fragments beyond the near and far planes
+                                            // are clamped instead of discarded
     rasterizer.rasterizerDiscardEnable
         = VK_FALSE; // if true, geometry never passes through the rasterizer
                     // stage(nothing it put into the frame buffer)
@@ -400,7 +412,7 @@ void SimpleRenderSystem::createGraphicsPipeline(
     pipelineLayoutInfo.pPushConstantRanges = nullptr;       // Optional
 
     if (vkCreatePipelineLayout(
-            _device->logicalDevice, &pipelineLayoutInfo, nullptr, &_pipelineLayout
+            _device->logicalDevice, &pipelineLayoutInfo, nullptr, &ctx._pipelineLayout
         )
         != VK_SUCCESS) {
         FATAL("Failed to create pipeline layout!");
@@ -420,8 +432,8 @@ void SimpleRenderSystem::createGraphicsPipeline(
     pipelineInfo.pColorBlendState = &colorBlending;
     pipelineInfo.pDynamicState = &dynamicStateCreateInfo;
     pipelineInfo.pDepthStencilState = &depthStencilCreateInfo;
-    pipelineInfo.layout = _pipelineLayout;
-    pipelineInfo.renderPass = renderPass;
+    pipelineInfo.layout = ctx._pipelineLayout;
+    pipelineInfo.renderPass = pass;
     pipelineInfo.subpass = 0;
 
     // only need to specify when deriving from an existing pipeline
@@ -429,7 +441,7 @@ void SimpleRenderSystem::createGraphicsPipeline(
     pipelineInfo.basePipelineIndex = -1;              // Optional
 
     if (vkCreateGraphicsPipelines(
-            _device->logicalDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &_pipeline
+            _device->logicalDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &ctx._pipeline
         )
         != VK_SUCCESS) {
         FATAL("Failed to create graphics pipeline!");
@@ -437,6 +449,16 @@ void SimpleRenderSystem::createGraphicsPipeline(
 
     vkDestroyShaderModule(_device->logicalDevice, fragShaderModule, nullptr);
     vkDestroyShaderModule(_device->logicalDevice, vertShaderModule, nullptr);
+}
+
+void SimpleRenderSystem::createGraphicsPipeline(
+    const VkRenderPass renderPassRGB,
+    const VkRenderPass renderPassCMY,
+    const InitContext* initData
+)
+{
+    buildPipelineForContext(renderPassRGB, initData, _renderSystemContexts.RGB);
+    buildPipelineForContext(renderPassCMY, initData, _renderSystemContexts.CMY);
 }
 
 MeshComponent* SimpleRenderSystem::MakeMeshInstanceComponent(
@@ -492,7 +514,9 @@ MeshComponent* SimpleRenderSystem::MakeMeshInstanceComponent(
             dynamicUBOId = _currDynamicUBO;
             _currDynamicUBO++;
             if (_currDynamicUBO >= _numDynamicUBO) {
-                resizeDynamicUbo(_numDynamicUBO * 1.5); // grow dynamic UBO
+                _numDynamicUBO *= 1.5;
+                resizeDynamicUbo(_renderSystemContexts.RGB, _numDynamicUBO); // grow dynamic UBO
+                resizeDynamicUbo(_renderSystemContexts.CMY, _numDynamicUBO); // grow dynamic UBO
             }
         }
     }
@@ -515,26 +539,26 @@ void SimpleRenderSystem::DestroyMeshComponent(MeshComponent*& component)
 // reallocate dynamic UBO array, updating the descriptors as well
 // note that contents from the old UBO array aren't copied over
 // TODO: implement copying over from the old array?
-void SimpleRenderSystem::resizeDynamicUbo(size_t dynamicUboCount)
+void SimpleRenderSystem::resizeDynamicUbo(RenderSystemContext& ctx, size_t dynamicUboCount)
 {
     for (int i = 0; i < NUM_FRAME_IN_FLIGHT; i++) {
         // reallocate dyamic ubo
-        this->_UBO[i].dynamicUBO.Cleanup();
+        ctx._UBO[i].dynamicUBO.Cleanup();
         this->_device->CreateBufferInPlace(
             _dynamicUBOAlignmentSize * dynamicUboCount,
             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-            this->_UBO[i].dynamicUBO
+            ctx._UBO[i].dynamicUBO
         );
         // point descriptor to newly allocated buffer
         VkDescriptorBufferInfo descriptorBufferInfo_dynamic{};
-        descriptorBufferInfo_dynamic.buffer = this->_UBO[i].dynamicUBO.buffer;
+        descriptorBufferInfo_dynamic.buffer = ctx._UBO[i].dynamicUBO.buffer;
         descriptorBufferInfo_dynamic.offset = 0;
         descriptorBufferInfo_dynamic.range = _dynamicUBOAlignmentSize;
 
         std::array<VkWriteDescriptorSet, 1> descriptorWrites{};
         descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[0].dstSet = this->_descriptorSets[i];
+        descriptorWrites[0].dstSet = ctx._descriptorSets[i];
         descriptorWrites[0].dstBinding = (int)BindingLocation::UBO_DYNAMIC;
         descriptorWrites[0].dstArrayElement = 0;
         descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
@@ -545,28 +569,29 @@ void SimpleRenderSystem::resizeDynamicUbo(size_t dynamicUboCount)
             _device->logicalDevice, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr
         );
     }
-    _numDynamicUBO = dynamicUboCount;
 }
 
 void SimpleRenderSystem::updateTextureDescriptorSet()
 {
     DEBUG("updating texture descirptor set");
-    for (size_t i = 0; i < NUM_FRAME_IN_FLIGHT; i++) {
-        std::array<VkWriteDescriptorSet, 1> descriptorWrites{};
-        descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[0].dstSet = this->_descriptorSets[i];
-        descriptorWrites[0].dstBinding = (int)BindingLocation::TEXTURE_SAMPLER;
-        descriptorWrites[0].dstArrayElement = 0;
-        descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        descriptorWrites[0].descriptorCount
-            = _textureDescriptorInfoIdx; // descriptors are 0-indexed, +1 for
-                                         // the # of valid samplers
-        descriptorWrites[0].pImageInfo = _textureDescriptorInfo.data();
+    for (auto& ctx : {_renderSystemContexts.RGB, _renderSystemContexts.CMY}) {
+        for (size_t i = 0; i < NUM_FRAME_IN_FLIGHT; i++) {
+            std::array<VkWriteDescriptorSet, 1> descriptorWrites{};
+            descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrites[0].dstSet = ctx._descriptorSets[i];
+            descriptorWrites[0].dstBinding = (int)BindingLocation::TEXTURE_SAMPLER;
+            descriptorWrites[0].dstArrayElement = 0;
+            descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            descriptorWrites[0].descriptorCount
+                = _textureDescriptorInfoIdx; // descriptors are 0-indexed, +1 for
+                                             // the # of valid samplers
+            descriptorWrites[0].pImageInfo = _textureDescriptorInfo.data();
 
-        DEBUG("descriptor cont: {}", descriptorWrites[0].descriptorCount);
+            DEBUG("descriptor cont: {}", descriptorWrites[0].descriptorCount);
 
-        vkUpdateDescriptorSets(
-            _device->logicalDevice, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr
-        );
+            vkUpdateDescriptorSets(
+                _device->logicalDevice, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr
+            );
+        }
     }
 };

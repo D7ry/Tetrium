@@ -25,6 +25,7 @@ struct QueueFamilyIndices
                && computeFamily.has_value();
     }
 };
+
 struct VQDevice
 {
     struct SwapChainSupport
@@ -104,6 +105,8 @@ struct VQDevice
     void CreateGraphicsCommandBuffer(uint32_t commandBufferCount);
 
     SwapChainSupport GetSwapChainSupportForSurface(const VkSurfaceKHR surface);
+
+    vk::Device Get() { return vk::Device(this->logicalDevice); }
 
     /**
      * @brief Create a VQBuffer from this device.

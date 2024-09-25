@@ -43,7 +43,8 @@ struct InitContext
 
     struct
     {
-        VkRenderPass mainPass;
+        VkRenderPass RGB;
+        VkRenderPass CMY;
     } renderPass;
 
     /**
