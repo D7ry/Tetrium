@@ -230,7 +230,6 @@ void ImGuiManager::Cleanup(VkDevice logicalDevice)
 void ImGuiManager::RecordCommandBuffer(const TickContext* tickData)
 {
     auto CB = tickData->graphics.CB;
-    auto FB = tickData->graphics.currentFB;
     auto extent = tickData->graphics.currentFBextend;
 
     // start render pass
