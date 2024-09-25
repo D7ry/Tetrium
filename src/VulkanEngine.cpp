@@ -469,9 +469,8 @@ void VulkanEngine::initDefaultStates()
     _inputManager.SetActive(_lockCursor);
     _uiMode = false;
 
-    // TODO:re-implement
-    // ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoMouse;
-    // ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoKeyboard;
+    ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoMouse;
+    ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoKeyboard;
 };
 
 void VulkanEngine::Init(const VulkanEngine::InitOptions& options)
@@ -633,7 +632,6 @@ void VulkanEngine::setupSoftwareEvenOddFrame()
     );
     ctx.nanoSecondsPerFrame = refreshCycleDuration.refreshDuration;
     ASSERT(ctx.nanoSecondsPerFrame != 0);
-
 }
 
 void VulkanEngine::checkSoftwareEvenOddFrameSupport()
@@ -792,7 +790,6 @@ void VulkanEngine::initVulkan()
     // TODO: maybe separate them?
     // this->createFramebuffers(_mainWindowSwapChain);
     //
-    // TODO: re-implement
     if (1) { // init misc imgui resources
         this->_imguiManager.InitializeImgui();
         this->_imguiManager.InitializeDescriptorPool(NUM_FRAME_IN_FLIGHT, _device->logicalDevice);
@@ -820,7 +817,6 @@ void VulkanEngine::initVulkan()
     default:
         NEEDS_IMPLEMENTATION();
     }
-    // TODO:re-implement
     this->_deletionStack.push([this]() { this->_imguiManager.Cleanup(_device->logicalDevice); });
 
     INFO("Vulkan initialized.");
@@ -1335,18 +1331,32 @@ void VulkanEngine::createSynchronizationObjects(
             || vkCreateFence(_device->logicalDevice, &fenceInfo, nullptr, &primitive.fenceInFlight)
                    != VK_SUCCESS
             || vkCreateSemaphore(
-                _device->logicalDevice, &semaphoreInfo, nullptr, &primitive.semaImageCopyFinished
-            )
-
-        ) {
+                   _device->logicalDevice, &semaphoreInfo, nullptr, &primitive.semaImageCopyFinished
+               ) != VK_SUCCESS) {
             FATAL("Failed to create synchronization objects for a frame!");
         }
+
+        VkSemaphoreTypeCreateInfo timelineCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO,
+            .pNext = NULL,
+            .semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE,
+            .initialValue = 0,
+        };
+        semaphoreInfo.pNext = &timelineCreateInfo;
+        VK_CHECK_RESULT(
+            vkCreateSemaphore(_device->logicalDevice, &semaphoreInfo, nullptr, &primitive.semaVsync)
+        );
     }
     this->_deletionStack.push([this, primitives]() {
         for (size_t i = 0; i < NUM_FRAME_IN_FLIGHT; i++) {
             const SyncPrimitives& primitive = primitives[i];
-            vkDestroySemaphore(this->_device->logicalDevice, primitive.semaRenderFinished, nullptr);
-            vkDestroySemaphore(this->_device->logicalDevice, primitive.semaImageAvailable, nullptr);
+            for (auto& sema :
+                 {primitive.semaVsync,
+                  primitive.semaImageCopyFinished,
+                  primitive.semaRenderFinished,
+                  primitive.semaImageAvailable}) {
+                vkDestroySemaphore(this->_device->logicalDevice, sema, nullptr);
+            }
             vkDestroyFence(this->_device->logicalDevice, primitive.fenceInFlight, nullptr);
         }
     });
@@ -1532,8 +1542,8 @@ void VulkanEngine::createFramebuffers(RenderContext& ctx)
         framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         framebufferInfo.renderPass = ctx.renderPass; // each framebuffer is associated with a
                                                      // render pass; they need to be compatible
-                                                     // i.e. having same number of attachments and
-                                                     // same formats
+                                                     // i.e. having same number of attachments
+                                                     // and same formats
         framebufferInfo.attachmentCount = sizeof(attachments) / sizeof(VkImageView);
         framebufferInfo.pAttachments = attachments;
         framebufferInfo.width = swapchainContext.extent.width;
@@ -1689,8 +1699,9 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
             renderPassBeginInfo.renderPass = _renderContexts.RGB.renderPass;
             renderPassBeginInfo.framebuffer
                 = _renderContexts.RGB
-                      .virtualFrameBuffer[swapchainImageIndex]; // which frame buffer in the swapchain do
-                                                         // the pass i.e. all draw calls render to?
+                      .virtualFrameBuffer[swapchainImageIndex]; // which frame buffer in the
+                                                                // swapchain do the pass i.e.
+                                                                // all draw calls render to?
             CB1.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
             vkCmdSetViewport(CB1, 0, 1, &viewport);
             vkCmdSetScissor(CB1, 0, 1, &scissor);
@@ -1701,8 +1712,9 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
             renderPassBeginInfo.renderPass = _renderContexts.CMY.renderPass;
             renderPassBeginInfo.framebuffer
                 = _renderContexts.CMY
-                      .virtualFrameBuffer[swapchainImageIndex]; // which frame buffer in the swapchain do
-                                                         // the pass i.e. all draw calls render to?
+                      .virtualFrameBuffer[swapchainImageIndex]; // which frame buffer in the
+                                                                // swapchain do the pass i.e.
+                                                                // all draw calls render to?
             CB1.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
             vkCmdSetViewport(CB1, 0, 1, &viewport);
             vkCmdSetScissor(CB1, 0, 1, &scissor);
@@ -2027,7 +2039,12 @@ uint64_t VulkanEngine::getSurfaceCounterValue()
                 _softwareEvenOddCtx.mostRecentPresentFinish, images.at(i).actualPresentTime
             );
             auto& img = images.at(i);
-            INFO("{} : expected: {} actual: {}", img.presentID, img.desiredPresentTime, img.actualPresentTime);
+            INFO(
+                "{} : expected: {} actual: {}",
+                img.presentID,
+                img.desiredPresentTime,
+                img.actualPresentTime
+            );
         }
         surfaceCounter = _softwareEvenOddCtx.lastPresentedImageId;
 #else

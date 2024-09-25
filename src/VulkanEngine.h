@@ -168,6 +168,7 @@ class VulkanEngine
         VkSemaphore semaImageAvailable;
         VkSemaphore semaRenderFinished;
         VkSemaphore semaImageCopyFinished;
+        VkSemaphore semaVsync;
         VkFence fenceInFlight;
     };
 
