@@ -105,7 +105,7 @@ void VQDevice::CreateGraphicsCommandBuffer(uint32_t commandBufferCount) {
         FATAL("Graphics command buffers already initialized!");
     }
     this->graphicsCommandBuffers.resize(commandBufferCount);
-    this->virtualFrameCommandBuffers.resize(commandBufferCount);
+    this->graphicsCommandBuffers2.resize(commandBufferCount);
 
     VkCommandBufferAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -117,7 +117,7 @@ void VQDevice::CreateGraphicsCommandBuffer(uint32_t commandBufferCount) {
         FATAL("Failed to allocate command buffers!");
     }
 
-    if (vkAllocateCommandBuffers(logicalDevice, &allocInfo, this->virtualFrameCommandBuffers.data()) != VK_SUCCESS) {
+    if (vkAllocateCommandBuffers(logicalDevice, &allocInfo, this->graphicsCommandBuffers2.data()) != VK_SUCCESS) {
         FATAL("Failed to allocate command buffers!");
     }
 }

@@ -20,6 +20,8 @@
 #include "imgui.h"
 #include "lib/ImGuiUtils.h"
 
+#include "lib/Utils.h"
+
 // Molten VK Config
 #if __APPLE__
 #include "MoltenVKConfig.h"
@@ -788,9 +790,7 @@ void VulkanEngine::initVulkan()
     // this->createDepthBuffer(_mainWindowSwapChain);
     //
     this->createSynchronizationObjects(_syncProjector);
-    this->_imguiManager.InitializeRenderPass(
-        this->_device->logicalDevice, _swapChain.imageFormat
-    );
+    this->_imguiManager.InitializeRenderPass(this->_device->logicalDevice, _swapChain.imageFormat);
     // NOTE: this has to go after ImGuiManager::InitializeRenderPass
     // because the function also creates imgui's frame buffer
     // TODO: maybe separate them?
@@ -799,8 +799,8 @@ void VulkanEngine::initVulkan()
     // TODO: re-implement
     if (1) { // init misc imgui resources
         this->_imguiManager.InitializeImgui();
-        this->_imguiManager.InitializeDescriptorPool(NUM_FRAME_IN_FLIGHT,
-        _device->logicalDevice); this->_imguiManager.BindVulkanResources(
+        this->_imguiManager.InitializeDescriptorPool(NUM_FRAME_IN_FLIGHT, _device->logicalDevice);
+        this->_imguiManager.BindVulkanResources(
             _window,
             _instance,
             _device->physicalDevice,
@@ -1550,7 +1550,6 @@ void VulkanEngine::createFramebuffers(RenderContext& ctx)
             FATAL("Failed to create framebuffer!");
         }
     }
-
 }
 
 void VulkanEngine::createFramebuffers(SwapChainContext& ctx, VkRenderPass rgbOrCnyPass)
@@ -1619,38 +1618,8 @@ void VulkanEngine::flushEngineUBOStatic(uint8_t frame)
     memcpy(buf.bufferAddress, &ubo, sizeof(ubo));
 }
 
-#define POWER_ON_DISPLAY 0
-
-// TODO: another hack to reduce even-odd frame error,
-// is to minimize time gap between the GetIsEven(),
-// and the even-odd rendering subroutines. If the gap
-// is too long, we may be rendering to an even frame because GetIsEven()== true, while
-// when we commit, the display is demanding an odd frame.
-// The best solution to this would be to render to two separate frame buffers
-// for every draw call, and determine which one to commit,
-// at commit time, through GetIsEven().
-//
 void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
 {
-#if POWER_ON_DISPLAY
-    static bool poweredOn = false;
-    if (false && !poweredOn) { // power display on, seems unnecessary
-        poweredOn = true;
-        // power on display
-        DEBUG("Turning display on...");
-        VkDisplayPowerInfoEXT powerInfo{
-            .sType = VK_STRUCTURE_TYPE_DISPLAY_POWER_INFO_EXT,
-            .pNext = VK_NULL_HANDLE,
-            .powerState = VkDisplayPowerStateEXT::VK_DISPLAY_POWER_STATE_ON_EXT
-        };
-        PFN_vkDisplayPowerControlEXT fnPtr = reinterpret_cast<PFN_vkDisplayPowerControlEXT>(
-            vkGetInstanceProcAddr(_instance, "vkDisplayPowerControlEXT")
-        );
-        ASSERT(fnPtr);
-        VK_CHECK_RESULT(fnPtr(_device->logicalDevice, _mainProjectorDisplay.display, &powerInfo));
-        std::this_thread::sleep_for(std::chrono::seconds(5));
-    }
-#endif // POWER_ON_DISPLAY
     SyncPrimitives& sync = _syncProjector[frame];
 
     //  Wait for the previous frame to finish
@@ -1680,18 +1649,13 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     // lock the fence
     vkResetFences(this->_device->logicalDevice, 1, &sync.fenceInFlight);
 
-    // VkFramebuffer FB = this->_mainWindowSwapChain.frameBuffer[imageIndex];
-
-    VkFramebuffer fbRGB = _renderContexts.RGB.frameBuffer[swapchainImageIndex];
-    VkFramebuffer fbCMY = _renderContexts.CMY.frameBuffer[swapchainImageIndex];
-
-    vk::CommandBuffer CB(_device->graphicsCommandBuffers[frame]);
+    vk::CommandBuffer CB1(_device->graphicsCommandBuffers[frame]);
     //  Record a command buffer which draws the scene onto that image
-    CB.reset();
+    CB1.reset();
     { // update ctx->graphics field
         ctx->graphics.currentFrameInFlight = frame;
         ctx->graphics.currentSwapchainImageIndex = swapchainImageIndex;
-        ctx->graphics.CB = CB;
+        ctx->graphics.CB = CB1;
         // ctx->graphics.currentFB = FB;
         ctx->graphics.currentFBextend = _swapChain.extent;
         getMainProjectionMatrix(ctx->graphics.mainProjectionMatrix);
@@ -1702,13 +1666,11 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         beginInfo.flags = 0;                  // Optional
         beginInfo.pInheritanceInfo = nullptr; // Optional
-        CB.begin(vk::CommandBufferBeginInfo());
+        CB1.begin(vk::CommandBufferBeginInfo());
     }
 
     { // main render pass
         vk::Extent2D extend = _swapChain.extent;
-        // the main render pass renders the actual graphics of the game.
-        // begin main render pass
         vk::Rect2D renderArea(VkOffset2D{0, 0}, extend);
         vk::RenderPassBeginInfo renderPassBeginInfo(
             {}, {}, renderArea, _clearValues.size(), _clearValues.data(), nullptr
@@ -1726,193 +1688,102 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
         scissor.offset = {0, 0};
         scissor.extent = extend;
 
-        // TODO: this so needs cleanup
+        // two-pass rendering: render RGB and CMY colors onto two virtual FBs
         {
             renderPassBeginInfo.renderPass = _renderContexts.RGB.renderPass;
             renderPassBeginInfo.framebuffer
                 = _renderContexts.RGB
-                      .frameBuffer[swapchainImageIndex]; // which frame buffer in the swapchain do the pass
-                                                // i.e. all draw calls render to?
-            CB.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
-            vkCmdSetViewport(CB, 0, 1, &viewport);
-            vkCmdSetScissor(CB, 0, 1, &scissor);
+                      .frameBuffer[swapchainImageIndex]; // which frame buffer in the swapchain do
+                                                         // the pass i.e. all draw calls render to?
+            CB1.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
+            vkCmdSetViewport(CB1, 0, 1, &viewport);
+            vkCmdSetScissor(CB1, 0, 1, &scissor);
             _renderer.TickRGB(ctx);
-            CB.endRenderPass();
+            CB1.endRenderPass();
         }
         {
             renderPassBeginInfo.renderPass = _renderContexts.CMY.renderPass;
             renderPassBeginInfo.framebuffer
                 = _renderContexts.CMY
-                      .frameBuffer[swapchainImageIndex]; // which frame buffer in the swapchain do the pass
-                                                // i.e. all draw calls render to?
-            CB.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
-            vkCmdSetViewport(CB, 0, 1, &viewport);
-            vkCmdSetScissor(CB, 0, 1, &scissor);
+                      .frameBuffer[swapchainImageIndex]; // which frame buffer in the swapchain do
+                                                         // the pass i.e. all draw calls render to?
+            CB1.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
+            vkCmdSetViewport(CB1, 0, 1, &viewport);
+            vkCmdSetScissor(CB1, 0, 1, &scissor);
             _renderer.TickCMY(ctx);
-            CB.endRenderPass();
+            CB1.endRenderPass();
         }
     }
 
-    // TODO: re-implement
+    CB1.end();
 
-    // end command buffer
-    CB.end();
-
-    //  Submit the recorded command buffer
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-    // VkSemaphore waitSemaphores[] = {sync.semaImageAvailable}; // use imageAvailable semaphore
-    //                                                           // to make sure that the image
-    //                                                           // is available before drawing
-
-    // INFO("1");
     VkSemaphore waitSemaphores[] = {}; // don't need semaphore since we're drawing on virtual fb
-    VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-    std::array<VkCommandBuffer, 1> submitCommandBuffers = {CB};
+    VkPipelineStageFlags waitStages[]
+        = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT}; // wait for color to be available
+    std::array<VkCommandBuffer, 1> submitCommandBuffers = {CB1};
 
-    // INFO("1");
     submitInfo.waitSemaphoreCount = 0;
     submitInfo.pWaitSemaphores = waitSemaphores;
     submitInfo.pWaitDstStageMask = waitStages;
     submitInfo.commandBufferCount = static_cast<uint32_t>(submitCommandBuffers.size());
     submitInfo.pCommandBuffers = submitCommandBuffers.data();
 
-    // INFO("1");
-    // VkSemaphore signalSemaphores[] = {sync.semaRenderFinished};
     VkSemaphore signalSemaphores[] = {sync.semaRenderFinished};
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = signalSemaphores;
 
-    // INFO("1");
-    {
-        // wait time tend to be long if framerate is hardware-capped.
-        // PROFILE_SCOPE(&_profiler, "wait: vkAcquireNextImageKHR");
-        // the submission does not start until vkAcquireNextImageKHR
-        // returns, and downs the corresponding _semaRenderFinished
-        // semapohre once it's done.
-        if (vkQueueSubmit(_device->graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE)
-            != VK_SUCCESS) {
-            FATAL("Failed to submit draw command buffer!");
-        }
+    if (vkQueueSubmit(_device->graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS) {
+        FATAL("Failed to submit draw command buffer!");
     }
 
-    vk::CommandBuffer CB2(_device->virtualFrameCommandBuffers[frame]);
+    vk::CommandBuffer CB2(_device->graphicsCommandBuffers2[frame]);
     CB2.reset();
     CB2.begin(vk::CommandBufferBeginInfo());
-    // INFO("1");
-    // copy over content from virtual fb to real fb
-    // this time wait for semaImageAvailable because we're painting to real fb
-    // also need to wait for  waitStages
-    VkImageMemoryBarrier barriers[2] = {};
 
-    // Transition virtual framebuffer to transfer source
+    // choose whether to render the even/odd frame buffer, discarding the other
     bool isEven = isEvenFrame();
-    VkImage virtualFramebufferImage =  isEven ? _renderContexts.RGB.image[swapchainImageIndex]
-                                                    : _renderContexts.CMY.image[swapchainImageIndex];
-    VkImage swapChainImage = _swapChain.image[swapchainImageIndex];
-    barriers[0].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    barriers[0].oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    barriers[0].newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-    barriers[0].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    barriers[0].dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-    barriers[0].image = virtualFramebufferImage;
-    barriers[0].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    barriers[0].subresourceRange.levelCount = 1;
-    barriers[0].subresourceRange.layerCount = 1;
-
-    // Transition swapchain image to transfer destination
-    barriers[1].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    barriers[1].oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    barriers[1].newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-    barriers[1].srcAccessMask = 0;
-    barriers[1].dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-    barriers[1].image = swapChainImage;
-    barriers[1].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    barriers[1].subresourceRange.levelCount = 1;
-    barriers[1].subresourceRange.layerCount = 1;
-
-    VkImageCopy copyRegion{};
-    copyRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    copyRegion.srcSubresource.layerCount = 1;
-    copyRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    copyRegion.dstSubresource.layerCount = 1;
-    copyRegion.extent.width = _swapChain.extent.width;
-    copyRegion.extent.height = _swapChain.extent.height;
-    copyRegion.extent.depth = 1;
-
-    vkCmdCopyImage(
-        CB2,
-        virtualFramebufferImage,
-        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-        swapChainImage,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        1,
-        &copyRegion
+    VkImage virtualFramebufferImage = isEven ? _renderContexts.RGB.image[swapchainImageIndex]
+                                             : _renderContexts.CMY.image[swapchainImageIndex];
+    VkImage swapchainFramebufferImage = _swapChain.image[swapchainImageIndex];
+    Utils::ImageTransfer::CmdTransferFB(
+        CB2, virtualFramebufferImage, swapchainFramebufferImage, _swapChain.extent
     );
 
-    VkImageMemoryBarrier presentBarrier{};
-    presentBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    presentBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-    presentBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-    presentBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-    presentBarrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-    presentBarrier.image = swapChainImage;
-    presentBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    presentBarrier.subresourceRange.levelCount = 1;
-    presentBarrier.subresourceRange.layerCount = 1;
-
-    vkCmdPipelineBarrier(
-        CB2,
-        VK_PIPELINE_STAGE_TRANSFER_BIT,
-        VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-        0,
-        0,
-        nullptr,
-        0,
-        nullptr,
-        1,
-        &presentBarrier
-    );
-
-    //  Submit the recorded command buffer
-    VkSubmitInfo submitInfo2{};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-
-    // real fb needs to be available, render also needs to finish before copying over
-    VkSemaphore waitSemaphores2[] = {sync.semaImageAvailable, sync.semaRenderFinished};
-
-    ctx->graphics.CB = CB2; // use the CB2 buffer for imgui, imgui should render right after
-                            // finishing up.
+    // virtual FB has been copied onto the physical FB, paint ImGui now.
+    ctx->graphics.CB = CB2;
     _imguiManager.RecordCommandBuffer(ctx);
     CB2.end();
 
-    // INFO("1");
-    // VkPipelineStageFlags waitStages2 = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+    // submit CB2
+    VkSubmitInfo submitInfo2{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+    // for the image transfer, two semas need to be uppsed:
+    // 1. the render from the previous CB has to finish for 2 virtual FBs to be available
+    // 2. the actual FB needs to be available for copying
+    VkSemaphore waitSemaphores2[] = {sync.semaImageAvailable, sync.semaRenderFinished};
+
     std::array<VkCommandBuffer, 1> submitCommandBuffers2 = {CB2};
 
-    // INFO("1");
     submitInfo2.waitSemaphoreCount = 2;
     submitInfo2.pWaitSemaphores = waitSemaphores2;
     submitInfo2.pWaitDstStageMask = 0;
     submitInfo2.commandBufferCount = static_cast<uint32_t>(submitCommandBuffers2.size());
     submitInfo2.pCommandBuffers = submitCommandBuffers2.data();
 
-    // INFO("1");
-    VkSemaphore signalSemaphores2[] = {sync.semaImageCopyFinished};
+    VkSemaphore signalSemaphores2[]
+        = {sync.semaImageCopyFinished}; // signal this semaphore
+                                        // for the presentation to happen
     submitInfo2.signalSemaphoreCount = 1;
     submitInfo2.pSignalSemaphores = signalSemaphores2;
 
-    // INFO("1");
-    {
-        // having fenceInFlight here is sufficient, as submit2 blocks on submit1
-        if (vkQueueSubmit(_device->graphicsQueue, 1, &submitInfo2, sync.fenceInFlight)
-            != VK_SUCCESS) {
-            FATAL("Failed to submit draw command buffer!");
-        }
+    if (vkQueueSubmit(_device->graphicsQueue, 1, &submitInfo2, sync.fenceInFlight) != VK_SUCCESS) {
+        FATAL("Failed to submit draw command buffer!");
     }
 
-    // INFO("1");
     //  Present the swap chain image
     VkPresentInfoKHR presentInfo{};
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -1927,9 +1798,9 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     presentInfo.swapchainCount = 1;
     presentInfo.pSwapchains = swapChains;
     presentInfo.pImageIndices = &swapchainImageIndex; // specify which image to present
-    presentInfo.pResults = nullptr;          // Optional: can be used to check if
-                                             // presentation was successful
-                                             //
+    presentInfo.pResults = nullptr;                   // Optional: can be used to check if
+                                                      // presentation was successful
+                                                      //
 
     // manual v-sync, disabled for now,
     // manual v-sync is for circumventing the annoying FIFO queue that jams over time
@@ -1947,6 +1818,8 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     uint64_t time = 0; // no early time limit
 
     // label each frame with the tick number
+    // this is useful for calculating the virtual frame counter,
+    // as we can take the max(frame.id) to get the number of presented frames.
     VkPresentTimeGOOGLE presentTime{(uint32_t)_numTicks, time};
 
     VkPresentTimesInfoGOOGLE presentTimeInfo{
@@ -1958,8 +1831,6 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
 
     presentInfo.pNext = &presentTimeInfo;
 
-    // the present doesn't happen until the render is finished, and the
-    // semaphore is signaled(result of vkQueueSubimt)
     result = vkQueuePresentKHR(_device->presentationQueue, &presentInfo);
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR
         || this->_framebufferResized) {
