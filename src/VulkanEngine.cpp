@@ -1329,7 +1329,12 @@ void VulkanEngine::createSynchronizationObjects(
                    _device->logicalDevice, &semaphoreInfo, nullptr, &primitive.semaRenderFinished
                ) != VK_SUCCESS
             || vkCreateFence(_device->logicalDevice, &fenceInfo, nullptr, &primitive.fenceInFlight)
-                   != VK_SUCCESS) {
+                   != VK_SUCCESS
+            || vkCreateSemaphore(
+                _device->logicalDevice, &semaphoreInfo, nullptr, &primitive.semaImageCopyFinished
+            )
+
+        ) {
             FATAL("Failed to create synchronization objects for a frame!");
         }
     }
@@ -1564,10 +1569,7 @@ void VulkanEngine::createFramebuffers(SwapChainContext& ctx, VkRenderPass rgbOrC
         framebufferInfo.height = ctx.extent.height;
         framebufferInfo.layers = 1; // number of layers in image arrays
         if (vkCreateFramebuffer(
-                _device->logicalDevice,
-                &framebufferInfo,
-                nullptr,
-                &ctx.frameBuffer[i]
+                _device->logicalDevice, &framebufferInfo, nullptr, &ctx.frameBuffer[i]
             )
             != VK_SUCCESS) {
             FATAL("Failed to create framebuffer!");
@@ -1759,25 +1761,32 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-    VkSemaphore waitSemaphores[] = {sync.semaImageAvailable}; // use imageAvailable semaphore
-                                                              // to make sure that the image
-                                                              // is available before drawing
+    // VkSemaphore waitSemaphores[] = {sync.semaImageAvailable}; // use imageAvailable semaphore
+    //                                                           // to make sure that the image
+    //                                                           // is available before drawing
+
+    // INFO("1");
+    VkSemaphore waitSemaphores[] = {}; // don't need semaphore since we're drawing on virtual fb
     VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
     std::array<VkCommandBuffer, 1> submitCommandBuffers = {CB};
 
-    submitInfo.waitSemaphoreCount = 1;
+    // INFO("1");
+    submitInfo.waitSemaphoreCount = 0;
     submitInfo.pWaitSemaphores = waitSemaphores;
     submitInfo.pWaitDstStageMask = waitStages;
     submitInfo.commandBufferCount = static_cast<uint32_t>(submitCommandBuffers.size());
     submitInfo.pCommandBuffers = submitCommandBuffers.data();
 
+    // INFO("1");
+    // VkSemaphore signalSemaphores[] = {sync.semaRenderFinished};
     VkSemaphore signalSemaphores[] = {sync.semaRenderFinished};
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = signalSemaphores;
 
+    // INFO("1");
     {
         // wait time tend to be long if framerate is hardware-capped.
-        PROFILE_SCOPE(&_profiler, "wait: vkAcquireNextImageKHR");
+        // PROFILE_SCOPE(&_profiler, "wait: vkAcquireNextImageKHR");
         // the submission does not start until vkAcquireNextImageKHR
         // returns, and downs the corresponding _semaRenderFinished
         // semapohre once it's done.
@@ -1787,13 +1796,124 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
         }
     }
 
+    vk::CommandBuffer CB2(_device->virtualFrameCommandBuffers[frame]);
+    CB2.reset();
+    CB2.begin(vk::CommandBufferBeginInfo());
+    // INFO("1");
+    // copy over content from virtual fb to real fb
+    // this time wait for semaImageAvailable because we're painting to real fb
+    // also need to wait for  waitStages
+    VkImageMemoryBarrier barriers[2] = {};
+
+    // Transition virtual framebuffer to transfer source
+    VkImage virtualFramebufferImage = isEvenFrame() ? _renderContexts.RGB.image[_currentFrame]
+                                                    : _renderContexts.CMY.image[_currentFrame];
+    VkImage swapChainImage = _swapChain.image[_currentFrame];
+    barriers[0].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barriers[0].oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    barriers[0].newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    barriers[0].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    barriers[0].dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+    barriers[0].image = virtualFramebufferImage;
+    barriers[0].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    barriers[0].subresourceRange.levelCount = 1;
+    barriers[0].subresourceRange.layerCount = 1;
+
+    // Transition swapchain image to transfer destination
+    barriers[1].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barriers[1].oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    barriers[1].newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    barriers[1].srcAccessMask = 0;
+    barriers[1].dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    barriers[1].image = swapChainImage;
+    barriers[1].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    barriers[1].subresourceRange.levelCount = 1;
+    barriers[1].subresourceRange.layerCount = 1;
+
+    VkImageCopy copyRegion{};
+    copyRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    copyRegion.srcSubresource.layerCount = 1;
+    copyRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    copyRegion.dstSubresource.layerCount = 1;
+    copyRegion.extent.width = _swapChain.extent.width;
+    copyRegion.extent.height = _swapChain.extent.height;
+    copyRegion.extent.depth = 1;
+
+    vkCmdCopyImage(
+        CB2,
+        virtualFramebufferImage,
+        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+        swapChainImage,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        1,
+        &copyRegion
+    );
+
+    VkImageMemoryBarrier presentBarrier{};
+    presentBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    presentBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    presentBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    presentBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    presentBarrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+    presentBarrier.image = swapChainImage;
+    presentBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    presentBarrier.subresourceRange.levelCount = 1;
+    presentBarrier.subresourceRange.layerCount = 1;
+
+    vkCmdPipelineBarrier(
+        CB2,
+        VK_PIPELINE_STAGE_TRANSFER_BIT,
+        VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+        0,
+        0,
+        nullptr,
+        0,
+        nullptr,
+        1,
+        &presentBarrier
+    );
+
+    //  Submit the recorded command buffer
+    VkSubmitInfo submitInfo2{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+    // real fb needs to be available, render also needs to finish before copying over
+    VkSemaphore waitSemaphores2[] = {sync.semaImageAvailable, sync.semaRenderFinished};
+
+    CB2.end();
+
+    // INFO("1");
+    // VkPipelineStageFlags waitStages2 = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+    std::array<VkCommandBuffer, 1> submitCommandBuffers2 = {CB2};
+
+    // INFO("1");
+    submitInfo2.waitSemaphoreCount = 1;
+    submitInfo2.pWaitSemaphores = waitSemaphores2;
+    submitInfo2.pWaitDstStageMask = 0;
+    submitInfo2.commandBufferCount = static_cast<uint32_t>(submitCommandBuffers2.size());
+    submitInfo2.pCommandBuffers = submitCommandBuffers2.data();
+
+    // INFO("1");
+    VkSemaphore signalSemaphores2[] = {sync.semaImageCopyFinished};
+    submitInfo2.signalSemaphoreCount = 1;
+    submitInfo2.pSignalSemaphores = signalSemaphores2;
+
+    // INFO("1");
+    {
+        if (vkQueueSubmit(_device->graphicsQueue, 1, &submitInfo2, sync.fenceInFlight)
+            != VK_SUCCESS) {
+            FATAL("Failed to submit draw command buffer!");
+        }
+    }
+
+    // INFO("1");
     //  Present the swap chain image
     VkPresentInfoKHR presentInfo{};
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 
     // wait for sync.semaRenderFinished upped by the previous render command
     presentInfo.waitSemaphoreCount = 1;
-    presentInfo.pWaitSemaphores = signalSemaphores;
+    presentInfo.pWaitSemaphores = signalSemaphores2;
 
     VkSwapchainKHR swapChains[] = {_swapChain.chain};
 

@@ -55,6 +55,7 @@ struct VQDevice
     std::vector<std::string> supportedExtensions;
     /** @brief Graphics command buffer associated with this device.*/
     std::vector<VkCommandBuffer> graphicsCommandBuffers;
+    std::vector<VkCommandBuffer> virtualFrameCommandBuffers;
 
     VkQueue graphicsQueue = VK_NULL_HANDLE;
 
