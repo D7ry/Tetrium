@@ -58,9 +58,6 @@ class SimpleRenderSystem : public ISystem
     void Cleanup() override;
 
   private:
-    // spir-v source to vertex and fragment shader, relative to compiled binary
-    const char* VERTEX_SHADER_SRC = "../shaders/phong/phong.vert.spv";
-    const char* FRAGMENT_SHADER_SRC = "../shaders/phong/phong.frag.spv";
 
     struct UBO
     {
@@ -73,6 +70,8 @@ class SimpleRenderSystem : public ISystem
         std::array<UBO, NUM_FRAME_IN_FLIGHT> _UBO;
         VkPipeline _pipeline = VK_NULL_HANDLE;
         VkPipelineLayout _pipelineLayout = VK_NULL_HANDLE;
+        const char* _vertShader;
+        const char* _fragShader;
     };
 
     struct

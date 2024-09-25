@@ -16,6 +16,13 @@ void SimpleRenderSystem::Init(const InitContext* ctx)
     _textureManager = ctx->textureManager;
     _dynamicUBOAlignmentSize = _device->GetDynamicUBOAlignedSize(sizeof(UBODynamic));
 
+    // TODO: fix jank
+    _renderSystemContexts.RGB._fragShader = ctx->FRAGMENT_SHADER_RGB_SRC;
+    _renderSystemContexts.CMY._fragShader = ctx->FRAGMENT_SHADER_CMY_SRC;
+
+    _renderSystemContexts.RGB._vertShader = ctx->VERTEX_SHADER_SRC;
+    _renderSystemContexts.CMY._vertShader = ctx->VERTEX_SHADER_SRC;
+
     buildPipelineForContext(ctx->renderPass.RGB, ctx, _renderSystemContexts.RGB);
     buildPipelineForContext(ctx->renderPass.CMY, ctx, _renderSystemContexts.CMY);
 }
@@ -238,9 +245,9 @@ void SimpleRenderSystem::buildPipelineForContext(
     /////  ---------- shader ---------- /////
 
     VkShaderModule vertShaderModule
-        = ShaderCreation::createShaderModule(_device->logicalDevice, VERTEX_SHADER_SRC);
+        = ShaderCreation::createShaderModule(_device->logicalDevice, ctx._vertShader);
     VkShaderModule fragShaderModule
-        = ShaderCreation::createShaderModule(_device->logicalDevice, FRAGMENT_SHADER_SRC);
+        = ShaderCreation::createShaderModule(_device->logicalDevice, ctx._fragShader);
 
     VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
     vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;

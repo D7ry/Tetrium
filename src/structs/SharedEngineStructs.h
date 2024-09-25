@@ -47,6 +47,12 @@ struct InitContext
         VkRenderPass CMY;
     } renderPass;
 
+    // temporary
+    // TODO: clean up
+    const char* VERTEX_SHADER_SRC = "../shaders/phong/phong.vert.spv";
+    const char* FRAGMENT_SHADER_RGB_SRC = "../shaders/phong/phong_rgb.frag.spv";
+    const char* FRAGMENT_SHADER_CMY_SRC = "../shaders/phong/phong_cmy.frag.spv";
+
     /**
      * points to initialized buffer of static engine ubo
      * the callee can bind static ubo to its descriptor set by using:
