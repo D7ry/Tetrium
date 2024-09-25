@@ -468,8 +468,8 @@ void VulkanEngine::initDefaultStates()
     _uiMode = false;
 
     // TODO:re-implement
-    //ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoMouse;
-    //ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoKeyboard;
+    // ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoMouse;
+    // ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoKeyboard;
 };
 
 void VulkanEngine::Init(const VulkanEngine::InitOptions& options)
@@ -768,6 +768,8 @@ void VulkanEngine::initVulkan()
         ctx->renderPass = createRenderPass(ctx->swapchain->imageFormat);
         createFramebuffers(*ctx);
     }
+
+    createFramebuffers(_swapChain, _renderContexts.RGB.renderPass);
 
     // createSwapChain(_mainWindowSwapChain, mainWindowSurface);
     // this->_deletionStack.push([this]() { this->cleanupSwapChain(_mainWindowSwapChain); });
@@ -1177,7 +1179,7 @@ void VulkanEngine::createSwapChain(VulkanEngine::SwapChainContext& ctx, const Vk
     vkGetSwapchainImagesKHR(this->_device->logicalDevice, ctx.chain, &imageCount, nullptr);
     ctx.image.resize(imageCount);
     ctx.imageView.resize(imageCount);
-    // ctx.frameBuffer.resize(imageCount);
+    ctx.frameBuffer.resize(imageCount);
     vkGetSwapchainImagesKHR(this->_device->logicalDevice, ctx.chain, &imageCount, ctx.image.data());
     ctx.imageFormat = surfaceFormat.format;
     DEBUG("Swap chain created!");
@@ -1222,7 +1224,7 @@ void VulkanEngine::recreateSwapChain(SwapChainContext& ctx)
     this->createSwapChain(ctx, ctx.surface);
     this->createImageViews(ctx);
     this->createDepthBuffer(ctx);
-    // this->createFramebuffers(ctx);
+    this->createFramebuffers(ctx, _renderContexts.RGB.renderPass);
     DEBUG("Swap chain recreated.");
 }
 
@@ -1426,6 +1428,25 @@ vk::RenderPass VulkanEngine::createRenderPass(const VkFormat imageFormat)
     return vk::RenderPass(pass);
 }
 
+uint32_t findMemoryType(
+    VkPhysicalDevice physicalDevice,
+    uint32_t typeFilter,
+    VkMemoryPropertyFlags properties
+)
+{
+    VkPhysicalDeviceMemoryProperties memProperties;
+    vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
+
+    for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
+        if ((typeFilter & (1 << i))
+            && (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+            return i;
+        }
+    }
+
+    throw std::runtime_error("failed to find suitable memory type!");
+}
+
 void VulkanEngine::createFramebuffers(RenderContext& ctx)
 {
     DEBUG("Creating framebuffers..");
@@ -1436,10 +1457,68 @@ void VulkanEngine::createFramebuffers(RenderContext& ctx)
     size_t numFrameBuffers = ctx.swapchain->image.size();
     ASSERT(numFrameBuffers != 0);
     ctx.frameBuffer.resize(numFrameBuffers);
+    ctx.image.resize(numFrameBuffers);
+    ctx.imageView.resize(numFrameBuffers);
+    ctx.imageMemory.resize(numFrameBuffers); // Add this line for image memory
     SwapChainContext& swapchainContext = *ctx.swapchain;
     for (size_t i = 0; i < numFrameBuffers; i++) {
-        VkImageView attachments[]
-            = {swapchainContext.imageView[i], swapchainContext.depthImageView};
+        VkImageCreateInfo imageInfo{};
+        imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        imageInfo.imageType = VK_IMAGE_TYPE_2D;
+        imageInfo.extent.width = swapchainContext.extent.width;
+        imageInfo.extent.height = swapchainContext.extent.height;
+        imageInfo.extent.depth = 1;
+        imageInfo.mipLevels = 1;
+        imageInfo.arrayLayers = 1;
+        imageInfo.format = swapchainContext.imageFormat;
+        imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+        imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+        imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+        imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+        if (vkCreateImage(_device->logicalDevice, &imageInfo, nullptr, &ctx.image[i])
+            != VK_SUCCESS) {
+            FATAL("Failed to create custom image!");
+        }
+
+        // Allocate memory for the image
+        VkMemoryRequirements memRequirements;
+        vkGetImageMemoryRequirements(_device->logicalDevice, ctx.image[i], &memRequirements);
+
+        VkMemoryAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+        allocInfo.allocationSize = memRequirements.size;
+        allocInfo.memoryTypeIndex = findMemoryType(
+            _device->physicalDevice,
+            memRequirements.memoryTypeBits,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+        );
+
+        if (vkAllocateMemory(_device->logicalDevice, &allocInfo, nullptr, &ctx.imageMemory[i])
+            != VK_SUCCESS) {
+            FATAL("Failed to allocate image memory!");
+        }
+
+        vkBindImageMemory(_device->logicalDevice, ctx.image[i], ctx.imageMemory[i], 0);
+
+        // Create image view
+        VkImageViewCreateInfo viewInfo{};
+        viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        viewInfo.image = ctx.image[i];
+        viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        viewInfo.format = swapchainContext.imageFormat;
+        viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        viewInfo.subresourceRange.baseMipLevel = 0;
+        viewInfo.subresourceRange.levelCount = 1;
+        viewInfo.subresourceRange.baseArrayLayer = 0;
+        viewInfo.subresourceRange.layerCount = 1;
+
+        if (vkCreateImageView(_device->logicalDevice, &viewInfo, nullptr, &ctx.imageView[i])
+            != VK_SUCCESS) {
+            FATAL("Failed to create custom image view!");
+        }
+        VkImageView attachments[] = {ctx.imageView[i], swapchainContext.depthImageView};
         VkFramebufferCreateInfo framebufferInfo{};
         framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         framebufferInfo.renderPass = ctx.renderPass; // each framebuffer is associated with a
@@ -1465,6 +1544,35 @@ void VulkanEngine::createFramebuffers(RenderContext& ctx)
     //     swapchainContext.imageView,
     //     swapchainContext.extent
     // );
+}
+
+void VulkanEngine::createFramebuffers(SwapChainContext& ctx, VkRenderPass rgbOrCnyPass)
+{
+    DEBUG("Creating framebuffers..");
+    // iterate through image views and create framebuffers
+    for (size_t i = 0; i < ctx.image.size(); i++) {
+        VkImageView attachments[] = {ctx.imageView[i], ctx.depthImageView};
+        VkFramebufferCreateInfo framebufferInfo{};
+        framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        framebufferInfo.renderPass = rgbOrCnyPass; // each framebuffer is associated with a
+                                                   // render pass; they need to be compatible
+                                                   // i.e. having same number of attachments and
+                                                   // same formats
+        framebufferInfo.attachmentCount = sizeof(attachments) / sizeof(VkImageView);
+        framebufferInfo.pAttachments = attachments;
+        framebufferInfo.width = ctx.extent.width;
+        framebufferInfo.height = ctx.extent.height;
+        framebufferInfo.layers = 1; // number of layers in image arrays
+        if (vkCreateFramebuffer(
+                _device->logicalDevice,
+                &framebufferInfo,
+                nullptr,
+                &ctx.frameBuffer[i]
+            )
+            != VK_SUCCESS) {
+            FATAL("Failed to create framebuffer!");
+        }
+    }
 }
 
 void VulkanEngine::createDepthBuffer(SwapChainContext& ctx)
@@ -1580,7 +1688,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
         ctx->graphics.currentFrameInFlight = frame;
         ctx->graphics.currentSwapchainImageIndex = imageIndex;
         ctx->graphics.CB = CB;
-        //ctx->graphics.currentFB = FB;
+        // ctx->graphics.currentFB = FB;
         ctx->graphics.currentFBextend = _swapChain.extent;
         getMainProjectionMatrix(ctx->graphics.mainProjectionMatrix);
     }
@@ -1687,7 +1795,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     presentInfo.waitSemaphoreCount = 1;
     presentInfo.pWaitSemaphores = signalSemaphores;
 
-    VkSwapchainKHR swapChains[] = { _swapChain.chain};
+    VkSwapchainKHR swapChains[] = {_swapChain.chain};
 
     presentInfo.swapchainCount = 1;
     presentInfo.pSwapchains = swapChains;

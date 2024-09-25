@@ -147,6 +147,7 @@ class VulkanEngine
         VkExtent2D extent; // resolution of the swapchain images
         std::vector<VkImage> image;
         std::vector<VkImageView> imageView;
+        std::vector<VkFramebuffer> frameBuffer;
         VkImage depthImage;
         VkDeviceMemory depthImageMemory;
         VkImageView depthImageView;
@@ -173,6 +174,12 @@ class VulkanEngine
         VkRenderPass renderPass;
         SwapChainContext* swapchain; // global swap chain
         std::vector<VkFramebuffer> frameBuffer;
+        // image and image view that are not associated with swapchain
+        // they exist as a "virtual" swap chain for RGB and CMY passes 
+        // to write into.
+        std::vector<VkImage> image;
+        std::vector<VkImageView> imageView;
+        std::vector<VkDeviceMemory> imageMemory;
     };
 
     SwapChainContext _swapChain;
@@ -218,6 +225,7 @@ class VulkanEngine
     void cleanupSwapChain(SwapChainContext& ctx);
     void createImageViews(SwapChainContext& ctx);
     void createDepthBuffer(SwapChainContext& ctx);
+    void createFramebuffers(SwapChainContext& ctx, VkRenderPass rgbOrCnyPass);
 
     /* ---------- FrameBuffers ---------- */
     void recreateFrameBuffers(RenderContext& ctx);
