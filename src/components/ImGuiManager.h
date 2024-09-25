@@ -24,10 +24,7 @@ class ImGuiManager
         int imageCount
     );
 
-    void InitializeRenderPass(
-        VkDevice logicalDevice,
-        VkFormat swapChainImageFormat
-    );
+    void InitializeRenderPass(VkDevice logicalDevice, VkFormat swapChainImageFormat);
 
     void InitializeFonts();
 
@@ -36,7 +33,8 @@ class ImGuiManager
     void InitializeFrameBuffer(
         int bufferCount,
         VkDevice device,
-        std::vector<VkImageView>& swapChainImageViews,
+        std::vector<VkImageView>& swapChainImageViewsRGB,
+        std::vector<VkImageView>& swapChainImageViewsCMY,
         VkExtent2D extent
     );
 
@@ -57,7 +55,11 @@ class ImGuiManager
     void ClearImGuiElements();
 
     // Push all recorded ImGui UI elements onto the CB.
-    void RecordCommandBuffer(const TickContext* tickData);
+    [[deprecated]]
+    void RecordCommandBuffer(vk::CommandBuffer cb, vk::Extent2D extent, int swapChainImageIndex);
+
+    void RecordCommandBufferRGB(vk::CommandBuffer cb, vk::Extent2D extent, int swapChainImageIndex);
+    void RecordCommandBufferCMY(vk::CommandBuffer cb, vk::Extent2D extent, int swapChainImageIndex);
 
     void Cleanup(VkDevice logicalDevice);
 
@@ -65,8 +67,16 @@ class ImGuiManager
     void setupImGuiStyle();
 
     VkRenderPass _imGuiRenderPass; // render pass sepcifically for imgui
+                                   //
     VkDescriptorPool _imguiDescriptorPool;
-    std::vector<VkFramebuffer> _imGuiFramebuffers;
-    VkClearValue _imguiClearValue
-        = {0.0f, 0.0f, 0.0f, 0.0f}; // transparent, unused
+    struct
+    {
+        std::vector<VkFramebuffer> RGB;
+        std::vector<VkFramebuffer> CMY;
+    } _imGuiFramebuffers;
+
+    [[deprecated]]
+    std::vector<VkFramebuffer> _imGuiFrameBuffer;
+
+    VkClearValue _imguiClearValue = {0.0f, 0.0f, 0.0f, 0.0f}; // transparent, unused
 };

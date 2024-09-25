@@ -770,8 +770,8 @@ void VulkanEngine::initVulkan()
     _imguiManager.InitializeFrameBuffer(
         _swapChain.image.size(),
         _device->logicalDevice,
-        _swapChain.imageView, // the view needs to be on the final physical swapchain,
-                              // imgui wants to overwrite it.
+        _renderContexts.RGB.imageView,
+        _renderContexts.CMY.imageView,
         _swapChain.extent
     );
 
@@ -1707,6 +1707,8 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
             vkCmdSetScissor(CB1, 0, 1, &scissor);
             _renderer.TickRGB(ctx);
             CB1.endRenderPass();
+
+            _imguiManager.RecordCommandBufferRGB(CB1, extend, swapchainImageIndex);
         }
         {
             renderPassBeginInfo.renderPass = _renderContexts.CMY.renderPass;
@@ -1720,6 +1722,8 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
             vkCmdSetScissor(CB1, 0, 1, &scissor);
             _renderer.TickCMY(ctx);
             CB1.endRenderPass();
+
+            _imguiManager.RecordCommandBufferCMY(CB1, extend, swapchainImageIndex);
         }
     }
 
@@ -1762,7 +1766,6 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
 
     // virtual FB has been copied onto the physical FB, paint ImGui now.
     ctx->graphics.CB = CB2;
-    _imguiManager.RecordCommandBuffer(ctx);
     CB2.end();
 
     // submit CB2
