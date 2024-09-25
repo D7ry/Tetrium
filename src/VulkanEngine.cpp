@@ -2039,12 +2039,12 @@ uint64_t VulkanEngine::getSurfaceCounterValue()
                 _softwareEvenOddCtx.mostRecentPresentFinish, images.at(i).actualPresentTime
             );
             auto& img = images.at(i);
-            INFO(
-                "{} : expected: {} actual: {}",
-                img.presentID,
-                img.desiredPresentTime,
-                img.actualPresentTime
-            );
+            // INFO(
+            //     "{} : expected: {} actual: {}",
+            //     img.presentID,
+            //     img.desiredPresentTime,
+            //     img.actualPresentTime
+            // );
         }
         surfaceCounter = _softwareEvenOddCtx.lastPresentedImageId;
 #else

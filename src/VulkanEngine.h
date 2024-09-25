@@ -345,7 +345,7 @@ class VulkanEngine
                                            // when the images are presented
                                            // tick # and image id are bijective and they
                                            // strictly increase over time
-        uint32_t vsyncFrameOffset = 0;
+        int vsyncFrameOffset = 0;
     } _softwareEvenOddCtx;
 
     /* ---------- Engine Components ---------- */

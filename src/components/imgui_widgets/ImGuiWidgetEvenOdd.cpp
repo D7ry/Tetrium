@@ -109,7 +109,7 @@ void ImGuiWidgetEvenOdd::Draw(VulkanEngine* engine)
     if (engine->_tetraMode == VulkanEngine::TetraMode::kEvenOddSoftwareSync) {
         int buf = engine->_softwareEvenOddCtx.vsyncFrameOffset;
         if (ImGui::SliderInt(
-            "VSync frame offset", &buf , 0, 10
+            "VSync frame offset", &buf , -10, 10
         )) {
             engine->_softwareEvenOddCtx.vsyncFrameOffset = buf;
         }
