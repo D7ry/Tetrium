@@ -1812,8 +1812,8 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
 
     uint64_t time = 0;
     if (_softwareEvenOddCtx.mostRecentPresentFinish) {
-        time
-            = _softwareEvenOddCtx.mostRecentPresentFinish + _softwareEvenOddCtx.nanoSecondsPerFrame;
+        time = _softwareEvenOddCtx.mostRecentPresentFinish
+               + _softwareEvenOddCtx.nanoSecondsPerFrame * _softwareEvenOddCtx.vsyncFrameOffset;
     }
 
     // label each frame with the tick number

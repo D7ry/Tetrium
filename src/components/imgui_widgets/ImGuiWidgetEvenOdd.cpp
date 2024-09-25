@@ -88,6 +88,7 @@ void ImGuiWidgetEvenOdd::drawCalibrationWindow(VulkanEngine* engine)
 void ImGuiWidgetEvenOdd::Draw(VulkanEngine* engine)
 {
     const char* evenOddMode = nullptr;
+
     uint64_t numFrames = engine->getSurfaceCounterValue();
     switch (engine->_tetraMode) {
     case VulkanEngine::TetraMode::kEvenOddSoftwareSync: {
@@ -104,6 +105,15 @@ void ImGuiWidgetEvenOdd::Draw(VulkanEngine* engine)
     bool isEven = engine->isEvenFrame();
 
     ImGui::Text("Num Frame: %llu", engine->getSurfaceCounterValue());
+
+    if (engine->_tetraMode == VulkanEngine::TetraMode::kEvenOddSoftwareSync) {
+        int buf = engine->_softwareEvenOddCtx.vsyncFrameOffset;
+        if (ImGui::SliderInt(
+            "VSync frame offset", &buf , 0, 10
+        )) {
+            engine->_softwareEvenOddCtx.vsyncFrameOffset = buf;
+        }
+    }
 
     if (ImGui::Button("Draw Calibration Window")) {
         _drawTestWindow = true;
