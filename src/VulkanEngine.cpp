@@ -1790,7 +1790,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
         // the submission does not start until vkAcquireNextImageKHR
         // returns, and downs the corresponding _semaRenderFinished
         // semapohre once it's done.
-        if (vkQueueSubmit(_device->graphicsQueue, 1, &submitInfo, sync.fenceInFlight)
+        if (vkQueueSubmit(_device->graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE)
             != VK_SUCCESS) {
             FATAL("Failed to submit draw command buffer!");
         }
@@ -1806,9 +1806,10 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     VkImageMemoryBarrier barriers[2] = {};
 
     // Transition virtual framebuffer to transfer source
-    VkImage virtualFramebufferImage = isEvenFrame() ? _renderContexts.RGB.image[_currentFrame]
-                                                    : _renderContexts.CMY.image[_currentFrame];
-    VkImage swapChainImage = _swapChain.image[_currentFrame];
+    bool isEven = isEvenFrame();
+    VkImage virtualFramebufferImage =  isEven ? _renderContexts.RGB.image[imageIndex]
+                                                    : _renderContexts.CMY.image[imageIndex];
+    VkImage swapChainImage = _swapChain.image[imageIndex];
     barriers[0].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     barriers[0].oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     barriers[0].newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
@@ -1887,7 +1888,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     std::array<VkCommandBuffer, 1> submitCommandBuffers2 = {CB2};
 
     // INFO("1");
-    submitInfo2.waitSemaphoreCount = 1;
+    submitInfo2.waitSemaphoreCount = 2;
     submitInfo2.pWaitSemaphores = waitSemaphores2;
     submitInfo2.pWaitDstStageMask = 0;
     submitInfo2.commandBufferCount = static_cast<uint32_t>(submitCommandBuffers2.size());
@@ -1900,6 +1901,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
 
     // INFO("1");
     {
+        // having fenceInFlight here is sufficient, as submit2 blocks on submit1
         if (vkQueueSubmit(_device->graphicsQueue, 1, &submitInfo2, sync.fenceInFlight)
             != VK_SUCCESS) {
             FATAL("Failed to submit draw command buffer!");
