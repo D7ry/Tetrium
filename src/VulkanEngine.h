@@ -103,6 +103,11 @@ class VulkanEngine
     };
 
   public:
+    enum class ColorSpace{
+        RGB,
+        CMY
+    };
+
     enum class TetraMode
     {
         kEvenOddHardwareSync, // use NVIDIA gpu to hardware sync even-odd frames
@@ -255,7 +260,7 @@ class VulkanEngine
 
     /* ---------- Render-Time Functions ---------- */
     void drawFrame(TickContext* tickData, uint8_t frame);
-    void drawImGui();
+    void drawImGui(ColorSpace colorSpace);
     void flushEngineUBOStatic(uint8_t frame);
     void getMainProjectionMatrix(glm::mat4& projectionMatrix);
 

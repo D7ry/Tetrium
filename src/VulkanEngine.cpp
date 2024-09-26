@@ -573,7 +573,6 @@ void VulkanEngine::Tick()
             _inputManager.Tick(deltaTime);
             TickContext tickData{&_mainCamera, deltaTime};
             tickData.profiler = &_profiler;
-            drawImGui();
             flushEngineUBOStatic(_currentFrame);
             drawFrame(&tickData, _currentFrame);
             _currentFrame = (_currentFrame + 1) % NUM_FRAME_IN_FLIGHT;
@@ -1708,6 +1707,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
             _renderer.TickRGB(ctx);
             CB1.endRenderPass();
 
+            drawImGui(ColorSpace::RGB);
             _imguiManager.RecordCommandBufferRGB(CB1, extend, swapchainImageIndex);
         }
         {
@@ -1723,6 +1723,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
             _renderer.TickCMY(ctx);
             CB1.endRenderPass();
 
+            drawImGui(ColorSpace::CMY);
             _imguiManager.RecordCommandBufferCMY(CB1, extend, swapchainImageIndex);
         }
     }
@@ -1846,7 +1847,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     }
 }
 
-void VulkanEngine::drawImGui()
+void VulkanEngine::drawImGui(ColorSpace colorSpace)
 {
     if (!_wantToDrawImGui) {
         return;
@@ -1882,6 +1883,11 @@ void VulkanEngine::drawImGui()
     if (ImGui::Begin(DEFAULTS::Engine::APPLICATION_NAME)) {
         if (ImGui::BeginTabBar("Engine Tab")) {
             if (ImGui::BeginTabItem("General")) {
+                if (colorSpace == ColorSpace::RGB) {
+                    ImGui::Text("RGB imgui frame");
+                } else {
+                    ImGui::Text("CMY imgui frame");
+                }
                 ImGui::SeparatorText("Camera");
                 {
                     ImGui::Text(
