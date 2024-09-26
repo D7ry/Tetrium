@@ -549,7 +549,6 @@ void VulkanEngine::Init(const VulkanEngine::InitOptions& options)
 
 void VulkanEngine::Run()
 {
-    exit(0);
     ASSERT(_window);
     glfwShowWindow(_window);
     while (!glfwWindowShouldClose(_window)) {
@@ -760,7 +759,7 @@ void VulkanEngine::initVulkan()
         createFramebuffers(*ctx);
     }
 
-    createFramebuffers(_swapChain, _renderContexts.RGB.renderPass);
+    createSwapchainFrameBuffers(_swapChain, _renderContexts.RGB.renderPass);
 
     // createSwapChain(_mainWindowSwapChain, mainWindowSurface);
     // this->_deletionStack.push([this]() { this->cleanupSwapChain(_mainWindowSwapChain); });
@@ -769,7 +768,22 @@ void VulkanEngine::initVulkan()
     // this->createDepthBuffer(_mainWindowSwapChain);
     //
     this->createSynchronizationObjects(_syncProjector);
-    this->_imguiManager.InitializeRenderPass(this->_device->logicalDevice, _swapChain.imageFormat);
+
+    // initial layout comes from separate render passes,
+    // final layout depends on tetra mode.
+    VkImageLayout imguiInitialLayout, imguiFinalLayout;
+    imguiInitialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    imguiFinalLayout
+        = _tetraMode == TetraMode::kDualProjector
+              ? VK_IMAGE_LAYOUT_PRESENT_SRC_KHR // dual project's two passes directly present
+              : VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+
+    this->_imguiManager.InitializeRenderPass(
+        this->_device->logicalDevice,
+        _swapChain.imageFormat,
+        imguiInitialLayout,
+        imguiFinalLayout
+    );
     // FIXME: need to recreate fb on resize
     // low priority since we don't resize
     _imguiManager.InitializeFrameBuffer(
@@ -1125,7 +1139,7 @@ void VulkanEngine::createSwapChain(VulkanEngine::SwapChainContext& ctx, const Vk
     createInfo.imageColorSpace = surfaceFormat.colorSpace;
     createInfo.imageExtent = extent;
     createInfo.imageArrayLayers = 1;
-    createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
     auto indices = _device->queueFamilyIndices;
     uint32_t queueFamilyIndices[]
@@ -1218,7 +1232,7 @@ void VulkanEngine::recreateSwapChain(SwapChainContext& ctx)
     this->createSwapChain(ctx, ctx.surface);
     this->createImageViews(ctx);
     this->createDepthBuffer(ctx);
-    this->createFramebuffers(ctx, _renderContexts.RGB.renderPass);
+    this->createSwapchainFrameBuffers(ctx, _renderContexts.RGB.renderPass);
     DEBUG("Swap chain recreated.");
 }
 
@@ -1318,11 +1332,10 @@ void VulkanEngine::createSynchronizationObjects(
                                                     // can start right away
     for (size_t i = 0; i < NUM_FRAME_IN_FLIGHT; i++) {
         SyncPrimitives& primitive = primitives[i];
-        for (VkSemaphore* sema : {
-                 &primitive.semaImageAvailable,
-                 &primitive.semaRenderFinished,
-                 &primitive.semaImageCopyFinished
-             }) {
+        for (VkSemaphore* sema :
+             {&primitive.semaImageAvailable,
+              &primitive.semaRenderFinished,
+              &primitive.semaImageCopyFinished}) {
             VK_CHECK_RESULT(vkCreateSemaphore(_device->logicalDevice, &semaphoreInfo, nullptr, sema)
             );
         }
@@ -1341,6 +1354,7 @@ void VulkanEngine::createSynchronizationObjects(
         VK_CHECK_RESULT(
             vkCreateSemaphore(_device->logicalDevice, &semaphoreInfo, nullptr, &primitive.semaVsync)
         );
+        semaphoreInfo.pNext = nullptr; // reset for next loop
     }
     this->_deletionStack.push([this, primitives]() {
         for (size_t i = 0; i < NUM_FRAME_IN_FLIGHT; i++) {
@@ -1381,8 +1395,8 @@ vk::RenderPass VulkanEngine::createRenderPass(const VkFormat imageFormat)
     colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 
     colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    // colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL; // for imgui
+
+    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
     VkAttachmentReference colorAttachmentRef{};
     colorAttachmentRef.attachment = 0;
@@ -1553,7 +1567,7 @@ void VulkanEngine::createFramebuffers(RenderContext& ctx)
     }
 }
 
-void VulkanEngine::createFramebuffers(SwapChainContext& ctx, VkRenderPass rgbOrCnyPass)
+void VulkanEngine::createSwapchainFrameBuffers(SwapChainContext& ctx, VkRenderPass rgbOrCnyPass)
 {
     DEBUG("Creating framebuffers..");
     // iterate through image views and create framebuffers
@@ -1726,8 +1740,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
 
     CB1.end();
 
-    VkSubmitInfo submitInfo{};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    VkSubmitInfo submitInfo{.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO};
 
     VkSemaphore waitSemaphores[] = {}; // don't need semaphore since we're drawing on virtual fb
     VkPipelineStageFlags waitStages[]
@@ -1757,7 +1770,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     VkImage virtualFramebufferImage = isEven ? _renderContexts.RGB.image[swapchainImageIndex]
                                              : _renderContexts.CMY.image[swapchainImageIndex];
     VkImage swapchainFramebufferImage = _swapChain.image[swapchainImageIndex];
-    Utils::ImageTransfer::CmdTransferFB(
+    Utils::ImageTransfer::CmdCopyToFB(
         CB2, virtualFramebufferImage, swapchainFramebufferImage, _swapChain.extent
     );
 
@@ -1766,19 +1779,18 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     CB2.end();
 
     // submit CB2
-    VkSubmitInfo submitInfo2{};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-
+    VkSubmitInfo submitInfo2{.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO};
+    std::array<VkCommandBuffer, 1> submitCommandBuffers2 = {CB2};
     // for the image transfer, two semas need to be uppsed:
     // 1. the render from the previous CB has to finish for 2 virtual FBs to be available
     // 2. the actual FB needs to be available for copying
     VkSemaphore waitSemaphores2[] = {sync.semaImageAvailable, sync.semaRenderFinished};
-
-    std::array<VkCommandBuffer, 1> submitCommandBuffers2 = {CB2};
+    VkPipelineStageFlags waitStages2[] // both sema need to pass before the image transfer happens
+        = {VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT};
 
     submitInfo2.waitSemaphoreCount = 2;
     submitInfo2.pWaitSemaphores = waitSemaphores2;
-    submitInfo2.pWaitDstStageMask = 0;
+    submitInfo2.pWaitDstStageMask = waitStages2;
     submitInfo2.commandBufferCount = static_cast<uint32_t>(submitCommandBuffers2.size());
     submitInfo2.pCommandBuffers = submitCommandBuffers2.data();
 

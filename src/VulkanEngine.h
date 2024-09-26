@@ -233,7 +233,7 @@ class VulkanEngine
     void cleanupSwapChain(SwapChainContext& ctx);
     void createImageViews(SwapChainContext& ctx);
     void createDepthBuffer(SwapChainContext& ctx);
-    void createFramebuffers(SwapChainContext& ctx, VkRenderPass rgbOrCnyPass);
+    void createSwapchainFrameBuffers(SwapChainContext& ctx, VkRenderPass rgbOrCnyPass);
 
     /* ---------- FrameBuffers ---------- */
     void recreateFrameBuffers(RenderContext& ctx);

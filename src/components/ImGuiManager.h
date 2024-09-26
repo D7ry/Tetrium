@@ -24,7 +24,12 @@ class ImGuiManager
         int imageCount
     );
 
-    void InitializeRenderPass(VkDevice logicalDevice, VkFormat swapChainImageFormat);
+    void InitializeRenderPass(
+        VkDevice logicalDevice,
+        VkFormat swapChainImageFormat,
+        VkImageLayout initialLayout,
+        VkImageLayout finalLayout
+    );
 
     void InitializeFonts();
 
@@ -67,8 +72,9 @@ class ImGuiManager
     void setupImGuiStyle();
 
     VkRenderPass _imGuiRenderPass = VK_NULL_HANDLE; // render pass sepcifically for imgui
-                                   //
+                                                    //
     VkDescriptorPool _imguiDescriptorPool;
+
     struct
     {
         std::vector<VkFramebuffer> RGB;

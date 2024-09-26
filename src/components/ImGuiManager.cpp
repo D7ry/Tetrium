@@ -98,7 +98,12 @@ void ImGuiManager::BindVulkanResources(
     ImGui_ImplVulkan_Init(&initInfo);
 };
 
-void ImGuiManager::InitializeRenderPass(VkDevice logicalDevice, VkFormat swapChainImageFormat)
+void ImGuiManager::InitializeRenderPass(
+    VkDevice logicalDevice,
+    VkFormat swapChainImageFormat,
+    VkImageLayout initialLayout,
+    VkImageLayout finalLayout
+)
 {
     INFO("Creating render pass...");
     VkAttachmentDescription colorAttachment{};
@@ -112,13 +117,13 @@ void ImGuiManager::InitializeRenderPass(VkDevice logicalDevice, VkFormat swapCha
     colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 
-    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    colorAttachment.initialLayout = initialLayout;
+    colorAttachment.finalLayout = finalLayout;
 
     // set up subpass
     VkAttachmentReference colorAttachmentRef{};
     colorAttachmentRef.attachment = 0;
-    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    colorAttachmentRef.layout = initialLayout;
 
     VkSubpassDescription subpass{};
     subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
