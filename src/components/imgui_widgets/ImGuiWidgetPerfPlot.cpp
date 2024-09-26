@@ -29,7 +29,7 @@ void ImGuiWidgetPerfPlot::ScrollingBuffer::Erase()
     }
 }
 
-void ImGuiWidgetPerfPlot::Draw(const VulkanEngine* engine, ColorSpace colorSpace)
+void ImGuiWidgetPerfPlot::Draw(const Quarkolor* engine, ColorSpace colorSpace)
 {
     ImGui::Checkbox("Show Perf Plot", std::addressof(_wantShowPerfPlot));
     double deltaTimeSeconds = engine->_deltaTimer.GetDeltaTimeSeconds();

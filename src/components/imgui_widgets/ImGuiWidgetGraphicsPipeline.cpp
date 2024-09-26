@@ -1,7 +1,7 @@
 #include "ImGuiWidget.h"
 #include "VulkanEngine.h"
 
-void ImGuiWidgetGraphicsPipeline::Draw(VulkanEngine* engine, ColorSpace colorSpace)
+void ImGuiWidgetGraphicsPipeline::Draw(Quarkolor* engine, ColorSpace colorSpace)
 {
     ImGui::SeparatorText("Main Render Pass");
     ImGui::Text("Clear Values");

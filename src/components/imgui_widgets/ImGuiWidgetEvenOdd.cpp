@@ -61,7 +61,7 @@ void ImGuiWidgetEvenOdd::drawColorQuadTest()
     ImGui::End();
 }
 
-void ImGuiWidgetEvenOdd::drawCalibrationWindow(VulkanEngine* engine, ColorSpace colorSpace)
+void ImGuiWidgetEvenOdd::drawCalibrationWindow(Quarkolor* engine, ColorSpace colorSpace)
 {
     ImGui::SetNextWindowPos(ImVec2(0, 0));
 
@@ -126,7 +126,7 @@ void ImGuiWidgetEvenOdd::drawCalibrationWindow(VulkanEngine* engine, ColorSpace 
     }
 
     ImGui::Checkbox("Flip RGB/CMY", &engine->_flipEvenOdd);
-    if (engine->_tetraMode == VulkanEngine::TetraMode::kEvenOddSoftwareSync) {
+    if (engine->_tetraMode == Quarkolor::TetraMode::kEvenOddSoftwareSync) {
         ImGui::SliderInt(
             "Software Sync Timing Offset (ns)",
             &engine->_softwareEvenOddCtx.timeOffset,
@@ -183,19 +183,19 @@ void ImGuiWidgetEvenOdd::drawCalibrationWindow(VulkanEngine* engine, ColorSpace 
     ImGui::End();
 }
 
-void ImGuiWidgetEvenOdd::Draw(VulkanEngine* engine, ColorSpace colorSpace)
+void ImGuiWidgetEvenOdd::Draw(Quarkolor* engine, ColorSpace colorSpace)
 {
     const char* evenOddMode = nullptr;
 
     uint64_t numFrames = engine->getSurfaceCounterValue();
     switch (engine->_tetraMode) {
-    case VulkanEngine::TetraMode::kEvenOddSoftwareSync: {
+    case Quarkolor::TetraMode::kEvenOddSoftwareSync: {
         evenOddMode = "Software Sync";
     } break;
-    case VulkanEngine::TetraMode::kEvenOddHardwareSync:
+    case Quarkolor::TetraMode::kEvenOddHardwareSync:
         evenOddMode = "Hardware Sync";
         break;
-    case VulkanEngine::TetraMode::kDualProjector:
+    case Quarkolor::TetraMode::kDualProjector:
         evenOddMode = "Dual Projector Does Not Use Even-Odd rendering";
         break;
     }
@@ -206,7 +206,7 @@ void ImGuiWidgetEvenOdd::Draw(VulkanEngine* engine, ColorSpace colorSpace)
 
     ImGui::Text("Num Dropped Frame: %u", engine->_evenOddDebugCtx.numDroppedFrames);
 
-    if (engine->_tetraMode == VulkanEngine::TetraMode::kEvenOddSoftwareSync) {
+    if (engine->_tetraMode == Quarkolor::TetraMode::kEvenOddSoftwareSync) {
         int buf = engine->_softwareEvenOddCtx.vsyncFrameOffset;
         if (ImGui::SliderInt("VSync frame offset", &buf, -10, 10)) {
             engine->_softwareEvenOddCtx.vsyncFrameOffset = buf;
@@ -253,7 +253,7 @@ void ImGuiWidgetEvenOdd::Draw(VulkanEngine* engine, ColorSpace colorSpace)
     }
 }
 
-int ImGuiWidgetEvenOdd::measureDroppedFrames(VulkanEngine* engine, int offset, int duration)
+int ImGuiWidgetEvenOdd::measureDroppedFrames(Quarkolor* engine, int offset, int duration)
 {
     engine->_softwareEvenOddCtx.timeOffset = offset;
     int initialDroppedFrames = engine->_evenOddDebugCtx.numDroppedFrames;
@@ -263,7 +263,7 @@ int ImGuiWidgetEvenOdd::measureDroppedFrames(VulkanEngine* engine, int offset, i
     return engine->_evenOddDebugCtx.numDroppedFrames - initialDroppedFrames;
 }
 
-void ImGuiWidgetEvenOdd::startAutoCalibration(VulkanEngine* engine)
+void ImGuiWidgetEvenOdd::startAutoCalibration(Quarkolor* engine)
 {
     if (!_calibrationInProgress) {
         _calibrationInProgress = true;
@@ -274,7 +274,7 @@ void ImGuiWidgetEvenOdd::startAutoCalibration(VulkanEngine* engine)
     }
 }
 
-void ImGuiWidgetEvenOdd::autoCalibrationThread(VulkanEngine* engine)
+void ImGuiWidgetEvenOdd::autoCalibrationThread(Quarkolor* engine)
 {
     int worstOffset = combinedCalibration(engine);
     int optimalOffset = (engine->_softwareEvenOddCtx.nanoSecondsPerFrame / 2 + worstOffset)
@@ -287,7 +287,7 @@ void ImGuiWidgetEvenOdd::autoCalibrationThread(VulkanEngine* engine)
     _calibrationInProgress = false;
 }
 
-int ImGuiWidgetEvenOdd::combinedCalibration(VulkanEngine* engine)
+int ImGuiWidgetEvenOdd::combinedCalibration(Quarkolor* engine)
 {
     int maxOffset = engine->_softwareEvenOddCtx.nanoSecondsPerFrame;
     int worstOffset = 0;
@@ -329,7 +329,7 @@ int ImGuiWidgetEvenOdd::combinedCalibration(VulkanEngine* engine)
 }
 
 void ImGuiWidgetEvenOdd::recursiveDescentCalibration(
-    VulkanEngine* engine,
+    Quarkolor* engine,
     int start,
     int end,
     int stepSize,

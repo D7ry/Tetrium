@@ -47,7 +47,7 @@ class TickContext;
 // TODO: implement even-odd for non-nvidia GPUs
 // may be much less accurate but useful for testing
 
-class VulkanEngine
+class Quarkolor
 {
   private:
     /* ---------- Extension Configurations ---------- */
@@ -231,7 +231,7 @@ class VulkanEngine
     );
 
     VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
-    void createSwapChain(VulkanEngine::SwapChainContext& ctx, const VkSurfaceKHR surface);
+    void createSwapChain(Quarkolor::SwapChainContext& ctx, const VkSurfaceKHR surface);
     void recreateSwapChain(SwapChainContext& ctx);
     void cleanupSwapChain(SwapChainContext& ctx);
     void createImageViews(SwapChainContext& ctx);

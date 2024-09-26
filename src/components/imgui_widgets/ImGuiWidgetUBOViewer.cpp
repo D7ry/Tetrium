@@ -37,12 +37,12 @@ void DrawMat4(
     ImGui::PopID();
 }
 
-void ImGuiWidgetUBOViewer::Draw(const VulkanEngine* engine, ColorSpace colorSpace) {
+void ImGuiWidgetUBOViewer::Draw(const Quarkolor* engine, ColorSpace colorSpace) {
     const VQBuffer& currentUBO
         = engine->_engineUBOStatic[engine->_currentFrame];
 
-    VulkanEngine::EngineUBOStatic* ubo
-        = reinterpret_cast<VulkanEngine::EngineUBOStatic*>(
+    Quarkolor::EngineUBOStatic* ubo
+        = reinterpret_cast<Quarkolor::EngineUBOStatic*>(
             currentUBO.bufferAddress
         );
 

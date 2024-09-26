@@ -40,7 +40,7 @@
 #define VIRTUAL_VSYNC 0
 
 // creates a cow for now
-void VulkanEngine::createFunnyObjects()
+void Quarkolor::createFunnyObjects()
 {
     // lil cow
     Entity* spot = new Entity("Spot");
@@ -62,7 +62,7 @@ void VulkanEngine::createFunnyObjects()
 // in CLI pop up a monitor selection interface, that lists
 // monitor names and properties
 // the user would input a number to select the right monitor.
-std::pair<GLFWmonitor*, GLFWvidmode> VulkanEngine::cliMonitorModeSelection()
+std::pair<GLFWmonitor*, GLFWvidmode> Quarkolor::cliMonitorModeSelection()
 {
     std::cout << "---------- Please Select Monitor and Video Mode ----------" << std::endl;
 
@@ -285,7 +285,7 @@ void VulkanEngine::selectDisplayXlib(DisplayContext& ctx)
 // take complete control over a physical display
 // the display must be directly connected to the GPU through x11
 // prompts the user to select the display and resolution in an ImGui window
-void VulkanEngine::initExclusiveDisplay(VulkanEngine::DisplayContext& ctx)
+void Quarkolor::initExclusiveDisplay(Quarkolor::DisplayContext& ctx)
 {
 #if __linux__
     selectDisplayXlib(ctx);
@@ -385,7 +385,7 @@ void VulkanEngine::initExclusiveDisplay(VulkanEngine::DisplayContext& ctx)
     DEBUG("display extent: {} {}", ctx.extent.width, ctx.extent.height);
 }
 
-void VulkanEngine::initGLFW(const InitOptions& options)
+void Quarkolor::initGLFW(const InitOptions& options)
 {
     glfwInit();
     glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE); // hide window at beginning
@@ -426,9 +426,9 @@ void VulkanEngine::initGLFW(const InitOptions& options)
     });
 }
 
-void VulkanEngine::keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
+void Quarkolor::keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
-    VulkanEngine* pThis = reinterpret_cast<VulkanEngine*>(glfwGetWindowUserPointer(window));
+    Quarkolor* pThis = reinterpret_cast<Quarkolor*>(glfwGetWindowUserPointer(window));
     if (key == GLFW_KEY_P && action == GLFW_PRESS) {
         _paused = !_paused;
     }
@@ -450,7 +450,7 @@ void VulkanEngine::keyCallback(GLFWwindow* window, int key, int scancode, int ac
     }
 }
 
-void VulkanEngine::cursorPosCallback(GLFWwindow* window, double xpos, double ypos)
+void Quarkolor::cursorPosCallback(GLFWwindow* window, double xpos, double ypos)
 {
     static bool updatedCursor = false;
     static int prevX = -1;
@@ -472,7 +472,7 @@ void VulkanEngine::cursorPosCallback(GLFWwindow* window, double xpos, double ypo
     prevY = ypos;
 }
 
-void VulkanEngine::initDefaultStates()
+void Quarkolor::initDefaultStates()
 {
     // configure states
 
@@ -493,7 +493,7 @@ void VulkanEngine::initDefaultStates()
     ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoKeyboard;
 };
 
-void VulkanEngine::Init(const VulkanEngine::InitOptions& options)
+void Quarkolor::Init(const Quarkolor::InitOptions& options)
 {
     // populate static config fields
     _tetraMode = options.tetraMode;
@@ -510,13 +510,13 @@ void VulkanEngine::Init(const VulkanEngine::InitOptions& options)
     ASSERT(_window);
     { // Input Handling
         auto keyCallback = [](GLFWwindow* window, int key, int scancode, int action, int mods) {
-            VulkanEngine* pThis = reinterpret_cast<VulkanEngine*>(glfwGetWindowUserPointer(window));
+            Quarkolor* pThis = reinterpret_cast<Quarkolor*>(glfwGetWindowUserPointer(window));
             pThis->keyCallback(window, key, scancode, action, mods);
         };
         glfwSetKeyCallback(this->_window, keyCallback);
 
         auto cursorPosCallback = [](GLFWwindow* window, double xpos, double ypos) {
-            VulkanEngine* pThis = reinterpret_cast<VulkanEngine*>(glfwGetWindowUserPointer(window));
+            Quarkolor* pThis = reinterpret_cast<Quarkolor*>(glfwGetWindowUserPointer(window));
             pThis->cursorPosCallback(window, xpos, ypos);
         };
         glfwSetCursorPosCallback(this->_window, cursorPosCallback);
@@ -565,7 +565,7 @@ void VulkanEngine::Init(const VulkanEngine::InitOptions& options)
     createFunnyObjects();
 }
 
-void VulkanEngine::Run()
+void Quarkolor::Run()
 {
     ASSERT(_window);
     glfwShowWindow(_window);
@@ -575,7 +575,7 @@ void VulkanEngine::Run()
     }
 }
 
-void VulkanEngine::Tick()
+void Quarkolor::Tick()
 {
     if (_paused) {
         std::this_thread::yield();
@@ -606,14 +606,14 @@ void VulkanEngine::Tick()
     _numTicks++;
 }
 
-void VulkanEngine::framebufferResizeCallback(GLFWwindow* window, int width, int height)
+void Quarkolor::framebufferResizeCallback(GLFWwindow* window, int width, int height)
 {
     DEBUG("Window resized to {}x{}", width, height);
-    auto app = reinterpret_cast<VulkanEngine*>(glfwGetWindowUserPointer(window));
+    auto app = reinterpret_cast<Quarkolor*>(glfwGetWindowUserPointer(window));
     app->_framebufferResized = true;
 }
 
-VkSurfaceKHR VulkanEngine::createGlfwWindowSurface(GLFWwindow* window)
+VkSurfaceKHR Quarkolor::createGlfwWindowSurface(GLFWwindow* window)
 {
     VkSurfaceKHR surface;
     VkResult result = glfwCreateWindowSurface(this->_instance, this->_window, nullptr, &surface);
@@ -627,14 +627,14 @@ VkSurfaceKHR VulkanEngine::createGlfwWindowSurface(GLFWwindow* window)
     return surface;
 }
 
-void VulkanEngine::createDevice()
+void Quarkolor::createDevice()
 {
     VkPhysicalDevice physicalDevice = this->pickPhysicalDevice();
     this->_device = std::make_shared<VQDevice>(physicalDevice);
     this->_deletionStack.push([this]() { this->_device->Cleanup(); });
 }
 
-void VulkanEngine::setupSoftwareEvenOddFrame()
+void Quarkolor::setupSoftwareEvenOddFrame()
 {
     DEBUG("Setting up even-odd frame resources...");
     auto& ctx = _softwareEvenOddCtx;
@@ -657,9 +657,9 @@ void VulkanEngine::setupSoftwareEvenOddFrame()
     ASSERT(ctx.nanoSecondsPerFrame != 0);
 }
 
-void VulkanEngine::checkSoftwareEvenOddFrameSupport() { return; }
+void Quarkolor::checkSoftwareEvenOddFrameSupport() { return; }
 
-void VulkanEngine::setupHardwareEvenOddFrame()
+void Quarkolor::setupHardwareEvenOddFrame()
 {
 #if WIN32
     NEEDS_IMPLEMENTATION();
@@ -682,7 +682,7 @@ void VulkanEngine::setupHardwareEvenOddFrame()
 // the counter ticks every time a vertical blanking period occurs,
 // which we use to decide whether the next frame to present should be
 // even or odd.
-void VulkanEngine::checkHardwareEvenOddFrameSupport()
+void Quarkolor::checkHardwareEvenOddFrameSupport()
 {
 #ifdef WIN32
     NEEDS_IMPLEMENTATION();
@@ -740,7 +740,7 @@ void VulkanEngine::checkHardwareEvenOddFrameSupport()
     DEBUG("Even-odd frame support check passed!");
 }
 
-void VulkanEngine::initVulkan()
+void Quarkolor::initVulkan()
 {
     VkSurfaceKHR mainWindowSurface = VK_NULL_HANDLE;
     INFO("Initializing Vulkan...");
@@ -847,7 +847,7 @@ void VulkanEngine::initVulkan()
     INFO("Vulkan initialized.");
 }
 
-bool VulkanEngine::checkValidationLayerSupport()
+bool Quarkolor::checkValidationLayerSupport()
 {
     uint32_t layerCount;
     vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
@@ -870,7 +870,7 @@ bool VulkanEngine::checkValidationLayerSupport()
     return true;
 }
 
-void VulkanEngine::createInstance()
+void Quarkolor::createInstance()
 {
     INFO("Creating Vulkan instance...");
     if (DEFAULTS::Engine::ENABLE_VALIDATION_LAYERS) {
@@ -975,7 +975,7 @@ void VulkanEngine::createInstance()
     INFO("Vulkan instance created.");
 }
 
-void VulkanEngine::createGlfwWindowSurface()
+void Quarkolor::createGlfwWindowSurface()
 {
     NEEDS_IMPLEMENTATION();
     // VkResult result
@@ -988,7 +988,7 @@ void VulkanEngine::createGlfwWindowSurface()
     // );
 }
 
-void VulkanEngine::populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo)
+void Quarkolor::populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo)
 {
     createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
@@ -1001,7 +1001,7 @@ void VulkanEngine::populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateI
     createInfo.pfnUserCallback = debugCallback;
 }
 
-void VulkanEngine::setupDebugMessenger()
+void Quarkolor::setupDebugMessenger()
 {
     VkDebugUtilsMessengerCreateInfoEXT createInfo;
     populateDebugMessengerCreateInfo(createInfo);
@@ -1029,7 +1029,7 @@ void VulkanEngine::setupDebugMessenger()
     });
 }
 
-VKAPI_ATTR VkBool32 VKAPI_CALL VulkanEngine::debugCallback(
+VKAPI_ATTR VkBool32 VKAPI_CALL Quarkolor::debugCallback(
     VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
     VkDebugUtilsMessageTypeFlagsEXT messageType,
     const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
@@ -1040,7 +1040,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL VulkanEngine::debugCallback(
     return VK_FALSE;
 }
 
-bool VulkanEngine::checkDeviceExtensionSupport(VkPhysicalDevice device)
+bool Quarkolor::checkDeviceExtensionSupport(VkPhysicalDevice device)
 {
     DEBUG("checking device extension support");
     uint32_t extensionCount;
@@ -1063,7 +1063,7 @@ bool VulkanEngine::checkDeviceExtensionSupport(VkPhysicalDevice device)
     return requiredExtensions.empty();
 }
 
-bool VulkanEngine::isDeviceSuitable(VkPhysicalDevice device)
+bool Quarkolor::isDeviceSuitable(VkPhysicalDevice device)
 {
 
     // check device properties and features
@@ -1094,7 +1094,7 @@ bool VulkanEngine::isDeviceSuitable(VkPhysicalDevice device)
     }
 }
 
-const std::vector<const char*> VulkanEngine::getRequiredDeviceExtensions() const
+const std::vector<const char*> Quarkolor::getRequiredDeviceExtensions() const
 {
     std::vector<const char*> extensions = DEFAULT_DEVICE_EXTENSIONS;
     if (_tetraMode == TetraMode::kEvenOddHardwareSync) {
@@ -1106,7 +1106,7 @@ const std::vector<const char*> VulkanEngine::getRequiredDeviceExtensions() const
 }
 
 // pick a physical device that satisfies `isDeviceSuitable()`
-VkPhysicalDevice VulkanEngine::pickPhysicalDevice()
+VkPhysicalDevice Quarkolor::pickPhysicalDevice()
 {
     DEBUG("Picking physical device ");
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
@@ -1130,7 +1130,7 @@ VkPhysicalDevice VulkanEngine::pickPhysicalDevice()
     return physicalDevice;
 }
 
-void VulkanEngine::createSwapChain(VulkanEngine::SwapChainContext& ctx, const VkSurfaceKHR surface)
+void Quarkolor::createSwapChain(Quarkolor::SwapChainContext& ctx, const VkSurfaceKHR surface)
 {
     DEBUG("creating swapchain...");
     ASSERT(_device);
@@ -1211,7 +1211,7 @@ void VulkanEngine::createSwapChain(VulkanEngine::SwapChainContext& ctx, const Vk
     DEBUG("Swap chain created!");
 }
 
-void VulkanEngine::cleanupSwapChain(SwapChainContext& ctx)
+void Quarkolor::cleanupSwapChain(SwapChainContext& ctx)
 {
     DEBUG("Cleaning up swap chain...");
     vkDestroyImageView(_device->logicalDevice, ctx.depthImageView, nullptr);
@@ -1228,12 +1228,12 @@ void VulkanEngine::cleanupSwapChain(SwapChainContext& ctx)
     vkDestroySwapchainKHR(this->_device->logicalDevice, ctx.chain, nullptr);
 }
 
-void VulkanEngine::recreateVirtualFrameBuffers(RenderContext& ctx)
+void Quarkolor::recreateVirtualFrameBuffers(RenderContext& ctx)
 {
     createVirtualFrameBuffers(ctx);
 }
 
-void VulkanEngine::recreateSwapChain(SwapChainContext& ctx)
+void Quarkolor::recreateSwapChain(SwapChainContext& ctx)
 {
     // need to recreate render pass for HDR changing, we're not doing that
     // for now
@@ -1256,7 +1256,7 @@ void VulkanEngine::recreateSwapChain(SwapChainContext& ctx)
     DEBUG("Swap chain recreated.");
 }
 
-VkSurfaceFormatKHR VulkanEngine::chooseSwapSurfaceFormat(
+VkSurfaceFormatKHR Quarkolor::chooseSwapSurfaceFormat(
     const std::vector<VkSurfaceFormatKHR>& availableFormats
 )
 {
@@ -1270,7 +1270,7 @@ VkSurfaceFormatKHR VulkanEngine::chooseSwapSurfaceFormat(
     return availableFormats[0];
 }
 
-VkPresentModeKHR VulkanEngine::chooseSwapPresentMode(
+VkPresentModeKHR Quarkolor::chooseSwapPresentMode(
     const std::vector<VkPresentModeKHR>& availablePresentModes
 )
 {
@@ -1288,7 +1288,7 @@ VkPresentModeKHR VulkanEngine::chooseSwapPresentMode(
     return VK_PRESENT_MODE_FIFO_KHR;
 }
 
-VkExtent2D VulkanEngine::chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities)
+VkExtent2D Quarkolor::chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities)
 {
     if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
         return capabilities.currentExtent;
@@ -1311,7 +1311,7 @@ VkExtent2D VulkanEngine::chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabi
     }
 }
 
-void VulkanEngine::createImageViews(SwapChainContext& ctx)
+void Quarkolor::createImageViews(SwapChainContext& ctx)
 {
     for (size_t i = 0; i < ctx.image.size(); i++) {
         VkImageViewCreateInfo createInfo{};
@@ -1336,7 +1336,7 @@ void VulkanEngine::createImageViews(SwapChainContext& ctx)
     DEBUG("Image views created.");
 }
 
-void VulkanEngine::createSynchronizationObjects(
+void Quarkolor::createSynchronizationObjects(
     std::array<SyncPrimitives, NUM_FRAME_IN_FLIGHT>& primitives
 )
 {
@@ -1391,7 +1391,7 @@ void VulkanEngine::createSynchronizationObjects(
     });
 }
 
-void VulkanEngine::Cleanup()
+void Quarkolor::Cleanup()
 {
     INFO("Cleaning up...");
     _deletionStack.flush();
@@ -1400,7 +1400,7 @@ void VulkanEngine::Cleanup()
 
 // create a render pass. The render pass will be pushed onto
 // the deletion stack.
-vk::RenderPass VulkanEngine::createRenderPass(const VkFormat imageFormat)
+vk::RenderPass Quarkolor::createRenderPass(const VkFormat imageFormat)
 {
     DEBUG("Creating render pass...");
     VkAttachmentDescription colorAttachment{};
@@ -1492,7 +1492,7 @@ uint32_t findMemoryType(
     throw std::runtime_error("failed to find suitable memory type!");
 }
 
-void VulkanEngine::createVirtualFrameBuffers(RenderContext& ctx)
+void Quarkolor::createVirtualFrameBuffers(RenderContext& ctx)
 {
     DEBUG("Creating framebuffers..");
     // iterate through image views and create framebuffers
@@ -1585,7 +1585,7 @@ void VulkanEngine::createVirtualFrameBuffers(RenderContext& ctx)
     }
 }
 
-void VulkanEngine::clearVirtualFrameBuffers(RenderContext& ctx)
+void Quarkolor::clearVirtualFrameBuffers(RenderContext& ctx)
 {
     size_t numFrameBuffers = ctx.swapchain->frameBuffer.size();
     VirtualFrameBuffer& vfb = ctx.virtualFrameBuffer;
@@ -1597,7 +1597,7 @@ void VulkanEngine::clearVirtualFrameBuffers(RenderContext& ctx)
     }
 }
 
-void VulkanEngine::createSwapchainFrameBuffers(SwapChainContext& ctx, VkRenderPass rgbOrCmyPass)
+void Quarkolor::createSwapchainFrameBuffers(SwapChainContext& ctx, VkRenderPass rgbOrCmyPass)
 {
     DEBUG("Creating framebuffers..");
     // iterate through image views and create framebuffers
@@ -1622,7 +1622,7 @@ void VulkanEngine::createSwapchainFrameBuffers(SwapChainContext& ctx, VkRenderPa
     }
 }
 
-void VulkanEngine::createDepthBuffer(SwapChainContext& ctx)
+void Quarkolor::createDepthBuffer(SwapChainContext& ctx)
 {
     DEBUG("Creating depth buffer...");
     VkFormat depthFormat = VulkanUtils::findBestFormat(
@@ -1648,7 +1648,7 @@ void VulkanEngine::createDepthBuffer(SwapChainContext& ctx)
     );
 }
 
-void VulkanEngine::flushEngineUBOStatic(uint8_t frame)
+void Quarkolor::flushEngineUBOStatic(uint8_t frame)
 {
     VQBuffer& buf = _engineUBOStatic[frame];
     EngineUBOStatic ubo{
@@ -1662,7 +1662,7 @@ void VulkanEngine::flushEngineUBOStatic(uint8_t frame)
     memcpy(buf.bufferAddress, &ubo, sizeof(ubo));
 }
 
-void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
+void Quarkolor::drawFrame(TickContext* ctx, uint8_t frame)
 {
     SyncPrimitives& sync = _syncProjector[frame];
 
@@ -1892,7 +1892,7 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     }
 }
 
-void VulkanEngine::drawImGui(ColorSpace colorSpace)
+void Quarkolor::drawImGui(ColorSpace colorSpace)
 {
     if (!_wantToDrawImGui) {
         return;
@@ -1993,7 +1993,7 @@ void VulkanEngine::drawImGui(ColorSpace colorSpace)
 
 // FIXME: glfw calls from a differnt thread; may need to add critical sections
 // currently for perf reasons we're leaving it as is.
-void VulkanEngine::bindDefaultInputs()
+void Quarkolor::bindDefaultInputs()
 {
     const int CAMERA_SPEED = 3;
     _inputManager.RegisterCallback(GLFW_KEY_W, InputManager::KeyCallbackCondition::HOLD, [this]() {
@@ -2051,7 +2051,7 @@ void VulkanEngine::bindDefaultInputs()
     );
 }
 
-void VulkanEngine::getMainProjectionMatrix(glm::mat4& projectionMatrix)
+void Quarkolor::getMainProjectionMatrix(glm::mat4& projectionMatrix)
 {
     auto& extent = _swapChain.extent;
     projectionMatrix = glm::perspective(
@@ -2069,7 +2069,7 @@ void VulkanEngine::getMainProjectionMatrix(glm::mat4& projectionMatrix)
 // TODO: profile precision of the new counter vs. old counter
 #define NEW_VIRTUAL_FRAMECOUNTER 0
 
-uint64_t VulkanEngine::getSurfaceCounterValue()
+uint64_t Quarkolor::getSurfaceCounterValue()
 {
     uint64_t surfaceCounter;
     switch (_tetraMode) {
@@ -2134,7 +2134,7 @@ uint64_t VulkanEngine::getSurfaceCounterValue()
     return surfaceCounter;
 }
 
-bool VulkanEngine::isEvenFrame()
+bool Quarkolor::isEvenFrame()
 {
     bool isEven = getSurfaceCounterValue() % 2 == 0;
 

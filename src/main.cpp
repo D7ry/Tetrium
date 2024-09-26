@@ -5,11 +5,11 @@ int main(int argc, char** argv)
     INIT_LOGS();
     INFO("Logger initialized.");
     DEBUG("running in debug mode");
-    VulkanEngine::InitOptions options{
-        .tetraMode = VulkanEngine::TetraMode::kEvenOddSoftwareSync,
+    Quarkolor::InitOptions options{
+        .tetraMode = Quarkolor::TetraMode::kEvenOddSoftwareSync,
         .fullScreen = true,
         .manualMonitorSelection = true};
-    VulkanEngine engine;
+    Quarkolor engine;
     engine.Init(options);
     engine.Run();
     engine.Cleanup();
