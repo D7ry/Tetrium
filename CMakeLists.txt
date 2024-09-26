@@ -44,7 +44,7 @@ project(quarkolor)
 add_executable(${PROJECT_NAME}
         src/lib/Utils.cpp
         src/main.cpp
-        src/VulkanEngine.cpp
+        src/Quarkolor.cpp
         src/components/Logging.cpp
         src/components/ShaderUtils.cpp
         src/components/DeltaTimer.cpp

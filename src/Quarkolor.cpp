@@ -30,7 +30,7 @@
 // ecs
 #include "ecs/component/TransformComponent.h"
 
-#include "VulkanEngine.h"
+#include "Quarkolor.h"
 
 #if __linux__
 #include <xf86drm.h>
@@ -132,7 +132,7 @@ std::pair<GLFWmonitor*, GLFWvidmode> Quarkolor::cliMonitorModeSelection()
 
 #if __linux__
 // select exclusive display using DRM
-void VulkanEngine::selectDisplayDRM(DisplayContext& ctx)
+void Quarkolor::selectDisplayDRM(DisplayContext& ctx)
 {
     int drmFd = open("/dev/dri/card0", O_RDWR);
     if (drmFd < 0) {
@@ -216,7 +216,7 @@ void VulkanEngine::selectDisplayDRM(DisplayContext& ctx)
 }
 
 // select exclusive display using xlib
-void VulkanEngine::selectDisplayXlib(DisplayContext& ctx)
+void Quarkolor::selectDisplayXlib(DisplayContext& ctx)
 {
     using namespace fmt;
     auto device = _device->physicalDevice;
@@ -1987,7 +1987,7 @@ void Quarkolor::drawImGui(ColorSpace colorSpace)
         }
     }
 
-    ImGui::End(); // VulkanEngine
+    ImGui::End();
     _imguiManager.EndImGuiContext();
 }
 
