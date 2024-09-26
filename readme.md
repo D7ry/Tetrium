@@ -13,7 +13,7 @@ Each tick, the engine simultaneously renders to the buffers with the RGB and CMY
 respectively. Once the rendering is done, depending on the presentation mode:
 
 - `TetraMode::kDualProjector`: both buffers are committed to either RGB or CMY projector.
-- `TetraMode::kEvenOddSoftwareSync` or `TetraMode::kEvenOddSoftwareSync`: the engine determines the
+- `TetraMode::kEvenOddSoftwareSync` or `TetraMode::kEvenOddHardwareSync`: the engine determines the
   count of the vertical blanking period, either through hardware APIs or a virtual software frame
   counter(TODO: add docs for even-odd evaluation); the engine then commits one frame buffer while
   discarding the other.
