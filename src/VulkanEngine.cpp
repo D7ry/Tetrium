@@ -1852,7 +1852,10 @@ void VulkanEngine::drawImGui(ColorSpace colorSpace)
     if (!_wantToDrawImGui) {
         return;
     }
-    PROFILE_SCOPE(&_profiler, "ImGui Draw");
+    // note that drawImGui is called twice per tick for RGB and CMY space,
+    // so we need different profiler ID for them.
+    const char* profileId = colorSpace == ColorSpace::RGB ? "ImGui Draw RGB" : "ImGui Draw CMY";
+    PROFILE_SCOPE(&_profiler, profileId);
     _imguiManager.BeginImGuiContext();
 
     // imgui is associated with the glfw window to handle inputs,
