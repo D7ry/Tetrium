@@ -61,6 +61,7 @@ add_executable(${PROJECT_NAME}
         src/components/imgui_widgets/ImGuiWidgetTetraViewerDemo.cpp
         src/lib/VQDevice.cpp
         src/lib/VQUtils.cpp
+        src/lib/ImGuiUtils.cpp
         src/structs/Vertex.cpp
         src/ecs/system/SimpleRenderSystem.cpp
 )

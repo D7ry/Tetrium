@@ -807,7 +807,7 @@ void Quarkolor::initVulkan()
         _renderContexts.CMY.virtualFrameBuffer.imageView,
         _swapChain.extent
     );
-    this->_imguiManager.InitializeImgui();
+    this->_imguiManager.InitializeImgui(&_textureManager);
     this->_imguiManager.InitializeDescriptorPool(
         DEFAULTS::ImGui::TEXTURE_DESCRIPTOR_POOL_SIZE, _device->logicalDevice
     );
@@ -1924,9 +1924,16 @@ void Quarkolor::drawImGui(ColorSpace colorSpace)
         ImDrawList* drawList = ImGui::GetForegroundDrawList();
 
         ImVec2 mousePos = io.MousePos;
-
-        ImU32 color = IM_COL32(255, 255, 255, 200);
-        drawList->AddCircleFilled(mousePos, 10, color);
+        // TODO: store all engine imgui assets in a table
+        const ImGuiTexture& cursorTexture
+            = _imguiManager.GetImGuiTexture("../assets/textures/engine/cursor.png");
+        ImVec2 cursorSize(cursorTexture.width * 2, cursorTexture.height * 2);
+        ImVec2 cursorPos(mousePos.x, mousePos.y);
+        drawList->AddImage(
+            (ImTextureID)cursorTexture.ds,
+            cursorPos,
+            ImVec2(cursorPos.x + cursorSize.x, cursorPos.y + cursorSize.y)
+        );
     }
 
     if (ImGui::Begin(DEFAULTS::Engine::APPLICATION_NAME)) {

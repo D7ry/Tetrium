@@ -3,6 +3,8 @@
 #include "imgui.h"
 #include "implot.h"
 
+#include "components/TextureManager.h"
+
 void ImGuiManager::setupImGuiStyle()
 {
     auto& style = ImGui::GetStyle();
@@ -48,7 +50,7 @@ void ImGuiManager::setupImGuiStyle()
     colors[ImGuiCol_TabUnfocusedActive] = ImVec4{0.2f, 0.2f, 0.2f, 1.0f};
 }
 
-void ImGuiManager::InitializeImgui()
+void ImGuiManager::InitializeImgui(TextureManager* textureManager)
 {
     INFO("Initializing imgui...");
     IMGUI_CHECKVERSION();
@@ -65,6 +67,7 @@ void ImGuiManager::InitializeImgui()
 #endif
     setupImGuiStyle();
     INFO("ImGui initialized.");
+    _textureManager = textureManager;
 }
 
 void ImGuiManager::BindVulkanResources(
@@ -343,4 +346,23 @@ void ImGuiManager::ClearImGuiElements()
 {
     BeginImGuiContext();
     EndImGuiContext();
+}
+
+const ImGuiTexture& ImGuiManager::GetImGuiTexture(const std::string& texturePath)
+{
+    auto it = _imguiTextures.find(texturePath);
+    if (it != _imguiTextures.end()) {
+        return it->second;
+    }
+
+    TextureManager::Texture t = _textureManager->GetTexture(texturePath);
+    auto ds = ImGui_ImplVulkan_AddTexture(
+        t.sampler, t.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+    );
+
+    ImGuiTexture tex{.ds = ds, .width = t.width, .height = t.height};
+
+    auto res = _imguiTextures.insert({texturePath, tex});
+    ASSERT(res.second);
+    return res.first->second;
 }
