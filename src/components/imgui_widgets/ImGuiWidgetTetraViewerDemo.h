@@ -1,7 +1,7 @@
 #pragma once
 #include "ImGuiWidget.h"
 
-// demo class to view a tetrachromatic image
+// prototype demo class to view a tetrachromatic image
 class ImGuiWidgetTetraViewerDemo : public ImGuiWidgetMut
 {
   private:

@@ -352,7 +352,7 @@ void ImGuiWidgetEvenOdd::recursiveDescentCalibration(
     float progressWeight // how much of progress does this descent take?
 )
 {
-    const int recursiveDescentDuration = 300;
+    const int recursiveDescentDuration = 100;
     if (end - start <= stepSize || !_calibrationInProgress)
         return;
 
