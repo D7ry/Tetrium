@@ -235,6 +235,7 @@ void ImGuiManager::Cleanup(VkDevice logicalDevice)
 
     vkDestroyRenderPass(logicalDevice, _imGuiRenderPass, nullptr);
     vkDestroyDescriptorPool(logicalDevice, _imguiDescriptorPool, nullptr);
+    DEBUG("cleaned up imgui");
 }
 
 void ImGuiManager::RecordCommandBufferCMY(

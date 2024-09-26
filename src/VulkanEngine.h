@@ -182,13 +182,17 @@ class VulkanEngine
     //
     // By the end of rendering, only one channel's render results from the "virtual frame buffer" gets
     // copied to the actual frame buffer, stored in `SwapChainContext::frameBuffer`
-    struct RenderContext {
-        VkRenderPass renderPass;
-        SwapChainContext* swapchain; // global swap chain
-        std::vector<VkFramebuffer> virtualFrameBuffer;
+    struct VirtualFrameBuffer
+    {
+        std::vector<VkFramebuffer> frameBuffer;
         std::vector<VkImage> image;
         std::vector<VkImageView> imageView;
         std::vector<VkDeviceMemory> imageMemory; // memory to hold virtual swap chain
+    };
+    struct RenderContext {
+        VkRenderPass renderPass;
+        SwapChainContext* swapchain; // global swap chain
+        VirtualFrameBuffer virtualFrameBuffer;
     };
 
     SwapChainContext _swapChain;
@@ -236,8 +240,9 @@ class VulkanEngine
     void createSwapchainFrameBuffers(SwapChainContext& ctx, VkRenderPass rgbOrCnyPass);
 
     /* ---------- FrameBuffers ---------- */
-    void recreateFrameBuffers(RenderContext& ctx);
-    void createFramebuffers(RenderContext& ctx);
+    void recreateVirtualFrameBuffers(RenderContext& ctx);
+    void createVirtualFrameBuffers(RenderContext& ctx);
+    void clearVirtualFrameBuffers(RenderContext& ctx);
 
     /* ---------- Debug Utilities ---------- */
     bool checkValidationLayerSupport();
@@ -295,7 +300,6 @@ class VulkanEngine
 
     /* ---------- Render Passes ---------- */
     // main render pass, and currently the only render pass
-    VkRenderPass _mainRenderPass = VK_NULL_HANDLE;
     std::array<vk::ClearValue, 2> _clearValues; // [color, depthStencil]
 
     /* ---------- Instance-static Data ---------- */

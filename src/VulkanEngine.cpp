@@ -752,11 +752,15 @@ void VulkanEngine::initVulkan()
     ASSERT(_swapChain.imageFormat);
     createDepthBuffer(_swapChain);
 
-    // create swapchains for RGB and CNY
+    // create context for rgb and cmy rendering
     for (RenderContext* ctx : {&_renderContexts.RGB, &_renderContexts.CMY}) {
         ctx->swapchain = &_swapChain;
         ctx->renderPass = createRenderPass(ctx->swapchain->imageFormat);
-        createFramebuffers(*ctx);
+        createVirtualFrameBuffers(*ctx);
+        _deletionStack.push([this, ctx] {
+            vkDestroyRenderPass(_device->logicalDevice, ctx->renderPass, NULL);
+            clearVirtualFrameBuffers(*ctx);
+        });
     }
 
     // create framebuffer for swapchain
@@ -783,8 +787,8 @@ void VulkanEngine::initVulkan()
     _imguiManager.InitializeFrameBuffer(
         _swapChain.image.size(),
         _device->logicalDevice,
-        _renderContexts.RGB.imageView,
-        _renderContexts.CMY.imageView,
+        _renderContexts.RGB.virtualFrameBuffer.imageView,
+        _renderContexts.CMY.virtualFrameBuffer.imageView,
         _swapChain.extent
     );
     // NOTE: this has to go after ImGuiManager::InitializeRenderPass
@@ -802,7 +806,8 @@ void VulkanEngine::initVulkan()
             _device->logicalDevice,
             _device->queueFamilyIndices.graphicsFamily.value(),
             _device->graphicsQueue,
-            _renderContexts.RGB.virtualFrameBuffer.size() // doesn't matter if it's RGB or CNY
+            _renderContexts.RGB.virtualFrameBuffer.frameBuffer.size(
+            ) // doesn't matter if it's RGB or CMY
         );
     }
 
@@ -1205,7 +1210,10 @@ void VulkanEngine::cleanupSwapChain(SwapChainContext& ctx)
     vkDestroySwapchainKHR(this->_device->logicalDevice, ctx.chain, nullptr);
 }
 
-void VulkanEngine::recreateFrameBuffers(RenderContext& ctx) { createFramebuffers(ctx); }
+void VulkanEngine::recreateVirtualFrameBuffers(RenderContext& ctx)
+{
+    createVirtualFrameBuffers(ctx);
+}
 
 void VulkanEngine::recreateSwapChain(SwapChainContext& ctx)
 {
@@ -1444,9 +1452,6 @@ vk::RenderPass VulkanEngine::createRenderPass(const VkFormat imageFormat)
     VkRenderPass pass = VK_NULL_HANDLE;
     VK_CHECK_RESULT(vkCreateRenderPass(_device->logicalDevice, &renderPassInfo, nullptr, &pass));
 
-    _deletionStack.push([this, pass]() {
-        vkDestroyRenderPass(this->_device->logicalDevice, pass, nullptr);
-    });
     return vk::RenderPass(pass);
 }
 
@@ -1469,7 +1474,7 @@ uint32_t findMemoryType(
     throw std::runtime_error("failed to find suitable memory type!");
 }
 
-void VulkanEngine::createFramebuffers(RenderContext& ctx)
+void VulkanEngine::createVirtualFrameBuffers(RenderContext& ctx)
 {
     DEBUG("Creating framebuffers..");
     // iterate through image views and create framebuffers
@@ -1478,10 +1483,11 @@ void VulkanEngine::createFramebuffers(RenderContext& ctx)
     }
     size_t numFrameBuffers = ctx.swapchain->image.size();
     ASSERT(numFrameBuffers != 0);
-    ctx.virtualFrameBuffer.resize(numFrameBuffers);
-    ctx.image.resize(numFrameBuffers);
-    ctx.imageView.resize(numFrameBuffers);
-    ctx.imageMemory.resize(numFrameBuffers); // Add this line for image memory
+    VirtualFrameBuffer& vfb = ctx.virtualFrameBuffer;
+    vfb.frameBuffer.resize(numFrameBuffers);
+    vfb.image.resize(numFrameBuffers);
+    vfb.imageView.resize(numFrameBuffers);
+    vfb.imageMemory.resize(numFrameBuffers); // Add this line for image memory
     SwapChainContext& swapchainContext = *ctx.swapchain;
     for (size_t i = 0; i < numFrameBuffers; i++) {
         VkImageCreateInfo imageInfo{};
@@ -1499,14 +1505,14 @@ void VulkanEngine::createFramebuffers(RenderContext& ctx)
         imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
         imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-        if (vkCreateImage(_device->logicalDevice, &imageInfo, nullptr, &ctx.image[i])
+        if (vkCreateImage(_device->logicalDevice, &imageInfo, nullptr, &vfb.image[i])
             != VK_SUCCESS) {
             FATAL("Failed to create custom image!");
         }
 
         // Allocate memory for the image
         VkMemoryRequirements memRequirements;
-        vkGetImageMemoryRequirements(_device->logicalDevice, ctx.image[i], &memRequirements);
+        vkGetImageMemoryRequirements(_device->logicalDevice, vfb.image[i], &memRequirements);
 
         VkMemoryAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -1517,17 +1523,17 @@ void VulkanEngine::createFramebuffers(RenderContext& ctx)
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
         );
 
-        if (vkAllocateMemory(_device->logicalDevice, &allocInfo, nullptr, &ctx.imageMemory[i])
+        if (vkAllocateMemory(_device->logicalDevice, &allocInfo, nullptr, &vfb.imageMemory[i])
             != VK_SUCCESS) {
             FATAL("Failed to allocate image memory!");
         }
 
-        vkBindImageMemory(_device->logicalDevice, ctx.image[i], ctx.imageMemory[i], 0);
+        vkBindImageMemory(_device->logicalDevice, vfb.image[i], vfb.imageMemory[i], 0);
 
         // Create image view
         VkImageViewCreateInfo viewInfo{};
         viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        viewInfo.image = ctx.image[i];
+        viewInfo.image = vfb.image[i];
         viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
         viewInfo.format = swapchainContext.imageFormat;
         viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -1536,11 +1542,11 @@ void VulkanEngine::createFramebuffers(RenderContext& ctx)
         viewInfo.subresourceRange.baseArrayLayer = 0;
         viewInfo.subresourceRange.layerCount = 1;
 
-        if (vkCreateImageView(_device->logicalDevice, &viewInfo, nullptr, &ctx.imageView[i])
+        if (vkCreateImageView(_device->logicalDevice, &viewInfo, nullptr, &vfb.imageView[i])
             != VK_SUCCESS) {
             FATAL("Failed to create custom image view!");
         }
-        VkImageView attachments[] = {ctx.imageView[i], swapchainContext.depthImageView};
+        VkImageView attachments[] = {vfb.imageView[i], swapchainContext.depthImageView};
         VkFramebufferCreateInfo framebufferInfo{};
         framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         framebufferInfo.renderPass = ctx.renderPass; // each framebuffer is associated with a
@@ -1553,11 +1559,23 @@ void VulkanEngine::createFramebuffers(RenderContext& ctx)
         framebufferInfo.height = swapchainContext.extent.height;
         framebufferInfo.layers = 1; // number of layers in image arrays
         if (vkCreateFramebuffer(
-                _device->logicalDevice, &framebufferInfo, nullptr, &ctx.virtualFrameBuffer[i]
+                _device->logicalDevice, &framebufferInfo, nullptr, &vfb.frameBuffer[i]
             )
             != VK_SUCCESS) {
             FATAL("Failed to create framebuffer!");
         }
+    }
+}
+
+void VulkanEngine::clearVirtualFrameBuffers(RenderContext& ctx)
+{
+    size_t numFrameBuffers = ctx.swapchain->frameBuffer.size();
+    VirtualFrameBuffer& vfb = ctx.virtualFrameBuffer;
+    for (size_t i = 0; i < numFrameBuffers; i++) {
+        vkDestroyFramebuffer(_device->logicalDevice, vfb.frameBuffer[i], NULL);
+        vkDestroyImageView(_device->logicalDevice, vfb.imageView[i], NULL);
+        vkDestroyImage(_device->logicalDevice, vfb.image[i], NULL);
+        vkFreeMemory(_device->logicalDevice, vfb.imageMemory[i], NULL);
     }
 }
 
@@ -1646,8 +1664,8 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     );
     [[unlikely]] if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
         this->recreateSwapChain(_swapChain);
-        this->recreateFrameBuffers(_renderContexts.RGB);
-        this->recreateFrameBuffers(_renderContexts.CMY);
+        this->recreateVirtualFrameBuffers(_renderContexts.RGB);
+        this->recreateVirtualFrameBuffers(_renderContexts.CMY);
         return;
     } else [[unlikely]] if (result != VK_SUCCESS) {
         const char* res = string_VkResult(result);
@@ -1700,10 +1718,10 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
         {
             renderPassBeginInfo.renderPass = _renderContexts.RGB.renderPass;
             renderPassBeginInfo.framebuffer
-                = _renderContexts.RGB
-                      .virtualFrameBuffer[swapchainImageIndex]; // which frame buffer in the
-                                                                // swapchain do the pass i.e.
-                                                                // all draw calls render to?
+                = _renderContexts.RGB.virtualFrameBuffer
+                      .frameBuffer[swapchainImageIndex]; // which frame buffer in the
+                                                         // swapchain do the pass i.e.
+                                                         // all draw calls render to?
             CB1.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
             vkCmdSetViewport(CB1, 0, 1, &viewport);
             vkCmdSetScissor(CB1, 0, 1, &scissor);
@@ -1716,10 +1734,10 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
         {
             renderPassBeginInfo.renderPass = _renderContexts.CMY.renderPass;
             renderPassBeginInfo.framebuffer
-                = _renderContexts.CMY
-                      .virtualFrameBuffer[swapchainImageIndex]; // which frame buffer in the
-                                                                // swapchain do the pass i.e.
-                                                                // all draw calls render to?
+                = _renderContexts.CMY.virtualFrameBuffer
+                      .frameBuffer[swapchainImageIndex]; // which frame buffer in the
+                                                         // swapchain do the pass i.e.
+                                                         // all draw calls render to?
             CB1.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
             vkCmdSetViewport(CB1, 0, 1, &viewport);
             vkCmdSetScissor(CB1, 0, 1, &scissor);
@@ -1760,8 +1778,9 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
 
     // choose whether to render the even/odd frame buffer, discarding the other
     bool isEven = isEvenFrame();
-    VkImage virtualFramebufferImage = isEven ? _renderContexts.RGB.image[swapchainImageIndex]
-                                             : _renderContexts.CMY.image[swapchainImageIndex];
+    VkImage virtualFramebufferImage
+        = isEven ? _renderContexts.RGB.virtualFrameBuffer.image[swapchainImageIndex]
+                 : _renderContexts.CMY.virtualFrameBuffer.image[swapchainImageIndex];
     VkImage swapchainFramebufferImage = _swapChain.image[swapchainImageIndex];
     Utils::ImageTransfer::CmdCopyToFB(
         CB2, virtualFramebufferImage, swapchainFramebufferImage, _swapChain.extent
@@ -1844,8 +1863,8 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
             _tetraMode != TetraMode::kEvenOddHardwareSync
         ); // exclusive window does not resize its swapchain
         this->recreateSwapChain(_swapChain);
-        this->recreateFrameBuffers(_renderContexts.RGB);
-        this->recreateFrameBuffers(_renderContexts.CMY);
+        this->recreateVirtualFrameBuffers(_renderContexts.RGB);
+        this->recreateVirtualFrameBuffers(_renderContexts.CMY);
         this->_framebufferResized = false;
     }
 }

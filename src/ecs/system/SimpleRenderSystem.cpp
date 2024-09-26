@@ -23,8 +23,7 @@ void SimpleRenderSystem::Init(const InitContext* ctx)
     _renderSystemContexts.RGB._vertShader = ctx->VERTEX_SHADER_SRC;
     _renderSystemContexts.CMY._vertShader = ctx->VERTEX_SHADER_SRC;
 
-    buildPipelineForContext(ctx->renderPass.RGB, ctx, _renderSystemContexts.RGB);
-    buildPipelineForContext(ctx->renderPass.CMY, ctx, _renderSystemContexts.CMY);
+    createGraphicsPipeline(ctx->renderPass.RGB, ctx->renderPass.CMY, ctx);
 }
 
 void SimpleRenderSystem::Cleanup()
@@ -129,75 +128,6 @@ void SimpleRenderSystem::buildPipelineForContext(
     RenderSystemContext& ctx
 )
 {
-    /////  ---------- descriptor ---------- /////
-    VkDescriptorSetLayoutBinding uboStaticBinding{};
-    VkDescriptorSetLayoutBinding uboDynamicBinding{};
-    VkDescriptorSetLayoutBinding samplerLayoutBinding{};
-    { // UBO static -- vertex
-        uboStaticBinding.binding = (int)BindingLocation::UBO_STATIC_ENGINE;
-        uboStaticBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        uboStaticBinding.descriptorCount = 1;                     // number of values in the array
-        uboStaticBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT; // only used in vertex shader
-        uboStaticBinding.pImmutableSamplers = nullptr;            // Optional
-    }
-    { // UBO dynamic -- vertex
-        uboDynamicBinding.binding = (int)BindingLocation::UBO_DYNAMIC;
-        uboDynamicBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-        uboDynamicBinding.descriptorCount = 1; // number of values in the array
-
-        uboDynamicBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT; // only used in vertex shader
-        uboDynamicBinding.pImmutableSamplers = nullptr;            // Optional
-    }
-    { // combined image sampler array -- fragment
-        samplerLayoutBinding.binding = (int)BindingLocation::TEXTURE_SAMPLER;
-        samplerLayoutBinding.descriptorCount = TEXTURE_ARRAY_SIZE;
-        samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        samplerLayoutBinding.stageFlags
-            = VK_SHADER_STAGE_FRAGMENT_BIT; // only used on fragment shader;
-                                            // (may use for vertex shader for
-                                            // height mapping)
-        samplerLayoutBinding.pImmutableSamplers = nullptr;
-    }
-
-    std::array<VkDescriptorSetLayoutBinding, 3> bindings
-        = {uboStaticBinding, uboDynamicBinding, samplerLayoutBinding};
-
-    { // _descriptorSetLayout
-        VkDescriptorSetLayoutCreateInfo layoutInfo{};
-        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-        layoutInfo.bindingCount = bindings.size(); // number of bindings
-        layoutInfo.pBindings = bindings.data();
-
-        if (vkCreateDescriptorSetLayout(
-                _device->logicalDevice, &layoutInfo, nullptr, &this->_descriptorSetLayout
-            )
-            != VK_SUCCESS) {
-            FATAL("Failed to create descriptor set layout!");
-        }
-    }
-
-    {                                         // _descriptorPool
-        uint32_t numDescriptorPerType = 5000; // each render group has its own set of descriptors
-        VkDescriptorPoolSize poolSizes[]
-            = {{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, static_cast<uint32_t>(numDescriptorPerType)},
-               {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
-                static_cast<uint32_t>(numDescriptorPerType)},
-               {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                static_cast<uint32_t>(numDescriptorPerType)}};
-
-        VkDescriptorPoolCreateInfo poolInfo{};
-        poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-        poolInfo.poolSizeCount
-            = sizeof(poolSizes) / sizeof(VkDescriptorPoolSize); // number of pool sizes
-        poolInfo.pPoolSizes = poolSizes;
-        poolInfo.maxSets = NUM_FRAME_IN_FLIGHT * poolInfo.poolSizeCount;
-        poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-
-        if (vkCreateDescriptorPool(_device->logicalDevice, &poolInfo, nullptr, &_descriptorPool)
-            != VK_SUCCESS) {
-            FATAL("Failed to create descriptor pool!");
-        }
-    }
 
     { // _descriptorSets
         // each frame in flight needs its own descriptorset
@@ -464,6 +394,74 @@ void SimpleRenderSystem::createGraphicsPipeline(
     const InitContext* initData
 )
 {
+    /////  ---------- descriptor ---------- /////
+    VkDescriptorSetLayoutBinding uboStaticBinding{};
+    VkDescriptorSetLayoutBinding uboDynamicBinding{};
+    VkDescriptorSetLayoutBinding samplerLayoutBinding{};
+    { // UBO static -- vertex
+        uboStaticBinding.binding = (int)BindingLocation::UBO_STATIC_ENGINE;
+        uboStaticBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        uboStaticBinding.descriptorCount = 1;                     // number of values in the array
+        uboStaticBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT; // only used in vertex shader
+        uboStaticBinding.pImmutableSamplers = nullptr;            // Optional
+    }
+    { // UBO dynamic -- vertex
+        uboDynamicBinding.binding = (int)BindingLocation::UBO_DYNAMIC;
+        uboDynamicBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+        uboDynamicBinding.descriptorCount = 1; // number of values in the array
+
+        uboDynamicBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT; // only used in vertex shader
+        uboDynamicBinding.pImmutableSamplers = nullptr;            // Optional
+    }
+    { // combined image sampler array -- fragment
+        samplerLayoutBinding.binding = (int)BindingLocation::TEXTURE_SAMPLER;
+        samplerLayoutBinding.descriptorCount = TEXTURE_ARRAY_SIZE;
+        samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        samplerLayoutBinding.stageFlags
+            = VK_SHADER_STAGE_FRAGMENT_BIT; // only used on fragment shader;
+                                            // (may use for vertex shader for
+                                            // height mapping)
+        samplerLayoutBinding.pImmutableSamplers = nullptr;
+    }
+    std::array<VkDescriptorSetLayoutBinding, 3> bindings
+        = {uboStaticBinding, uboDynamicBinding, samplerLayoutBinding};
+    { // _descriptorSetLayout
+        VkDescriptorSetLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = bindings.size(); // number of bindings
+        layoutInfo.pBindings = bindings.data();
+
+        if (vkCreateDescriptorSetLayout(
+                _device->logicalDevice, &layoutInfo, nullptr, &this->_descriptorSetLayout
+            )
+            != VK_SUCCESS) {
+            FATAL("Failed to create descriptor set layout!");
+        }
+    }
+
+    {                                         // _descriptorPool
+        uint32_t numDescriptorPerType = 5000; // each render group has its own set of descriptors
+        VkDescriptorPoolSize poolSizes[]
+            = {{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, static_cast<uint32_t>(numDescriptorPerType)},
+               {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+                static_cast<uint32_t>(numDescriptorPerType)},
+               {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                static_cast<uint32_t>(numDescriptorPerType)}};
+
+        VkDescriptorPoolCreateInfo poolInfo{};
+        poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        poolInfo.poolSizeCount
+            = sizeof(poolSizes) / sizeof(VkDescriptorPoolSize); // number of pool sizes
+        poolInfo.pPoolSizes = poolSizes;
+        poolInfo.maxSets = NUM_FRAME_IN_FLIGHT * poolInfo.poolSizeCount;
+        poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+
+        if (vkCreateDescriptorPool(_device->logicalDevice, &poolInfo, nullptr, &_descriptorPool)
+            != VK_SUCCESS) {
+            FATAL("Failed to create descriptor pool!");
+        }
+    }
+
     buildPipelineForContext(renderPassRGB, initData, _renderSystemContexts.RGB);
     buildPipelineForContext(renderPassCMY, initData, _renderSystemContexts.CMY);
 }
