@@ -549,6 +549,7 @@ void VulkanEngine::Init(const VulkanEngine::InitOptions& options)
 
 void VulkanEngine::Run()
 {
+    exit(0);
     ASSERT(_window);
     glfwShowWindow(_window);
     while (!glfwWindowShouldClose(_window)) {
@@ -639,10 +640,7 @@ void VulkanEngine::setupSoftwareEvenOddFrame()
     ASSERT(ctx.nanoSecondsPerFrame != 0);
 }
 
-void VulkanEngine::checkSoftwareEvenOddFrameSupport()
-{
-    return;
-}
+void VulkanEngine::checkSoftwareEvenOddFrameSupport() { return; }
 
 void VulkanEngine::setupHardwareEvenOddFrame()
 {
@@ -1320,20 +1318,19 @@ void VulkanEngine::createSynchronizationObjects(
                                                     // can start right away
     for (size_t i = 0; i < NUM_FRAME_IN_FLIGHT; i++) {
         SyncPrimitives& primitive = primitives[i];
-        if (vkCreateSemaphore(
-                _device->logicalDevice, &semaphoreInfo, nullptr, &primitive.semaImageAvailable
-            ) != VK_SUCCESS
-            || vkCreateSemaphore(
-                   _device->logicalDevice, &semaphoreInfo, nullptr, &primitive.semaRenderFinished
-               ) != VK_SUCCESS
-            || vkCreateFence(_device->logicalDevice, &fenceInfo, nullptr, &primitive.fenceInFlight)
-                   != VK_SUCCESS
-            || vkCreateSemaphore(
-                   _device->logicalDevice, &semaphoreInfo, nullptr, &primitive.semaImageCopyFinished
-               ) != VK_SUCCESS) {
-            FATAL("Failed to create synchronization objects for a frame!");
+        for (VkSemaphore* sema : {
+                 &primitive.semaImageAvailable,
+                 &primitive.semaRenderFinished,
+                 &primitive.semaImageCopyFinished
+             }) {
+            VK_CHECK_RESULT(vkCreateSemaphore(_device->logicalDevice, &semaphoreInfo, nullptr, sema)
+            );
         }
+        VK_CHECK_RESULT(
+            vkCreateFence(_device->logicalDevice, &fenceInfo, nullptr, &primitive.fenceInFlight)
+        );
 
+        // create vsync semahore as a timeline semaphore
         VkSemaphoreTypeCreateInfo timelineCreateInfo{
             .sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO,
             .pNext = NULL,

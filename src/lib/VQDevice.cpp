@@ -29,6 +29,10 @@ void VQDevice::CreateLogicalDeviceAndQueue(const std::vector<const char*>& exten
 
     VkPhysicalDeviceFeatures deviceFeatures{};
     deviceFeatures.multiDrawIndirect = true; // we enable multi-draw on everything -- 99% of desktop GPUs supports it
+    
+    vk::PhysicalDeviceVulkan12Features deviceFeaturesVk12;
+    deviceFeaturesVk12.timelineSemaphore = true;
+
     VkDeviceCreateInfo createInfo{};
     float queuePriority = 1.f;
     for (uint32_t queueFamily : uniqueQueueFamilyIndices) {
@@ -44,6 +48,7 @@ void VQDevice::CreateLogicalDeviceAndQueue(const std::vector<const char*>& exten
     createInfo.pQueueCreateInfos = queueCreateInfos.data();
     createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     createInfo.pEnabledFeatures = &deviceFeatures;
+    createInfo.pNext = &deviceFeaturesVk12;
     createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
     createInfo.ppEnabledExtensionNames = extensions.data(); // enable swapchain extension
     VK_CHECK_RESULT(vkCreateDevice(this->physicalDevice, &createInfo, nullptr, &this->logicalDevice));
