@@ -103,10 +103,6 @@ class VulkanEngine
     };
 
   public:
-    enum class ColorSpace{
-        RGB,
-        CMY
-    };
 
     enum class TetraMode
     {

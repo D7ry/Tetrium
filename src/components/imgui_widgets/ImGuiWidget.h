@@ -1,6 +1,8 @@
 #pragma once
 #include "imgui.h"
 #include <map>
+#include "structs/ColorSpace.h"
+
 
 class VulkanEngine;
 
@@ -10,27 +12,27 @@ class ImGuiWidget
 {
   public:
     ImGuiWidget(){};
-    virtual void Draw(const VulkanEngine* engine) = 0;
+    virtual void Draw(const VulkanEngine* engine, ColorSpace colorSpace) = 0;
 };
 
 class ImGuiWidgetMut
 {
   public:
     ImGuiWidgetMut(){};
-    virtual void Draw(VulkanEngine* engine) = 0;
+    virtual void Draw(VulkanEngine* engine, ColorSpace colorSpace) = 0;
 };
 
 class ImGuiWidgetDeviceInfo : public ImGuiWidget
 {
   public:
-    virtual void Draw(const VulkanEngine* engine) override;
+    virtual void Draw(const VulkanEngine* engine, ColorSpace colorSpace) override;
 };
 
 class ImGuiWidgetPerfPlot : public ImGuiWidget
 {
 
   public:
-    virtual void Draw(const VulkanEngine* engine) override;
+    virtual void Draw(const VulkanEngine* engine, ColorSpace colorSpace) override;
 
   private:
     struct ScrollingBuffer
@@ -61,17 +63,17 @@ class ImGuiWidgetPerfPlot : public ImGuiWidget
 class ImGuiWidgetUBOViewer : public ImGuiWidget
 {
   public:
-    virtual void Draw(const VulkanEngine* engine) override;
+    virtual void Draw(const VulkanEngine* engine, ColorSpace colorSpace) override;
 };
 
 // even-odd frame
 class ImGuiWidgetEvenOdd : public ImGuiWidgetMut
 {
   public:
-    virtual void Draw(VulkanEngine* engine) override;
+    virtual void Draw(VulkanEngine* engine, ColorSpace colorSpace) override;
   private:
     bool _drawTestWindow = false;
-    void drawCalibrationWindow(VulkanEngine* engine);
+    void drawCalibrationWindow(VulkanEngine* engine, ColorSpace colorSpace);
 };
 
 
@@ -79,5 +81,5 @@ class ImGuiWidgetEvenOdd : public ImGuiWidgetMut
 class ImGuiWidgetGraphicsPipeline : public ImGuiWidgetMut
 {
   public:
-    virtual void Draw(VulkanEngine* engine) override;
+    virtual void Draw(VulkanEngine* engine, ColorSpace colorSpace) override;
 };

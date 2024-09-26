@@ -1883,11 +1883,6 @@ void VulkanEngine::drawImGui(ColorSpace colorSpace)
     if (ImGui::Begin(DEFAULTS::Engine::APPLICATION_NAME)) {
         if (ImGui::BeginTabBar("Engine Tab")) {
             if (ImGui::BeginTabItem("General")) {
-                if (colorSpace == ColorSpace::RGB) {
-                    ImGui::Text("RGB imgui frame");
-                } else {
-                    ImGui::Text("CMY imgui frame");
-                }
                 ImGui::SeparatorText("Camera");
                 {
                     ImGui::Text(
@@ -1919,24 +1914,24 @@ void VulkanEngine::drawImGui(ColorSpace colorSpace)
                     ImGui::Text("UI Mode: Deactive");
                 }
                 ImGui::SeparatorText("Engine UBO");
-                _widgetUBOViewer.Draw(this);
+                _widgetUBOViewer.Draw(this, colorSpace);
                 ImGui::SeparatorText("Graphics Pipeline");
-                _widgetGraphicsPipeline.Draw(this);
+                _widgetGraphicsPipeline.Draw(this, colorSpace);
                 ImGui::EndTabItem();
             }
 
             if (ImGui::BeginTabItem("Performance")) {
-                _widgetPerfPlot.Draw(this);
+                _widgetPerfPlot.Draw(this, colorSpace);
                 ImGui::EndTabItem();
             }
 
             if (ImGui::BeginTabItem("Device")) {
-                _widgetDeviceInfo.Draw(this);
+                _widgetDeviceInfo.Draw(this, colorSpace);
                 ImGui::EndTabItem();
             }
 
             if (ImGui::BeginTabItem("Even-Odd")) {
-                _widgetEvenOdd.Draw(this);
+                _widgetEvenOdd.Draw(this, colorSpace);
                 ImGui::EndTabItem();
             }
 

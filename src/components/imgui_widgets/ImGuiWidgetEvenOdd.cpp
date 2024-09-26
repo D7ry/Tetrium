@@ -2,7 +2,7 @@
 
 #include "ImGuiWidget.h"
 
-void ImGuiWidgetEvenOdd::drawCalibrationWindow(VulkanEngine* engine)
+void ImGuiWidgetEvenOdd::drawCalibrationWindow(VulkanEngine* engine, ColorSpace colorSpace)
 {
     ImGui::SetNextWindowPos(ImVec2(0, 0));
     ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
@@ -21,12 +21,10 @@ void ImGuiWidgetEvenOdd::drawCalibrationWindow(VulkanEngine* engine)
         _drawTestWindow = false;
     }
 
-    bool isEven = engine->isEvenFrame();
-
-    if (isEven) {
-        ImGui::Text("Is even frame!");
+    if (colorSpace == ColorSpace::RGB) {
+        ImGui::Text("Color Space: RGB");
     } else {
-        ImGui::Text("Is odd frame!");
+        ImGui::Text("Color Space: CMY");
     }
 
     { // draw RGBCMY quads
@@ -40,9 +38,6 @@ void ImGuiWidgetEvenOdd::drawCalibrationWindow(VulkanEngine* engine)
             IM_COL32(255, 0, 0, 255), // Red
             IM_COL32(0, 255, 0, 255), // Green
             IM_COL32(0, 0, 255, 255), // Blue
-            // IM_COL32(255, 255, 0, 255), // Yellow
-            // IM_COL32(255, 0, 255, 255), // Magenta
-            // IM_COL32(0, 255, 255, 255)  // Cyan
         };
 
         // Get the window size
@@ -53,10 +48,10 @@ void ImGuiWidgetEvenOdd::drawCalibrationWindow(VulkanEngine* engine)
 
         int iBegin;
         int iEnd;
-        if (engine->isEvenFrame()) {
+        if (colorSpace == ColorSpace::RGB) {
             iBegin = 0;
             iEnd = 3;
-        } else {
+        } else { // CMY
             iBegin = 3;
             iEnd = 6;
         }
@@ -68,7 +63,7 @@ void ImGuiWidgetEvenOdd::drawCalibrationWindow(VulkanEngine* engine)
         }
     }
 
-    ImGui::Checkbox("Flip Even Odd", &engine->_flipEvenOdd);
+    ImGui::Checkbox("Flip RGB/CMY", &engine->_flipEvenOdd);
     if (engine->_tetraMode == VulkanEngine::TetraMode::kEvenOddSoftwareSync) {
         ImGui::SliderInt(
             "Software Sync Timing Offset (ns)",
@@ -85,7 +80,7 @@ void ImGuiWidgetEvenOdd::drawCalibrationWindow(VulkanEngine* engine)
     ImGui::End();
 }
 
-void ImGuiWidgetEvenOdd::Draw(VulkanEngine* engine)
+void ImGuiWidgetEvenOdd::Draw(VulkanEngine* engine, ColorSpace colorSpace)
 {
     const char* evenOddMode = nullptr;
 
@@ -120,6 +115,6 @@ void ImGuiWidgetEvenOdd::Draw(VulkanEngine* engine)
     }
 
     if (_drawTestWindow) {
-        drawCalibrationWindow(engine);
+        drawCalibrationWindow(engine, colorSpace);
     }
 }

@@ -26,7 +26,7 @@ void ImGuiWidgetPerfPlot::ScrollingBuffer::Erase() {
     }
 }
 
-void ImGuiWidgetPerfPlot::Draw(const VulkanEngine* engine) {
+void ImGuiWidgetPerfPlot::Draw(const VulkanEngine* engine, ColorSpace colorSpace) {
     ImGui::Checkbox("Show Perf Plot", std::addressof(_wantShowPerfPlot));
     double deltaTimeSeconds = engine->_deltaTimer.GetDeltaTimeSeconds();
     ImGui::Text("Framerate: %f", 1 / deltaTimeSeconds);
