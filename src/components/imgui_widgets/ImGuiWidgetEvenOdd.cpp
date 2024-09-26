@@ -1,6 +1,7 @@
-#include "VulkanEngine.h"
+#include <iostream>
 
 #include "ImGuiWidget.h"
+#include "VulkanEngine.h"
 
 void ImGuiWidgetEvenOdd::drawColorQuadTest()
 {
@@ -85,6 +86,8 @@ void ImGuiWidgetEvenOdd::drawCalibrationWindow(VulkanEngine* engine, ColorSpace 
     } else {
         ImGui::Text("Color Space: CMY");
     }
+
+    ImGui::Text("Num Dropped Frame: %u", engine->_evenOddDebugCtx.numDroppedFrames);
 
     { // draw RGBCMY quads
         ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -182,5 +185,29 @@ void ImGuiWidgetEvenOdd::Draw(VulkanEngine* engine, ColorSpace colorSpace)
     }
     if (_drawQuadColorTest) {
         drawColorQuadTest();
+    }
+
+    ImGui::Text("Stress Test");
+
+    if (_stressTesting) {
+        ImGui::Text("Stress testing with %i threads...", NUM_STRESS_THREADS);
+        ImGui::SameLine();
+        if (ImGui::Button("Stop")) {
+            _stressTesting = false;
+        }
+    } else {
+        if (ImGui::Button("Start")) {
+            for (int i = 0; i < NUM_STRESS_THREADS; i++) {
+                auto stressFunc = [this, i]() {
+                    while (_stressTesting) {
+                        std::cout << "here" << i << std::endl;
+                    }
+                    std::cout << i << "done" << std::endl;
+                };
+                _stressThreads[i] = std::thread(stressFunc);
+                _stressThreads[i].detach();
+            }
+            _stressTesting = true;
+        }
     }
 }

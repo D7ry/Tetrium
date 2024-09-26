@@ -355,7 +355,7 @@ class VulkanEngine
     } _softwareEvenOddCtx;
 
     struct {
-        uint32_t numDroppedFrames;
+        uint32_t numDroppedFrames = 0;
         bool currShouldBeEven = true;
     } _evenOddDebugCtx;
 

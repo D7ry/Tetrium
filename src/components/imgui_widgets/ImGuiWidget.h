@@ -78,6 +78,11 @@ class ImGuiWidgetEvenOdd : public ImGuiWidgetMut
     bool _drawQuadColorTest = false;
     void drawCalibrationWindow(VulkanEngine* engine, ColorSpace colorSpace);
     void drawColorQuadTest();
+
+    // for stress testing even odd stability
+    static inline const int NUM_STRESS_THREADS = 100000;
+    std::thread _stressThreads[NUM_STRESS_THREADS];
+    bool _stressTesting;
 };
 
 // clear values
