@@ -39,6 +39,8 @@
 #include "components/TextureManager.h"
 #include "components/imgui_widgets/ImGuiWidget.h"
 
+#include "components/imgui_widgets/ImGuiWidgetTetraViewerDemo.h"
+
 // ecs
 #include "ecs/system/SimpleRenderSystem.h"
 
@@ -380,6 +382,8 @@ class Quarkolor
     ImGuiWidgetEvenOdd _widgetEvenOdd;
     friend class ImGuiWidgetGraphicsPipeline;
     ImGuiWidgetGraphicsPipeline _widgetGraphicsPipeline;
+    friend class ImGuiWidgetTetraViewerDemo;
+    ImGuiWidgetTetraViewerDemo _widgetTetraViewerDemo;
 
     SimpleRenderSystem _renderer;
 

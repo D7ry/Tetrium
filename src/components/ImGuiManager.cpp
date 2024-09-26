@@ -202,10 +202,11 @@ void ImGuiManager::InitializeFrameBuffer(
     DEBUG("Imgui frame buffers created.");
 }
 
-void ImGuiManager::InitializeDescriptorPool(int frames_in_flight, VkDevice logicalDevice)
+void ImGuiManager::InitializeDescriptorPool(int poolSize, VkDevice logicalDevice)
 {
+    ASSERT(poolSize >= NUM_FRAME_IN_FLIGHT);
     // create a pool that will allocate to actual descriptor sets
-    uint32_t descriptorSetCount = static_cast<uint32_t>(frames_in_flight);
+    uint32_t descriptorSetCount = static_cast<uint32_t>(poolSize);
     VkDescriptorPoolSize poolSizes[] = {
         {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, descriptorSetCount} // image sampler for imgui
     };

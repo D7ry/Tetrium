@@ -563,6 +563,8 @@ void Quarkolor::Init(const Quarkolor::InitOptions& options)
     initDefaultStates();
 
     createFunnyObjects();
+
+    _widgetTetraViewerDemo.TempSetup(_device.get());
 }
 
 void Quarkolor::Run()
@@ -808,7 +810,9 @@ void Quarkolor::initVulkan()
         _swapChain.extent
     );
     this->_imguiManager.InitializeImgui();
-    this->_imguiManager.InitializeDescriptorPool(NUM_FRAME_IN_FLIGHT, _device->logicalDevice);
+    this->_imguiManager.InitializeDescriptorPool(
+        DEFAULTS::ImGui::TEXTURE_DESCRIPTOR_POOL_SIZE, _device->logicalDevice
+    );
     this->_imguiManager.BindVulkanResources(
         _window,
         _instance,
@@ -1979,6 +1983,11 @@ void Quarkolor::drawImGui(ColorSpace colorSpace)
 
             if (ImGui::BeginTabItem("Even-Odd")) {
                 _widgetEvenOdd.Draw(this, colorSpace);
+                ImGui::EndTabItem();
+            }
+
+            if (ImGui::BeginTabItem("Tetra Viewer")) {
+                _widgetTetraViewerDemo.Draw(this, colorSpace);
                 ImGui::EndTabItem();
             }
 

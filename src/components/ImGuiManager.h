@@ -43,7 +43,7 @@ class ImGuiManager
         VkExtent2D extent
     );
 
-    void InitializeDescriptorPool(int frames_in_flight, VkDevice logicalDevice);
+    void InitializeDescriptorPool(int poolSize, VkDevice logicalDevice);
 
     // Create a new frame and records all ImGui::**** draws
     // for the draw calls to actually be presented, call RecordCommandBuffer(),
