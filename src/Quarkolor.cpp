@@ -800,8 +800,6 @@ void Quarkolor::initVulkan()
     this->_imguiManager.InitializeRenderPass(
         this->_device->logicalDevice, _swapChain.imageFormat, imguiInitialLayout, imguiFinalLayout
     );
-    // FIXME: need to recreate fb on resize
-    // low priority since we don't resize
     _imguiManager.InitializeFrameBuffer(
         _swapChain.image.size(),
         _device->logicalDevice,
@@ -809,25 +807,18 @@ void Quarkolor::initVulkan()
         _renderContexts.CMY.virtualFrameBuffer.imageView,
         _swapChain.extent
     );
-    // NOTE: this has to go after ImGuiManager::InitializeRenderPass
-    // because the function also creates imgui's frame buffer
-    // TODO: maybe separate them?
-    // this->createFramebuffers(_mainWindowSwapChain);
-    //
-    if (1) { // init misc imgui resources
-        this->_imguiManager.InitializeImgui();
-        this->_imguiManager.InitializeDescriptorPool(NUM_FRAME_IN_FLIGHT, _device->logicalDevice);
-        this->_imguiManager.BindVulkanResources(
-            _window,
-            _instance,
-            _device->physicalDevice,
-            _device->logicalDevice,
-            _device->queueFamilyIndices.graphicsFamily.value(),
-            _device->graphicsQueue,
-            _renderContexts.RGB.virtualFrameBuffer.frameBuffer.size(
-            ) // doesn't matter if it's RGB or CMY
-        );
-    }
+    this->_imguiManager.InitializeImgui();
+    this->_imguiManager.InitializeDescriptorPool(NUM_FRAME_IN_FLIGHT, _device->logicalDevice);
+    this->_imguiManager.BindVulkanResources(
+        _window,
+        _instance,
+        _device->physicalDevice,
+        _device->logicalDevice,
+        _device->queueFamilyIndices.graphicsFamily.value(),
+        _device->graphicsQueue,
+        _renderContexts.RGB.virtualFrameBuffer.frameBuffer.size(
+        ) // doesn't matter if it's RGB or CMY
+    );
 
     // even-odd specific resource checkup and setup
     switch (_tetraMode) {

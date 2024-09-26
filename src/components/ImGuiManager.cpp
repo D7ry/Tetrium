@@ -233,6 +233,7 @@ void ImGuiManager::Cleanup(VkDevice logicalDevice)
     ImPlot::DestroyContext();
     ImGui::DestroyContext();
 
+    DestroyFrameBuffers(logicalDevice);
     vkDestroyRenderPass(logicalDevice, _imGuiRenderPass, nullptr);
     vkDestroyDescriptorPool(logicalDevice, _imguiDescriptorPool, nullptr);
     DEBUG("cleaned up imgui");
