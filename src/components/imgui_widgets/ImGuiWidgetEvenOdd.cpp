@@ -138,45 +138,51 @@ void ImGuiWidgetEvenOdd::drawCalibrationWindow(Quarkolor* engine, ColorSpace col
         );
     }
 
-    if (!_calibrationInProgress) {
-        if (ImGui::Button("Start Auto Calibration") && colorSpace == ColorSpace::RGB) {
-            startAutoCalibration(engine);
+    if (ImGui::CollapsingHeader("Auto Calibration")) {
+        if (!_calibrationInProgress) {
+            if (ImGui::Button("Calibrate") && colorSpace == ColorSpace::RGB) {
+                startAutoCalibration(engine);
+            }
         }
-    }
 
-    // Display calibration status
-    if (_calibrationInProgress) {
-        ImGui::Text("Calibration in progress...");
-        ImGui::PushStyleColor(
-            ImGuiCol_PlotHistogram, ImVec4(0.3f, 0.7f, 0.3f, 1.0f)
-        );                                                                       // Green progress
-        ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.1f, 0.1f, 0.1f, 1.0f)); // Dark background
-        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 5.0f);
-        ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
-        ImGui::ProgressBar(_calibrationProgress, ImVec2{ImGui::GetWindowWidth() * 0.6f, 0});
-        ImGui::PopStyleVar(2);
-        ImGui::PopStyleColor(2);
-        if (ImGui::Button("Cancel Calibration")) {
-            _calibrationInProgress = false;
+        // Display calibration status
+        if (_calibrationInProgress) {
+            ImGui::Text("Calibration in progress...");
+            ImGui::PushStyleColor(
+                ImGuiCol_PlotHistogram, ImVec4(0.3f, 0.7f, 0.3f, 1.0f)
+            ); // Green progress
+            ImGui::PushStyleColor(
+                ImGuiCol_FrameBg, ImVec4(0.1f, 0.1f, 0.1f, 1.0f)
+            ); // Dark background
+            ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 5.0f);
+            ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
+            ImGui::ProgressBar(_calibrationProgress, ImVec2{ImGui::GetWindowWidth() * 0.6f, 0});
+            ImGui::PopStyleVar(2);
+            ImGui::PopStyleColor(2);
+            if (ImGui::Button("Cancel")) {
+                _calibrationInProgress = false;
+            }
         }
-    }
 
-    if (_calibrationComplete) {
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 1.0f, 0.0f, 1.0f)); // Bright green color
-        ImGui::Text("Calibration complete.");
-        ImGui::PopStyleColor();
+        if (_calibrationComplete) {
+            ImGui::PushStyleColor(
+                ImGuiCol_Text, ImVec4(0.0f, 1.0f, 0.0f, 1.0f)
+            ); // Bright green color
+            ImGui::Text("Calibration complete.");
+            ImGui::PopStyleColor();
 
-        ImGui::Text("Optimal offset: ");
-        ImGui::SameLine();
-        ImGui::TextColored(
-            ImVec4(0.0f, 1.0f, 0.5f, 1.0f), "%d ns", _optimalOffset.load()
-        ); // Light green color
+            ImGui::Text("Optimal offset: ");
+            ImGui::SameLine();
+            ImGui::TextColored(
+                ImVec4(0.0f, 1.0f, 0.5f, 1.0f), "%d ns", _optimalOffset.load()
+            ); // Light green color
 
-        ImGui::Text("Highest dropped frames at worst offset: ");
-        ImGui::SameLine();
-        ImGui::TextColored(
-            ImVec4(0.0f, 0.8f, 0.0f, 1.0f), "%d", _highestDroppedFrames.load()
-        ); // Slightly darker green
+            ImGui::Text("Highest dropped frames at worst offset: ");
+            ImGui::SameLine();
+            ImGui::TextColored(
+                ImVec4(0.0f, 0.8f, 0.0f, 1.0f), "%d", _highestDroppedFrames.load()
+            ); // Slightly darker green
+        }
     }
 
     ImGui::PopStyleColor();
@@ -298,7 +304,7 @@ int ImGuiWidgetEvenOdd::combinedCalibration(Quarkolor* engine)
 
     // Phase 1: Quick linear scan to find potential regions
     const int quickScanStep = maxOffset / 300;
-    const int quickScanDuration = 30;
+    const int quickScanDuration = 20;
     std::vector<int> highFreqOffsets; // offsets observing high-frequency dropped frames
 
     for (int offset = 0; offset <= maxOffset; offset += quickScanStep) {
@@ -311,13 +317,22 @@ int ImGuiWidgetEvenOdd::combinedCalibration(Quarkolor* engine)
             return worstOffset;
     }
 
+    const int recursiveDescentNumRegions = 50;
+    const int recursiveDescentStep = maxOffset / recursiveDescentNumRegions;
+    // cluster close offsets into regions
+    std::unordered_set<int> highFreqRegions;
+    for (int offset : highFreqOffsets) {
+        int region = std::round(offset / recursiveDescentStep);
+        highFreqRegions.insert(region);
+    }
+
     // Phase 2: Recursive descent on potential regions
     const int minStepSize = maxOffset / 1000; // 0.1% of frame time
-    float progressPerRegion = progBarPortionRecursiveDescent / highFreqOffsets.size();
+    float progressPerRegion = progBarPortionRecursiveDescent / highFreqRegions.size();
 
-    for (const auto& region : highFreqOffsets) {
-        int start = std::max(0, region - quickScanStep);
-        int end = std::min(maxOffset, region + quickScanStep);
+    for (int region : highFreqRegions) {
+        int start = std::max(0, (int)std::round((region - 0.5) * recursiveDescentStep));
+        int end = std::min(maxOffset, (int)std::round((region + 0.5) * recursiveDescentStep));
         recursiveDescentCalibration(
             engine, start, end, minStepSize, worstOffset, progressPerRegion
         );
@@ -337,7 +352,7 @@ void ImGuiWidgetEvenOdd::recursiveDescentCalibration(
     float progressWeight // how much of progress does this descent take?
 )
 {
-    const int recursiveDescentDuration = 150;
+    const int recursiveDescentDuration = 300;
     if (end - start <= stepSize || !_calibrationInProgress)
         return;
 
