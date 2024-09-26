@@ -198,8 +198,7 @@ class VulkanEngine
     SwapChainContext _swapChain;
 
     /* ---------- Initialization Subroutines ---------- */
-    [[deprecated]]
-    GLFWmonitor* cliMonitorSelection();
+    std::pair<GLFWmonitor*, GLFWvidmode> cliMonitorModeSelection();
     void initGLFW(const InitOptions& options);
 
     [[deprecated("Use selectDisplayXlib")]]

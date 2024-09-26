@@ -62,47 +62,72 @@ void VulkanEngine::createFunnyObjects()
 // in CLI pop up a monitor selection interface, that lists
 // monitor names and properties
 // the user would input a number to select the right monitor.
-GLFWmonitor* VulkanEngine::cliMonitorSelection()
+std::pair<GLFWmonitor*, GLFWvidmode> VulkanEngine::cliMonitorModeSelection()
 {
-    const char* line = nullptr;
-    line = "---------- Please Select Monitor Index ----------"; // lol
-    std::cout << line << std::endl;
+    std::cout << "---------- Please Select Monitor and Video Mode ----------" << std::endl;
+
     int numMonitors;
     GLFWmonitor** monitors = glfwGetMonitors(&numMonitors);
-    // print out monitor details
+    if (!monitors || numMonitors == 0) {
+        std::cerr << "No monitors detected!" << std::endl;
+        return {nullptr, GLFWvidmode{}};
+    }
+
+    std::vector<std::pair<GLFWmonitor*, GLFWvidmode>> monitorModes;
+
     for (int monitorIdx = 0; monitorIdx < numMonitors; monitorIdx++) {
         GLFWmonitor* monitor = monitors[monitorIdx];
+        if (!monitor)
+            continue;
+
         const char* name = glfwGetMonitorName(monitor);
-        const GLFWvidmode* mode = glfwGetVideoMode(monitor);
-        fmt::println( // print out monitor's detailed infos
-            "{}: {} {} x {}, {} Hz",
-            monitorIdx,
-            name,
-            mode->width,
-            mode->height,
-            mode->refreshRate
-        );
-    }
-    line = "-------------------------------------------------";
-    std::cout << line << std::endl;
-    // scan user input for monitor idx and choose monitor
-    int monitorIdx = 0;
-    do {
-        std::string input;
-        getline(std::cin, input);
-        char* endPtr;
-        monitorIdx = strtol(input.c_str(), &endPtr, 10);
-        if (endPtr) { // conversion success
-            if (monitorIdx < numMonitors) {
-                break;
-            } else {
-                std::cout << "Monitor index out of range!" << std::endl;
-            }
-        } else {
-            std::cout << "Please input a valid integer number!" << std::endl;
+        if (!name)
+            name = "Unknown";
+
+        int modeCount;
+        const GLFWvidmode* modes = glfwGetVideoModes(monitor, &modeCount);
+        if (!modes || modeCount == 0)
+            continue;
+
+        fmt::println("Monitor {}: {}", monitorIdx, name);
+        for (int modeIdx = 0; modeIdx < modeCount; modeIdx++) {
+            const GLFWvidmode& mode = modes[modeIdx];
+            fmt::println(
+                "  {}: {} x {}, {} Hz",
+                monitorModes.size(),
+                mode.width,
+                mode.height,
+                mode.refreshRate
+            );
+            monitorModes.emplace_back(monitor, mode);
         }
-    } while (1);
-    return monitors[monitorIdx];
+    }
+
+    if (monitorModes.empty()) {
+        std::cerr << "No valid monitor modes found!" << std::endl;
+        return {nullptr, GLFWvidmode{}};
+    }
+
+    std::cout << "-----------------------------------------------------" << std::endl;
+
+    int selectedModeIdx = -1;
+    do {
+        std::cout << "Enter the number of the desired mode: ";
+        std::string input;
+        std::getline(std::cin, input);
+        try {
+            selectedModeIdx = std::stoi(input);
+            if (selectedModeIdx >= 0 && selectedModeIdx < static_cast<int>(monitorModes.size())) {
+                break;
+            }
+        } catch (const std::exception&) {
+            // Invalid input, will prompt again
+        }
+        std::cout << "Invalid input. Please enter a number between 0 and "
+                  << monitorModes.size() - 1 << std::endl;
+    } while (true);
+
+    return monitorModes[selectedModeIdx];
 }
 
 #if __linux__
@@ -376,24 +401,17 @@ void VulkanEngine::initGLFW(const InitOptions& options)
     if (options.fullScreen) {
         monitor = glfwGetPrimaryMonitor();
         if (options.manualMonitorSelection) {
-            monitor = cliMonitorSelection();
+            auto ret = cliMonitorModeSelection();
+            monitor = ret.first;
+            auto mode = ret.second;
+            glfwWindowHint(GLFW_RED_BITS, mode.redBits);
+            glfwWindowHint(GLFW_GREEN_BITS, mode.greenBits);
+            glfwWindowHint(GLFW_BLUE_BITS, mode.blueBits);
+            glfwWindowHint(GLFW_REFRESH_RATE, mode.refreshRate);
+            width = mode.width;
+            height = mode.height;
         }
         fmt::println("Selected {} as full-screen monitor.", glfwGetMonitorName(monitor));
-        // update width and height with monitor's form factor
-        const GLFWvidmode* mode = glfwGetVideoMode(monitor);
-        glfwWindowHint(GLFW_RED_BITS, mode->redBits);
-        glfwWindowHint(GLFW_GREEN_BITS, mode->greenBits);
-        glfwWindowHint(GLFW_BLUE_BITS, mode->blueBits);
-        glfwWindowHint(GLFW_REFRESH_RATE, mode->refreshRate);
-        width = mode->width;
-        height = mode->height;
-#if __APPLE__
-        const int MACOS_SCALING_FACTOR = 2;
-        if (monitor == glfwGetPrimaryMonitor()) {
-            width *= MACOS_SCALING_FACTOR;
-            height *= MACOS_SCALING_FACTOR;
-        }
-#endif // __APPLE__
     }
 
     this->_window
