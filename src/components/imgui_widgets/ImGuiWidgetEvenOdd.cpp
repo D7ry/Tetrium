@@ -2,11 +2,70 @@
 
 #include "ImGuiWidget.h"
 
+void ImGuiWidgetEvenOdd::drawColorQuadTest()
+{
+    ImGui::SetNextWindowPos(ImVec2(0, 0));
+
+    ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
+
+    // ImGui::SetNextWindowFocus();
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0, 0, 0, 1));
+    ImGui::Begin("Color Quad Test");
+
+    if (ImGui::Button("close")) {
+        _drawQuadColorTest = false;
+    }
+    static int currentColor = 0;
+    static int currentIntensity = 7; // Start at 128 (2^7)
+
+    const char* colorNames[] = {"Red", "Green", "Blue", "Cyan", "Magenta", "Yellow"};
+    ImGui::Combo("Primary Color", &currentColor, colorNames, IM_ARRAYSIZE(colorNames));
+
+    ImGui::SliderInt("Intensity (Power of 2)", &currentIntensity, 0, 8);
+
+    ImVec2 windowSize = ImGui::GetContentRegionAvail();
+    ImVec2 quadSize(windowSize.x, windowSize.y);
+
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+    ImVec2 quadMin = ImGui::GetCursorScreenPos();
+    ImVec2 quadMax(quadMin.x + quadSize.x, quadMin.y + quadSize.y);
+
+    // Calculate color based on selection
+    int intensity = 1 << currentIntensity;
+    ImU32 quadColor = 0;
+    switch (currentColor) {
+    case 0:
+        quadColor = IM_COL32(intensity, 0, 0, 255);
+        break; // Red
+    case 1:
+        quadColor = IM_COL32(0, intensity, 0, 255);
+        break; // Green
+    case 2:
+        quadColor = IM_COL32(0, 0, intensity, 255);
+        break; // Blue
+    case 3:
+        quadColor = IM_COL32(0, intensity, intensity, 255);
+        break; // Cyan
+    case 4:
+        quadColor = IM_COL32(intensity, 0, intensity, 255);
+        break; // Magenta
+    case 5:
+        quadColor = IM_COL32(intensity, intensity, 0, 255);
+        break; // Yellow
+    }
+
+    drawList->AddRectFilled(quadMin, quadMax, quadColor);
+
+    ImGui::PopStyleColor();
+    ImGui::End();
+}
+
 void ImGuiWidgetEvenOdd::drawCalibrationWindow(VulkanEngine* engine, ColorSpace colorSpace)
 {
     ImGui::SetNextWindowPos(ImVec2(0, 0));
+
     ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
-    ImGui::SetNextWindowFocus();
+    // ImGui::SetNextWindowFocus();
     //
     ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0, 0, 0, 1));
 
@@ -103,9 +162,7 @@ void ImGuiWidgetEvenOdd::Draw(VulkanEngine* engine, ColorSpace colorSpace)
 
     if (engine->_tetraMode == VulkanEngine::TetraMode::kEvenOddSoftwareSync) {
         int buf = engine->_softwareEvenOddCtx.vsyncFrameOffset;
-        if (ImGui::SliderInt(
-            "VSync frame offset", &buf , -10, 10
-        )) {
+        if (ImGui::SliderInt("VSync frame offset", &buf, -10, 10)) {
             engine->_softwareEvenOddCtx.vsyncFrameOffset = buf;
         }
     }
@@ -114,7 +171,14 @@ void ImGuiWidgetEvenOdd::Draw(VulkanEngine* engine, ColorSpace colorSpace)
         _drawTestWindow = true;
     }
 
+    if (ImGui::Button("Draw Quad Color Test")) {
+        _drawQuadColorTest = true;
+    }
+
     if (_drawTestWindow) {
         drawCalibrationWindow(engine, colorSpace);
+    }
+    if (_drawQuadColorTest) {
+        drawColorQuadTest();
     }
 }

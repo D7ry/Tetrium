@@ -1,8 +1,7 @@
 #pragma once
 #include "imgui.h"
-#include <map>
 #include "structs/ColorSpace.h"
-
+#include <map>
 
 class VulkanEngine;
 
@@ -11,14 +10,14 @@ class VulkanEngine;
 class ImGuiWidget
 {
   public:
-    ImGuiWidget(){};
+    ImGuiWidget() {};
     virtual void Draw(const VulkanEngine* engine, ColorSpace colorSpace) = 0;
 };
 
 class ImGuiWidgetMut
 {
   public:
-    ImGuiWidgetMut(){};
+    ImGuiWidgetMut() {};
     virtual void Draw(VulkanEngine* engine, ColorSpace colorSpace) = 0;
 };
 
@@ -71,11 +70,13 @@ class ImGuiWidgetEvenOdd : public ImGuiWidgetMut
 {
   public:
     virtual void Draw(VulkanEngine* engine, ColorSpace colorSpace) override;
+
   private:
     bool _drawTestWindow = false;
+    bool _drawQuadColorTest = false;
     void drawCalibrationWindow(VulkanEngine* engine, ColorSpace colorSpace);
+    void drawColorQuadTest();
 };
-
 
 // clear values
 class ImGuiWidgetGraphicsPipeline : public ImGuiWidgetMut
