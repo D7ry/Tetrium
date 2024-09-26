@@ -759,14 +759,11 @@ void VulkanEngine::initVulkan()
         createFramebuffers(*ctx);
     }
 
+    // create framebuffer for swapchain
     createSwapchainFrameBuffers(_swapChain, _renderContexts.RGB.renderPass);
 
-    // createSwapChain(_mainWindowSwapChain, mainWindowSurface);
-    // this->_deletionStack.push([this]() { this->cleanupSwapChain(_mainWindowSwapChain); });
-    // this->createImageViews(_mainWindowSwapChain);
-    // _mainRenderPass = this->createRenderPass(_mainWindowSwapChain.imageFormat);
-    // this->createDepthBuffer(_mainWindowSwapChain);
-    //
+    _deletionStack.push([this] { cleanupSwapChain(_swapChain); });
+
     this->createSynchronizationObjects(_syncProjector);
 
     // initial layout comes from separate render passes,
@@ -779,10 +776,7 @@ void VulkanEngine::initVulkan()
               : VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
 
     this->_imguiManager.InitializeRenderPass(
-        this->_device->logicalDevice,
-        _swapChain.imageFormat,
-        imguiInitialLayout,
-        imguiFinalLayout
+        this->_device->logicalDevice, _swapChain.imageFormat, imguiInitialLayout, imguiFinalLayout
     );
     // FIXME: need to recreate fb on resize
     // low priority since we don't resize
@@ -1567,7 +1561,7 @@ void VulkanEngine::createFramebuffers(RenderContext& ctx)
     }
 }
 
-void VulkanEngine::createSwapchainFrameBuffers(SwapChainContext& ctx, VkRenderPass rgbOrCnyPass)
+void VulkanEngine::createSwapchainFrameBuffers(SwapChainContext& ctx, VkRenderPass rgbOrCmyPass)
 {
     DEBUG("Creating framebuffers..");
     // iterate through image views and create framebuffers
@@ -1575,10 +1569,9 @@ void VulkanEngine::createSwapchainFrameBuffers(SwapChainContext& ctx, VkRenderPa
         VkImageView attachments[] = {ctx.imageView[i], ctx.depthImageView};
         VkFramebufferCreateInfo framebufferInfo{};
         framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        framebufferInfo.renderPass = rgbOrCnyPass; // each framebuffer is associated with a
-                                                   // render pass; they need to be compatible
-                                                   // i.e. having same number of attachments and
-                                                   // same formats
+        // NOTE: framebuffer DOES NOT need to have a dedicated render pass,
+        // just need to be compatible. Therefore we pass either RGB&CMY pass
+        framebufferInfo.renderPass = rgbOrCmyPass;
         framebufferInfo.attachmentCount = sizeof(attachments) / sizeof(VkImageView);
         framebufferInfo.pAttachments = attachments;
         framebufferInfo.width = ctx.extent.width;
