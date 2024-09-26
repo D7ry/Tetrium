@@ -66,7 +66,7 @@ class ImGuiManager
   private:
     void setupImGuiStyle();
 
-    VkRenderPass _imGuiRenderPass; // render pass sepcifically for imgui
+    VkRenderPass _imGuiRenderPass = VK_NULL_HANDLE; // render pass sepcifically for imgui
                                    //
     VkDescriptorPool _imguiDescriptorPool;
     struct

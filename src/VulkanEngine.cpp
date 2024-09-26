@@ -628,8 +628,12 @@ void VulkanEngine::setupSoftwareEvenOddFrame()
     ASSERT(_renderContexts.CMY.swapchain->chain);
     ASSERT(_device->logicalDevice);
 
-    vkGetRefreshCycleDurationGOOGLE(
-        _device->logicalDevice, _renderContexts.RGB.swapchain->chain, &refreshCycleDuration
+    PFN_vkGetRefreshCycleDurationGOOGLE ptr = reinterpret_cast<PFN_vkGetRefreshCycleDurationGOOGLE>(
+        vkGetInstanceProcAddr(_instance, "vkGetRefreshCycleDurationGOOGLE")
+    );
+    ASSERT(ptr);
+    VK_CHECK_RESULT(
+        ptr(_device->logicalDevice, _renderContexts.RGB.swapchain->chain, &refreshCycleDuration)
     );
     ctx.nanoSecondsPerFrame = refreshCycleDuration.refreshDuration;
     ASSERT(ctx.nanoSecondsPerFrame != 0);
@@ -637,15 +641,7 @@ void VulkanEngine::setupSoftwareEvenOddFrame()
 
 void VulkanEngine::checkSoftwareEvenOddFrameSupport()
 {
-    DEBUG("Checking software even-odd frame support...");
-#if __APPLE__
-#if !NDEBUG
-    PANIC("\nMacOS software even-odd frame does not work in none-release mode,\n"
-          "MoltenVK's implementation`vkGetRefreshCycleDurationGOOGLE` is bugged\n"
-          "that it segfaults in debug-mode. To use software even-odd sync for macos,\n"
-          "build in release mode.");
-#endif
-#endif // __APPLE__
+    return;
 }
 
 void VulkanEngine::setupHardwareEvenOddFrame()
@@ -766,16 +762,6 @@ void VulkanEngine::initVulkan()
         createFramebuffers(*ctx);
     }
 
-    // FIXME: need to recreate fb on resize
-    // low priority since we don't resize
-    _imguiManager.InitializeFrameBuffer(
-        _swapChain.image.size(),
-        _device->logicalDevice,
-        _renderContexts.RGB.imageView,
-        _renderContexts.CMY.imageView,
-        _swapChain.extent
-    );
-
     createFramebuffers(_swapChain, _renderContexts.RGB.renderPass);
 
     // createSwapChain(_mainWindowSwapChain, mainWindowSurface);
@@ -786,6 +772,15 @@ void VulkanEngine::initVulkan()
     //
     this->createSynchronizationObjects(_syncProjector);
     this->_imguiManager.InitializeRenderPass(this->_device->logicalDevice, _swapChain.imageFormat);
+    // FIXME: need to recreate fb on resize
+    // low priority since we don't resize
+    _imguiManager.InitializeFrameBuffer(
+        _swapChain.image.size(),
+        _device->logicalDevice,
+        _renderContexts.RGB.imageView,
+        _renderContexts.CMY.imageView,
+        _swapChain.extent
+    );
     // NOTE: this has to go after ImGuiManager::InitializeRenderPass
     // because the function also creates imgui's frame buffer
     // TODO: maybe separate them?
@@ -1249,7 +1244,7 @@ VkPresentModeKHR VulkanEngine::chooseSwapPresentMode(
 {
 #if VIRTUAL_VSYNC
     return VK_PRESENT_MODE_IMMEDIATE_KHR; // force immediate mode
-#endif // VIRTUAL_VSYNC
+#endif                                    // VIRTUAL_VSYNC
     INFO("available present modes: ");
     for (const auto& availablePresentMode : availablePresentModes) {
         INFO("{}", string_VkPresentModeKHR(availablePresentMode));
