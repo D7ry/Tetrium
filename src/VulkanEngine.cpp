@@ -37,6 +37,8 @@
 #include <xf86drmMode.h>
 #endif // __linux__
 
+#define VIRTUAL_VSYNC 0
+
 // creates a cow for now
 void VulkanEngine::createFunnyObjects()
 {
@@ -1245,7 +1247,9 @@ VkPresentModeKHR VulkanEngine::chooseSwapPresentMode(
     const std::vector<VkPresentModeKHR>& availablePresentModes
 )
 {
+#if VIRTUAL_VSYNC
     return VK_PRESENT_MODE_IMMEDIATE_KHR; // force immediate mode
+#endif // VIRTUAL_VSYNC
     INFO("available present modes: ");
     for (const auto& availablePresentMode : availablePresentModes) {
         INFO("{}", string_VkPresentModeKHR(availablePresentMode));
@@ -1815,10 +1819,12 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
                                                       //
 
     uint64_t time = 0;
+#if VIRTUAL_VSYNC
     if (_softwareEvenOddCtx.mostRecentPresentFinish) {
         time = _softwareEvenOddCtx.mostRecentPresentFinish
                + _softwareEvenOddCtx.nanoSecondsPerFrame * _softwareEvenOddCtx.vsyncFrameOffset;
     }
+#endif // VIRTUAL_VSYNC
 
     // label each frame with the tick number
     // this is useful for calculating the virtual frame counter,
@@ -2022,7 +2028,7 @@ void VulkanEngine::getMainProjectionMatrix(glm::mat4& projectionMatrix)
 // the old counter uses a nanosecond-precision timer,
 // the new counter takes the max of the image id so far presented.
 // TODO: profile precision of the new counter vs. old counter
-#define NEW_VIRTUAL_FRAMECOUNTER 1
+#define NEW_VIRTUAL_FRAMECOUNTER 0
 
 uint64_t VulkanEngine::getSurfaceCounterValue()
 {
