@@ -160,6 +160,8 @@ void ImGuiWidgetEvenOdd::Draw(VulkanEngine* engine, ColorSpace colorSpace)
 
     ImGui::Text("Num Frame: %llu", engine->getSurfaceCounterValue());
 
+    ImGui::Text("Num Dropped Frame: %u", engine->_evenOddDebugCtx.numDroppedFrames);
+
     if (engine->_tetraMode == VulkanEngine::TetraMode::kEvenOddSoftwareSync) {
         int buf = engine->_softwareEvenOddCtx.vsyncFrameOffset;
         if (ImGui::SliderInt("VSync frame offset", &buf, -10, 10)) {

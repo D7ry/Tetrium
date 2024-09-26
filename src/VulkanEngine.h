@@ -354,6 +354,11 @@ class VulkanEngine
         int vsyncFrameOffset = 0;
     } _softwareEvenOddCtx;
 
+    struct {
+        uint32_t numDroppedFrames;
+        bool currShouldBeEven = true;
+    } _evenOddDebugCtx;
+
     /* ---------- Engine Components ---------- */
     DeletionStack _deletionStack;
     TextureManager _textureManager;

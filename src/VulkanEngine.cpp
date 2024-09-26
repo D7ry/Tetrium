@@ -1804,6 +1804,11 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
         CB2, virtualFramebufferImage, swapchainFramebufferImage, _swapChain.extent
     );
 
+    if (isEven != _evenOddDebugCtx.currShouldBeEven) {
+        _evenOddDebugCtx.numDroppedFrames++;
+    }
+    _evenOddDebugCtx.currShouldBeEven = !isEven; // advance to next frame
+
     // virtual FB has been copied onto the physical FB, paint ImGui now.
     ctx->graphics.CB = CB2;
     CB2.end();
