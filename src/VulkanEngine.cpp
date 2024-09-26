@@ -20,6 +20,8 @@
 #include "imgui.h"
 #include "lib/ImGuiUtils.h"
 
+#include "lib/Utils.h"
+
 // Molten VK Config
 #if __APPLE__
 #include "MoltenVKConfig.h"
@@ -35,11 +37,14 @@
 #include <xf86drmMode.h>
 #endif // __linux__
 
+#define VIRTUAL_VSYNC 0
+
 // creates a cow for now
 void VulkanEngine::createFunnyObjects()
 {
     // lil cow
     Entity* spot = new Entity("Spot");
+
     auto meshInstance = _renderer.MakeMeshInstanceComponent(
         DIRECTORIES::ASSETS + "models/spot.obj", DIRECTORIES::ASSETS + "textures/spot.png"
     );
@@ -47,57 +52,82 @@ void VulkanEngine::createFunnyObjects()
     spot->AddComponent(meshInstance);
     // give the lil cow a transform
     spot->AddComponent(new TransformComponent());
+    _renderer.AddEntity(spot);
     spot->GetComponent<TransformComponent>()->rotation.x = 90;
     spot->GetComponent<TransformComponent>()->rotation.y = 90;
     spot->GetComponent<TransformComponent>()->position.z = 0.05;
     // register lil cow
-    _renderer.AddEntity(spot);
 }
 
 // in CLI pop up a monitor selection interface, that lists
 // monitor names and properties
 // the user would input a number to select the right monitor.
-GLFWmonitor* VulkanEngine::cliMonitorSelection()
+std::pair<GLFWmonitor*, GLFWvidmode> VulkanEngine::cliMonitorModeSelection()
 {
-    const char* line = nullptr;
-    line = "---------- Please Select Monitor Index ----------"; // lol
-    std::cout << line << std::endl;
+    std::cout << "---------- Please Select Monitor and Video Mode ----------" << std::endl;
+
     int numMonitors;
     GLFWmonitor** monitors = glfwGetMonitors(&numMonitors);
-    // print out monitor details
+    if (!monitors || numMonitors == 0) {
+        std::cerr << "No monitors detected!" << std::endl;
+        return {nullptr, GLFWvidmode{}};
+    }
+
+    std::vector<std::pair<GLFWmonitor*, GLFWvidmode>> monitorModes;
+
     for (int monitorIdx = 0; monitorIdx < numMonitors; monitorIdx++) {
         GLFWmonitor* monitor = monitors[monitorIdx];
+        if (!monitor)
+            continue;
+
         const char* name = glfwGetMonitorName(monitor);
-        const GLFWvidmode* mode = glfwGetVideoMode(monitor);
-        fmt::println( // print out monitor's detailed infos
-            "{}: {} {} x {}, {} Hz",
-            monitorIdx,
-            name,
-            mode->width,
-            mode->height,
-            mode->refreshRate
-        );
-    }
-    line = "-------------------------------------------------";
-    std::cout << line << std::endl;
-    // scan user input for monitor idx and choose monitor
-    int monitorIdx = 0;
-    do {
-        std::string input;
-        getline(std::cin, input);
-        char* endPtr;
-        monitorIdx = strtol(input.c_str(), &endPtr, 10);
-        if (endPtr) { // conversion success
-            if (monitorIdx < numMonitors) {
-                break;
-            } else {
-                std::cout << "Monitor index out of range!" << std::endl;
-            }
-        } else {
-            std::cout << "Please input a valid integer number!" << std::endl;
+        if (!name)
+            name = "Unknown";
+
+        int modeCount;
+        const GLFWvidmode* modes = glfwGetVideoModes(monitor, &modeCount);
+        if (!modes || modeCount == 0)
+            continue;
+
+        fmt::println("Monitor {}: {}", monitorIdx, name);
+        for (int modeIdx = 0; modeIdx < modeCount; modeIdx++) {
+            const GLFWvidmode& mode = modes[modeIdx];
+            fmt::println(
+                "  {}: {} x {}, {} Hz",
+                monitorModes.size(),
+                mode.width,
+                mode.height,
+                mode.refreshRate
+            );
+            monitorModes.emplace_back(monitor, mode);
         }
-    } while (1);
-    return monitors[monitorIdx];
+    }
+
+    if (monitorModes.empty()) {
+        std::cerr << "No valid monitor modes found!" << std::endl;
+        return {nullptr, GLFWvidmode{}};
+    }
+
+    std::cout << "-----------------------------------------------------" << std::endl;
+
+    int selectedModeIdx = -1;
+    do {
+        std::cout << "Enter the number of the desired mode: ";
+        std::string input;
+        std::getline(std::cin, input);
+        try {
+            selectedModeIdx = std::stoi(input);
+            if (selectedModeIdx >= 0 && selectedModeIdx < static_cast<int>(monitorModes.size())) {
+                break;
+            }
+        } catch (const std::exception&) {
+            // Invalid input, will prompt again
+        }
+        std::cout << "Invalid input. Please enter a number between 0 and "
+                  << monitorModes.size() - 1 << std::endl;
+    } while (true);
+
+    return monitorModes[selectedModeIdx];
 }
 
 #if __linux__
@@ -371,24 +401,17 @@ void VulkanEngine::initGLFW(const InitOptions& options)
     if (options.fullScreen) {
         monitor = glfwGetPrimaryMonitor();
         if (options.manualMonitorSelection) {
-            monitor = cliMonitorSelection();
+            auto ret = cliMonitorModeSelection();
+            monitor = ret.first;
+            auto mode = ret.second;
+            glfwWindowHint(GLFW_RED_BITS, mode.redBits);
+            glfwWindowHint(GLFW_GREEN_BITS, mode.greenBits);
+            glfwWindowHint(GLFW_BLUE_BITS, mode.blueBits);
+            glfwWindowHint(GLFW_REFRESH_RATE, mode.refreshRate);
+            width = mode.width;
+            height = mode.height;
         }
         fmt::println("Selected {} as full-screen monitor.", glfwGetMonitorName(monitor));
-        // update width and height with monitor's form factor
-        const GLFWvidmode* mode = glfwGetVideoMode(monitor);
-        glfwWindowHint(GLFW_RED_BITS, mode->redBits);
-        glfwWindowHint(GLFW_GREEN_BITS, mode->greenBits);
-        glfwWindowHint(GLFW_BLUE_BITS, mode->blueBits);
-        glfwWindowHint(GLFW_REFRESH_RATE, mode->refreshRate);
-        width = mode->width;
-        height = mode->height;
-#if __APPLE__
-        const int MACOS_SCALING_FACTOR = 2;
-        if (monitor == glfwGetPrimaryMonitor()) {
-            width *= MACOS_SCALING_FACTOR;
-            height *= MACOS_SCALING_FACTOR;
-        }
-#endif // __APPLE__
     }
 
     this->_window
@@ -454,8 +477,8 @@ void VulkanEngine::initDefaultStates()
     // configure states
 
     // clear color
-    _mainRenderPassClearValues[0].color = {0.5f, 0.3f, 0.1f, 1.f};
-    _mainRenderPassClearValues[1].depthStencil = vk::ClearDepthStencilValue(1.f, 0.f);
+    _clearValues[0].color = {0.5f, 0.3f, 0.1f, 1.f};
+    _clearValues[1].depthStencil = vk::ClearDepthStencilValue(1.f, 0.f);
 
     // camera location
     _mainCamera.SetPosition(-2, 0, 0);
@@ -465,6 +488,7 @@ void VulkanEngine::initDefaultStates()
     _lockCursor = false;
     _inputManager.SetActive(_lockCursor);
     _uiMode = false;
+
     ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoMouse;
     ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoKeyboard;
 };
@@ -523,8 +547,9 @@ void VulkanEngine::Init(const VulkanEngine::InitOptions& options)
     { // populate initData
         initCtx.device = this->_device.get();
         initCtx.textureManager = &_textureManager;
-        initCtx.swapChainImageFormat = this->_mainWindowSwapChain.imageFormat;
-        initCtx.renderPass.mainPass = _mainRenderPass;
+        initCtx.swapChainImageFormat = this->_renderContexts.RGB.swapchain->imageFormat;
+        initCtx.renderPass.RGB = _renderContexts.RGB.renderPass;
+        initCtx.renderPass.CMY = _renderContexts.CMY.renderPass;
         for (int i = 0; i < _engineUBOStatic.size(); i++) {
             initCtx.engineUBOStaticDescriptorBufferInfo[i].range = sizeof(EngineUBOStatic);
             initCtx.engineUBOStaticDescriptorBufferInfo[i].buffer = _engineUBOStatic[i].buffer;
@@ -568,7 +593,6 @@ void VulkanEngine::Tick()
             _inputManager.Tick(deltaTime);
             TickContext tickData{&_mainCamera, deltaTime};
             tickData.profiler = &_profiler;
-            drawImGui();
             flushEngineUBOStatic(_currentFrame);
             drawFrame(&tickData, _currentFrame);
             _currentFrame = (_currentFrame + 1) % NUM_FRAME_IN_FLIGHT;
@@ -618,33 +642,22 @@ void VulkanEngine::setupSoftwareEvenOddFrame()
 
     // get refresh cycle
     VkRefreshCycleDurationGOOGLE refreshCycleDuration;
-    ASSERT(_mainWindowSwapChain.chain);
+    ASSERT(_renderContexts.RGB.swapchain->chain);
+    ASSERT(_renderContexts.CMY.swapchain->chain);
     ASSERT(_device->logicalDevice);
 
-    vkGetRefreshCycleDurationGOOGLE(
-        _device->logicalDevice, _mainWindowSwapChain.chain, &refreshCycleDuration
+    PFN_vkGetRefreshCycleDurationGOOGLE ptr = reinterpret_cast<PFN_vkGetRefreshCycleDurationGOOGLE>(
+        vkGetInstanceProcAddr(_instance, "vkGetRefreshCycleDurationGOOGLE")
+    );
+    ASSERT(ptr);
+    VK_CHECK_RESULT(
+        ptr(_device->logicalDevice, _renderContexts.RGB.swapchain->chain, &refreshCycleDuration)
     );
     ctx.nanoSecondsPerFrame = refreshCycleDuration.refreshDuration;
     ASSERT(ctx.nanoSecondsPerFrame != 0);
-
-    timespec tp{};
-    clock_gettime(CLOCK_REALTIME, &tp);
-    ctx.clockTimeBegin = tp.tv_nsec;
-    INFO("clock begin: {}", ctx.clockTimeBegin);
 }
 
-void VulkanEngine::checkSoftwareEvenOddFrameSupport()
-{
-    DEBUG("Checking software even-odd frame support...");
-#if __APPLE__
-#if !NDEBUG
-    PANIC("\nMacOS software even-odd frame does not work in none-release mode,\n"
-          "MoltenVK's implementation`vkGetRefreshCycleDurationGOOGLE` is bugged\n"
-          "that it segfaults in debug-mode. To use software even-odd sync for macos,\n"
-          "build in release mode.");
-#endif
-#endif // __APPLE__
-}
+void VulkanEngine::checkSoftwareEvenOddFrameSupport() { return; }
 
 void VulkanEngine::setupHardwareEvenOddFrame()
 {
@@ -752,27 +765,56 @@ void VulkanEngine::initVulkan()
     this->_device->CreateGraphicsCommandPool();
     this->_device->CreateGraphicsCommandBuffer(NUM_FRAME_IN_FLIGHT);
 
-    createSwapChain(_mainWindowSwapChain, mainWindowSurface);
-    DEBUG(
-        "main window swapchain extent: {} {}",
-        _mainWindowSwapChain.extent.width,
-        _mainWindowSwapChain.extent.height
-    );
+    createSwapChain(_swapChain, mainWindowSurface);
+    createImageViews(_swapChain);
+    ASSERT(_swapChain.imageFormat);
+    createDepthBuffer(_swapChain);
 
-    this->_deletionStack.push([this]() { this->cleanupSwapChain(_mainWindowSwapChain); });
+    // create context for rgb and cmy rendering
+    for (RenderContext* ctx : {&_renderContexts.RGB, &_renderContexts.CMY}) {
+        ctx->swapchain = &_swapChain;
+        ctx->renderPass = createRenderPass(ctx->swapchain->imageFormat);
+        createVirtualFrameBuffers(*ctx);
+        _deletionStack.push([this, ctx] {
+            vkDestroyRenderPass(_device->logicalDevice, ctx->renderPass, NULL);
+            clearVirtualFrameBuffers(*ctx);
+        });
+    }
 
-    this->createImageViews(_mainWindowSwapChain);
-    this->createMainRenderPass(_mainWindowSwapChain.imageFormat);
-    this->createDepthBuffer(_mainWindowSwapChain);
+    // create framebuffer for swapchain
+    createSwapchainFrameBuffers(_swapChain, _renderContexts.RGB.renderPass);
+
+    _deletionStack.push([this] { cleanupSwapChain(_swapChain); });
+
     this->createSynchronizationObjects(_syncProjector);
+
+    // initial layout comes from separate render passes,
+    // final layout depends on tetra mode.
+    VkImageLayout imguiInitialLayout, imguiFinalLayout;
+    imguiInitialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    imguiFinalLayout
+        = _tetraMode == TetraMode::kDualProjector
+              ? VK_IMAGE_LAYOUT_PRESENT_SRC_KHR // dual project's two passes directly present
+              : VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+
     this->_imguiManager.InitializeRenderPass(
-        this->_device->logicalDevice, _mainWindowSwapChain.imageFormat
+        this->_device->logicalDevice, _swapChain.imageFormat, imguiInitialLayout, imguiFinalLayout
+    );
+    // FIXME: need to recreate fb on resize
+    // low priority since we don't resize
+    _imguiManager.InitializeFrameBuffer(
+        _swapChain.image.size(),
+        _device->logicalDevice,
+        _renderContexts.RGB.virtualFrameBuffer.imageView,
+        _renderContexts.CMY.virtualFrameBuffer.imageView,
+        _swapChain.extent
     );
     // NOTE: this has to go after ImGuiManager::InitializeRenderPass
     // because the function also creates imgui's frame buffer
     // TODO: maybe separate them?
-    this->createFramebuffers(_mainWindowSwapChain);
-    { // init misc imgui resources
+    // this->createFramebuffers(_mainWindowSwapChain);
+    //
+    if (1) { // init misc imgui resources
         this->_imguiManager.InitializeImgui();
         this->_imguiManager.InitializeDescriptorPool(NUM_FRAME_IN_FLIGHT, _device->logicalDevice);
         this->_imguiManager.BindVulkanResources(
@@ -782,7 +824,8 @@ void VulkanEngine::initVulkan()
             _device->logicalDevice,
             _device->queueFamilyIndices.graphicsFamily.value(),
             _device->graphicsQueue,
-            _mainWindowSwapChain.frameBuffer.size()
+            _renderContexts.RGB.virtualFrameBuffer.frameBuffer.size(
+            ) // doesn't matter if it's RGB or CMY
         );
     }
 
@@ -1113,7 +1156,7 @@ void VulkanEngine::createSwapChain(VulkanEngine::SwapChainContext& ctx, const Vk
     createInfo.imageColorSpace = surfaceFormat.colorSpace;
     createInfo.imageExtent = extent;
     createInfo.imageArrayLayers = 1;
-    createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
     auto indices = _device->queueFamilyIndices;
     uint32_t queueFamilyIndices[]
@@ -1185,6 +1228,11 @@ void VulkanEngine::cleanupSwapChain(SwapChainContext& ctx)
     vkDestroySwapchainKHR(this->_device->logicalDevice, ctx.chain, nullptr);
 }
 
+void VulkanEngine::recreateVirtualFrameBuffers(RenderContext& ctx)
+{
+    createVirtualFrameBuffers(ctx);
+}
+
 void VulkanEngine::recreateSwapChain(SwapChainContext& ctx)
 {
     // need to recreate render pass for HDR changing, we're not doing that
@@ -1204,7 +1252,7 @@ void VulkanEngine::recreateSwapChain(SwapChainContext& ctx)
     this->createSwapChain(ctx, ctx.surface);
     this->createImageViews(ctx);
     this->createDepthBuffer(ctx);
-    this->createFramebuffers(ctx);
+    this->createSwapchainFrameBuffers(ctx, _renderContexts.RGB.renderPass);
     DEBUG("Swap chain recreated.");
 }
 
@@ -1226,7 +1274,9 @@ VkPresentModeKHR VulkanEngine::chooseSwapPresentMode(
     const std::vector<VkPresentModeKHR>& availablePresentModes
 )
 {
-    // return VK_PRESENT_MODE_IMMEDIATE_KHR; force immediate mode
+#if VIRTUAL_VSYNC
+    return VK_PRESENT_MODE_IMMEDIATE_KHR; // force immediate mode
+#endif                                    // VIRTUAL_VSYNC
     INFO("available present modes: ");
     for (const auto& availablePresentMode : availablePresentModes) {
         INFO("{}", string_VkPresentModeKHR(availablePresentMode));
@@ -1266,9 +1316,9 @@ void VulkanEngine::createImageViews(SwapChainContext& ctx)
     for (size_t i = 0; i < ctx.image.size(); i++) {
         VkImageViewCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        createInfo.image = _mainWindowSwapChain.image[i];
+        createInfo.image = ctx.image[i];
         createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        createInfo.format = _mainWindowSwapChain.imageFormat;
+        createInfo.format = ctx.imageFormat;
         createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
         createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
         createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -1278,12 +1328,7 @@ void VulkanEngine::createImageViews(SwapChainContext& ctx)
         createInfo.subresourceRange.levelCount = 1;
         createInfo.subresourceRange.baseArrayLayer = 0;
         createInfo.subresourceRange.layerCount = 1;
-        if (vkCreateImageView(
-                this->_device->logicalDevice,
-                &createInfo,
-                nullptr,
-                &_mainWindowSwapChain.imageView[i]
-            )
+        if (vkCreateImageView(this->_device->logicalDevice, &createInfo, nullptr, &ctx.imageView[i])
             != VK_SUCCESS) {
             FATAL("Failed to create image views!");
         }
@@ -1307,22 +1352,40 @@ void VulkanEngine::createSynchronizationObjects(
                                                     // can start right away
     for (size_t i = 0; i < NUM_FRAME_IN_FLIGHT; i++) {
         SyncPrimitives& primitive = primitives[i];
-        if (vkCreateSemaphore(
-                _device->logicalDevice, &semaphoreInfo, nullptr, &primitive.semaImageAvailable
-            ) != VK_SUCCESS
-            || vkCreateSemaphore(
-                   _device->logicalDevice, &semaphoreInfo, nullptr, &primitive.semaRenderFinished
-               ) != VK_SUCCESS
-            || vkCreateFence(_device->logicalDevice, &fenceInfo, nullptr, &primitive.fenceInFlight)
-                   != VK_SUCCESS) {
-            FATAL("Failed to create synchronization objects for a frame!");
+        for (VkSemaphore* sema :
+             {&primitive.semaImageAvailable,
+              &primitive.semaRenderFinished,
+              &primitive.semaImageCopyFinished}) {
+            VK_CHECK_RESULT(vkCreateSemaphore(_device->logicalDevice, &semaphoreInfo, nullptr, sema)
+            );
         }
+        VK_CHECK_RESULT(
+            vkCreateFence(_device->logicalDevice, &fenceInfo, nullptr, &primitive.fenceInFlight)
+        );
+
+        // create vsync semahore as a timeline semaphore
+        VkSemaphoreTypeCreateInfo timelineCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO,
+            .pNext = NULL,
+            .semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE,
+            .initialValue = 0,
+        };
+        semaphoreInfo.pNext = &timelineCreateInfo;
+        VK_CHECK_RESULT(
+            vkCreateSemaphore(_device->logicalDevice, &semaphoreInfo, nullptr, &primitive.semaVsync)
+        );
+        semaphoreInfo.pNext = nullptr; // reset for next loop
     }
     this->_deletionStack.push([this, primitives]() {
         for (size_t i = 0; i < NUM_FRAME_IN_FLIGHT; i++) {
             const SyncPrimitives& primitive = primitives[i];
-            vkDestroySemaphore(this->_device->logicalDevice, primitive.semaRenderFinished, nullptr);
-            vkDestroySemaphore(this->_device->logicalDevice, primitive.semaImageAvailable, nullptr);
+            for (auto& sema :
+                 {primitive.semaVsync,
+                  primitive.semaImageCopyFinished,
+                  primitive.semaRenderFinished,
+                  primitive.semaImageAvailable}) {
+                vkDestroySemaphore(this->_device->logicalDevice, sema, nullptr);
+            }
             vkDestroyFence(this->_device->logicalDevice, primitive.fenceInFlight, nullptr);
         }
     });
@@ -1335,7 +1398,9 @@ void VulkanEngine::Cleanup()
     INFO("Resource cleaned up.");
 }
 
-void VulkanEngine::createMainRenderPass(const VkFormat imageFormat)
+// create a render pass. The render pass will be pushed onto
+// the deletion stack.
+vk::RenderPass VulkanEngine::createRenderPass(const VkFormat imageFormat)
 {
     DEBUG("Creating render pass...");
     VkAttachmentDescription colorAttachment{};
@@ -1350,8 +1415,8 @@ void VulkanEngine::createMainRenderPass(const VkFormat imageFormat)
     colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 
     colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    // colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL; // for imgui
+
+    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
     VkAttachmentReference colorAttachmentRef{};
     colorAttachmentRef.attachment = 0;
@@ -1402,52 +1467,159 @@ void VulkanEngine::createMainRenderPass(const VkFormat imageFormat)
     renderPassInfo.dependencyCount = 1;
     renderPassInfo.pDependencies = &dependency;
 
-    if (vkCreateRenderPass(_device->logicalDevice, &renderPassInfo, nullptr, &this->_mainRenderPass)
-        != VK_SUCCESS) {
-        FATAL("Failed to create render pass!");
-    }
+    VkRenderPass pass = VK_NULL_HANDLE;
+    VK_CHECK_RESULT(vkCreateRenderPass(_device->logicalDevice, &renderPassInfo, nullptr, &pass));
 
-    _deletionStack.push([this]() {
-        vkDestroyRenderPass(this->_device->logicalDevice, this->_mainRenderPass, nullptr);
-    });
+    return vk::RenderPass(pass);
 }
 
-void VulkanEngine::createFramebuffers(SwapChainContext& ctx)
+uint32_t findMemoryType(
+    VkPhysicalDevice physicalDevice,
+    uint32_t typeFilter,
+    VkMemoryPropertyFlags properties
+)
+{
+    VkPhysicalDeviceMemoryProperties memProperties;
+    vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
+
+    for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
+        if ((typeFilter & (1 << i))
+            && (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+            return i;
+        }
+    }
+
+    throw std::runtime_error("failed to find suitable memory type!");
+}
+
+void VulkanEngine::createVirtualFrameBuffers(RenderContext& ctx)
 {
     DEBUG("Creating framebuffers..");
     // iterate through image views and create framebuffers
-    if (_mainRenderPass == VK_NULL_HANDLE) {
+    if (ctx.renderPass == VK_NULL_HANDLE) {
         FATAL("Render pass is null!");
     }
+    size_t numFrameBuffers = ctx.swapchain->image.size();
+    ASSERT(numFrameBuffers != 0);
+    VirtualFrameBuffer& vfb = ctx.virtualFrameBuffer;
+    vfb.frameBuffer.resize(numFrameBuffers);
+    vfb.image.resize(numFrameBuffers);
+    vfb.imageView.resize(numFrameBuffers);
+    vfb.imageMemory.resize(numFrameBuffers); // Add this line for image memory
+    SwapChainContext& swapchainContext = *ctx.swapchain;
+    for (size_t i = 0; i < numFrameBuffers; i++) {
+        VkImageCreateInfo imageInfo{};
+        imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        imageInfo.imageType = VK_IMAGE_TYPE_2D;
+        imageInfo.extent.width = swapchainContext.extent.width;
+        imageInfo.extent.height = swapchainContext.extent.height;
+        imageInfo.extent.depth = 1;
+        imageInfo.mipLevels = 1;
+        imageInfo.arrayLayers = 1;
+        imageInfo.format = swapchainContext.imageFormat;
+        imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+        imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+        imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+        imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+        if (vkCreateImage(_device->logicalDevice, &imageInfo, nullptr, &vfb.image[i])
+            != VK_SUCCESS) {
+            FATAL("Failed to create custom image!");
+        }
+
+        // Allocate memory for the image
+        VkMemoryRequirements memRequirements;
+        vkGetImageMemoryRequirements(_device->logicalDevice, vfb.image[i], &memRequirements);
+
+        VkMemoryAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+        allocInfo.allocationSize = memRequirements.size;
+        allocInfo.memoryTypeIndex = findMemoryType(
+            _device->physicalDevice,
+            memRequirements.memoryTypeBits,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+        );
+
+        if (vkAllocateMemory(_device->logicalDevice, &allocInfo, nullptr, &vfb.imageMemory[i])
+            != VK_SUCCESS) {
+            FATAL("Failed to allocate image memory!");
+        }
+
+        vkBindImageMemory(_device->logicalDevice, vfb.image[i], vfb.imageMemory[i], 0);
+
+        // Create image view
+        VkImageViewCreateInfo viewInfo{};
+        viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        viewInfo.image = vfb.image[i];
+        viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        viewInfo.format = swapchainContext.imageFormat;
+        viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        viewInfo.subresourceRange.baseMipLevel = 0;
+        viewInfo.subresourceRange.levelCount = 1;
+        viewInfo.subresourceRange.baseArrayLayer = 0;
+        viewInfo.subresourceRange.layerCount = 1;
+
+        if (vkCreateImageView(_device->logicalDevice, &viewInfo, nullptr, &vfb.imageView[i])
+            != VK_SUCCESS) {
+            FATAL("Failed to create custom image view!");
+        }
+        VkImageView attachments[] = {vfb.imageView[i], swapchainContext.depthImageView};
+        VkFramebufferCreateInfo framebufferInfo{};
+        framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        framebufferInfo.renderPass = ctx.renderPass; // each framebuffer is associated with a
+                                                     // render pass; they need to be compatible
+                                                     // i.e. having same number of attachments
+                                                     // and same formats
+        framebufferInfo.attachmentCount = sizeof(attachments) / sizeof(VkImageView);
+        framebufferInfo.pAttachments = attachments;
+        framebufferInfo.width = swapchainContext.extent.width;
+        framebufferInfo.height = swapchainContext.extent.height;
+        framebufferInfo.layers = 1; // number of layers in image arrays
+        if (vkCreateFramebuffer(
+                _device->logicalDevice, &framebufferInfo, nullptr, &vfb.frameBuffer[i]
+            )
+            != VK_SUCCESS) {
+            FATAL("Failed to create framebuffer!");
+        }
+    }
+}
+
+void VulkanEngine::clearVirtualFrameBuffers(RenderContext& ctx)
+{
+    size_t numFrameBuffers = ctx.swapchain->frameBuffer.size();
+    VirtualFrameBuffer& vfb = ctx.virtualFrameBuffer;
+    for (size_t i = 0; i < numFrameBuffers; i++) {
+        vkDestroyFramebuffer(_device->logicalDevice, vfb.frameBuffer[i], NULL);
+        vkDestroyImageView(_device->logicalDevice, vfb.imageView[i], NULL);
+        vkDestroyImage(_device->logicalDevice, vfb.image[i], NULL);
+        vkFreeMemory(_device->logicalDevice, vfb.imageMemory[i], NULL);
+    }
+}
+
+void VulkanEngine::createSwapchainFrameBuffers(SwapChainContext& ctx, VkRenderPass rgbOrCmyPass)
+{
+    DEBUG("Creating framebuffers..");
+    // iterate through image views and create framebuffers
     for (size_t i = 0; i < ctx.image.size(); i++) {
         VkImageView attachments[] = {ctx.imageView[i], ctx.depthImageView};
         VkFramebufferCreateInfo framebufferInfo{};
         framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        framebufferInfo.renderPass = _mainRenderPass; // each framebuffer is associated with a
-                                                      // render pass; they need to be compatible
-                                                      // i.e. having same number of attachments and
-                                                      // same formats
+        // NOTE: framebuffer DOES NOT need to have a dedicated render pass,
+        // just need to be compatible. Therefore we pass either RGB&CMY pass
+        framebufferInfo.renderPass = rgbOrCmyPass;
         framebufferInfo.attachmentCount = sizeof(attachments) / sizeof(VkImageView);
         framebufferInfo.pAttachments = attachments;
         framebufferInfo.width = ctx.extent.width;
         framebufferInfo.height = ctx.extent.height;
         framebufferInfo.layers = 1; // number of layers in image arrays
         if (vkCreateFramebuffer(
-                _device->logicalDevice,
-                &framebufferInfo,
-                nullptr,
-                &_mainWindowSwapChain.frameBuffer[i]
+                _device->logicalDevice, &framebufferInfo, nullptr, &ctx.frameBuffer[i]
             )
             != VK_SUCCESS) {
             FATAL("Failed to create framebuffer!");
         }
     }
-    _imguiManager.InitializeFrameBuffer(
-        this->_mainWindowSwapChain.image.size(),
-        _device->logicalDevice,
-        _mainWindowSwapChain.imageView,
-        _mainWindowSwapChain.extent
-    );
 }
 
 void VulkanEngine::createDepthBuffer(SwapChainContext& ctx)
@@ -1490,38 +1662,8 @@ void VulkanEngine::flushEngineUBOStatic(uint8_t frame)
     memcpy(buf.bufferAddress, &ubo, sizeof(ubo));
 }
 
-#define POWER_ON_DISPLAY 0
-
-// TODO: another hack to reduce even-odd frame error,
-// is to minimize time gap between the GetIsEven(),
-// and the even-odd rendering subroutines. If the gap
-// is too long, we may be rendering to an even frame because GetIsEven()== true, while
-// when we commit, the display is demanding an odd frame.
-// The best solution to this would be to render to two separate frame buffers
-// for every draw call, and determine which one to commit,
-// at commit time, through GetIsEven().
-//
 void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
 {
-#if POWER_ON_DISPLAY
-    static bool poweredOn = false;
-    if (false && !poweredOn) { // power display on, seems unnecessary
-        poweredOn = true;
-        // power on display
-        DEBUG("Turning display on...");
-        VkDisplayPowerInfoEXT powerInfo{
-            .sType = VK_STRUCTURE_TYPE_DISPLAY_POWER_INFO_EXT,
-            .pNext = VK_NULL_HANDLE,
-            .powerState = VkDisplayPowerStateEXT::VK_DISPLAY_POWER_STATE_ON_EXT
-        };
-        PFN_vkDisplayPowerControlEXT fnPtr = reinterpret_cast<PFN_vkDisplayPowerControlEXT>(
-            vkGetInstanceProcAddr(_instance, "vkDisplayPowerControlEXT")
-        );
-        ASSERT(fnPtr);
-        VK_CHECK_RESULT(fnPtr(_device->logicalDevice, _mainProjectorDisplay.display, &powerInfo));
-        std::this_thread::sleep_for(std::chrono::seconds(5));
-    }
-#endif // POWER_ON_DISPLAY
     SyncPrimitives& sync = _syncProjector[frame];
 
     //  Wait for the previous frame to finish
@@ -1529,17 +1671,19 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     vkWaitForFences(_device->logicalDevice, 1, &sync.fenceInFlight, VK_TRUE, UINT64_MAX);
 
     //  Acquire an image from the swap chain
-    uint32_t imageIndex;
+    uint32_t swapchainImageIndex;
     VkResult result = vkAcquireNextImageKHR(
         this->_device->logicalDevice,
-        _mainWindowSwapChain.chain,
+        _swapChain.chain,
         UINT64_MAX,
         sync.semaImageAvailable,
         VK_NULL_HANDLE,
-        &imageIndex
+        &swapchainImageIndex
     );
     [[unlikely]] if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-        this->recreateSwapChain(_mainWindowSwapChain);
+        this->recreateSwapChain(_swapChain);
+        this->recreateVirtualFrameBuffers(_renderContexts.RGB);
+        this->recreateVirtualFrameBuffers(_renderContexts.CMY);
         return;
     } else [[unlikely]] if (result != VK_SUCCESS) {
         const char* res = string_VkResult(result);
@@ -1549,16 +1693,15 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     // lock the fence
     vkResetFences(this->_device->logicalDevice, 1, &sync.fenceInFlight);
 
-    VkFramebuffer FB = this->_mainWindowSwapChain.frameBuffer[imageIndex];
-    vk::CommandBuffer CB(_device->graphicsCommandBuffers[frame]);
+    vk::CommandBuffer CB1(_device->graphicsCommandBuffers[frame]);
     //  Record a command buffer which draws the scene onto that image
-    CB.reset();
+    CB1.reset();
     { // update ctx->graphics field
         ctx->graphics.currentFrameInFlight = frame;
-        ctx->graphics.currentSwapchainImageIndex = imageIndex;
-        ctx->graphics.CB = CB;
-        ctx->graphics.currentFB = FB;
-        ctx->graphics.currentFBextend = _mainWindowSwapChain.extent;
+        ctx->graphics.currentSwapchainImageIndex = swapchainImageIndex;
+        ctx->graphics.CB = CB1;
+        // ctx->graphics.currentFB = FB;
+        ctx->graphics.currentFBextend = _swapChain.extent;
         getMainProjectionMatrix(ctx->graphics.mainProjectionMatrix);
     }
 
@@ -1567,62 +1710,73 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         beginInfo.flags = 0;                  // Optional
         beginInfo.pInheritanceInfo = nullptr; // Optional
-        CB.begin(vk::CommandBufferBeginInfo());
+        CB1.begin(vk::CommandBufferBeginInfo());
     }
 
     { // main render pass
-        vk::Extent2D extend = _mainWindowSwapChain.extent;
-        // the main render pass renders the actual graphics of the game.
-        { // begin main render pass
-            vk::Rect2D renderArea(VkOffset2D{0, 0}, extend);
-            vk::RenderPassBeginInfo renderPassBeginInfo(
-                _mainRenderPass,
-                FB, // which frame buffer in the swapchain do the pass i.e. all draw calls render
-                    // to?
-                renderArea,
-                _mainRenderPassClearValues.size(),
-                _mainRenderPassClearValues.data(),
-                nullptr
-            );
+        vk::Extent2D extend = _swapChain.extent;
+        vk::Rect2D renderArea(VkOffset2D{0, 0}, extend);
+        vk::RenderPassBeginInfo renderPassBeginInfo(
+            {}, {}, renderArea, _clearValues.size(), _clearValues.data(), nullptr
+        );
 
-            CB.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
-        }
-        { // set viewport and scissor
-            VkViewport viewport{};
-            viewport.x = 0.0f;
-            viewport.y = 0.0f;
-            viewport.width = static_cast<float>(extend.width);
-            viewport.height = static_cast<float>(extend.height);
-            viewport.minDepth = 0.0f;
-            viewport.maxDepth = 1.0f;
-            vkCmdSetViewport(CB, 0, 1, &viewport);
+        VkViewport viewport{};
+        viewport.x = 0.0f;
+        viewport.y = 0.0f;
+        viewport.width = static_cast<float>(extend.width);
+        viewport.height = static_cast<float>(extend.height);
+        viewport.minDepth = 0.0f;
+        viewport.maxDepth = 1.0f;
 
-            VkRect2D scissor{};
-            scissor.offset = {0, 0};
-            scissor.extent = extend;
-            vkCmdSetScissor(CB, 0, 1, &scissor);
+        VkRect2D scissor{};
+        scissor.offset = {0, 0};
+        scissor.extent = extend;
+
+        // two-pass rendering: render RGB and CMY colors onto two virtual FBs
+        {
+            renderPassBeginInfo.renderPass = _renderContexts.RGB.renderPass;
+            renderPassBeginInfo.framebuffer
+                = _renderContexts.RGB.virtualFrameBuffer
+                      .frameBuffer[swapchainImageIndex]; // which frame buffer in the
+                                                         // swapchain do the pass i.e.
+                                                         // all draw calls render to?
+            CB1.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
+            vkCmdSetViewport(CB1, 0, 1, &viewport);
+            vkCmdSetScissor(CB1, 0, 1, &scissor);
+            _renderer.TickRGB(ctx);
+            CB1.endRenderPass();
+
+            drawImGui(ColorSpace::RGB);
+            _imguiManager.RecordCommandBufferRGB(CB1, extend, swapchainImageIndex);
         }
-        _renderer.Tick(ctx);
-        CB.endRenderPass();
+        {
+            renderPassBeginInfo.renderPass = _renderContexts.CMY.renderPass;
+            renderPassBeginInfo.framebuffer
+                = _renderContexts.CMY.virtualFrameBuffer
+                      .frameBuffer[swapchainImageIndex]; // which frame buffer in the
+                                                         // swapchain do the pass i.e.
+                                                         // all draw calls render to?
+            CB1.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
+            vkCmdSetViewport(CB1, 0, 1, &viewport);
+            vkCmdSetScissor(CB1, 0, 1, &scissor);
+            _renderer.TickCMY(ctx);
+            CB1.endRenderPass();
+
+            drawImGui(ColorSpace::CMY);
+            _imguiManager.RecordCommandBufferCMY(CB1, extend, swapchainImageIndex);
+        }
     }
 
-    _imguiManager.RecordCommandBuffer(ctx);
+    CB1.end();
 
-    // end command buffer
-    CB.end();
+    VkSubmitInfo submitInfo{.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO};
 
-    //  Submit the recorded command buffer
-    VkSubmitInfo submitInfo{};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    VkSemaphore waitSemaphores[] = {}; // don't need semaphore since we're drawing on virtual fb
+    VkPipelineStageFlags waitStages[]
+        = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT}; // wait for color to be available
+    std::array<VkCommandBuffer, 1> submitCommandBuffers = {CB1};
 
-    VkSemaphore waitSemaphores[] = {sync.semaImageAvailable}; // use imageAvailable semaphore
-                                                              // to make sure that the image
-                                                              // is available before drawing
-    VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-    std::array<VkCommandBuffer, 1> submitCommandBuffers
-        = {this->_device->graphicsCommandBuffers[frame]};
-
-    submitInfo.waitSemaphoreCount = 1;
+    submitInfo.waitSemaphoreCount = 0;
     submitInfo.pWaitSemaphores = waitSemaphores;
     submitInfo.pWaitDstStageMask = waitStages;
     submitInfo.commandBufferCount = static_cast<uint32_t>(submitCommandBuffers.size());
@@ -1632,16 +1786,57 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = signalSemaphores;
 
-    {
-        // wait time tend to be long if framerate is hardware-capped.
-        PROFILE_SCOPE(&_profiler, "wait: vkAcquireNextImageKHR");
-        // the submission does not start until vkAcquireNextImageKHR
-        // returns, and downs the corresponding _semaRenderFinished
-        // semapohre once it's done.
-        if (vkQueueSubmit(_device->graphicsQueue, 1, &submitInfo, sync.fenceInFlight)
-            != VK_SUCCESS) {
-            FATAL("Failed to submit draw command buffer!");
-        }
+    if (vkQueueSubmit(_device->graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS) {
+        FATAL("Failed to submit draw command buffer!");
+    }
+
+    vk::CommandBuffer CB2(_device->graphicsCommandBuffers2[frame]);
+    CB2.reset();
+    CB2.begin(vk::CommandBufferBeginInfo());
+
+    // choose whether to render the even/odd frame buffer, discarding the other
+    bool isEven = isEvenFrame();
+    VkImage virtualFramebufferImage
+        = isEven ? _renderContexts.RGB.virtualFrameBuffer.image[swapchainImageIndex]
+                 : _renderContexts.CMY.virtualFrameBuffer.image[swapchainImageIndex];
+    VkImage swapchainFramebufferImage = _swapChain.image[swapchainImageIndex];
+    Utils::ImageTransfer::CmdCopyToFB(
+        CB2, virtualFramebufferImage, swapchainFramebufferImage, _swapChain.extent
+    );
+
+    if (isEven != _evenOddDebugCtx.currShouldBeEven) {
+        _evenOddDebugCtx.numDroppedFrames++;
+    }
+    _evenOddDebugCtx.currShouldBeEven = !isEven; // advance to next frame
+
+    // virtual FB has been copied onto the physical FB, paint ImGui now.
+    ctx->graphics.CB = CB2;
+    CB2.end();
+
+    // submit CB2
+    VkSubmitInfo submitInfo2{.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO};
+    std::array<VkCommandBuffer, 1> submitCommandBuffers2 = {CB2};
+    // for the image transfer, two semas need to be uppsed:
+    // 1. the render from the previous CB has to finish for 2 virtual FBs to be available
+    // 2. the actual FB needs to be available for copying
+    VkSemaphore waitSemaphores2[] = {sync.semaImageAvailable, sync.semaRenderFinished};
+    VkPipelineStageFlags waitStages2[] // both sema need to pass before the image transfer happens
+        = {VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT};
+
+    submitInfo2.waitSemaphoreCount = 2;
+    submitInfo2.pWaitSemaphores = waitSemaphores2;
+    submitInfo2.pWaitDstStageMask = waitStages2;
+    submitInfo2.commandBufferCount = static_cast<uint32_t>(submitCommandBuffers2.size());
+    submitInfo2.pCommandBuffers = submitCommandBuffers2.data();
+
+    VkSemaphore signalSemaphores2[]
+        = {sync.semaImageCopyFinished}; // signal this semaphore
+                                        // for the presentation to happen
+    submitInfo2.signalSemaphoreCount = 1;
+    submitInfo2.pSignalSemaphores = signalSemaphores2;
+
+    if (vkQueueSubmit(_device->graphicsQueue, 1, &submitInfo2, sync.fenceInFlight) != VK_SUCCESS) {
+        FATAL("Failed to submit draw command buffer!");
     }
 
     //  Present the swap chain image
@@ -1650,33 +1845,29 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
 
     // wait for sync.semaRenderFinished upped by the previous render command
     presentInfo.waitSemaphoreCount = 1;
-    presentInfo.pWaitSemaphores = signalSemaphores;
+    presentInfo.pWaitSemaphores = signalSemaphores2; // semaImageCopyFinished, virtual fb
+                                                     // is copied over to actual fb, can render
 
-    VkSwapchainKHR swapChains[] = {_mainWindowSwapChain.chain};
+    VkSwapchainKHR swapChains[] = {_swapChain.chain};
 
     presentInfo.swapchainCount = 1;
     presentInfo.pSwapchains = swapChains;
-    presentInfo.pImageIndices = &imageIndex; // specify which image to present
-    presentInfo.pResults = nullptr;          // Optional: can be used to check if
-                                             // presentation was successful
-                                             //
+    presentInfo.pImageIndices = &swapchainImageIndex; // specify which image to present
+    presentInfo.pResults = nullptr;                   // Optional: can be used to check if
+                                                      // presentation was successful
+                                                      //
 
-    // manual v-sync, disabled for now,
-    // manual v-sync is for circumventing the annoying FIFO queue that jams over time
-    // vk::PresentTimeGOOGLE presentTime(
-    //     _currentFrame,
-    //     std::chrono::duration<unsigned long long, std::chrono::nanoseconds::period>(
-    //         _softwareEvenOddCtx.timeEngineStart.time_since_epoch()
-    //     )
-    //             .count()
-    //         + _currentFrame * _softwareEvenOddCtx.nanoSecondsPerFrame
-    // );
-    // uint64_t time = (uint64_t)_softwareEvenOddCtx.mostRecentPresentFinish
-    //                 + (uint64_t)(_softwareEvenOddCtx.nanoSecondsPerFrame * _numTicks) * 100;
-
-    uint64_t time = 0; // no early time limit
+    uint64_t time = 0;
+#if VIRTUAL_VSYNC
+    if (_softwareEvenOddCtx.mostRecentPresentFinish) {
+        time = _softwareEvenOddCtx.mostRecentPresentFinish
+               + _softwareEvenOddCtx.nanoSecondsPerFrame * _softwareEvenOddCtx.vsyncFrameOffset;
+    }
+#endif // VIRTUAL_VSYNC
 
     // label each frame with the tick number
+    // this is useful for calculating the virtual frame counter,
+    // as we can take the max(frame.id) to get the number of presented frames.
     VkPresentTimeGOOGLE presentTime{(uint32_t)_numTicks, time};
 
     VkPresentTimesInfoGOOGLE presentTimeInfo{
@@ -1688,27 +1879,28 @@ void VulkanEngine::drawFrame(TickContext* ctx, uint8_t frame)
 
     presentInfo.pNext = &presentTimeInfo;
 
-    // the present doesn't happen until the render is finished, and the
-    // semaphore is signaled(result of vkQueueSubimt)
     result = vkQueuePresentKHR(_device->presentationQueue, &presentInfo);
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR
         || this->_framebufferResized) {
         ASSERT(
             _tetraMode != TetraMode::kEvenOddHardwareSync
         ); // exclusive window does not resize its swapchain
-        [[unlikely]] this->recreateSwapChain(_mainWindowSwapChain);
+        this->recreateSwapChain(_swapChain);
+        this->recreateVirtualFrameBuffers(_renderContexts.RGB);
+        this->recreateVirtualFrameBuffers(_renderContexts.CMY);
         this->_framebufferResized = false;
     }
 }
 
-void VulkanEngine::initSwapchains() {}
-
-void VulkanEngine::drawImGui()
+void VulkanEngine::drawImGui(ColorSpace colorSpace)
 {
     if (!_wantToDrawImGui) {
         return;
     }
-    PROFILE_SCOPE(&_profiler, "ImGui Draw");
+    // note that drawImGui is called twice per tick for RGB and CMY space,
+    // so we need different profiler ID for them.
+    const char* profileId = colorSpace == ColorSpace::RGB ? "ImGui Draw RGB" : "ImGui Draw CMY";
+    PROFILE_SCOPE(&_profiler, profileId);
     _imguiManager.BeginImGuiContext();
 
     // imgui is associated with the glfw window to handle inputs,
@@ -1770,24 +1962,24 @@ void VulkanEngine::drawImGui()
                     ImGui::Text("UI Mode: Deactive");
                 }
                 ImGui::SeparatorText("Engine UBO");
-                _widgetUBOViewer.Draw(this);
+                _widgetUBOViewer.Draw(this, colorSpace);
                 ImGui::SeparatorText("Graphics Pipeline");
-                _widgetGraphicsPipeline.Draw(this);
+                _widgetGraphicsPipeline.Draw(this, colorSpace);
                 ImGui::EndTabItem();
             }
 
             if (ImGui::BeginTabItem("Performance")) {
-                _widgetPerfPlot.Draw(this);
+                _widgetPerfPlot.Draw(this, colorSpace);
                 ImGui::EndTabItem();
             }
 
             if (ImGui::BeginTabItem("Device")) {
-                _widgetDeviceInfo.Draw(this);
+                _widgetDeviceInfo.Draw(this, colorSpace);
                 ImGui::EndTabItem();
             }
 
             if (ImGui::BeginTabItem("Even-Odd")) {
-                _widgetEvenOdd.Draw(this);
+                _widgetEvenOdd.Draw(this, colorSpace);
                 ImGui::EndTabItem();
             }
 
@@ -1834,8 +2026,8 @@ void VulkanEngine::bindDefaultInputs()
             io.ConfigFlags &= ~ImGuiConfigFlags_NoMouse;
             io.ConfigFlags &= ~ImGuiConfigFlags_NoKeyboard;
             io.MousePos = ImVec2{
-                static_cast<float>(_mainWindowSwapChain.extent.width) / 2,
-                static_cast<float>(_mainWindowSwapChain.extent.height) / 2
+                static_cast<float>(_swapChain.extent.width) / 2,
+                static_cast<float>(_swapChain.extent.height) / 2
             };
             io.WantSetMousePos = true;
         } else {
@@ -1861,7 +2053,7 @@ void VulkanEngine::bindDefaultInputs()
 
 void VulkanEngine::getMainProjectionMatrix(glm::mat4& projectionMatrix)
 {
-    auto& extent = _mainWindowSwapChain.extent;
+    auto& extent = _swapChain.extent;
     projectionMatrix = glm::perspective(
         glm::radians(_FOV),
         extent.width / static_cast<float>(extent.height),
@@ -1875,7 +2067,8 @@ void VulkanEngine::getMainProjectionMatrix(glm::mat4& projectionMatrix)
 // the old counter uses a nanosecond-precision timer,
 // the new counter takes the max of the image id so far presented.
 // TODO: profile precision of the new counter vs. old counter
-#define NEW_VIRTUAL_FRAMECOUNTER 1
+#define NEW_VIRTUAL_FRAMECOUNTER 0
+
 uint64_t VulkanEngine::getSurfaceCounterValue()
 {
     uint64_t surfaceCounter;
@@ -1884,20 +2077,29 @@ uint64_t VulkanEngine::getSurfaceCounterValue()
         uint32_t imageCount;
 #if NEW_VIRTUAL_FRAMECOUNTER
         vkGetPastPresentationTimingGOOGLE(
-            _device->logicalDevice, _mainWindowSwapChain.chain, &imageCount, nullptr
+            _device->logicalDevice, _renderContexts.RGB.swapchain->chain, &imageCount, nullptr
         );
         std::vector<VkPastPresentationTimingGOOGLE> images(imageCount);
 
         vkGetPastPresentationTimingGOOGLE(
-            _device->logicalDevice, _mainWindowSwapChain.chain, &imageCount, images.data()
+            _device->logicalDevice, _renderContexts.RGB.swapchain->chain, &imageCount, images.data()
         );
         for (int i = 0; i < imageCount; i++) {
             _softwareEvenOddCtx.lastPresentedImageId
                 = std::max(_softwareEvenOddCtx.lastPresentedImageId, images.at(i).presentID);
+            _softwareEvenOddCtx.mostRecentPresentFinish = std::max(
+                _softwareEvenOddCtx.mostRecentPresentFinish, images.at(i).actualPresentTime
+            );
+            auto& img = images.at(i);
+            // INFO(
+            //     "{} : expected: {} actual: {}",
+            //     img.presentID,
+            //     img.desiredPresentTime,
+            //     img.actualPresentTime
+            // );
         }
         surfaceCounter = _softwareEvenOddCtx.lastPresentedImageId;
 #else
-        surfaceCounter = _softwareEvenOddCtx.lastPresentedImageId;
         // old method: count the time
         // return a software-based surface counter
         unsigned long long timeSinceStartNanoSeconds

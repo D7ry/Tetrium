@@ -79,7 +79,9 @@ class VulkanEngine
        //https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetRefreshCycleDurationGOOGLE.html
        //https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPastPresentationTimingGOOGLE.html
        //https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPresentTimesInfoGOOGLE.html
-        VK_GOOGLE_DISPLAY_TIMING_EXTENSION_NAME // for query refresh rate
+        VK_GOOGLE_DISPLAY_TIMING_EXTENSION_NAME, // for query refresh rate
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_timeline_semaphore.html
+        VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME, // for softare side v-sync
     };
 
     // instance extensions required for even-odd rendering
@@ -103,6 +105,7 @@ class VulkanEngine
     };
 
   public:
+
     enum class TetraMode
     {
         kEvenOddHardwareSync, // use NVIDIA gpu to hardware sync even-odd frames
@@ -145,9 +148,9 @@ class VulkanEngine
         VkSwapchainKHR chain = VK_NULL_HANDLE;
         VkFormat imageFormat;
         VkExtent2D extent; // resolution of the swapchain images
-        std::vector<VkFramebuffer> frameBuffer;
         std::vector<VkImage> image;
         std::vector<VkImageView> imageView;
+        std::vector<VkFramebuffer> frameBuffer;
         VkImage depthImage;
         VkDeviceMemory depthImageMemory;
         VkImageView depthImageView;
@@ -167,12 +170,35 @@ class VulkanEngine
     {
         VkSemaphore semaImageAvailable;
         VkSemaphore semaRenderFinished;
+        VkSemaphore semaImageCopyFinished;
+        VkSemaphore semaVsync;
         VkFence fenceInFlight;
     };
 
+    // render context for the dual-pass, virtual frame buffer rendering architecture.
+    // RGB and CMY channel each have their own render context,
+    // they are rendered in parallel for each tick; both's render results are written onto `RenderContext::virtualFrameBuffer`,
+    // associated with `RenderContext::imageView`, `RenderContext::imageMemory`, and `RenderContext::image`
+    //
+    // By the end of rendering, only one channel's render results from the "virtual frame buffer" gets
+    // copied to the actual frame buffer, stored in `SwapChainContext::frameBuffer`
+    struct VirtualFrameBuffer
+    {
+        std::vector<VkFramebuffer> frameBuffer;
+        std::vector<VkImage> image;
+        std::vector<VkImageView> imageView;
+        std::vector<VkDeviceMemory> imageMemory; // memory to hold virtual swap chain
+    };
+    struct RenderContext {
+        VkRenderPass renderPass;
+        SwapChainContext* swapchain; // global swap chain
+        VirtualFrameBuffer virtualFrameBuffer;
+    };
+
+    SwapChainContext _swapChain;
+
     /* ---------- Initialization Subroutines ---------- */
-    [[deprecated]]
-    GLFWmonitor* cliMonitorSelection();
+    std::pair<GLFWmonitor*, GLFWvidmode> cliMonitorModeSelection();
     void initGLFW(const InitOptions& options);
 
     [[deprecated("Use selectDisplayXlib")]]
@@ -185,7 +211,7 @@ class VulkanEngine
     void createGlfwWindowSurface();
     void createDevice();
     VkSurfaceKHR createGlfwWindowSurface(GLFWwindow* window);
-    void createMainRenderPass(const VkFormat imageFormat); // create main render pass
+    vk::RenderPass createRenderPass(const VkFormat imageFormat); // create main render pass
     void createSynchronizationObjects(std::array<SyncPrimitives, NUM_FRAME_IN_FLIGHT>& primitives);
     void createFunnyObjects();
 
@@ -204,14 +230,18 @@ class VulkanEngine
         const std::vector<VkPresentModeKHR>& availablePresentModes
     );
 
-    void initSwapchains();
     VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
     void createSwapChain(VulkanEngine::SwapChainContext& ctx, const VkSurfaceKHR surface);
     void recreateSwapChain(SwapChainContext& ctx);
     void cleanupSwapChain(SwapChainContext& ctx);
     void createImageViews(SwapChainContext& ctx);
     void createDepthBuffer(SwapChainContext& ctx);
-    void createFramebuffers(SwapChainContext& ctx);
+    void createSwapchainFrameBuffers(SwapChainContext& ctx, VkRenderPass rgbOrCnyPass);
+
+    /* ---------- FrameBuffers ---------- */
+    void recreateVirtualFrameBuffers(RenderContext& ctx);
+    void createVirtualFrameBuffers(RenderContext& ctx);
+    void clearVirtualFrameBuffers(RenderContext& ctx);
 
     /* ---------- Debug Utilities ---------- */
     bool checkValidationLayerSupport();
@@ -232,7 +262,7 @@ class VulkanEngine
 
     /* ---------- Render-Time Functions ---------- */
     void drawFrame(TickContext* tickData, uint8_t frame);
-    void drawImGui();
+    void drawImGui(ColorSpace colorSpace);
     void flushEngineUBOStatic(uint8_t frame);
     void getMainProjectionMatrix(glm::mat4& projectionMatrix);
 
@@ -243,6 +273,7 @@ class VulkanEngine
     void setupSoftwareEvenOddFrame();        // set up resources for software-based even-odd frame
     uint64_t getSurfaceCounterValue(); // get the number of frames requested so far from the display
     bool isEvenFrame();
+    void setupEvenOddRenderContext(); // set up `_evenOddRenderContexts`
 
     /* ---------- Top-level data ---------- */
     VkInstance _instance;
@@ -257,13 +288,18 @@ class VulkanEngine
     SwapChainContext _mainWindowSwapChain;
     SwapChainContext _auxWindowSwapchain; // unused for now
 
+
+    struct {
+        RenderContext RGB; // red, green, blue
+        RenderContext CMY; // cyan, magenta, yellow
+    } _renderContexts;
+
     /* ---------- Synchronization Primivites ---------- */
     std::array<SyncPrimitives, NUM_FRAME_IN_FLIGHT> _syncProjector;
 
     /* ---------- Render Passes ---------- */
     // main render pass, and currently the only render pass
-    VkRenderPass _mainRenderPass = VK_NULL_HANDLE;
-    std::array<vk::ClearValue, 2> _mainRenderPassClearValues; // [color, depthStencil]
+    std::array<vk::ClearValue, 2> _clearValues; // [color, depthStencil]
 
     /* ---------- Instance-static Data ---------- */
     TetraMode _tetraMode;
@@ -309,14 +345,19 @@ class VulkanEngine
                                       // obtained through a precise vulkan API call
         int timeOffset = 0; // time offset added to the time that's used
                              // to evaluate current frame, used for the old counter method
-        long clockTimeBegin = 0; // obtained from clock_gettime, unused
-        long mostRecentPresentFinish = 0; // unused
+        uint64_t mostRecentPresentFinish = 0;
         uint32_t lastPresentedImageId = 0; // each image are tagged with an image id,
                                            // image id corresponds to the tick # 
                                            // when the images are presented
                                            // tick # and image id are bijective and they
                                            // strictly increase over time
+        int vsyncFrameOffset = 0;
     } _softwareEvenOddCtx;
+
+    struct {
+        uint32_t numDroppedFrames = 0;
+        bool currShouldBeEven = true;
+    } _evenOddDebugCtx;
 
     /* ---------- Engine Components ---------- */
     DeletionStack _deletionStack;
@@ -340,6 +381,6 @@ class VulkanEngine
     friend class ImGuiWidgetGraphicsPipeline;
     ImGuiWidgetGraphicsPipeline _widgetGraphicsPipeline;
 
-    // ecs Systems
     SimpleRenderSystem _renderer;
+
 };

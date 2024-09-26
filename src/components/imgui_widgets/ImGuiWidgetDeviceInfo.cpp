@@ -3,7 +3,7 @@
 #include "ImGuiWidget.h"
 
 // current setup assumes single logical device
-void ImGuiWidgetDeviceInfo::Draw(const VulkanEngine* engine)
+void ImGuiWidgetDeviceInfo::Draw(const VulkanEngine* engine, ColorSpace colorSpace)
 {
     const int INDENT = 20;
     { // GPU

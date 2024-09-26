@@ -98,7 +98,12 @@ void ImGuiManager::BindVulkanResources(
     ImGui_ImplVulkan_Init(&initInfo);
 };
 
-void ImGuiManager::InitializeRenderPass(VkDevice logicalDevice, VkFormat swapChainImageFormat)
+void ImGuiManager::InitializeRenderPass(
+    VkDevice logicalDevice,
+    VkFormat swapChainImageFormat,
+    VkImageLayout initialLayout,
+    VkImageLayout finalLayout
+)
 {
     INFO("Creating render pass...");
     VkAttachmentDescription colorAttachment{};
@@ -112,13 +117,13 @@ void ImGuiManager::InitializeRenderPass(VkDevice logicalDevice, VkFormat swapCha
     colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 
-    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    colorAttachment.initialLayout = initialLayout;
+    colorAttachment.finalLayout = finalLayout;
 
     // set up subpass
     VkAttachmentReference colorAttachmentRef{};
     colorAttachmentRef.attachment = 0;
-    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    colorAttachmentRef.layout = initialLayout;
 
     VkSubpassDescription subpass{};
     subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
@@ -155,27 +160,29 @@ void ImGuiManager::InitializeFonts() { ImGui_ImplVulkan_CreateFontsTexture(); }
 void ImGuiManager::DestroyFrameBuffers(VkDevice device)
 {
     DEBUG("Destroying imgui frame buffers...");
-    for (auto framebuffer : _imGuiFramebuffers) {
-        vkDestroyFramebuffer(device, framebuffer, nullptr);
+    for (auto framebuffer : {&_imGuiFramebuffers.RGB, &_imGuiFramebuffers.CMY}) {
+        for (auto fb : *framebuffer) {
+            vkDestroyFramebuffer(device, fb, nullptr);
+        }
     }
 }
 
 void ImGuiManager::InitializeFrameBuffer(
     int bufferCount,
     VkDevice device,
-    std::vector<VkImageView>& swapChainImageViews,
+    std::vector<VkImageView>& swapChainImageViewsRGB,
+    std::vector<VkImageView>& swapChainImageViewsCMY,
     VkExtent2D extent
 )
 {
     DEBUG("Creating imgui frame buffers...");
-    if (swapChainImageViews.size() != bufferCount) {
-        FATAL("Swap chain image views must be the same size as the number of "
-              "buffers!");
-    }
+    ASSERT(swapChainImageViewsRGB.size() == bufferCount);
+    ASSERT(swapChainImageViewsCMY.size() == bufferCount);
     if (this->_imGuiRenderPass == VK_NULL_HANDLE) {
         FATAL("Render pass must be initialized before creating frame buffers!");
     }
-    _imGuiFramebuffers.resize(bufferCount);
+    _imGuiFramebuffers.RGB.resize(bufferCount);
+    _imGuiFramebuffers.CMY.resize(bufferCount);
     VkImageView attachment[1];
     VkFramebufferCreateInfo info = {};
     info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
@@ -185,9 +192,12 @@ void ImGuiManager::InitializeFrameBuffer(
     info.width = extent.width;
     info.height = extent.height;
     info.layers = 1;
+
     for (uint32_t i = 0; i < bufferCount; i++) {
-        attachment[0] = swapChainImageViews[i];
-        vkCreateFramebuffer(device, &info, nullptr, &_imGuiFramebuffers[i]);
+        attachment[0] = swapChainImageViewsRGB[i];
+        vkCreateFramebuffer(device, &info, nullptr, &_imGuiFramebuffers.RGB[i]);
+        attachment[0] = swapChainImageViewsCMY[i];
+        vkCreateFramebuffer(device, &info, nullptr, &_imGuiFramebuffers.CMY[i]);
     }
     DEBUG("Imgui frame buffers created.");
 }
@@ -225,33 +235,88 @@ void ImGuiManager::Cleanup(VkDevice logicalDevice)
 
     vkDestroyRenderPass(logicalDevice, _imGuiRenderPass, nullptr);
     vkDestroyDescriptorPool(logicalDevice, _imguiDescriptorPool, nullptr);
+    DEBUG("cleaned up imgui");
 }
 
-void ImGuiManager::RecordCommandBuffer(const TickContext* tickData)
+void ImGuiManager::RecordCommandBufferCMY(
+    vk::CommandBuffer cb,
+    vk::Extent2D extent,
+    int swapChainImageIndex
+)
 {
-    auto CB = tickData->graphics.CB;
-    auto FB = tickData->graphics.currentFB;
-    auto extent = tickData->graphics.currentFBextend;
-
     // start render pass
     VkRenderPassBeginInfo renderPassInfo{};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     renderPassInfo.renderPass = _imGuiRenderPass;
-    renderPassInfo.framebuffer = _imGuiFramebuffers[tickData->graphics.currentSwapchainImageIndex];
+    renderPassInfo.framebuffer = _imGuiFramebuffers.CMY[swapChainImageIndex];
     renderPassInfo.renderArea.extent = extent;
     renderPassInfo.renderArea.offset = {0, 0};
     renderPassInfo.clearValueCount = 0;
     renderPassInfo.pClearValues = nullptr;
 
-    vkCmdBeginRenderPass(CB, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+    vkCmdBeginRenderPass(cb, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
     ImDrawData* drawData = ImGui::GetDrawData();
     if (drawData == nullptr) {
         FATAL("Draw data is null!");
     }
-    ImGui_ImplVulkan_RenderDrawData(drawData, CB);
+    ImGui_ImplVulkan_RenderDrawData(drawData, cb);
 
-    vkCmdEndRenderPass(CB);
+    vkCmdEndRenderPass(cb);
+}
+
+void ImGuiManager::RecordCommandBufferRGB(
+    vk::CommandBuffer cb,
+    vk::Extent2D extent,
+    int swapChainImageIndex
+)
+{
+    // start render pass
+    VkRenderPassBeginInfo renderPassInfo{};
+    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    renderPassInfo.renderPass = _imGuiRenderPass;
+    renderPassInfo.framebuffer = _imGuiFramebuffers.RGB[swapChainImageIndex];
+    renderPassInfo.renderArea.extent = extent;
+    renderPassInfo.renderArea.offset = {0, 0};
+    renderPassInfo.clearValueCount = 0;
+    renderPassInfo.pClearValues = nullptr;
+
+    vkCmdBeginRenderPass(cb, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+    ImDrawData* drawData = ImGui::GetDrawData();
+    if (drawData == nullptr) {
+        FATAL("Draw data is null!");
+    }
+    ImGui_ImplVulkan_RenderDrawData(drawData, cb);
+
+    vkCmdEndRenderPass(cb);
+}
+
+void ImGuiManager::RecordCommandBuffer(
+    vk::CommandBuffer cb,
+    vk::Extent2D extent,
+    int swapChainImageIndex
+)
+{
+    // start render pass
+    VkRenderPassBeginInfo renderPassInfo{};
+    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    renderPassInfo.renderPass = _imGuiRenderPass;
+    renderPassInfo.framebuffer = _imGuiFrameBuffer[swapChainImageIndex];
+    renderPassInfo.renderArea.extent = extent;
+    renderPassInfo.renderArea.offset = {0, 0};
+    renderPassInfo.clearValueCount = 0;
+    renderPassInfo.pClearValues = nullptr;
+
+    vkCmdBeginRenderPass(cb, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+    ImDrawData* drawData = ImGui::GetDrawData();
+    if (drawData == nullptr) {
+        FATAL("Draw data is null!");
+    }
+    ImGui_ImplVulkan_RenderDrawData(drawData, cb);
+
+    vkCmdEndRenderPass(cb);
 }
 
 void ImGuiManager::BeginImGuiContext()
@@ -265,7 +330,8 @@ void ImGuiManager::BeginImGuiContext()
 void ImGuiManager::forceDisplaySize(ImVec2 size)
 {
     ImGuiIO& io = ImGui::GetIO();
-    io.DisplaySize = size;    io.DisplayFramebufferScale = {1, 1};
+    io.DisplaySize = size;
+    io.DisplayFramebufferScale = {1, 1};
     ImGui::GetMainViewport()->Size = size;
 }
 

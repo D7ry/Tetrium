@@ -1,5 +1,6 @@
 #pragma once
 #include "imgui.h"
+#include "structs/ColorSpace.h"
 #include <map>
 
 class VulkanEngine;
@@ -9,28 +10,28 @@ class VulkanEngine;
 class ImGuiWidget
 {
   public:
-    ImGuiWidget(){};
-    virtual void Draw(const VulkanEngine* engine) = 0;
+    ImGuiWidget() {};
+    virtual void Draw(const VulkanEngine* engine, ColorSpace colorSpace) = 0;
 };
 
 class ImGuiWidgetMut
 {
   public:
-    ImGuiWidgetMut(){};
-    virtual void Draw(VulkanEngine* engine) = 0;
+    ImGuiWidgetMut() {};
+    virtual void Draw(VulkanEngine* engine, ColorSpace colorSpace) = 0;
 };
 
 class ImGuiWidgetDeviceInfo : public ImGuiWidget
 {
   public:
-    virtual void Draw(const VulkanEngine* engine) override;
+    virtual void Draw(const VulkanEngine* engine, ColorSpace colorSpace) override;
 };
 
 class ImGuiWidgetPerfPlot : public ImGuiWidget
 {
 
   public:
-    virtual void Draw(const VulkanEngine* engine) override;
+    virtual void Draw(const VulkanEngine* engine, ColorSpace colorSpace) override;
 
   private:
     struct ScrollingBuffer
@@ -47,6 +48,8 @@ class ImGuiWidgetPerfPlot : public ImGuiWidget
         void AddPoint(float x, float y);
 
         void Erase();
+
+        bool Empty() { return Data.empty(); }
     };
 
     std::map<const char*, ScrollingBuffer> _scrollingBuffers;
@@ -61,23 +64,51 @@ class ImGuiWidgetPerfPlot : public ImGuiWidget
 class ImGuiWidgetUBOViewer : public ImGuiWidget
 {
   public:
-    virtual void Draw(const VulkanEngine* engine) override;
+    virtual void Draw(const VulkanEngine* engine, ColorSpace colorSpace) override;
 };
 
 // even-odd frame
 class ImGuiWidgetEvenOdd : public ImGuiWidgetMut
 {
   public:
-    virtual void Draw(VulkanEngine* engine) override;
+    virtual void Draw(VulkanEngine* engine, ColorSpace colorSpace) override;
+
   private:
     bool _drawTestWindow = false;
-    void drawCalibrationWindow(VulkanEngine* engine);
-};
+    bool _drawQuadColorTest = false;
+    void drawCalibrationWindow(VulkanEngine* engine, ColorSpace colorSpace);
+    void drawColorQuadTest();
 
+    // for stress testing even odd stability
+    static inline const int NUM_STRESS_THREADS = 100000;
+    std::thread _stressThreads[NUM_STRESS_THREADS];
+    bool _stressTesting;
+
+    // Calibration fields
+    std::atomic<bool> _calibrationInProgress{false};
+    std::atomic<float> _calibrationProgress{0.0f};
+    std::atomic<bool> _calibrationComplete{false};
+    std::atomic<int> _optimalOffset{0};
+    std::atomic<int> _highestDroppedFrames{std::numeric_limits<int>::max()};
+
+    void recursiveDescentCalibration(
+        VulkanEngine* engine,
+        int start,
+        int end,
+        int stepSize,
+        int& worstOffset,
+        float progressWeight
+    );
+    int combinedCalibration(VulkanEngine* engine);
+
+    void startAutoCalibration(VulkanEngine* engine);
+    void autoCalibrationThread(VulkanEngine* engine);
+    int measureDroppedFrames(VulkanEngine* engine, int offset, int duration);
+};
 
 // clear values
 class ImGuiWidgetGraphicsPipeline : public ImGuiWidgetMut
 {
   public:
-    virtual void Draw(VulkanEngine* engine) override;
+    virtual void Draw(VulkanEngine* engine, ColorSpace colorSpace) override;
 };

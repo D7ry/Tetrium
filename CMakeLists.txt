@@ -42,6 +42,7 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 project(quarkolor)
 
 add_executable(${PROJECT_NAME}
+        src/lib/Utils.cpp
         src/main.cpp
         src/VulkanEngine.cpp
         src/components/Logging.cpp
