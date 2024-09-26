@@ -5,22 +5,36 @@
 
 #include "ImGuiWidgetTetraViewerDemo.h"
 #include "components/TextureManager.h"
-#include "components/VulkanUtils.h"
-#include "stb_image.h"
 
 void ImGuiWidgetTetraViewerDemo::Draw(Quarkolor* engine, ColorSpace colorSpace)
 {
-    static bool init = false;
-    static TextureManager::Texture tex;
-    static VkDescriptorSet ds;
-    if (!init) {
-        tex = engine->_textureManager.GetTexture("../assets/textures/spot.png");
-        ds = ImGui_ImplVulkan_AddTexture(tex.sampler, tex.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-        init = true;
+    switch (colorSpace) {
+    case ColorSpace::RGB:
+        if (!rgbLoaded) {
+            auto tex = engine->_textureManager.GetTexture(TETRA_IMAGE_PATH_RGB);
+            auto ds = ImGui_ImplVulkan_AddTexture(
+                tex.sampler, tex.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            );
+            rgb.height = tex.height;
+            rgb.width = tex.width;
+            rgb.ds = ds;
+            rgbLoaded = true;
+        }
+
+        ImGui::Image((ImTextureID)rgb.ds, ImVec2(rgb.width, rgb.height));
+        break;
+    case ColorSpace::CMY:
+        if (!cmyLoaded) {
+            auto tex = engine->_textureManager.GetTexture(TETRA_IMAGE_PATH_CMY);
+            auto ds = ImGui_ImplVulkan_AddTexture(
+                tex.sampler, tex.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            );
+            cmy.height = tex.height;
+            cmy.width = tex.width;
+            cmy.ds = ds;
+            cmyLoaded = true;
+        }
+        ImGui::Image((ImTextureID)cmy.ds, ImVec2(cmy.width, cmy.height));
+        break;
     }
-    ImGui::Begin("Vulkan Texture Test");
-    ImGui::Text("pointer = %p", ds);
-    ImGui::Text("size = %d x %d", tex.width, tex.height);
-    ImGui::Image((ImTextureID)ds, ImVec2(tex.width,tex.height));
-    ImGui::End();
 }
