@@ -49,7 +49,7 @@ class ImGuiWidgetPerfPlot : public ImGuiWidget
 
         void Erase();
 
-        bool Empty() {return Data.empty();}
+        bool Empty() { return Data.empty(); }
     };
 
     std::map<const char*, ScrollingBuffer> _scrollingBuffers;
@@ -83,6 +83,27 @@ class ImGuiWidgetEvenOdd : public ImGuiWidgetMut
     static inline const int NUM_STRESS_THREADS = 100000;
     std::thread _stressThreads[NUM_STRESS_THREADS];
     bool _stressTesting;
+
+    // Calibration fields
+    std::atomic<bool> _calibrationInProgress{false};
+    std::atomic<float> _calibrationProgress{0.0f};
+    std::atomic<bool> _calibrationComplete{false};
+    std::atomic<int> _optimalOffset{0};
+    std::atomic<int> _highestDroppedFrames{std::numeric_limits<int>::max()};
+
+    void recursiveDescentCalibration(
+        VulkanEngine* engine,
+        int start,
+        int end,
+        int stepSize,
+        int& worstOffset,
+        float progressWeight
+    );
+    int combinedCalibration(VulkanEngine* engine);
+
+    void startAutoCalibration(VulkanEngine* engine);
+    void autoCalibrationThread(VulkanEngine* engine);
+    int measureDroppedFrames(VulkanEngine* engine, int offset, int duration);
 };
 
 // clear values
