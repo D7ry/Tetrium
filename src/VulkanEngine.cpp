@@ -2065,7 +2065,6 @@ uint64_t VulkanEngine::getSurfaceCounterValue()
         }
         surfaceCounter = _softwareEvenOddCtx.lastPresentedImageId;
 #else
-        surfaceCounter = _softwareEvenOddCtx.lastPresentedImageId;
         // old method: count the time
         // return a software-based surface counter
         unsigned long long timeSinceStartNanoSeconds

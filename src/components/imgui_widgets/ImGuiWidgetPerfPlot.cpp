@@ -82,15 +82,17 @@ void ImGuiWidgetPerfPlot::Draw(const VulkanEngine* engine, ColorSpace colorSpace
             if (colorSpace == ColorSpace::RGB) {
                 buf.AddPoint(engine->_timeSinceStartSeconds, ms);
             }
-            ImPlot::PlotLine(
-                entry.name,
-                &buf.Data[0].x,
-                &buf.Data[0].y,
-                buf.Data.size(),
-                0,
-                buf.Offset,
-                2 * sizeof(float)
-            );
+            if (!buf.Empty()) {
+                ImPlot::PlotLine(
+                    entry.name,
+                    &buf.Data[0].x,
+                    &buf.Data[0].y,
+                    buf.Data.size(),
+                    0,
+                    buf.Offset,
+                    2 * sizeof(float)
+                );
+            }
         }
         { // text section
             int indentWidth = entry.level * 10;

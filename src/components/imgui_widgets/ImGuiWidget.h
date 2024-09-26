@@ -48,6 +48,8 @@ class ImGuiWidgetPerfPlot : public ImGuiWidget
         void AddPoint(float x, float y);
 
         void Erase();
+
+        bool Empty() {return Data.empty();}
     };
 
     std::map<const char*, ScrollingBuffer> _scrollingBuffers;
