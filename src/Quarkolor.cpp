@@ -1218,7 +1218,6 @@ void Quarkolor::cleanupSwapChain(SwapChainContext& ctx)
     vkDestroyImage(_device->logicalDevice, ctx.depthImage, nullptr);
     vkFreeMemory(_device->logicalDevice, ctx.depthImageMemory, nullptr);
 
-    _imguiManager.DestroyFrameBuffers(_device->logicalDevice);
     for (VkFramebuffer framebuffer : ctx.frameBuffer) {
         vkDestroyFramebuffer(this->_device->logicalDevice, framebuffer, nullptr);
     }
@@ -1228,9 +1227,20 @@ void Quarkolor::cleanupSwapChain(SwapChainContext& ctx)
     vkDestroySwapchainKHR(this->_device->logicalDevice, ctx.chain, nullptr);
 }
 
-void Quarkolor::recreateVirtualFrameBuffers(RenderContext& ctx)
+void Quarkolor::recreateVirtualFrameBuffers()
 {
-    createVirtualFrameBuffers(ctx);
+    clearVirtualFrameBuffers(_renderContexts.RGB);
+    clearVirtualFrameBuffers(_renderContexts.CMY);
+    createVirtualFrameBuffers(_renderContexts.RGB);
+    createVirtualFrameBuffers(_renderContexts.CMY);
+    _imguiManager.DestroyFrameBuffers(_device->logicalDevice);
+    _imguiManager.InitializeFrameBuffer(
+        _swapChain.image.size(),
+        _device->logicalDevice,
+        _renderContexts.RGB.virtualFrameBuffer.imageView,
+        _renderContexts.CMY.virtualFrameBuffer.imageView,
+        _swapChain.extent
+    );
 }
 
 void Quarkolor::recreateSwapChain(SwapChainContext& ctx)
@@ -1682,8 +1692,7 @@ void Quarkolor::drawFrame(TickContext* ctx, uint8_t frame)
     );
     [[unlikely]] if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
         this->recreateSwapChain(_swapChain);
-        this->recreateVirtualFrameBuffers(_renderContexts.RGB);
-        this->recreateVirtualFrameBuffers(_renderContexts.CMY);
+        recreateVirtualFrameBuffers();
         return;
     } else [[unlikely]] if (result != VK_SUCCESS) {
         const char* res = string_VkResult(result);
@@ -1886,8 +1895,7 @@ void Quarkolor::drawFrame(TickContext* ctx, uint8_t frame)
             _tetraMode != TetraMode::kEvenOddHardwareSync
         ); // exclusive window does not resize its swapchain
         this->recreateSwapChain(_swapChain);
-        this->recreateVirtualFrameBuffers(_renderContexts.RGB);
-        this->recreateVirtualFrameBuffers(_renderContexts.CMY);
+        recreateVirtualFrameBuffers();
         this->_framebufferResized = false;
     }
 }

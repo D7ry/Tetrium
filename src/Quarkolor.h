@@ -239,7 +239,7 @@ class Quarkolor
     void createSwapchainFrameBuffers(SwapChainContext& ctx, VkRenderPass rgbOrCnyPass);
 
     /* ---------- FrameBuffers ---------- */
-    void recreateVirtualFrameBuffers(RenderContext& ctx);
+    void recreateVirtualFrameBuffers();
     void createVirtualFrameBuffers(RenderContext& ctx);
     void clearVirtualFrameBuffers(RenderContext& ctx);
 
