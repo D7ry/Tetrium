@@ -1,4 +1,4 @@
-#include "Quarkolor.h"
+#include "Tetrium.h"
 
 #include "ImGuiWidget.h"
 
@@ -37,12 +37,12 @@ void DrawMat4(
     ImGui::PopID();
 }
 
-void ImGuiWidgetUBOViewer::Draw(const Quarkolor* engine, ColorSpace colorSpace) {
+void ImGuiWidgetUBOViewer::Draw(const Tetrium* engine, ColorSpace colorSpace) {
     const VQBuffer& currentUBO
         = engine->_engineUBOStatic[engine->_currentFrame];
 
-    Quarkolor::EngineUBOStatic* ubo
-        = reinterpret_cast<Quarkolor::EngineUBOStatic*>(
+    Tetrium::EngineUBOStatic* ubo
+        = reinterpret_cast<Tetrium::EngineUBOStatic*>(
             currentUBO.bufferAddress
         );
 

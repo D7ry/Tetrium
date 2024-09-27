@@ -49,7 +49,7 @@ class TickContext;
 // TODO: implement even-odd for non-nvidia GPUs
 // may be much less accurate but useful for testing
 
-class Quarkolor
+class Tetrium
 {
   private:
     /* ---------- Extension Configurations ---------- */
@@ -233,7 +233,7 @@ class Quarkolor
     );
 
     VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
-    void createSwapChain(Quarkolor::SwapChainContext& ctx, const VkSurfaceKHR surface);
+    void createSwapChain(Tetrium::SwapChainContext& ctx, const VkSurfaceKHR surface);
     void recreateSwapChain(SwapChainContext& ctx);
     void cleanupSwapChain(SwapChainContext& ctx);
     void createImageViews(SwapChainContext& ctx);

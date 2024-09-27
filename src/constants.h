@@ -49,7 +49,7 @@ const bool ENABLE_VALIDATION_LAYERS = true;
 
 const std::array<const char*, 1> VALIDATION_LAYERS = {"VK_LAYER_KHRONOS_validation"};
 
-const char* const APPLICATION_NAME = "quarkolor";
+const char* const APPLICATION_NAME = "Tetrium";
 
 const struct
 {
@@ -58,7 +58,7 @@ const struct
     uint32_t patch = 0;
 } APPLICATION_VERSION;
 
-const char* const ENGINE_NAME = "Vulkan Engine";
+const char* const ENGINE_NAME = "Tetrium Engine";
 
 const struct
 {

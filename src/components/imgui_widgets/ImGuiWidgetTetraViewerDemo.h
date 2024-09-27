@@ -21,5 +21,5 @@ class ImGuiWidgetTetraViewerDemo : public ImGuiWidgetMut
     bool cmyLoaded = false;
 
   public:
-    virtual void Draw(Quarkolor* engine, ColorSpace colorSpace) override;
+    virtual void Draw(Tetrium* engine, ColorSpace colorSpace) override;
 };

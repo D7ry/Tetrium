@@ -1,7 +1,7 @@
 #include "ImGuiWidget.h"
-#include "Quarkolor.h"
+#include "Tetrium.h"
 
-void ImGuiWidgetGraphicsPipeline::Draw(Quarkolor* engine, ColorSpace colorSpace)
+void ImGuiWidgetGraphicsPipeline::Draw(Tetrium* engine, ColorSpace colorSpace)
 {
     ImGui::SeparatorText("Main Render Pass");
     ImGui::Text("Clear Values");

@@ -1,7 +1,7 @@
 #include <iostream>
 
 #include "ImGuiWidget.h"
-#include "Quarkolor.h"
+#include "Tetrium.h"
 
 void ImGuiWidgetEvenOdd::drawColorQuadTest()
 {
@@ -61,7 +61,7 @@ void ImGuiWidgetEvenOdd::drawColorQuadTest()
     ImGui::End();
 }
 
-void ImGuiWidgetEvenOdd::drawCalibrationWindow(Quarkolor* engine, ColorSpace colorSpace)
+void ImGuiWidgetEvenOdd::drawCalibrationWindow(Tetrium* engine, ColorSpace colorSpace)
 {
     ImGui::SetNextWindowPos(ImVec2(0, 0));
 
@@ -126,7 +126,7 @@ void ImGuiWidgetEvenOdd::drawCalibrationWindow(Quarkolor* engine, ColorSpace col
     }
 
     ImGui::Checkbox("Flip RGB/CMY", &engine->_flipEvenOdd);
-    if (engine->_tetraMode == Quarkolor::TetraMode::kEvenOddSoftwareSync) {
+    if (engine->_tetraMode == Tetrium::TetraMode::kEvenOddSoftwareSync) {
         ImGui::SliderInt(
             "Software Sync Timing Offset (ns)",
             &engine->_softwareEvenOddCtx.timeOffset,
@@ -184,19 +184,19 @@ void ImGuiWidgetEvenOdd::drawCalibrationWindow(Quarkolor* engine, ColorSpace col
     ImGui::End();
 }
 
-void ImGuiWidgetEvenOdd::Draw(Quarkolor* engine, ColorSpace colorSpace)
+void ImGuiWidgetEvenOdd::Draw(Tetrium* engine, ColorSpace colorSpace)
 {
     const char* evenOddMode = nullptr;
 
     uint64_t numFrames = engine->getSurfaceCounterValue();
     switch (engine->_tetraMode) {
-    case Quarkolor::TetraMode::kEvenOddSoftwareSync: {
+    case Tetrium::TetraMode::kEvenOddSoftwareSync: {
         evenOddMode = "Software Sync";
     } break;
-    case Quarkolor::TetraMode::kEvenOddHardwareSync:
+    case Tetrium::TetraMode::kEvenOddHardwareSync:
         evenOddMode = "Hardware Sync";
         break;
-    case Quarkolor::TetraMode::kDualProjector:
+    case Tetrium::TetraMode::kDualProjector:
         evenOddMode = "Dual Projector Does Not Use Even-Odd rendering";
         break;
     }
@@ -207,7 +207,7 @@ void ImGuiWidgetEvenOdd::Draw(Quarkolor* engine, ColorSpace colorSpace)
 
     ImGui::Text("Num Dropped Frame: %u", engine->_evenOddDebugCtx.numDroppedFrames);
 
-    if (engine->_tetraMode == Quarkolor::TetraMode::kEvenOddSoftwareSync) {
+    if (engine->_tetraMode == Tetrium::TetraMode::kEvenOddSoftwareSync) {
         int buf = engine->_softwareEvenOddCtx.vsyncFrameOffset;
         if (ImGui::SliderInt("VSync frame offset", &buf, -10, 10)) {
             engine->_softwareEvenOddCtx.vsyncFrameOffset = buf;
@@ -254,7 +254,7 @@ void ImGuiWidgetEvenOdd::Draw(Quarkolor* engine, ColorSpace colorSpace)
     }
 }
 
-int ImGuiWidgetEvenOdd::measureDroppedFrames(Quarkolor* engine, int offset, int duration)
+int ImGuiWidgetEvenOdd::measureDroppedFrames(Tetrium* engine, int offset, int duration)
 {
     engine->_softwareEvenOddCtx.timeOffset = offset;
     int initialDroppedFrames = engine->_evenOddDebugCtx.numDroppedFrames;
@@ -264,7 +264,7 @@ int ImGuiWidgetEvenOdd::measureDroppedFrames(Quarkolor* engine, int offset, int 
     return engine->_evenOddDebugCtx.numDroppedFrames - initialDroppedFrames;
 }
 
-void ImGuiWidgetEvenOdd::startAutoCalibration(Quarkolor* engine)
+void ImGuiWidgetEvenOdd::startAutoCalibration(Tetrium* engine)
 {
     if (!_calibrationInProgress) {
         _calibrationInProgress = true;
@@ -275,7 +275,7 @@ void ImGuiWidgetEvenOdd::startAutoCalibration(Quarkolor* engine)
     }
 }
 
-void ImGuiWidgetEvenOdd::autoCalibrationThread(Quarkolor* engine)
+void ImGuiWidgetEvenOdd::autoCalibrationThread(Tetrium* engine)
 {
     int worstOffset = combinedCalibration(engine);
     int optimalOffset = (engine->_softwareEvenOddCtx.nanoSecondsPerFrame / 2 + worstOffset)
@@ -288,7 +288,7 @@ void ImGuiWidgetEvenOdd::autoCalibrationThread(Quarkolor* engine)
     _calibrationInProgress = false;
 }
 
-int ImGuiWidgetEvenOdd::combinedCalibration(Quarkolor* engine)
+int ImGuiWidgetEvenOdd::combinedCalibration(Tetrium* engine)
 {
     int maxOffset = engine->_softwareEvenOddCtx.nanoSecondsPerFrame;
     int worstOffset = 0;
@@ -339,7 +339,7 @@ int ImGuiWidgetEvenOdd::combinedCalibration(Quarkolor* engine)
 }
 
 void ImGuiWidgetEvenOdd::recursiveDescentCalibration(
-    Quarkolor* engine,
+    Tetrium* engine,
     int start,
     int end,
     int stepSize,

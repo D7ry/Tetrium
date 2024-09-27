@@ -1,4 +1,4 @@
-# Quarkolor
+# Tetrium
 
 Vulkan-based tetrachromacy display engine.
 

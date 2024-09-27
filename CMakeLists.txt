@@ -44,12 +44,12 @@ if (APPLE)
     set(FREETYPE_LIBRARIES "/opt/homebrew/lib/libfreetype.dylib")
 endif() # APPLE
 
-project(quarkolor)
+project(Tetrium)
 
 add_executable(${PROJECT_NAME}
         src/lib/Utils.cpp
         src/main.cpp
-        src/Quarkolor.cpp
+        src/Tetrium.cpp
         src/components/Logging.cpp
         src/components/ShaderUtils.cpp
         src/components/DeltaTimer.cpp

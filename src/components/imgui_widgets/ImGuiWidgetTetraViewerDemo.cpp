@@ -1,12 +1,12 @@
 
 #include "backends/imgui_impl_vulkan.h"
 
-#include "Quarkolor.h"
+#include "Tetrium.h"
 
 #include "ImGuiWidgetTetraViewerDemo.h"
 #include "components/TextureManager.h"
 
-void ImGuiWidgetTetraViewerDemo::Draw(Quarkolor* engine, ColorSpace colorSpace)
+void ImGuiWidgetTetraViewerDemo::Draw(Tetrium* engine, ColorSpace colorSpace)
 {
     ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0, 0, 0, 1));
     if (ImGui::Begin("Tetra Viewer")) {
