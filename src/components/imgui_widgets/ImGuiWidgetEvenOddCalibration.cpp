@@ -131,7 +131,7 @@ void ImGuiWidgetEvenOddCalibration::drawCalibrationWindow(Tetrium* engine, Color
     }
 
     ImGui::Checkbox("Flip RGB/OCV", &engine->_flipEvenOdd);
-    if (engine->_tetraMode == Tetrium::TetraMode::kEvenOddSoftwareSync) {
+    if (0 && engine->_tetraMode == Tetrium::TetraMode::kEvenOddSoftwareSync) {
         ImGui::SliderInt(
             "Software Sync Timing Offset (ns)",
             &engine->_softwareEvenOddCtx.timeOffset,
