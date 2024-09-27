@@ -410,6 +410,7 @@ void Tetrium::initGLFW(const InitOptions& options)
             glfwWindowHint(GLFW_REFRESH_RATE, mode.refreshRate);
             width = mode.width;
             height = mode.height;
+            width = 1140; height = 912;
         }
         fmt::println("Selected {} as full-screen monitor.", glfwGetMonitorName(monitor));
     }
@@ -1979,7 +1980,7 @@ void Tetrium::getMainProjectionMatrix(glm::mat4& projectionMatrix)
 // the old counter uses a nanosecond-precision timer,
 // the new counter takes the max of the image id so far presented.
 // TODO: profile precision of the new counter vs. old counter
-#define NEW_VIRTUAL_FRAMECOUNTER 0
+#define NEW_VIRTUAL_FRAMECOUNTER 1
 
 uint64_t Tetrium::getSurfaceCounterValue()
 {
@@ -1997,20 +1998,15 @@ uint64_t Tetrium::getSurfaceCounterValue()
             _device->logicalDevice, _renderContexts.RGB.swapchain->chain, &imageCount, images.data()
         );
         for (int i = 0; i < imageCount; i++) {
-            _softwareEvenOddCtx.lastPresentedImageId
-                = std::max(_softwareEvenOddCtx.lastPresentedImageId, images.at(i).presentID);
-            _softwareEvenOddCtx.mostRecentPresentFinish = std::max(
-                _softwareEvenOddCtx.mostRecentPresentFinish, images.at(i).actualPresentTime
-            );
             auto& img = images.at(i);
-            // INFO(
-            //     "{} : expected: {} actual: {}",
-            //     img.presentID,
-            //     img.desiredPresentTime,
-            //     img.actualPresentTime
-            // );
+            _softwareEvenOddCtx.lastPresentedImageId
+                = std::max(_softwareEvenOddCtx.lastPresentedImageId, img.presentID);
+            _softwareEvenOddCtx.mostRecentPresentFinish = std::max(
+                _softwareEvenOddCtx.mostRecentPresentFinish, img.actualPresentTime
+            );
+            _softwareEvenOddCtx.framePresented.insert(img.presentID);
         }
-        surfaceCounter = _softwareEvenOddCtx.lastPresentedImageId;
+        surfaceCounter = _softwareEvenOddCtx.framePresented.size();
 #else
         // old method: count the time
         // return a software-based surface counter
