@@ -78,10 +78,8 @@ class ImGuiManager
     // get or generate an imgui texture
     const ImGuiTexture& GetImGuiTexture(const std::string& texturePath);
 
-    void PushEmojiFont();
 
   private:
-    ImFont* emojiFont = nullptr;
     void setupImGuiStyle();
 
     VkRenderPass _imGuiRenderPass = VK_NULL_HANDLE; // render pass sepcifically for imgui

@@ -381,5 +381,3 @@ const ImGuiTexture& ImGuiManager::GetImGuiTexture(const std::string& texturePath
     ASSERT(res.second);
     return res.first->second;
 }
-
-void ImGuiManager::PushEmojiFont() { ImGui::PushFont(emojiFont); }
