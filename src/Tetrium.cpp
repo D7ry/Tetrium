@@ -657,7 +657,7 @@ void Tetrium::setupSoftwareEvenOddFrame()
     ASSERT(ctx.nanoSecondsPerFrame != 0);
 }
 
-void Tetrium::checkSoftwareEvenOddFrameSupport() { return; }
+void Tetrium::checkSoftwareEvenOddFrameSupport() {}
 
 void Tetrium::setupHardwareEvenOddFrame()
 {
@@ -716,8 +716,7 @@ void Tetrium::checkHardwareEvenOddFrameSupport()
     }
 
     VkSurfaceCapabilities2EXT capabilities{
-        .sType = VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES_2_EXT, .pNext = VK_NULL_HANDLE
-    };
+        .sType = VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES_2_EXT, .pNext = VK_NULL_HANDLE};
 
     auto func = (PFN_vkGetPhysicalDeviceSurfaceCapabilities2EXT
     )vkGetInstanceProcAddr(_instance, "vkGetPhysicalDeviceSurfaceCapabilities2EXT");
@@ -1097,6 +1096,11 @@ const std::vector<const char*> Tetrium::getRequiredDeviceExtensions() const
             extensions.push_back(extension);
         }
     }
+    if (_tetraMode == TetraMode::kEvenOddSoftwareSync) {
+        for (auto extension : EVEN_ODD_SOFTWARE_DEVICE_EXTENSIONS) {
+            extensions.push_back(extension);
+        }
+    }
     return extensions;
 }
 
@@ -1175,8 +1179,7 @@ void Tetrium::createSwapChain(Tetrium::SwapChainContext& ctx, const VkSurfaceKHR
     VkSwapchainCounterCreateInfoEXT swapChainCounterCreateInfo{
         .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_COUNTER_CREATE_INFO_EXT,
         .pNext = NULL,
-        .surfaceCounters = VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_BIT_EXT
-    };
+        .surfaceCounters = VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_BIT_EXT};
 
     if (_tetraMode == TetraMode::kEvenOddHardwareSync) {
 #if __linux__
@@ -1685,11 +1688,14 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
         VK_NULL_HANDLE,
         &swapchainImageIndex
     );
-    [[unlikely]] if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+    [[unlikely]] if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
+    {
         this->recreateSwapChain(_swapChain);
         recreateVirtualFrameBuffers();
         return;
-    } else [[unlikely]] if (result != VK_SUCCESS) {
+    }
+    else [[unlikely]] if (result != VK_SUCCESS)
+    {
         const char* res = string_VkResult(result);
         PANIC("Failed to acquire swap chain image: {}", res);
     }
@@ -1878,8 +1884,7 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
         .sType = VK_STRUCTURE_TYPE_PRESENT_TIMES_INFO_GOOGLE,
         .pNext = VK_NULL_HANDLE,
         .swapchainCount = 1,
-        .pTimes = &presentTime
-    };
+        .pTimes = &presentTime};
 
     presentInfo.pNext = &presentTimeInfo;
 
@@ -1894,7 +1899,6 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
         this->_framebufferResized = false;
     }
 }
-
 
 // FIXME: glfw calls from a differnt thread; may need to add critical sections
 // currently for perf reasons we're leaving it as is.
@@ -1932,8 +1936,7 @@ void Tetrium::bindDefaultInputs()
             io.ConfigFlags &= ~ImGuiConfigFlags_NoKeyboard;
             io.MousePos = ImVec2{
                 static_cast<float>(_swapChain.extent.width) / 2,
-                static_cast<float>(_swapChain.extent.height) / 2
-            };
+                static_cast<float>(_swapChain.extent.height) / 2};
             io.WantSetMousePos = true;
         } else {
             io.ConfigFlags |= (ImGuiConfigFlags_NoMouse | ImGuiConfigFlags_NoKeyboard);

@@ -79,10 +79,6 @@ class Tetrium
 #if __APPLE__ // molten vk support
         VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME,
 #endif // __APPLE__
-       //https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetRefreshCycleDurationGOOGLE.html
-       //https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPastPresentationTimingGOOGLE.html
-       //https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPresentTimesInfoGOOGLE.html
-        VK_GOOGLE_DISPLAY_TIMING_EXTENSION_NAME, // for query refresh rate
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_timeline_semaphore.html
         VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME, // for softare side v-sync
     };
@@ -105,6 +101,13 @@ class Tetrium
 #if __linux__
         VK_EXT_DISPLAY_CONTROL_EXTENSION_NAME, // to wake up display
 #endif // __linux__
+    };
+
+    static inline const std::vector<const char*> EVEN_ODD_SOFTWARE_DEVICE_EXTENSIONS = {
+       //https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetRefreshCycleDurationGOOGLE.html
+       //https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPastPresentationTimingGOOGLE.html
+       //https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPresentTimesInfoGOOGLE.html
+        VK_GOOGLE_DISPLAY_TIMING_EXTENSION_NAME, // for query refresh rate
     };
 
   public:
