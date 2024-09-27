@@ -1,5 +1,6 @@
 #pragma once
 // stl
+#include "components/TaskQueue.h"
 #include <cstdint>
 #include <initializer_list>
 #include <memory>
@@ -322,7 +323,6 @@ class Tetrium
     // engine level pause, toggle with P key
     bool _paused = false;
 
-
     // static ubo for each frame
     // each buffer stores a `EngineUBOStatic`
     std::array<VQBuffer, NUM_FRAME_IN_FLIGHT> _engineUBOStatic;
@@ -369,6 +369,7 @@ class Tetrium
     Camera _mainCamera;
     InputManager _inputManager;
     Profiler _profiler;
+    TaskQueue _taskQueue;
     std::unique_ptr<std::vector<Profiler::Entry>> _lastProfilerData = _profiler.NewProfile();
 
     // ImGui widgets
@@ -386,5 +387,4 @@ class Tetrium
     ImGuiWidgetTetraViewerDemo _widgetTetraViewerDemo;
 
     SimpleRenderSystem _renderer;
-
 };
