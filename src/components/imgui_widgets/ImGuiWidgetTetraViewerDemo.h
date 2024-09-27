@@ -22,7 +22,7 @@ class ImGuiWidgetTetraViewerDemo : public ImGuiWidgetMut
 
     bool _noUI = false;
 
-    static const int NUM_IMAGES = 2;
+    static const int NUM_IMAGES = 8;
     std::array<DemoImage, NUM_IMAGES> _images = {
         DemoImage{
             .name = "observer vs noise",
@@ -33,6 +33,36 @@ class ImGuiWidgetTetraViewerDemo : public ImGuiWidgetMut
             .name = "metamer pair",
             .path_rgb = "../assets/textures/metamer_pair__even.png",
             .path_ocv = "../assets/textures/metamer_pair__odd.png"
+        },
+        DemoImage{
+            .name = "govardovskii_common_genes",
+            .path_rgb = "../assets/textures/govardovskii_common_genes-rgb.png",
+            .path_ocv = "../assets/textures/govardovskii_common_genes-ocv.png"
+        },
+        DemoImage{
+            .name = "govardovskii_common_genes rdmclr",
+            .path_rgb = "../assets/textures/govardovskii_common_genes_rdmclr-rgb.png",
+            .path_ocv = "../assets/textures/govardovskii_common_genes_rdmclr-ocv.png"
+        },
+        DemoImage{
+            .name = "neitz_common_genes",
+            .path_rgb = "../assets/textures/neitz_common_genes-rgb.png",
+            .path_ocv = "../assets/textures/neitz_common_genes-ocv.png"
+        },
+        DemoImage{
+            .name = "neitz_common_genes rdmclr",
+            .path_rgb = "../assets/textures/neitz_common_genes_rdmclr-rgb.png",
+            .path_ocv = "../assets/textures/neitz_common_genes_rdmclr-ocv.png"
+        },
+        DemoImage{
+            .name = "stockman_vs_neitz_vs_govardovskii",
+            .path_rgb = "../assets/textures/stockman_vs_neitz_vs_govardovskii-rgb.png",
+            .path_ocv = "../assets/textures/stockman_vs_neitz_vs_govardovskii-ocv.png"
+        },
+        DemoImage{
+            .name = "stockman_vs_neitz_vs_govardovskii rdmclr",
+            .path_rgb = "../assets/textures/stockman_vs_neitz_vs_govardovskii_rdmclr-rgb.png",
+            .path_ocv = "../assets/textures/stockman_vs_neitz_vs_govardovskii_rdmclr-ocv.png"
         },
     };
 
