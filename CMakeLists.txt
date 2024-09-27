@@ -39,10 +39,15 @@ set(GLM_INCLUDE extern/glm)
 set(TINY_OBJ_LOADER_INCLUDE extern/tinyobjloader)
 
 # freetype
+if (UNIX)
 if (APPLE)
     set(FREETYPE_INCLUDE_DIRS "/opt/homebrew/include/freetype2")
     set(FREETYPE_LIBRARIES "/opt/homebrew/lib/libfreetype.dylib")
-endif() # APPLE
+else() #linux
+    set(FREETYPE_INCLUDE_DIRS "/usr/include/freetype2")
+    set(FREETYPE_LIBRARIES "/usr/lib/x86_64-linux-gnu/libfreetype.so")
+endif()
+endif()
 
 project(Tetrium)
 
