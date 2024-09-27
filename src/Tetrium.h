@@ -353,7 +353,7 @@ class Tetrium
                                            // tick # and image id are bijective and they
                                            // strictly increase over time
         int vsyncFrameOffset = 0;
-        std::unordered_set<int> framePresented; // all frames that has been presented
+        uint64_t numFramesPresented = 0; // total number of frames that have been presented so far
     } _softwareEvenOddCtx;
 
     struct {

@@ -1990,23 +1990,31 @@ uint64_t Tetrium::getSurfaceCounterValue()
         uint32_t imageCount;
 #if NEW_VIRTUAL_FRAMECOUNTER
         vkGetPastPresentationTimingGOOGLE(
-            _device->logicalDevice, _renderContexts.RGB.swapchain->chain, &imageCount, nullptr
+            _device->logicalDevice, _swapChain.chain, &imageCount, nullptr
         );
         std::vector<VkPastPresentationTimingGOOGLE> images(imageCount);
-
         vkGetPastPresentationTimingGOOGLE(
-            _device->logicalDevice, _renderContexts.RGB.swapchain->chain, &imageCount, images.data()
+            _device->logicalDevice, _swapChain.chain, &imageCount, images.data()
         );
+        auto& ctx = _softwareEvenOddCtx;
         for (int i = 0; i < imageCount; i++) {
             auto& img = images.at(i);
-            _softwareEvenOddCtx.lastPresentedImageId
-                = std::max(_softwareEvenOddCtx.lastPresentedImageId, img.presentID);
+            if (img.presentID > ctx.lastPresentedImageId) {
+                ctx.numFramesPresented += 1;
+                ctx.lastPresentedImageId = img.presentID;
+            }
             _softwareEvenOddCtx.mostRecentPresentFinish = std::max(
                 _softwareEvenOddCtx.mostRecentPresentFinish, img.actualPresentTime
             );
-            _softwareEvenOddCtx.framePresented.insert(img.presentID);
+            // INFO(
+            //     "i = {}; present id: {} : expected: {} actual: {}",
+            //     i,
+            //     img.presentID,
+            //     img.desiredPresentTime,
+            //     img.actualPresentTime
+            // );
         }
-        surfaceCounter = _softwareEvenOddCtx.framePresented.size();
+        surfaceCounter = ctx.numFramesPresented;
 #else
         // old method: count the time
         // return a software-based surface counter
