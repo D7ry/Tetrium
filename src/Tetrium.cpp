@@ -254,6 +254,11 @@ void Tetrium::selectDisplayXlib(DisplayContext& ctx)
         XRRFreeScreenResources(resources);
     }
 
+    if (displays.empty()) {
+        PANIC("No external display fonud! Make sure to have GPU connected to at least one external "
+              "display.");
+    }
+
     println("============== Choose Display ===============");
 
     for (size_t i = 0; i < displays.size(); ++i) {
@@ -278,7 +283,11 @@ void Tetrium::selectDisplayXlib(DisplayContext& ctx)
         );
     ASSERT(vkAcquireXlibDisplayEXT);
 
-    VK_CHECK_RESULT(vkAcquireXlibDisplayEXT(device, xDisplay, ctx.display));
+    VkResult result = vkAcquireXlibDisplayEXT(device, xDisplay, ctx.display);
+    if (result != VK_SUCCESS) {
+        PANIC("Failed to find acquire exclusive access to xlib display, make sure to disable "
+              "display in OS and graphics drivers.");
+    }
 }
 #endif // __linux__
 
@@ -360,6 +369,11 @@ void Tetrium::initExclusiveDisplay(Tetrium::DisplayContext& ctx)
     }
     ASSERT(foundPlaneIndex);
     DEBUG("plane index: {}; stack index: {}", ctx.planeIndex, stackIndex);
+    VkExtent2D extent = modeProperties[selectedModeIndex].parameters.visibleRegion;
+#define FLIP_VERTICAL_HORIZONTAL 1 // flip extent for portrait mode
+#if FLIP_VERTICAL_HORIZONTAL
+    std::swap(extent.width, extent.height);
+#endif // FLIP_VERTICAL_HORIZONTAL
 
     // Create display surface
     VkDisplaySurfaceCreateInfoKHR surfaceCreateInfo = {};
@@ -370,7 +384,7 @@ void Tetrium::initExclusiveDisplay(Tetrium::DisplayContext& ctx)
     surfaceCreateInfo.transform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
     surfaceCreateInfo.globalAlpha = 1.0f;
     surfaceCreateInfo.alphaMode = VK_DISPLAY_PLANE_ALPHA_OPAQUE_BIT_KHR;
-    surfaceCreateInfo.imageExtent = modeProperties[selectedModeIndex].parameters.visibleRegion;
+    surfaceCreateInfo.imageExtent = extent;
 
     VK_CHECK_RESULT(
         vkCreateDisplayPlaneSurfaceKHR(_instance, &surfaceCreateInfo, nullptr, &ctx.surface)
@@ -380,7 +394,8 @@ void Tetrium::initExclusiveDisplay(Tetrium::DisplayContext& ctx)
     _deletionStack.push([this, ctx]() { vkDestroySurfaceKHR(_instance, ctx.surface, nullptr); });
 
     // Store the display properties for later use
-    ctx.extent = modeProperties[selectedModeIndex].parameters.visibleRegion;
+    ctx.extent = extent;
+
     ctx.refreshrate = modeProperties[selectedModeIndex].parameters.refreshRate;
     DEBUG("display extent: {} {}", ctx.extent.width, ctx.extent.height);
 }
@@ -410,7 +425,8 @@ void Tetrium::initGLFW(const InitOptions& options)
             glfwWindowHint(GLFW_REFRESH_RATE, mode.refreshRate);
             width = mode.width;
             height = mode.height;
-            width = 1140; height = 912;
+            width = 1140;
+            height = 912;
         }
         fmt::println("Selected {} as full-screen monitor.", glfwGetMonitorName(monitor));
     }
@@ -717,7 +733,8 @@ void Tetrium::checkHardwareEvenOddFrameSupport()
     }
 
     VkSurfaceCapabilities2EXT capabilities{
-        .sType = VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES_2_EXT, .pNext = VK_NULL_HANDLE};
+        .sType = VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES_2_EXT, .pNext = VK_NULL_HANDLE
+    };
 
     auto func = (PFN_vkGetPhysicalDeviceSurfaceCapabilities2EXT
     )vkGetInstanceProcAddr(_instance, "vkGetPhysicalDeviceSurfaceCapabilities2EXT");
@@ -1180,7 +1197,8 @@ void Tetrium::createSwapChain(Tetrium::SwapChainContext& ctx, const VkSurfaceKHR
     VkSwapchainCounterCreateInfoEXT swapChainCounterCreateInfo{
         .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_COUNTER_CREATE_INFO_EXT,
         .pNext = NULL,
-        .surfaceCounters = VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_BIT_EXT};
+        .surfaceCounters = VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_BIT_EXT
+    };
 
     if (_tetraMode == TetraMode::kEvenOddHardwareSync) {
 #if __linux__
@@ -1689,14 +1707,11 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
         VK_NULL_HANDLE,
         &swapchainImageIndex
     );
-    [[unlikely]] if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
-    {
+    [[unlikely]] if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
         this->recreateSwapChain(_swapChain);
         recreateVirtualFrameBuffers();
         return;
-    }
-    else [[unlikely]] if (result != VK_SUCCESS)
-    {
+    } else [[unlikely]] if (result != VK_SUCCESS) {
         const char* res = string_VkResult(result);
         PANIC("Failed to acquire swap chain image: {}", res);
     }
@@ -1880,14 +1895,15 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
     // label each frame with the tick number
     // this is useful for calculating the virtual frame counter,
     // as we can take the max(frame.id) to get the number of presented frames.
-    
+
     VkPresentTimeGOOGLE presentTime{(uint32_t)_numTicks, time};
 
     VkPresentTimesInfoGOOGLE presentTimeInfo{
         .sType = VK_STRUCTURE_TYPE_PRESENT_TIMES_INFO_GOOGLE,
         .pNext = VK_NULL_HANDLE,
         .swapchainCount = 1,
-        .pTimes = &presentTime};
+        .pTimes = &presentTime
+    };
 
     if (_tetraMode == TetraMode::kEvenOddSoftwareSync) {
         presentInfo.pNext = &presentTimeInfo;
@@ -1941,7 +1957,8 @@ void Tetrium::bindDefaultInputs()
             io.ConfigFlags &= ~ImGuiConfigFlags_NoKeyboard;
             io.MousePos = ImVec2{
                 static_cast<float>(_swapChain.extent.width) / 2,
-                static_cast<float>(_swapChain.extent.height) / 2};
+                static_cast<float>(_swapChain.extent.height) / 2
+            };
             io.WantSetMousePos = true;
         } else {
             io.ConfigFlags |= (ImGuiConfigFlags_NoMouse | ImGuiConfigFlags_NoKeyboard);
@@ -1989,6 +2006,7 @@ uint64_t Tetrium::getSurfaceCounterValue()
     case TetraMode::kEvenOddSoftwareSync: {
         uint32_t imageCount;
 #if NEW_VIRTUAL_FRAMECOUNTER
+#if __APPLE__
         vkGetPastPresentationTimingGOOGLE(
             _device->logicalDevice, _swapChain.chain, &imageCount, nullptr
         );
@@ -2003,9 +2021,8 @@ uint64_t Tetrium::getSurfaceCounterValue()
                 ctx.numFramesPresented += 1;
                 ctx.lastPresentedImageId = img.presentID;
             }
-            _softwareEvenOddCtx.mostRecentPresentFinish = std::max(
-                _softwareEvenOddCtx.mostRecentPresentFinish, img.actualPresentTime
-            );
+            _softwareEvenOddCtx.mostRecentPresentFinish
+                = std::max(_softwareEvenOddCtx.mostRecentPresentFinish, img.actualPresentTime);
             // INFO(
             //     "i = {}; present id: {} : expected: {} actual: {}",
             //     i,
@@ -2015,9 +2032,12 @@ uint64_t Tetrium::getSurfaceCounterValue()
             // );
         }
         surfaceCounter = ctx.numFramesPresented;
-#else
-        // old method: count the time
-        // return a software-based surface counter
+#else  // !__APPLE__
+        NEEDS_IMPLEMENTATION(); // only apple device supports software counter so far.
+#endif // __APPLE__
+#else  // ! NEW_VIRTUAL_FRAMECOUNTER
+       // old method: count the time
+       // return a software-based surface counter
         unsigned long long timeSinceStartNanoSeconds
             = std::chrono::duration<double, std::chrono::nanoseconds::period>(
                   std::chrono::steady_clock().now() - _softwareEvenOddCtx.timeEngineStart
