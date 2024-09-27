@@ -2,7 +2,7 @@
 #include <array>
 
 // absolute constants
-const int NUM_FRAME_IN_FLIGHT = 2;   // how many frames to pipeline
+const int NUM_FRAME_IN_FLIGHT = 2; // how many frames to pipeline
 const int TEXTURE_ARRAY_SIZE = 16; // size of the texture array for bindless texture indexing
 
 // default setting values.
@@ -66,6 +66,10 @@ const struct
     uint32_t minor = 0;
     uint32_t patch = 0;
 } ENGINE_VERSION;
+
+const char* const BANNER_TEXT = "___  ___ ___  __               \n"
+                                " |  |__   |  |__) | |  |  |\\/| \n"
+                                " |  |___  |  |  \\ | \\__/  |  | \n";
 } // namespace Engine
 
 } // namespace DEFAULTS
@@ -74,6 +78,6 @@ using INDEX_BUFFER_INDEX_TYPE = unsigned int;
 
 namespace DIRECTORIES
 {
-    const std::string ASSETS = "../assets/";
-    const std::string SHADERS = "../shaders/";
-}
+const std::string ASSETS = "../assets/";
+const std::string SHADERS = "../shaders/";
+} // namespace DIRECTORIES
