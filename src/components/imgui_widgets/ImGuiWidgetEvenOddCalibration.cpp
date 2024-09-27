@@ -141,48 +141,51 @@ void ImGuiWidgetEvenOddCalibration::drawCalibrationWindow(Tetrium* engine, Color
         ImGui::Text(
             "Software Sync Frame Time (ns): %lu", engine->_softwareEvenOddCtx.nanoSecondsPerFrame
         );
-    }
+        ImGui::SeparatorText("Auto Calibration");
 
-    ImGui::SeparatorText("Auto Calibration");
-
-    if (!_calibrationInProgress) {
-        if (ImGui::Button("Calibrate") && colorSpace == ColorSpace::RGB) {
-            startAutoCalibration(engine);
+        if (!_calibrationInProgress) {
+            if (ImGui::Button("Calibrate") && colorSpace == ColorSpace::RGB) {
+                startAutoCalibration(engine);
+            }
+        } else {
+            if (ImGui::Button("Cancel")) {
+                _calibrationInProgress = false;
+            }
+            ImGui::SameLine();
+            ImGui::Text("Calibration in progress...");
+            ImGui::PushStyleColor(
+                ImGuiCol_PlotHistogram, ImVec4(0.3f, 0.7f, 0.3f, 1.0f)
+            ); // Green progress
+            ImGui::PushStyleColor(
+                ImGuiCol_FrameBg, ImVec4(0.1f, 0.1f, 0.1f, 1.0f)
+            ); // Dark background
+            ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 5.0f);
+            ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
+            ImGui::ProgressBar(_calibrationProgress, ImVec2{ImGui::GetWindowWidth() * 0.6f, 0});
+            ImGui::PopStyleVar(2);
+            ImGui::PopStyleColor(2);
         }
-    } else {
-        if (ImGui::Button("Cancel")) {
-            _calibrationInProgress = false;
+
+        // calibration results
+        if (_calibrationComplete) {
+            ImGui::PushStyleColor(
+                ImGuiCol_Text, ImVec4(0.0f, 1.0f, 0.0f, 1.0f)
+            ); // Bright green color
+            ImGui::Text("Calibration complete.");
+            ImGui::PopStyleColor();
+
+            ImGui::Text("Optimal offset: ");
+            ImGui::SameLine();
+            ImGui::TextColored(
+                ImVec4(0.0f, 1.0f, 0.5f, 1.0f), "%d ns", _optimalOffset.load()
+            ); // Light green color
+
+            ImGui::Text("Highest dropped frames at worst offset: ");
+            ImGui::SameLine();
+            ImGui::TextColored(
+                ImVec4(0.0f, 0.8f, 0.0f, 1.0f), "%d", _highestDroppedFrames.load()
+            ); // Slightly darker green
         }
-        ImGui::SameLine();
-        ImGui::Text("Calibration in progress...");
-        ImGui::PushStyleColor(
-            ImGuiCol_PlotHistogram, ImVec4(0.3f, 0.7f, 0.3f, 1.0f)
-        );                                                                       // Green progress
-        ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.1f, 0.1f, 0.1f, 1.0f)); // Dark background
-        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 5.0f);
-        ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
-        ImGui::ProgressBar(_calibrationProgress, ImVec2{ImGui::GetWindowWidth() * 0.6f, 0});
-        ImGui::PopStyleVar(2);
-        ImGui::PopStyleColor(2);
-    }
-
-    // calibration results
-    if (_calibrationComplete) {
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 1.0f, 0.0f, 1.0f)); // Bright green color
-        ImGui::Text("Calibration complete.");
-        ImGui::PopStyleColor();
-
-        ImGui::Text("Optimal offset: ");
-        ImGui::SameLine();
-        ImGui::TextColored(
-            ImVec4(0.0f, 1.0f, 0.5f, 1.0f), "%d ns", _optimalOffset.load()
-        ); // Light green color
-
-        ImGui::Text("Highest dropped frames at worst offset: ");
-        ImGui::SameLine();
-        ImGui::TextColored(
-            ImVec4(0.0f, 0.8f, 0.0f, 1.0f), "%d", _highestDroppedFrames.load()
-        ); // Slightly darker green
     }
 
     ImGui::PopStyleColor();
@@ -275,7 +278,9 @@ void ImGuiWidgetEvenOddCalibration::startAutoCalibration(Tetrium* engine)
         _calibrationInProgress = true;
         _calibrationProgress = 0.0f;
         _calibrationComplete = false;
-        std::thread calibrationThread(&ImGuiWidgetEvenOddCalibration::autoCalibrationThread, this, engine);
+        std::thread calibrationThread(
+            &ImGuiWidgetEvenOddCalibration::autoCalibrationThread, this, engine
+        );
         calibrationThread.detach();
     }
 }
