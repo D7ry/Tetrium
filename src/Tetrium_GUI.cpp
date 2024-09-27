@@ -22,6 +22,25 @@ void drawCursor(ImGuiManager* imguiManager)
     );
 }
 
+void drawFootNote()
+{
+    ImGuiIO& io = ImGui::GetIO();
+    ImVec2 windowSize = io.DisplaySize;
+    ImDrawList* drawList = ImGui::GetForegroundDrawList();
+
+    const char* footnoteText = (const char*)u8"🧩 Tetrium 0.3a";
+    ImVec2 textSize = ImGui::CalcTextSize(footnoteText);
+    ImVec2 padding(10.0f, 5.0f);
+    ImVec2 pos(
+        windowSize.x - textSize.x - padding.x * 2, windowSize.y - textSize.y - padding.y * 2
+    );
+
+    drawList->AddRectFilled(pos, ImVec2(windowSize.x, windowSize.y), IM_COL32(0, 0, 0, 200));
+    drawList->AddText(
+        ImVec2(pos.x + padding.x, pos.y + padding.y), IM_COL32(255, 255, 255, 255), footnoteText
+    );
+}
+
 }; // namespace Tetrium_GUI
 
 // parent function to draw imgui; sets up all contexts and performs drawing.
@@ -56,13 +75,12 @@ void Tetrium::drawImGui(ColorSpace colorSpace)
     } else if (_uiMode) { // window focused and in ui mode, draw cursor
         Tetrium_GUI::drawCursor(&_imguiManager);
     }
+    Tetrium_GUI::drawFootNote();
 
     if (ImGui::Begin(DEFAULTS::Engine::APPLICATION_NAME)) {
         if (ImGui::BeginTabBar("Engine Tab")) {
             if (ImGui::BeginTabItem("General")) {
                 ImGui::ShowDemoWindow();
-                ImGui::Text((const char*)u8"Method 1: 🐮 here");
-                ImGui::TextUnformatted((const char*)u8"Method 2: 🐮 here");
                 ImGui::SeparatorText("Camera");
                 {
                     ImGui::Text(
