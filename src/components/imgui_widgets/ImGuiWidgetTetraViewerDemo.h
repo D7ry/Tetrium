@@ -12,19 +12,21 @@ class ImGuiWidgetTetraViewerDemo : public ImGuiWidgetMut
         const char* path_ocv;
     };
 
-    DemoImage images[5] = {
+    int _selectedImageId = 0;
+
+    static const int NUM_IMAGES = 2;
+    std::array<DemoImage, NUM_IMAGES> _images = {
         DemoImage{
             .name = "observer vs noise",
-            .path_rgb = "../assets/textures/observer_vs_noise_even.png",
-            .path_ocv = "../assets/textures/observer_vs_noise_odd.png"
+            .path_rgb = "../assets/textures/observers_vs_noise-even.png",
+            .path_ocv = "../assets/textures/observers_vs_noise-odd.png"
         },
         DemoImage{
-            "metamer pair"
-
+            .name = "metamer pair",
+            .path_rgb = "../assets/textures/metamer_pair__even.png",
+            .path_ocv = "../assets/textures/metamer_pair__odd.png"
         },
     };
-    const char* TETRA_IMAGE_PATH_RGB = "../assets/textures/metamer_pair__even.png";
-    const char* TETRA_IMAGE_PATH_CMY = "../assets/textures/metamer_pair__odd.png";
 
     struct TetraImage
     {
@@ -32,11 +34,6 @@ class ImGuiWidgetTetraViewerDemo : public ImGuiWidgetMut
         int width;
         int height;
     };
-
-    TetraImage rgb;
-    TetraImage cmy;
-    bool rgbLoaded = false;
-    bool cmyLoaded = false;
 
   public:
     virtual void Draw(Tetrium* engine, ColorSpace colorSpace) override;
