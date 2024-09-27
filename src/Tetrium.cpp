@@ -2004,6 +2004,7 @@ uint64_t Tetrium::getSurfaceCounterValue()
     case TetraMode::kEvenOddSoftwareSync: {
         uint32_t imageCount;
 #if NEW_VIRTUAL_FRAMECOUNTER
+#if __APPLE__
         vkGetPastPresentationTimingGOOGLE(
             _device->logicalDevice, _renderContexts.RGB.swapchain->chain, &imageCount, nullptr
         );
@@ -2022,6 +2023,9 @@ uint64_t Tetrium::getSurfaceCounterValue()
             _softwareEvenOddCtx.framePresented.insert(img.presentID);
         }
         surfaceCounter = _softwareEvenOddCtx.framePresented.size();
+#else 
+        NEEDS_IMPLEMENTATION(); // only apple device supports software counter so far.
+#endif // __APPLE__
 #else
         // old method: count the time
         // return a software-based surface counter
