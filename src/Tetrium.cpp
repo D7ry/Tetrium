@@ -369,6 +369,11 @@ void Tetrium::initExclusiveDisplay(Tetrium::DisplayContext& ctx)
     }
     ASSERT(foundPlaneIndex);
     DEBUG("plane index: {}; stack index: {}", ctx.planeIndex, stackIndex);
+    VkExtent2D extent = modeProperties[selectedModeIndex].parameters.visibleRegion;
+#define FLIP_VERTICAL_HORIZONTAL 1 // flip extent for portrait mode
+#if FLIP_VERTICAL_HORIZONTAL
+    std::swap(extent.width, extent.height);
+#endif // FLIP_VERTICAL_HORIZONTAL
 
     // Create display surface
     VkDisplaySurfaceCreateInfoKHR surfaceCreateInfo = {};
@@ -379,7 +384,7 @@ void Tetrium::initExclusiveDisplay(Tetrium::DisplayContext& ctx)
     surfaceCreateInfo.transform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
     surfaceCreateInfo.globalAlpha = 1.0f;
     surfaceCreateInfo.alphaMode = VK_DISPLAY_PLANE_ALPHA_OPAQUE_BIT_KHR;
-    surfaceCreateInfo.imageExtent = modeProperties[selectedModeIndex].parameters.visibleRegion;
+    surfaceCreateInfo.imageExtent = extent;
 
     VK_CHECK_RESULT(
         vkCreateDisplayPlaneSurfaceKHR(_instance, &surfaceCreateInfo, nullptr, &ctx.surface)
@@ -389,7 +394,8 @@ void Tetrium::initExclusiveDisplay(Tetrium::DisplayContext& ctx)
     _deletionStack.push([this, ctx]() { vkDestroySurfaceKHR(_instance, ctx.surface, nullptr); });
 
     // Store the display properties for later use
-    ctx.extent = modeProperties[selectedModeIndex].parameters.visibleRegion;
+    ctx.extent = extent;
+
     ctx.refreshrate = modeProperties[selectedModeIndex].parameters.refreshRate;
     DEBUG("display extent: {} {}", ctx.extent.width, ctx.extent.height);
 }
