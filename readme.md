@@ -47,6 +47,13 @@ respectively. Once the rendering is done, depending on the presentation mode:
 
 set `VULKAN_LIB_PATH` in `CMakeLists.txt` to your own path after installing Vulkan SDK
 
+##### FreeType
+
+`brew install freetype`
+
+validate that `/opt/homebrew/include/freetype2` and `/opt/homebrew/lib/libfreetype.dylib`
+contains freetype library and include files.
+
 #### Linux
 
 install `X11` and `Xrandr` for direct display access, for hardware even-odd frame sync

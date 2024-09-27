@@ -822,6 +822,7 @@ void Quarkolor::initVulkan()
         _renderContexts.RGB.virtualFrameBuffer.frameBuffer.size(
         ) // doesn't matter if it's RGB or CMY
     );
+    _imguiManager.InitializeFonts();
 
     // even-odd specific resource checkup and setup
     switch (_tetraMode) {
@@ -1940,6 +1941,11 @@ void Quarkolor::drawImGui(ColorSpace colorSpace)
     if (ImGui::Begin(DEFAULTS::Engine::APPLICATION_NAME)) {
         if (ImGui::BeginTabBar("Engine Tab")) {
             if (ImGui::BeginTabItem("General")) {
+                ImGui::ShowDemoWindow();
+                _imguiManager.PushEmojiFont();
+                ImGui::Text((const char*)u8"Method 1: 🐮 here");
+                ImGui::TextUnformatted((const char*)u8"Method 2: 🐮 here");
+                ImGui::PopFont();
                 ImGui::SeparatorText("Camera");
                 {
                     ImGui::Text(

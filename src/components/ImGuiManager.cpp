@@ -2,6 +2,7 @@
 #include "backends/imgui_impl_glfw.h"
 #include "imgui.h"
 #include "implot.h"
+#include "misc/freetype/imgui_freetype.h"
 
 #include "components/TextureManager.h"
 
@@ -60,11 +61,6 @@ void ImGuiManager::InitializeImgui(TextureManager* textureManager)
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
     ImGui::StyleColorsDark();
-#if __APPLE__
-    ImFont* font = io.Fonts->AddFontFromFileTTF(
-        "/System/Library/Fonts/Optima.ttc", DEFAULTS::ImGui::DEFAULT_FONT_SIZE
-    );
-#endif
     setupImGuiStyle();
     INFO("ImGui initialized.");
     _textureManager = textureManager;
@@ -158,7 +154,25 @@ void ImGuiManager::InitializeRenderPass(
     }
 }
 
-void ImGuiManager::InitializeFonts() { ImGui_ImplVulkan_CreateFontsTexture(); }
+void ImGuiManager::InitializeFonts()
+{
+    auto io = ImGui::GetIO();
+    ImFontAtlas* atlas = ImGui::GetIO().Fonts;
+    atlas->FontBuilderIO = ImGuiFreeType::GetBuilderForFreeType();
+    atlas->FontBuilderFlags
+        = ImGuiFreeTypeBuilderFlags_LightHinting | ImGuiFreeTypeBuilderFlags_LoadColor;
+
+    const ImWchar ranges[] = {0x1, 0x1FFFF, 0};
+    ImFontConfig cfg;
+    cfg.MergeMode = false;
+    cfg.OversampleH = cfg.OversampleV = 1;
+    cfg.FontBuilderFlags |= ImGuiFreeTypeBuilderFlags_LoadColor;
+
+    atlas->AddFontFromFileTTF("../assets/fonts/seguiemj.ttf", DEFAULTS::ImGui::DEFAULT_FONT_SIZE, &cfg, ranges);
+
+    atlas->Build();
+    ImGui_ImplVulkan_CreateFontsTexture();
+}
 
 void ImGuiManager::DestroyFrameBuffers(VkDevice device)
 {
@@ -211,7 +225,8 @@ void ImGuiManager::InitializeDescriptorPool(int poolSize, VkDevice logicalDevice
     // create a pool that will allocate to actual descriptor sets
     uint32_t descriptorSetCount = static_cast<uint32_t>(poolSize);
     VkDescriptorPoolSize poolSizes[] = {
-        {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, descriptorSetCount} // image sampler for imgui
+        {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, descriptorSetCount}, // image sampler for imgui
+        {VK_DESCRIPTOR_TYPE_SAMPLER, descriptorSetCount}                 // sampler for imgui
     };
 
     VkDescriptorPoolCreateInfo poolInfo{};
@@ -366,3 +381,5 @@ const ImGuiTexture& ImGuiManager::GetImGuiTexture(const std::string& texturePath
     ASSERT(res.second);
     return res.first->second;
 }
+
+void ImGuiManager::PushEmojiFont() { ImGui::PushFont(emojiFont); }

@@ -78,9 +78,11 @@ class ImGuiManager
     // get or generate an imgui texture
     const ImGuiTexture& GetImGuiTexture(const std::string& texturePath);
 
-  private:
-    void setupImGuiStyle();
+    void PushEmojiFont();
 
+  private:
+    ImFont* emojiFont = nullptr;
+    void setupImGuiStyle();
 
     VkRenderPass _imGuiRenderPass = VK_NULL_HANDLE; // render pass sepcifically for imgui
                                                     //
@@ -96,7 +98,7 @@ class ImGuiManager
     std::vector<VkFramebuffer> _imGuiFrameBuffer;
 
     VkClearValue _imguiClearValue = {0.0f, 0.0f, 0.0f, 0.0f}; // transparent, unused
-    
+
     TextureManager* _textureManager = nullptr;
 
     std::unordered_map<std::string, ImGuiTexture> _imguiTextures;

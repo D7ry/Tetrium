@@ -14,6 +14,8 @@ set(IMGUI_SRC
     extern/imgui/imgui_tables.cpp
     extern/imgui/backends/imgui_impl_glfw.cpp
     extern/imgui/backends/imgui_impl_vulkan.cpp
+    extern/imgui/misc/cpp/imgui_stdlib.cpp
+    extern/imgui/misc/freetype/imgui_freetype.cpp
     extern/implot/implot.cpp
     extern/implot/implot_items.cpp
 )
@@ -36,8 +38,11 @@ set(GLM_INCLUDE extern/glm)
 # tinyobjloader
 set(TINY_OBJ_LOADER_INCLUDE extern/tinyobjloader)
 
-# modules
-list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+# freetype
+if (APPLE)
+    set(FREETYPE_INCLUDE_DIRS "/opt/homebrew/include/freetype2")
+    set(FREETYPE_LIBRARIES "/opt/homebrew/lib/libfreetype.dylib")
+endif() # APPLE
 
 project(quarkolor)
 
@@ -79,6 +84,7 @@ target_include_directories(${PROJECT_NAME}
     PRIVATE ${GLFW_INCLUDE}
     PRIVATE ${GLM_INCLUDE}
     PRIVATE ${TINY_OBJ_LOADER_INCLUDE}
+    PRIVATE ${FREETYPE_INCLUDE_DIRS}
     PRIVATE src
 )
 
@@ -127,6 +133,7 @@ endif() # WIN32
 target_link_libraries(${PROJECT_NAME} 
     spdlog::spdlog 
     glfw
+    ${FREETYPE_LIBRARIES}
 )
 
 # debug flag for unix

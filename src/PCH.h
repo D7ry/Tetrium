@@ -17,3 +17,9 @@
 /* glm */
 #include "glm/glm.hpp"
 #include "glm/ext/matrix_transform.hpp" // glm::rotate(), glm::translate()
+
+
+/* ImGui */
+// enable freetype rendering
+#define IMGUI_USE_WCHAR32
+#define IMGUI_ENABLE_FREETYPE
