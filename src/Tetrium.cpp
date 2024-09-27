@@ -1809,6 +1809,7 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
     VkImage virtualFramebufferImage
         = isEven ? _renderContexts.RGB.virtualFrameBuffer.image[swapchainImageIndex]
                  : _renderContexts.OCV.virtualFrameBuffer.image[swapchainImageIndex];
+
     VkImage swapchainFramebufferImage = _swapChain.image[swapchainImageIndex];
     Utils::ImageTransfer::CmdCopyToFB(
         CB2, virtualFramebufferImage, swapchainFramebufferImage, _swapChain.extent
@@ -1878,6 +1879,7 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
     // label each frame with the tick number
     // this is useful for calculating the virtual frame counter,
     // as we can take the max(frame.id) to get the number of presented frames.
+    
     VkPresentTimeGOOGLE presentTime{(uint32_t)_numTicks, time};
 
     VkPresentTimesInfoGOOGLE presentTimeInfo{
@@ -1886,7 +1888,9 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
         .swapchainCount = 1,
         .pTimes = &presentTime};
 
-    presentInfo.pNext = &presentTimeInfo;
+    if (_tetraMode == TetraMode::kEvenOddSoftwareSync) {
+        presentInfo.pNext = &presentTimeInfo;
+    }
 
     result = vkQueuePresentKHR(_device->presentationQueue, &presentInfo);
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR
@@ -2027,12 +2031,12 @@ uint64_t Tetrium::getSurfaceCounterValue()
         NEEDS_IMPLEMENTATION();
 #endif
 #if __linux__
-        VK_CHECK_RESULT(_hardWareEvenOddCtx.vkGetSwapchainCounterEXT(
+        _hardWareEvenOddCtx.vkGetSwapchainCounterEXT(
             _device->logicalDevice,
-            _mainWindowSwapChain.chain,
+            _swapChain.chain,
             VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_EXT,
             &surfaceCounter
-        ))
+        );
 #endif
         break;
     default:

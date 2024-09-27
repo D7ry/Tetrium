@@ -290,11 +290,7 @@ class Tetrium
     GLFWwindow* _window;
     DisplayContext _mainProjectorDisplay;
 
-    /* ---------- swapchain ---------- */
-    SwapChainContext _mainWindowSwapChain;
-    SwapChainContext _auxWindowSwapchain; // unused for now
-
-
+    /* ---------- Render Contexts ---------- */
     struct {
         RenderContext RGB; // red, green, blue
         RenderContext OCV; // orange, cyan, violet
