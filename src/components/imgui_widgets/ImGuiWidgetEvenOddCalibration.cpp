@@ -85,7 +85,7 @@ void ImGuiWidgetEvenOddCalibration::drawCalibrationWindow(Tetrium* engine, Color
     if (colorSpace == ColorSpace::RGB) {
         ImGui::Text("Color Space: RGB");
     } else {
-        ImGui::Text("Color Space: CMY");
+        ImGui::Text("Color Space: OCV");
     }
 
     ImGui::Text("Num Dropped Frame: %u", engine->_evenOddDebugCtx.numDroppedFrames);
@@ -94,9 +94,9 @@ void ImGuiWidgetEvenOddCalibration::drawCalibrationWindow(Tetrium* engine, Color
         engine->_evenOddDebugCtx.numDroppedFrames = 0;
     }
 
-    { // draw RGBCMY quads
+    { // draw RGB OCV quads
         ImDrawList* dl = ImGui::GetWindowDrawList();
-        // RGBCMY
+        // RGB, what is to be interpreted as OCV
         ImU32 colors[6] = {
             IM_COL32(255, 0, 0, 255), // Red
             IM_COL32(0, 255, 0, 255), // Green
@@ -118,7 +118,7 @@ void ImGuiWidgetEvenOddCalibration::drawCalibrationWindow(Tetrium* engine, Color
         if (colorSpace == ColorSpace::RGB) {
             iBegin = 0;
             iEnd = 3;
-        } else { // CMY
+        } else { // OCV
             iBegin = 3;
             iEnd = 6;
         }
@@ -130,7 +130,7 @@ void ImGuiWidgetEvenOddCalibration::drawCalibrationWindow(Tetrium* engine, Color
         }
     }
 
-    ImGui::Checkbox("Flip RGB/CMY", &engine->_flipEvenOdd);
+    ImGui::Checkbox("Flip RGB/OCV", &engine->_flipEvenOdd);
     if (engine->_tetraMode == Tetrium::TetraMode::kEvenOddSoftwareSync) {
         ImGui::SliderInt(
             "Software Sync Timing Offset (ns)",

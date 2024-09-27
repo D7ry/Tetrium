@@ -46,7 +46,7 @@ class ImGuiManager
         int bufferCount,
         VkDevice device,
         std::vector<VkImageView>& swapChainImageViewsRGB,
-        std::vector<VkImageView>& swapChainImageViewsCMY,
+        std::vector<VkImageView>& swapChainImageViewsOCV,
         VkExtent2D extent
     );
 
@@ -71,7 +71,7 @@ class ImGuiManager
     void RecordCommandBuffer(vk::CommandBuffer cb, vk::Extent2D extent, int swapChainImageIndex);
 
     void RecordCommandBufferRGB(vk::CommandBuffer cb, vk::Extent2D extent, int swapChainImageIndex);
-    void RecordCommandBufferCMY(vk::CommandBuffer cb, vk::Extent2D extent, int swapChainImageIndex);
+    void RecordCommandBufferOCV(vk::CommandBuffer cb, vk::Extent2D extent, int swapChainImageIndex);
 
     void Cleanup(VkDevice logicalDevice);
 
@@ -89,7 +89,7 @@ class ImGuiManager
     struct
     {
         std::vector<VkFramebuffer> RGB;
-        std::vector<VkFramebuffer> CMY;
+        std::vector<VkFramebuffer> OCV;
     } _imGuiFramebuffers;
 
     [[deprecated]]

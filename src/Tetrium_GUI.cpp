@@ -32,9 +32,9 @@ void Tetrium::drawImGui(ColorSpace colorSpace)
     }
 
     // ---------- Prologue ----------
-    // note that drawImGui is called twice per tick for RGB and CMY space,
+    // note that drawImGui is called twice per tick for RGB and OCV space,
     // so we need different profiler ID for them.
-    const char* profileId = colorSpace == ColorSpace::RGB ? "ImGui Draw RGB" : "ImGui Draw CMY";
+    const char* profileId = colorSpace == ColorSpace::RGB ? "ImGui Draw RGB" : "ImGui Draw OCV";
     PROFILE_SCOPE(&_profiler, profileId);
     _imguiManager.BeginImGuiContext();
 

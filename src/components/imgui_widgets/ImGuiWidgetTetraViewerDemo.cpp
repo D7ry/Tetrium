@@ -25,7 +25,7 @@ void ImGuiWidgetTetraViewerDemo::Draw(Tetrium* engine, ColorSpace colorSpace)
 
             ImGui::Image((ImTextureID)rgb.ds, ImVec2(rgb.width, rgb.height));
             break;
-        case ColorSpace::CMY:
+        case ColorSpace::OCV:
             if (!cmyLoaded) {
                 auto tex = engine->_textureManager.GetTexture(TETRA_IMAGE_PATH_CMY);
                 auto ds = ImGui_ImplVulkan_AddTexture(

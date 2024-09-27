@@ -18,12 +18,12 @@ void SimpleRenderSystem::Init(const InitContext* ctx)
 
     // TODO: fix jank
     _renderSystemContexts.RGB._fragShader = ctx->FRAGMENT_SHADER_RGB_SRC;
-    _renderSystemContexts.CMY._fragShader = ctx->FRAGMENT_SHADER_CMY_SRC;
+    _renderSystemContexts.OCV._fragShader = ctx->FRAGMENT_SHADER_OCV_SRC;
 
     _renderSystemContexts.RGB._vertShader = ctx->VERTEX_SHADER_SRC;
-    _renderSystemContexts.CMY._vertShader = ctx->VERTEX_SHADER_SRC;
+    _renderSystemContexts.OCV._vertShader = ctx->VERTEX_SHADER_SRC;
 
-    createGraphicsPipeline(ctx->renderPass.RGB, ctx->renderPass.CMY, ctx);
+    createGraphicsPipeline(ctx->renderPass.RGB, ctx->renderPass.OCV, ctx);
 }
 
 void SimpleRenderSystem::Cleanup()
@@ -37,7 +37,7 @@ void SimpleRenderSystem::Cleanup()
         mesh.second.vertexBuffer.Cleanup();
     }
 
-    for (auto& ctx : {&(_renderSystemContexts.RGB), &(_renderSystemContexts.CMY)}) {
+    for (auto& ctx : {&(_renderSystemContexts.RGB), &(_renderSystemContexts.OCV)}) {
         // clean up static UBO & dynamic UBO
         for (int i = 0; i < ctx->_UBO.size(); i++) {
             ctx->_UBO[i].dynamicUBO.Cleanup();
@@ -117,9 +117,9 @@ void SimpleRenderSystem::TickRGB(const TickContext* tickData)
     render(tickData, _renderSystemContexts.RGB);
 }
 
-void SimpleRenderSystem::TickCMY(const TickContext* tickData)
+void SimpleRenderSystem::TickOCV(const TickContext* tickData)
 {
-    render(tickData, _renderSystemContexts.CMY);
+    render(tickData, _renderSystemContexts.OCV);
 }
 
 void SimpleRenderSystem::buildPipelineForContext(
@@ -390,7 +390,7 @@ void SimpleRenderSystem::buildPipelineForContext(
 
 void SimpleRenderSystem::createGraphicsPipeline(
     const VkRenderPass renderPassRGB,
-    const VkRenderPass renderPassCMY,
+    const VkRenderPass renderPassOCV,
     const InitContext* initData
 )
 {
@@ -463,7 +463,7 @@ void SimpleRenderSystem::createGraphicsPipeline(
     }
 
     buildPipelineForContext(renderPassRGB, initData, _renderSystemContexts.RGB);
-    buildPipelineForContext(renderPassCMY, initData, _renderSystemContexts.CMY);
+    buildPipelineForContext(renderPassOCV, initData, _renderSystemContexts.OCV);
 }
 
 MeshComponent* SimpleRenderSystem::MakeMeshInstanceComponent(
@@ -521,7 +521,7 @@ MeshComponent* SimpleRenderSystem::MakeMeshInstanceComponent(
             if (_currDynamicUBO >= _numDynamicUBO) {
                 _numDynamicUBO *= 1.5;
                 resizeDynamicUbo(_renderSystemContexts.RGB, _numDynamicUBO); // grow dynamic UBO
-                resizeDynamicUbo(_renderSystemContexts.CMY, _numDynamicUBO); // grow dynamic UBO
+                resizeDynamicUbo(_renderSystemContexts.OCV, _numDynamicUBO); // grow dynamic UBO
             }
         }
     }
@@ -579,7 +579,7 @@ void SimpleRenderSystem::resizeDynamicUbo(RenderSystemContext& ctx, size_t dynam
 void SimpleRenderSystem::updateTextureDescriptorSet()
 {
     DEBUG("updating texture descirptor set");
-    for (auto& ctx : {_renderSystemContexts.RGB, _renderSystemContexts.CMY}) {
+    for (auto& ctx : {_renderSystemContexts.RGB, _renderSystemContexts.OCV}) {
         for (size_t i = 0; i < NUM_FRAME_IN_FLIGHT; i++) {
             std::array<VkWriteDescriptorSet, 1> descriptorWrites{};
             descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;

@@ -78,7 +78,7 @@ void ImGuiWidgetPerfPlot::Draw(const Tetrium* engine, ColorSpace colorSpace)
             ScrollingBuffer& buf = it->second;
 
             // NOTE: we only update the scrolling buffer on RGB pass,
-            // and present on CMY pass; no need to write the same data twice.
+            // and present on OCV pass; no need to write the same data twice.
             if (colorSpace == ColorSpace::RGB) {
                 buf.AddPoint(engine->_timeSinceStartSeconds, ms);
             }

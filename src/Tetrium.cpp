@@ -549,7 +549,7 @@ void Tetrium::Init(const Tetrium::InitOptions& options)
         initCtx.textureManager = &_textureManager;
         initCtx.swapChainImageFormat = this->_renderContexts.RGB.swapchain->imageFormat;
         initCtx.renderPass.RGB = _renderContexts.RGB.renderPass;
-        initCtx.renderPass.CMY = _renderContexts.CMY.renderPass;
+        initCtx.renderPass.OCV = _renderContexts.OCV.renderPass;
         for (int i = 0; i < _engineUBOStatic.size(); i++) {
             initCtx.engineUBOStaticDescriptorBufferInfo[i].range = sizeof(EngineUBOStatic);
             initCtx.engineUBOStaticDescriptorBufferInfo[i].buffer = _engineUBOStatic[i].buffer;
@@ -643,7 +643,7 @@ void Tetrium::setupSoftwareEvenOddFrame()
     // get refresh cycle
     VkRefreshCycleDurationGOOGLE refreshCycleDuration;
     ASSERT(_renderContexts.RGB.swapchain->chain);
-    ASSERT(_renderContexts.CMY.swapchain->chain);
+    ASSERT(_renderContexts.OCV.swapchain->chain);
     ASSERT(_device->logicalDevice);
 
     PFN_vkGetRefreshCycleDurationGOOGLE ptr = reinterpret_cast<PFN_vkGetRefreshCycleDurationGOOGLE>(
@@ -770,8 +770,8 @@ void Tetrium::initVulkan()
     ASSERT(_swapChain.imageFormat);
     createDepthBuffer(_swapChain);
 
-    // create context for rgb and cmy rendering
-    for (RenderContext* ctx : {&_renderContexts.RGB, &_renderContexts.CMY}) {
+    // create context for rgb and ocv rendering
+    for (RenderContext* ctx : {&_renderContexts.RGB, &_renderContexts.OCV}) {
         ctx->swapchain = &_swapChain;
         ctx->renderPass = createRenderPass(ctx->swapchain->imageFormat);
         createVirtualFrameBuffers(*ctx);
@@ -805,7 +805,7 @@ void Tetrium::initVulkan()
         _swapChain.image.size(),
         _device->logicalDevice,
         _renderContexts.RGB.virtualFrameBuffer.imageView,
-        _renderContexts.CMY.virtualFrameBuffer.imageView,
+        _renderContexts.OCV.virtualFrameBuffer.imageView,
         _swapChain.extent
     );
     this->_imguiManager.InitializeImgui(&_textureManager);
@@ -820,7 +820,7 @@ void Tetrium::initVulkan()
         _device->queueFamilyIndices.graphicsFamily.value(),
         _device->graphicsQueue,
         _renderContexts.RGB.virtualFrameBuffer.frameBuffer.size(
-        ) // doesn't matter if it's RGB or CMY
+        ) // doesn't matter if it's RGB or OCV
     );
     _imguiManager.InitializeFonts();
 
@@ -1225,15 +1225,15 @@ void Tetrium::cleanupSwapChain(SwapChainContext& ctx)
 void Tetrium::recreateVirtualFrameBuffers()
 {
     clearVirtualFrameBuffers(_renderContexts.RGB);
-    clearVirtualFrameBuffers(_renderContexts.CMY);
+    clearVirtualFrameBuffers(_renderContexts.OCV);
     createVirtualFrameBuffers(_renderContexts.RGB);
-    createVirtualFrameBuffers(_renderContexts.CMY);
+    createVirtualFrameBuffers(_renderContexts.OCV);
     _imguiManager.DestroyFrameBuffers(_device->logicalDevice);
     _imguiManager.InitializeFrameBuffer(
         _swapChain.image.size(),
         _device->logicalDevice,
         _renderContexts.RGB.virtualFrameBuffer.imageView,
-        _renderContexts.CMY.virtualFrameBuffer.imageView,
+        _renderContexts.OCV.virtualFrameBuffer.imageView,
         _swapChain.extent
     );
 }
@@ -1602,7 +1602,7 @@ void Tetrium::clearVirtualFrameBuffers(RenderContext& ctx)
     }
 }
 
-void Tetrium::createSwapchainFrameBuffers(SwapChainContext& ctx, VkRenderPass rgbOrCmyPass)
+void Tetrium::createSwapchainFrameBuffers(SwapChainContext& ctx, VkRenderPass rgbOrOcvPass)
 {
     DEBUG("Creating framebuffers..");
     // iterate through image views and create framebuffers
@@ -1611,8 +1611,8 @@ void Tetrium::createSwapchainFrameBuffers(SwapChainContext& ctx, VkRenderPass rg
         VkFramebufferCreateInfo framebufferInfo{};
         framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         // NOTE: framebuffer DOES NOT need to have a dedicated render pass,
-        // just need to be compatible. Therefore we pass either RGB&CMY pass
-        framebufferInfo.renderPass = rgbOrCmyPass;
+        // just need to be compatible. Therefore we pass either RGB&OCV pass
+        framebufferInfo.renderPass = rgbOrOcvPass;
         framebufferInfo.attachmentCount = sizeof(attachments) / sizeof(VkImageView);
         framebufferInfo.pAttachments = attachments;
         framebufferInfo.width = ctx.extent.width;
@@ -1736,7 +1736,7 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
         scissor.offset = {0, 0};
         scissor.extent = extend;
 
-        // two-pass rendering: render RGB and CMY colors onto two virtual FBs
+        // two-pass rendering: render RGB and OCV colors onto two virtual FBs
         {
             renderPassBeginInfo.renderPass = _renderContexts.RGB.renderPass;
             renderPassBeginInfo.framebuffer
@@ -1754,20 +1754,20 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
             _imguiManager.RecordCommandBufferRGB(CB1, extend, swapchainImageIndex);
         }
         {
-            renderPassBeginInfo.renderPass = _renderContexts.CMY.renderPass;
+            renderPassBeginInfo.renderPass = _renderContexts.OCV.renderPass;
             renderPassBeginInfo.framebuffer
-                = _renderContexts.CMY.virtualFrameBuffer
+                = _renderContexts.OCV.virtualFrameBuffer
                       .frameBuffer[swapchainImageIndex]; // which frame buffer in the
                                                          // swapchain do the pass i.e.
                                                          // all draw calls render to?
             CB1.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
             vkCmdSetViewport(CB1, 0, 1, &viewport);
             vkCmdSetScissor(CB1, 0, 1, &scissor);
-            _renderer.TickCMY(ctx);
+            _renderer.TickOCV(ctx);
             CB1.endRenderPass();
 
-            drawImGui(ColorSpace::CMY);
-            _imguiManager.RecordCommandBufferCMY(CB1, extend, swapchainImageIndex);
+            drawImGui(ColorSpace::OCV);
+            _imguiManager.RecordCommandBufferOCV(CB1, extend, swapchainImageIndex);
         }
     }
 
@@ -1802,7 +1802,7 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
     bool isEven = isEvenFrame();
     VkImage virtualFramebufferImage
         = isEven ? _renderContexts.RGB.virtualFrameBuffer.image[swapchainImageIndex]
-                 : _renderContexts.CMY.virtualFrameBuffer.image[swapchainImageIndex];
+                 : _renderContexts.OCV.virtualFrameBuffer.image[swapchainImageIndex];
     VkImage swapchainFramebufferImage = _swapChain.image[swapchainImageIndex];
     Utils::ImageTransfer::CmdCopyToFB(
         CB2, virtualFramebufferImage, swapchainFramebufferImage, _swapChain.extent

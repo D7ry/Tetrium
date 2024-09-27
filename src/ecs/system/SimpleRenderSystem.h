@@ -53,7 +53,7 @@ class SimpleRenderSystem : public ISystem
 
     // TODO: clean up to make it more DOD
     void TickRGB(const TickContext* ctx);
-    void TickCMY(const TickContext* ctx);
+    void TickOCV(const TickContext* ctx);
 
     void Cleanup() override;
 
@@ -77,7 +77,7 @@ class SimpleRenderSystem : public ISystem
     struct
     {
         RenderSystemContext RGB;
-        RenderSystemContext CMY;
+        RenderSystemContext OCV;
     } _renderSystemContexts;
 
 
@@ -107,7 +107,7 @@ class SimpleRenderSystem : public ISystem
     // and the pipeline itself
     void createGraphicsPipeline(
         const VkRenderPass renderPassRGB,
-        const VkRenderPass renderPassCMY,
+        const VkRenderPass renderPassOCV,
         const InitContext* initData
     );
 

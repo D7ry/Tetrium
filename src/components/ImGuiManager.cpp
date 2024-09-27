@@ -177,7 +177,7 @@ void ImGuiManager::InitializeFonts()
 void ImGuiManager::DestroyFrameBuffers(VkDevice device)
 {
     DEBUG("Destroying imgui frame buffers...");
-    for (auto framebuffer : {&_imGuiFramebuffers.RGB, &_imGuiFramebuffers.CMY}) {
+    for (auto framebuffer : {&_imGuiFramebuffers.RGB, &_imGuiFramebuffers.OCV}) {
         for (auto fb : *framebuffer) {
             vkDestroyFramebuffer(device, fb, nullptr);
         }
@@ -188,18 +188,18 @@ void ImGuiManager::InitializeFrameBuffer(
     int bufferCount,
     VkDevice device,
     std::vector<VkImageView>& swapChainImageViewsRGB,
-    std::vector<VkImageView>& swapChainImageViewsCMY,
+    std::vector<VkImageView>& swapChainImageViewsOCV,
     VkExtent2D extent
 )
 {
     DEBUG("Creating imgui frame buffers...");
     ASSERT(swapChainImageViewsRGB.size() == bufferCount);
-    ASSERT(swapChainImageViewsCMY.size() == bufferCount);
+    ASSERT(swapChainImageViewsOCV.size() == bufferCount);
     if (this->_imGuiRenderPass == VK_NULL_HANDLE) {
         FATAL("Render pass must be initialized before creating frame buffers!");
     }
     _imGuiFramebuffers.RGB.resize(bufferCount);
-    _imGuiFramebuffers.CMY.resize(bufferCount);
+    _imGuiFramebuffers.OCV.resize(bufferCount);
     VkImageView attachment[1];
     VkFramebufferCreateInfo info = {};
     info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
@@ -213,8 +213,8 @@ void ImGuiManager::InitializeFrameBuffer(
     for (uint32_t i = 0; i < bufferCount; i++) {
         attachment[0] = swapChainImageViewsRGB[i];
         vkCreateFramebuffer(device, &info, nullptr, &_imGuiFramebuffers.RGB[i]);
-        attachment[0] = swapChainImageViewsCMY[i];
-        vkCreateFramebuffer(device, &info, nullptr, &_imGuiFramebuffers.CMY[i]);
+        attachment[0] = swapChainImageViewsOCV[i];
+        vkCreateFramebuffer(device, &info, nullptr, &_imGuiFramebuffers.OCV[i]);
     }
     DEBUG("Imgui frame buffers created.");
 }
@@ -258,7 +258,7 @@ void ImGuiManager::Cleanup(VkDevice logicalDevice)
     DEBUG("cleaned up imgui");
 }
 
-void ImGuiManager::RecordCommandBufferCMY(
+void ImGuiManager::RecordCommandBufferOCV(
     vk::CommandBuffer cb,
     vk::Extent2D extent,
     int swapChainImageIndex
@@ -268,7 +268,7 @@ void ImGuiManager::RecordCommandBufferCMY(
     VkRenderPassBeginInfo renderPassInfo{};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     renderPassInfo.renderPass = _imGuiRenderPass;
-    renderPassInfo.framebuffer = _imGuiFramebuffers.CMY[swapChainImageIndex];
+    renderPassInfo.framebuffer = _imGuiFramebuffers.OCV[swapChainImageIndex];
     renderPassInfo.renderArea.extent = extent;
     renderPassInfo.renderArea.offset = {0, 0};
     renderPassInfo.clearValueCount = 0;

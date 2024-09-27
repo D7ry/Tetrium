@@ -40,14 +40,14 @@ struct InitContext
     struct
     {
         VkRenderPass RGB;
-        VkRenderPass CMY;
+        VkRenderPass OCV;
     } renderPass;
 
     // temporary
     // TODO: clean up
     const char* VERTEX_SHADER_SRC = "../shaders/phong/phong.vert.spv";
     const char* FRAGMENT_SHADER_RGB_SRC = "../shaders/phong/phong_rgb.frag.spv";
-    const char* FRAGMENT_SHADER_CMY_SRC = "../shaders/phong/phong_cmy.frag.spv";
+    const char* FRAGMENT_SHADER_OCV_SRC = "../shaders/phong/phong_cmy.frag.spv";
 
     /**
      * points to initialized buffer of static engine ubo

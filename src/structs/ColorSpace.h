@@ -2,5 +2,5 @@
 enum class ColorSpace
 {
     RGB,
-    CMY
+    OCV
 };

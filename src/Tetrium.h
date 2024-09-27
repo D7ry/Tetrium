@@ -179,7 +179,7 @@ class Tetrium
     };
 
     // render context for the dual-pass, virtual frame buffer rendering architecture.
-    // RGB and CMY channel each have their own render context,
+    // RGB and OCV channel each have their own render context,
     // they are rendered in parallel for each tick; both's render results are written onto `RenderContext::virtualFrameBuffer`,
     // associated with `RenderContext::imageView`, `RenderContext::imageMemory`, and `RenderContext::image`
     //
@@ -294,7 +294,7 @@ class Tetrium
 
     struct {
         RenderContext RGB; // red, green, blue
-        RenderContext CMY; // cyan, magenta, yellow
+        RenderContext OCV; // orange, cyan, violet
     } _renderContexts;
 
     /* ---------- Synchronization Primivites ---------- */

@@ -7,12 +7,12 @@ Vulkan-based tetrachromacy display engine.
 ### Dual-Frame Buffer Rendering
 
 The engine holds two off-screen frame buffers, one buffer for the RGB color space, and the other for
-CMY color space.
+OCV color space.
 
-Each tick, the engine simultaneously renders to the buffers with the RGB and CMY pipeline,
+Each tick, the engine simultaneously renders to the buffers with the RGB and OCV pipeline,
 respectively. Once the rendering is done, depending on the presentation mode:
 
-- `TetraMode::kDualProjector`: both buffers are committed to either RGB or CMY projector.
+- `TetraMode::kDualProjector`: both buffers are committed to either RGB or OCV projector.
 - `TetraMode::kEvenOddSoftwareSync` or `TetraMode::kEvenOddHardwareSync`: the engine determines the
   count of the vertical blanking period, either through hardware APIs or a virtual software frame
   counter(TODO: add docs for even-odd evaluation); the engine then commits one frame buffer while
