@@ -254,6 +254,11 @@ void Tetrium::selectDisplayXlib(DisplayContext& ctx)
         XRRFreeScreenResources(resources);
     }
 
+    if (displays.empty()) {
+        PANIC("No external display fonud! Make sure to have GPU connected to at least one external "
+              "display.");
+    }
+
     println("============== Choose Display ===============");
 
     for (size_t i = 0; i < displays.size(); ++i) {
@@ -278,7 +283,11 @@ void Tetrium::selectDisplayXlib(DisplayContext& ctx)
         );
     ASSERT(vkAcquireXlibDisplayEXT);
 
-    VK_CHECK_RESULT(vkAcquireXlibDisplayEXT(device, xDisplay, ctx.display));
+    VkResult result = vkAcquireXlibDisplayEXT(device, xDisplay, ctx.display);
+    if (result != VK_SUCCESS) {
+        PANIC("Failed to find acquire exclusive access to xlib display, make sure to disable "
+              "display in OS and graphics drivers.");
+    }
 }
 #endif // __linux__
 
@@ -1879,7 +1888,7 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
     // label each frame with the tick number
     // this is useful for calculating the virtual frame counter,
     // as we can take the max(frame.id) to get the number of presented frames.
-    
+
     VkPresentTimeGOOGLE presentTime{(uint32_t)_numTicks, time};
 
     VkPresentTimesInfoGOOGLE presentTimeInfo{
