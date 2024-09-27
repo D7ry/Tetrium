@@ -6,11 +6,11 @@ Vulkan-based tetrachromacy display engine.
 
 ### Dual-Frame Buffer Rendering
 
-The engine holds two off-screen frame buffers, one buffer for the RGB color space, and the other for
-OCV color space.
+The engine holds two off-screen frame buffers, each responsible for one color space.
 
-Each tick, the engine simultaneously renders to the buffers with the RGB and OCV pipeline,
-respectively. Once the rendering is done, depending on the presentation mode:
+Each tick, the engine simultaneously renders to the two buffers.
+
+Once the rendering is done, depending on the presentation mode:
 
 - `TetraMode::kDualProjector`: both buffers are committed to either RGB or OCV projector.
 - `TetraMode::kEvenOddSoftwareSync` or `TetraMode::kEvenOddHardwareSync`: the engine determines the
@@ -41,31 +41,22 @@ respectively. Once the rendering is done, depending on the presentation mode:
 
 ## Build
 
-### Unix
-
-#### Apple
+### Apple
 
 set `VULKAN_LIB_PATH` in `CMakeLists.txt` to your own path after installing Vulkan SDK
 
-##### FreeType
+#### FreeType
 
 `brew install freetype`
 
 validate that `/opt/homebrew/include/freetype2` and `/opt/homebrew/lib/libfreetype.dylib`
 contains freetype library and include files.
 
-#### Linux
+### Linux
 
 install `X11` and `Xrandr` for direct display access, for hardware even-odd frame sync
 
-#### Commands
-```bash
-git clone -recurse-submodules git@github.com:D7ry/quarkolor.git
-mkdir build
-cd build
-cmake ../
-make
-```
+install freetype
 
 ### Windows
 
