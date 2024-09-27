@@ -1,7 +1,11 @@
-# Tetrium
+```
+___  ___ ___  __
+ |  |__   |  |__) | |  |  |\/|
+ |  |___  |  |  \ | \__/  |  |
+
+```
 
 Vulkan-based tetrachromacy display engine.
-
 ## Engine Architecture
 
 ### Dual-Frame Buffer Rendering
