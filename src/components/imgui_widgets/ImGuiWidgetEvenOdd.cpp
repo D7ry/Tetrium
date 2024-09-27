@@ -68,7 +68,7 @@ void ImGuiWidgetEvenOdd::drawCalibrationWindow(Quarkolor* engine, ColorSpace col
     ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
     // ImGui::SetNextWindowFocus();
     //
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0, 0, 0, 1));
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0, 0, 0, 255));
 
     ImGui::Begin(
         "Even Odd Test",
@@ -138,51 +138,46 @@ void ImGuiWidgetEvenOdd::drawCalibrationWindow(Quarkolor* engine, ColorSpace col
         );
     }
 
-    if (ImGui::CollapsingHeader("Auto Calibration")) {
-        if (!_calibrationInProgress) {
-            if (ImGui::Button("Calibrate") && colorSpace == ColorSpace::RGB) {
-                startAutoCalibration(engine);
-            }
+    ImGui::SeparatorText("Auto Calibration");
+
+    if (!_calibrationInProgress) {
+        if (ImGui::Button("Calibrate") && colorSpace == ColorSpace::RGB) {
+            startAutoCalibration(engine);
         }
-
-        // Display calibration status
-        if (_calibrationInProgress) {
-            ImGui::Text("Calibration in progress...");
-            ImGui::PushStyleColor(
-                ImGuiCol_PlotHistogram, ImVec4(0.3f, 0.7f, 0.3f, 1.0f)
-            ); // Green progress
-            ImGui::PushStyleColor(
-                ImGuiCol_FrameBg, ImVec4(0.1f, 0.1f, 0.1f, 1.0f)
-            ); // Dark background
-            ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 5.0f);
-            ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
-            ImGui::ProgressBar(_calibrationProgress, ImVec2{ImGui::GetWindowWidth() * 0.6f, 0});
-            ImGui::PopStyleVar(2);
-            ImGui::PopStyleColor(2);
-            if (ImGui::Button("Cancel")) {
-                _calibrationInProgress = false;
-            }
+    } else {
+        if (ImGui::Button("Cancel")) {
+            _calibrationInProgress = false;
         }
+        ImGui::SameLine();
+        ImGui::Text("Calibration in progress...");
+        ImGui::PushStyleColor(
+            ImGuiCol_PlotHistogram, ImVec4(0.3f, 0.7f, 0.3f, 1.0f)
+        );                                                                       // Green progress
+        ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.1f, 0.1f, 0.1f, 1.0f)); // Dark background
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 5.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
+        ImGui::ProgressBar(_calibrationProgress, ImVec2{ImGui::GetWindowWidth() * 0.6f, 0});
+        ImGui::PopStyleVar(2);
+        ImGui::PopStyleColor(2);
+    }
 
-        if (_calibrationComplete) {
-            ImGui::PushStyleColor(
-                ImGuiCol_Text, ImVec4(0.0f, 1.0f, 0.0f, 1.0f)
-            ); // Bright green color
-            ImGui::Text("Calibration complete.");
-            ImGui::PopStyleColor();
+    // calibration results
+    if (_calibrationComplete) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 1.0f, 0.0f, 1.0f)); // Bright green color
+        ImGui::Text("Calibration complete.");
+        ImGui::PopStyleColor();
 
-            ImGui::Text("Optimal offset: ");
-            ImGui::SameLine();
-            ImGui::TextColored(
-                ImVec4(0.0f, 1.0f, 0.5f, 1.0f), "%d ns", _optimalOffset.load()
-            ); // Light green color
+        ImGui::Text("Optimal offset: ");
+        ImGui::SameLine();
+        ImGui::TextColored(
+            ImVec4(0.0f, 1.0f, 0.5f, 1.0f), "%d ns", _optimalOffset.load()
+        ); // Light green color
 
-            ImGui::Text("Highest dropped frames at worst offset: ");
-            ImGui::SameLine();
-            ImGui::TextColored(
-                ImVec4(0.0f, 0.8f, 0.0f, 1.0f), "%d", _highestDroppedFrames.load()
-            ); // Slightly darker green
-        }
+        ImGui::Text("Highest dropped frames at worst offset: ");
+        ImGui::SameLine();
+        ImGui::TextColored(
+            ImVec4(0.0f, 0.8f, 0.0f, 1.0f), "%d", _highestDroppedFrames.load()
+        ); // Slightly darker green
     }
 
     ImGui::PopStyleColor();

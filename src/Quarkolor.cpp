@@ -794,8 +794,9 @@ void Quarkolor::initVulkan()
     imguiInitialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     imguiFinalLayout
         = _tetraMode == TetraMode::kDualProjector
-              ? VK_IMAGE_LAYOUT_PRESENT_SRC_KHR // dual project's two passes directly present
-              : VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+              ? VK_IMAGE_LAYOUT_PRESENT_SRC_KHR       // dual project's two passes directly present
+              : VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL; // virtual fb to be finally transferred to
+                                                      // swapchain
 
     this->_imguiManager.InitializeRenderPass(
         this->_device->logicalDevice, _swapChain.imageFormat, imguiInitialLayout, imguiFinalLayout
