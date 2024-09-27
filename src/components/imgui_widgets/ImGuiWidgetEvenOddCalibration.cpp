@@ -1,9 +1,10 @@
 #include <iostream>
 
-#include "ImGuiWidget.h"
 #include "Tetrium.h"
 
-void ImGuiWidgetEvenOdd::drawColorQuadTest()
+#include "ImGuiWidgetEvenOddCalibration.h"
+
+void ImGuiWidgetEvenOddCalibration::drawColorQuadTest()
 {
     ImGui::SetNextWindowPos(ImVec2(0, 0));
 
@@ -61,7 +62,7 @@ void ImGuiWidgetEvenOdd::drawColorQuadTest()
     ImGui::End();
 }
 
-void ImGuiWidgetEvenOdd::drawCalibrationWindow(Tetrium* engine, ColorSpace colorSpace)
+void ImGuiWidgetEvenOddCalibration::drawCalibrationWindow(Tetrium* engine, ColorSpace colorSpace)
 {
     ImGui::SetNextWindowPos(ImVec2(0, 0));
 
@@ -184,7 +185,7 @@ void ImGuiWidgetEvenOdd::drawCalibrationWindow(Tetrium* engine, ColorSpace color
     ImGui::End();
 }
 
-void ImGuiWidgetEvenOdd::Draw(Tetrium* engine, ColorSpace colorSpace)
+void ImGuiWidgetEvenOddCalibration::Draw(Tetrium* engine, ColorSpace colorSpace)
 {
     const char* evenOddMode = nullptr;
 
@@ -254,7 +255,7 @@ void ImGuiWidgetEvenOdd::Draw(Tetrium* engine, ColorSpace colorSpace)
     }
 }
 
-int ImGuiWidgetEvenOdd::measureDroppedFrames(Tetrium* engine, int offset, int duration)
+int ImGuiWidgetEvenOddCalibration::measureDroppedFrames(Tetrium* engine, int offset, int duration)
 {
     engine->_softwareEvenOddCtx.timeOffset = offset;
     int initialDroppedFrames = engine->_evenOddDebugCtx.numDroppedFrames;
@@ -264,18 +265,18 @@ int ImGuiWidgetEvenOdd::measureDroppedFrames(Tetrium* engine, int offset, int du
     return engine->_evenOddDebugCtx.numDroppedFrames - initialDroppedFrames;
 }
 
-void ImGuiWidgetEvenOdd::startAutoCalibration(Tetrium* engine)
+void ImGuiWidgetEvenOddCalibration::startAutoCalibration(Tetrium* engine)
 {
     if (!_calibrationInProgress) {
         _calibrationInProgress = true;
         _calibrationProgress = 0.0f;
         _calibrationComplete = false;
-        std::thread calibrationThread(&ImGuiWidgetEvenOdd::autoCalibrationThread, this, engine);
+        std::thread calibrationThread(&ImGuiWidgetEvenOddCalibration::autoCalibrationThread, this, engine);
         calibrationThread.detach();
     }
 }
 
-void ImGuiWidgetEvenOdd::autoCalibrationThread(Tetrium* engine)
+void ImGuiWidgetEvenOddCalibration::autoCalibrationThread(Tetrium* engine)
 {
     int worstOffset = combinedCalibration(engine);
     int optimalOffset = (engine->_softwareEvenOddCtx.nanoSecondsPerFrame / 2 + worstOffset)
@@ -288,7 +289,7 @@ void ImGuiWidgetEvenOdd::autoCalibrationThread(Tetrium* engine)
     _calibrationInProgress = false;
 }
 
-int ImGuiWidgetEvenOdd::combinedCalibration(Tetrium* engine)
+int ImGuiWidgetEvenOddCalibration::combinedCalibration(Tetrium* engine)
 {
     int maxOffset = engine->_softwareEvenOddCtx.nanoSecondsPerFrame;
     int worstOffset = 0;
@@ -338,7 +339,7 @@ int ImGuiWidgetEvenOdd::combinedCalibration(Tetrium* engine)
     return worstOffset;
 }
 
-void ImGuiWidgetEvenOdd::recursiveDescentCalibration(
+void ImGuiWidgetEvenOddCalibration::recursiveDescentCalibration(
     Tetrium* engine,
     int start,
     int end,

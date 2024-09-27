@@ -40,7 +40,7 @@
 #include "components/imgui_widgets/ImGuiWidget.h"
 
 #include "components/imgui_widgets/ImGuiWidgetTetraViewerDemo.h"
-
+#include "components/imgui_widgets/ImGuiWidgetEvenOddCalibration.h"
 // ecs
 #include "ecs/system/SimpleRenderSystem.h"
 
@@ -378,8 +378,8 @@ class Tetrium
     ImGuiWidgetPerfPlot _widgetPerfPlot;
     friend class ImGuiWidgetUBOViewer;
     ImGuiWidgetUBOViewer _widgetUBOViewer;
-    friend class ImGuiWidgetEvenOdd;
-    ImGuiWidgetEvenOdd _widgetEvenOdd;
+    friend class ImGuiWidgetEvenOddCalibration;
+    ImGuiWidgetEvenOddCalibration _widgetEvenOdd;
     friend class ImGuiWidgetGraphicsPipeline;
     ImGuiWidgetGraphicsPipeline _widgetGraphicsPipeline;
     friend class ImGuiWidgetTetraViewerDemo;
