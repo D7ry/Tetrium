@@ -89,6 +89,10 @@ void ImGuiWidgetEvenOddCalibration::drawCalibrationWindow(Tetrium* engine, Color
     }
 
     ImGui::Text("Num Dropped Frame: %u", engine->_evenOddDebugCtx.numDroppedFrames);
+    ImGui::SameLine();
+    if (ImGui::Button("Reset") && colorSpace == ColorSpace::RGB) {
+        engine->_evenOddDebugCtx.numDroppedFrames = 0;
+    }
 
     { // draw RGBCMY quads
         ImDrawList* dl = ImGui::GetWindowDrawList();
