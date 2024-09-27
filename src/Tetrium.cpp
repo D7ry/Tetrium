@@ -436,14 +436,14 @@ void Tetrium::keyCallback(GLFWwindow* window, int key, int scancode, int action,
 
     // toggle cursor lock
     if (key == GLFW_KEY_TAB && action == GLFW_PRESS) {
-        _lockCursor = !_lockCursor;
-        if (_lockCursor) {
+        _windowFocused = !_windowFocused;
+        if (_windowFocused) {
             glfwSetInputMode(_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         } else {
             glfwSetInputMode(_window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
         }
         // only activate input on cursor lock
-        _inputManager.SetActive(_lockCursor);
+        _inputManager.SetActive(_windowFocused);
     }
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
         glfwSetWindowShouldClose(_window, GLFW_TRUE);
@@ -465,7 +465,7 @@ void Tetrium::cursorPosCallback(GLFWwindow* window, double xpos, double ypos)
     // handle camera movement
     deltaX *= 0.3;
     deltaY *= 0.3; // make movement slower
-    if (_lockCursor && !_uiMode) {
+    if (_windowFocused && !_uiMode) {
         _mainCamera.ModRotation(deltaX, deltaY, 0);
     }
     prevX = xpos;
@@ -485,8 +485,8 @@ void Tetrium::initDefaultStates()
 
     // input states
     // by default, unlock cursor, disable imgui inputs, disable input handling
-    _lockCursor = false;
-    _inputManager.SetActive(_lockCursor);
+    _windowFocused = false;
+    _inputManager.SetActive(_windowFocused);
     _uiMode = false;
 
     ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoMouse;
@@ -1895,121 +1895,6 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
     }
 }
 
-void Tetrium::drawImGui(ColorSpace colorSpace)
-{
-    if (!_wantToDrawImGui) {
-        return;
-    }
-    // note that drawImGui is called twice per tick for RGB and CMY space,
-    // so we need different profiler ID for them.
-    const char* profileId = colorSpace == ColorSpace::RGB ? "ImGui Draw RGB" : "ImGui Draw CMY";
-    PROFILE_SCOPE(&_profiler, profileId);
-    _imguiManager.BeginImGuiContext();
-
-    // imgui is associated with the glfw window to handle inputs,
-    // but its actual fb is associated with the projector display;
-    // so we need to manually re-adjust the display size for the scissors/
-    // viewports/clipping to be consistent
-    bool imguiDisplaySizeOverride = _tetraMode == TetraMode::kEvenOddHardwareSync;
-    if (imguiDisplaySizeOverride) {
-        ImVec2 projectorDisplaySize{
-            static_cast<float>(_mainProjectorDisplay.extent.width),
-            static_cast<float>(_mainProjectorDisplay.extent.height)
-        };
-        _imguiManager.forceDisplaySize(projectorDisplaySize);
-    }
-
-    if (!_lockCursor) {
-        ImGuiU::DrawCenteredText("Press Tab to enable input", ImVec4(0, 0, 0, 0.8));
-    } else if (_uiMode) {
-        ImGuiIO& io = ImGui::GetIO();
-        ImDrawList* drawList = ImGui::GetForegroundDrawList();
-
-        ImVec2 mousePos = io.MousePos;
-        // TODO: store all engine imgui assets in a table
-        const ImGuiTexture& cursorTexture
-            = _imguiManager.GetImGuiTexture("../assets/textures/engine/cursor.png");
-        ImVec2 cursorSize(cursorTexture.width * 2, cursorTexture.height * 2);
-        ImVec2 cursorPos(mousePos.x, mousePos.y);
-        drawList->AddImage(
-            (ImTextureID)cursorTexture.ds,
-            cursorPos,
-            ImVec2(cursorPos.x + cursorSize.x, cursorPos.y + cursorSize.y)
-        );
-    }
-
-    if (ImGui::Begin(DEFAULTS::Engine::APPLICATION_NAME)) {
-        if (ImGui::BeginTabBar("Engine Tab")) {
-            if (ImGui::BeginTabItem("General")) {
-                ImGui::ShowDemoWindow();
-                _imguiManager.PushEmojiFont();
-                ImGui::Text((const char*)u8"Method 1: 🐮 here");
-                ImGui::TextUnformatted((const char*)u8"Method 2: 🐮 here");
-                ImGui::PopFont();
-                ImGui::SeparatorText("Camera");
-                {
-                    ImGui::Text(
-                        "Position: (%f, %f, %f)",
-                        _mainCamera.GetPosition().x,
-                        _mainCamera.GetPosition().y,
-                        _mainCamera.GetPosition().z
-                    );
-                    ImGui::Text(
-                        "Yaw: %f Pitch: %f Roll: %f",
-                        _mainCamera.GetRotation().y,
-                        _mainCamera.GetRotation().x,
-                        _mainCamera.GetRotation().z
-                    );
-                    ImGui::SliderFloat("FOV", &_FOV, 30, 120, "%.f");
-                }
-                if (ImGui::Button("Reset")) {
-                    _mainCamera.SetPosition(0, 0, 0);
-                }
-                ImGui::SeparatorText("Cursor Lock(tab)");
-                if (_lockCursor) {
-                    ImGui::Text("Cursor Lock: Active");
-                } else {
-                    ImGui::Text("Cursor Lock: Deactive");
-                }
-                if (_uiMode) {
-                    ImGui::Text("UI Mode: Active");
-                } else {
-                    ImGui::Text("UI Mode: Deactive");
-                }
-                ImGui::SeparatorText("Engine UBO");
-                _widgetUBOViewer.Draw(this, colorSpace);
-                ImGui::SeparatorText("Graphics Pipeline");
-                _widgetGraphicsPipeline.Draw(this, colorSpace);
-                ImGui::EndTabItem();
-            }
-
-            if (ImGui::BeginTabItem("Performance")) {
-                _widgetPerfPlot.Draw(this, colorSpace);
-                ImGui::EndTabItem();
-            }
-
-            if (ImGui::BeginTabItem("Device")) {
-                _widgetDeviceInfo.Draw(this, colorSpace);
-                ImGui::EndTabItem();
-            }
-
-            if (ImGui::BeginTabItem("Even-Odd")) {
-                _widgetEvenOdd.Draw(this, colorSpace);
-                ImGui::EndTabItem();
-            }
-
-            if (ImGui::BeginTabItem("Tetra Viewer")) {
-                _widgetTetraViewerDemo.Draw(this, colorSpace);
-                ImGui::EndTabItem();
-            }
-
-            ImGui::EndTabBar(); // Engine Tab
-        }
-    }
-
-    ImGui::End();
-    _imguiManager.EndImGuiContext();
-}
 
 // FIXME: glfw calls from a differnt thread; may need to add critical sections
 // currently for perf reasons we're leaving it as is.

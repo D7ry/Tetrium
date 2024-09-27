@@ -312,7 +312,7 @@ class Tetrium
     uint8_t _currentFrame = 0;
 
     // whether we are locking the cursor within the glfw window
-    bool _lockCursor = false;
+    bool _windowFocused = false;
     // UI mode: ImGui processes user inputs,
     // and movement / camera inputs disables
     bool _uiMode = true;
@@ -374,16 +374,17 @@ class Tetrium
 
     // ImGui widgets
     friend class ImGuiWidgetDeviceInfo;
-    ImGuiWidgetDeviceInfo _widgetDeviceInfo;
     friend class ImGuiWidgetPerfPlot;
-    ImGuiWidgetPerfPlot _widgetPerfPlot;
     friend class ImGuiWidgetUBOViewer;
-    ImGuiWidgetUBOViewer _widgetUBOViewer;
     friend class ImGuiWidgetEvenOddCalibration;
-    ImGuiWidgetEvenOddCalibration _widgetEvenOdd;
     friend class ImGuiWidgetGraphicsPipeline;
-    ImGuiWidgetGraphicsPipeline _widgetGraphicsPipeline;
     friend class ImGuiWidgetTetraViewerDemo;
+
+    ImGuiWidgetDeviceInfo _widgetDeviceInfo;
+    ImGuiWidgetPerfPlot _widgetPerfPlot;
+    ImGuiWidgetUBOViewer _widgetUBOViewer;
+    ImGuiWidgetEvenOddCalibration _widgetEvenOdd;
+    ImGuiWidgetGraphicsPipeline _widgetGraphicsPipeline;
     ImGuiWidgetTetraViewerDemo _widgetTetraViewerDemo;
 
     SimpleRenderSystem _renderer;

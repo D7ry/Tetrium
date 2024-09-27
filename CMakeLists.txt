@@ -50,6 +50,7 @@ add_executable(${PROJECT_NAME}
         src/lib/Utils.cpp
         src/main.cpp
         src/Tetrium.cpp
+        src/Tetrium_GUI.cpp
         src/components/TaskQueue.cpp
         src/components/Logging.cpp
         src/components/ShaderUtils.cpp
