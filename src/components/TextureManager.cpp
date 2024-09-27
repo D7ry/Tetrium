@@ -1,16 +1,18 @@
-#include "lib/VQBuffer.h"
 #include "TextureManager.h"
 #include "VulkanUtils.h"
+#include "lib/VQBuffer.h"
 #include <stb_image.h>
 #include <vulkan/vulkan_core.h>
 
-TextureManager::~TextureManager() {
+TextureManager::~TextureManager()
+{
     if (!_textures.empty()) {
         PANIC("Textures must be cleaned up before ending texture manager!");
     }
 }
 
-void TextureManager::Cleanup() {
+void TextureManager::Cleanup()
+{
     for (auto& elem : _textures) {
         __TextureInternal& texture = elem.second;
         vkDestroyImageView(_device->logicalDevice, texture.textureImageView, nullptr);
@@ -21,7 +23,11 @@ void TextureManager::Cleanup() {
     _textures.clear();
 }
 
-void TextureManager::GetDescriptorImageInfo(const std::string& texturePath, VkDescriptorImageInfo& imageInfo) {
+void TextureManager::GetDescriptorImageInfo(
+    const std::string& texturePath,
+    VkDescriptorImageInfo& imageInfo
+)
+{
     DEBUG("texture path: {}", texturePath);
     if (_textures.find(texturePath) == _textures.end()) {
         LoadTexture(texturePath);
@@ -32,7 +38,8 @@ void TextureManager::GetDescriptorImageInfo(const std::string& texturePath, VkDe
     imageInfo.sampler = texture.textureSampler;
 }
 
-void TextureManager::LoadTexture(const std::string& texturePath) {
+void TextureManager::LoadTexture(const std::string& texturePath)
+{
     if (_device == VK_NULL_HANDLE) {
         FATAL("Texture manager hasn't been initialized!");
     }
@@ -52,7 +59,8 @@ void TextureManager::LoadTexture(const std::string& texturePath) {
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
     );
 
-    // copy memory to staging buffer. we can directly copy because staging buffer is host visible and mapped.
+    // copy memory to staging buffer. we can directly copy because staging buffer is host visible
+    // and mapped.
     memcpy(stagingBuffer.bufferAddress, pixels, static_cast<size_t>(vkTextureSize));
     stbi_image_free(pixels);
 
@@ -76,9 +84,17 @@ void TextureManager::LoadTexture(const std::string& texturePath) {
     );
 
     transitionImageLayout(
-        textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+        textureImage,
+        VK_FORMAT_R8G8B8A8_SRGB,
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
     );
-    copyBufferToImage(stagingBuffer.buffer, textureImage, static_cast<uint32_t>(width), static_cast<uint32_t>(height));
+    copyBufferToImage(
+        stagingBuffer.buffer,
+        textureImage,
+        static_cast<uint32_t>(width),
+        static_cast<uint32_t>(height)
+    );
     // transition again for shader read
     transitionImageLayout(
         textureImage,
@@ -114,13 +130,17 @@ void TextureManager::LoadTexture(const std::string& texturePath) {
         samplerInfo.minLod = 0.0f;
         samplerInfo.maxLod = 0.0f;
 
-        if (vkCreateSampler(_device->logicalDevice, &samplerInfo, nullptr, &textureSampler) != VK_SUCCESS) {
+        if (vkCreateSampler(_device->logicalDevice, &samplerInfo, nullptr, &textureSampler)
+            != VK_SUCCESS) {
             FATAL("Failed to create texture sampler!");
         }
     }
 
     _textures.emplace(std::make_pair(
-        texturePath, __TextureInternal{textureImage, textureImageView, textureImageMemory, textureSampler}
+        texturePath,
+        __TextureInternal{
+            textureImage, textureImageView, textureImageMemory, textureSampler, width, height
+        }
     ));
 
     stagingBuffer.Cleanup(); // clean up staging buffer
@@ -131,7 +151,8 @@ void TextureManager::transitionImageLayout(
     VkFormat format,
     VkImageLayout oldLayout,
     VkImageLayout newLayout
-) {
+)
+{
     VulkanUtils::QuickCommandBuffer commandBuffer(this->_device);
 
     // create a barrier to transition layout
@@ -156,13 +177,15 @@ void TextureManager::transitionImageLayout(
     VkPipelineStageFlags destinationStage;
 
     // before texture from staging buffer
-    if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+    if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED
+        && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
         barrier.srcAccessMask = 0;
         barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 
         sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
         destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-    } else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) { // after texture transfer
+    } else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+               && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) { // after texture transfer
         barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
         barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
@@ -173,11 +196,26 @@ void TextureManager::transitionImageLayout(
     }
 
     vkCmdPipelineBarrier(
-        commandBuffer.cmdBuffer, sourceStage, destinationStage, 0, 0, nullptr, 0, nullptr, 1, &barrier
+        commandBuffer.cmdBuffer,
+        sourceStage,
+        destinationStage,
+        0,
+        0,
+        nullptr,
+        0,
+        nullptr,
+        1,
+        &barrier
     );
 }
 
-void TextureManager::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) {
+void TextureManager::copyBufferToImage(
+    VkBuffer buffer,
+    VkImage image,
+    uint32_t width,
+    uint32_t height
+)
+{
     VulkanUtils::QuickCommandBuffer commandBuffer(this->_device);
 
     VkBufferImageCopy region{};
@@ -194,7 +232,26 @@ void TextureManager::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t 
     region.imageOffset = {0, 0, 0};
     region.imageExtent = {width, height, 1};
 
-    vkCmdCopyBufferToImage(commandBuffer.cmdBuffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+    vkCmdCopyBufferToImage(
+        commandBuffer.cmdBuffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region
+    );
 }
 
 void TextureManager::Init(std::shared_ptr<VQDevice> device) { this->_device = device; }
+
+TextureManager::Texture TextureManager::GetTexture(const std::string& texturePath)
+{
+    auto it = _textures.find(texturePath);
+    if (it == _textures.end()) {
+        LoadTexture(texturePath);
+        it = _textures.find(texturePath);
+        ASSERT(it != _textures.end());
+    }
+    __TextureInternal& tex = it->second;
+    return Texture{
+        .sampler = tex.textureSampler,
+        .imageView = tex.textureImageView,
+        .width = tex.width,
+        .height = tex.height
+    };
+}

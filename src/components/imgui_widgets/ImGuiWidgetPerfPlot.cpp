@@ -2,7 +2,7 @@
 
 #include "ImGuiWidget.h"
 
-#include "Quarkolor.h"
+#include "Tetrium.h"
 
 ImGuiWidgetPerfPlot::ScrollingBuffer::ScrollingBuffer(int max_size)
 {
@@ -29,7 +29,7 @@ void ImGuiWidgetPerfPlot::ScrollingBuffer::Erase()
     }
 }
 
-void ImGuiWidgetPerfPlot::Draw(const Quarkolor* engine, ColorSpace colorSpace)
+void ImGuiWidgetPerfPlot::Draw(const Tetrium* engine, ColorSpace colorSpace)
 {
     ImGui::Checkbox("Show Perf Plot", std::addressof(_wantShowPerfPlot));
     double deltaTimeSeconds = engine->_deltaTimer.GetDeltaTimeSeconds();

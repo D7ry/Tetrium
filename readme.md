@@ -1,4 +1,4 @@
-# Quarkolor
+# Tetrium
 
 Vulkan-based tetrachromacy display engine.
 
@@ -46,6 +46,13 @@ respectively. Once the rendering is done, depending on the presentation mode:
 #### Apple
 
 set `VULKAN_LIB_PATH` in `CMakeLists.txt` to your own path after installing Vulkan SDK
+
+##### FreeType
+
+`brew install freetype`
+
+validate that `/opt/homebrew/include/freetype2` and `/opt/homebrew/lib/libfreetype.dylib`
+contains freetype library and include files.
 
 #### Linux
 

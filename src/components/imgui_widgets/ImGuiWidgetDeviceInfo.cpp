@@ -1,9 +1,9 @@
-#include "Quarkolor.h"
+#include "Tetrium.h"
 
 #include "ImGuiWidget.h"
 
 // current setup assumes single logical device
-void ImGuiWidgetDeviceInfo::Draw(const Quarkolor* engine, ColorSpace colorSpace)
+void ImGuiWidgetDeviceInfo::Draw(const Tetrium* engine, ColorSpace colorSpace)
 {
     const int INDENT = 20;
     { // GPU
@@ -20,8 +20,8 @@ void ImGuiWidgetDeviceInfo::Draw(const Quarkolor* engine, ColorSpace colorSpace)
     }
     { // Display
         ImGui::SeparatorText("Display");
-        if (engine->_tetraMode == Quarkolor::TetraMode::kEvenOddHardwareSync) {
-            Quarkolor::DisplayContext display = engine->_mainProjectorDisplay;
+        if (engine->_tetraMode == Tetrium::TetraMode::kEvenOddHardwareSync) {
+            Tetrium::DisplayContext display = engine->_mainProjectorDisplay;
             ASSERT(display.display);
             ImGui::Text("Using Exclusive Display");
             ImGui::Text("Size: %i x %i", display.extent.width, display.extent.height);
