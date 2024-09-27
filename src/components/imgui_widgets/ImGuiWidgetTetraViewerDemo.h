@@ -14,6 +14,14 @@ class ImGuiWidgetTetraViewerDemo : public ImGuiWidgetMut
 
     int _selectedImageId = 0;
 
+    float _zoom = 1.f;
+
+    bool _imageFitWindow = false;
+
+    bool _fullScreen = false;
+
+    bool _noUI = false;
+
     static const int NUM_IMAGES = 2;
     std::array<DemoImage, NUM_IMAGES> _images = {
         DemoImage{

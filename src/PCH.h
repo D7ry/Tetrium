@@ -23,3 +23,5 @@
 // enable freetype rendering
 #define IMGUI_USE_WCHAR32
 #define IMGUI_ENABLE_FREETYPE
+// enable imvec math operations
+#define IMGUI_DEFINE_MATH_OPERATORS

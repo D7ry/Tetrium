@@ -6,6 +6,22 @@
 #include "ImGuiWidgetTetraViewerDemo.h"
 #include "components/TextureManager.h"
 
+ImVec2 calculateFitSize(const ImGuiTexture& texture, const ImVec2& availableSize)
+{
+    float aspectRatio = (float)texture.width / (float)texture.height;
+
+    float scaleWidth = availableSize.x / (float)texture.width;
+    float scaleHeight = availableSize.y / (float)texture.height;
+
+    float scale = std::min(scaleWidth, scaleHeight);
+
+    ImVec2 fitSize;
+    fitSize.x = (float)texture.width * scale;
+    fitSize.y = (float)texture.height * scale;
+
+    return fitSize;
+}
+
 void ImGuiWidgetTetraViewerDemo::Draw(Tetrium* engine, ColorSpace colorSpace)
 {
     ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0, 0, 0, 1));
@@ -16,10 +32,53 @@ void ImGuiWidgetTetraViewerDemo::Draw(Tetrium* engine, ColorSpace colorSpace)
         items[i] = _images[i].name;
     }
 
-    if (ImGui::Begin("Tetra Viewer")) {
-        if (ImGui::Combo("Select Image", &selectedImageId, items, NUM_IMAGES)
-            && colorSpace == ColorSpace::RGB) {
-            _selectedImageId = selectedImageId;
+    if (colorSpace == ColorSpace::RGB) {
+        if (ImGui::IsKeyPressed(ImGuiKey_K)) {
+            _zoom += 0.1;
+        }
+        if (ImGui::IsKeyPressed(ImGuiKey_J)) {
+            _zoom -= 0.1;
+        }
+        if (ImGui::IsKeyPressed(ImGuiKey_F)) {
+            _fullScreen = !_fullScreen;
+        }
+        if (ImGui::IsKeyPressed(ImGuiKey_B)) {
+            _noUI = !_noUI;
+        }
+        if (ImGui::IsKeyPressed(ImGuiKey_L)) {
+            _selectedImageId++;
+            _selectedImageId = _selectedImageId % NUM_IMAGES;
+        }
+        if (ImGui::IsKeyPressed(ImGuiKey_H)) {
+            _selectedImageId--;
+            if (_selectedImageId == -1) { // wrap
+                _selectedImageId = NUM_IMAGES - 1;
+            }
+        }
+    }
+
+    ImGuiWindowFlags flags = 0;
+    if (_fullScreen) {
+        ImGui::SetNextWindowPos(ImVec2(0, 0));
+        ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
+        flags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse
+                | ImGuiWindowFlags_NoResize;
+    }
+
+    if (ImGui::Begin("Tetra Viewer", NULL, flags)) {
+        if (!_noUI) {
+            ImGui::Text("J/K : zoom in/out. H/L: cycle images. F: toggle full screen mode. B: toggle UI");
+            ImGui::Checkbox("Fit Window", &_imageFitWindow);
+
+            if (ImGui::Combo("Select Image", &selectedImageId, items, NUM_IMAGES)
+                && colorSpace == ColorSpace::RGB) {
+                _selectedImageId = selectedImageId;
+            }
+
+            float zoom = _zoom;
+            if (ImGui::SliderFloat("zoom", &zoom, 0.1, 5) && colorSpace == ColorSpace::RGB) {
+                _zoom = zoom;
+            }
         }
 
         DemoImage& image = _images[_selectedImageId];
@@ -33,7 +92,13 @@ void ImGuiWidgetTetraViewerDemo::Draw(Tetrium* engine, ColorSpace colorSpace)
             tex = engine->_imguiManager.GetImGuiTexture(image.path_ocv);
             break;
         }
-        ImGui::Image(tex.ds, {(float)tex.width, (float)tex.height});
+
+        ImVec2 size = {(float)tex.width * _zoom, (float)tex.height * _zoom};
+        if (_imageFitWindow) {
+            ImVec2 availableSize = ImGui::GetContentRegionAvail();
+            size = calculateFitSize(tex, availableSize);
+        }
+        ImGui::Image(tex.ds, size);
     }
     ImGui::End();
     ImGui::PopStyleColor();
