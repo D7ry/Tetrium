@@ -45,11 +45,11 @@ void Tetrium::Tick()
         std::this_thread::yield();
         return;
     }
+    //PROFILE_SCOPE(&_profiler, "Tick");
     _deltaTimer.Tick();
     {
-        PROFILE_SCOPE(&_profiler, "Main Tick");
         {
-            PROFILE_SCOPE(&_profiler, "CPU");
+            PROFILE_SCOPE(&_profiler, "Render Loop");
             // CPU-exclusive workloads
             double deltaTime = _deltaTimer.GetDeltaTime();
             _timeSinceStartSeconds += deltaTime;
@@ -62,7 +62,7 @@ void Tetrium::Tick()
             _currentFrame = (_currentFrame + 1) % NUM_FRAME_IN_FLIGHT;
         }
         {
-            PROFILE_SCOPE(&_profiler, "GPU: vkDeviceWaitIdle");
+            PROFILE_SCOPE(&_profiler, "GPU: Wait Idle");
             vkDeviceWaitIdle(this->_device->logicalDevice);
         }
     }
@@ -76,9 +76,8 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
     VkResult result;
     uint32_t swapchainImageIndex;
 
-    PROFILE_SCOPE(&_profiler, "Render Tick");
     { // wait for previous render
-        PROFILE_SCOPE(&_profiler, "vkWaitForFences:fenceInFlight");
+        PROFILE_SCOPE(&_profiler, "vkWaitForFences: fenceInFlight");
         vkWaitForFences(_device->logicalDevice, 1, &sync.fenceInFlight, VK_TRUE, UINT64_MAX);
         vkResetFences(this->_device->logicalDevice, 1, &sync.fenceInFlight);
     }
@@ -103,7 +102,7 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
     }
 
     { // Render RGB, OCV channels onto both frame buffers
-        PROFILE_SCOPE(&_profiler, "Render to virtual frame buffer");
+        PROFILE_SCOPE(&_profiler, "Record render commands");
 
         vk::CommandBuffer CB1(_device->graphicsCommandBuffers[frame]);
         //  Record a command buffer which draws the scene onto that image
