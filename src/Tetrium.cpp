@@ -788,7 +788,6 @@ void Tetrium::initVulkan()
 
     // create context for rgb and ocv rendering
     for (RenderContext* ctx : {&_renderContexts.RGB, &_renderContexts.OCV}) {
-        ctx->swapchain = &_swapChain;
         ctx->renderPass = createRenderPass(_swapChain.imageFormat);
         createVirtualFrameBuffer(ctx->renderPass, _swapChain, ctx->virtualFrameBuffer);
         _deletionStack.push([this, ctx] {
@@ -1693,7 +1692,6 @@ void Tetrium::flushEngineUBOStatic(uint8_t frame)
     getMainProjectionMatrix(ubo.proj);
     ubo.timeSinceStartSeconds = _timeSinceStartSeconds;
     ubo.sinWave = (sin(_timeSinceStartSeconds) + 1) / 2.f; // offset to [0, 1]
-    ubo.isEvenFrame = isEvenFrame();
     memcpy(buf.bufferAddress, &ubo, sizeof(ubo));
 }
 

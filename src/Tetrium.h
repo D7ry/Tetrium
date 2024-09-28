@@ -48,11 +48,12 @@ class TickContext;
 class Tetrium
 {
   public:
+    // Display mode to present tetracolor outputs.
     enum class TetraMode
     {
         kEvenOddHardwareSync, // use NVIDIA gpu to hardware sync even-odd frames
-        kEvenOddSoftwareSync, // use a timer to software sync even-odd frames
-        kDualProjector // use two projetors, not implemented
+        kEvenOddSoftwareSync, // use a timer/frame render callback to software sync even-odd frames
+        kDualProjector        // use two projectors and superposition the outputs, not implemented
     };
 
     struct InitOptions
@@ -72,7 +73,6 @@ class Tetrium
         glm::mat4 proj;              // proj matrix
         float timeSinceStartSeconds; // time in seconds since engine start
         float sinWave;               // a number interpolating between [0,1]
-        bool isEvenFrame;                   // a switch that gets flipped every frame
     };
 
     void Init(const InitOptions& options);
@@ -100,7 +100,7 @@ class Tetrium
         VkSurfaceKHR surface;
     };
 
-    // context for a dedicated display
+    // Dedicated display context, used only under `kEvenOddHardwareSync`
     struct DisplayContext {
         uint32_t refreshrate;
         VkExtent2D extent = {};
@@ -109,6 +109,7 @@ class Tetrium
         uint32_t planeIndex = {};
     };
 
+    // Synchronization primitives
     struct SyncPrimitives
     {
         VkSemaphore semaImageAvailable;
@@ -120,8 +121,7 @@ class Tetrium
 
     // render context for the dual-pass, virtual frame buffer rendering architecture.
     // RGB and OCV channel each have their own render context,
-    // they are rendered in parallel for each tick; both's render results are written onto `RenderContext::virtualFrameBuffer`,
-    // associated with `RenderContext::imageView`, `RenderContext::imageMemory`, and `RenderContext::image`
+    // they are rendered in parallel for each tick.
     //
     // By the end of rendering, only one channel's render results from the "virtual frame buffer" gets
     // copied to the actual frame buffer, stored in `SwapChainContext::frameBuffer`
@@ -132,13 +132,13 @@ class Tetrium
         std::vector<VkImageView> imageView;
         std::vector<VkDeviceMemory> imageMemory; // memory to hold virtual swap chain
     };
+
+    // Render context for RGV/OCV color space
+    // Each color space has its own context
     struct RenderContext {
         VkRenderPass renderPass;
-        SwapChainContext* swapchain; // global swap chain
         VirtualFrameBuffer virtualFrameBuffer;
     };
-
-    SwapChainContext _swapChain;
 
     /* ---------- Initialization Subroutines ---------- */
     std::pair<GLFWmonitor*, GLFWvidmode> cliMonitorModeSelection();
@@ -222,6 +222,7 @@ class Tetrium
     VkInstance _instance;
     VkDebugUtilsMessengerEXT _debugMessenger;
     std::shared_ptr<VQDevice> _device;
+    SwapChainContext _swapChain;
 
     /* ---------- Prensentation ---------- */
     GLFWwindow* _window;
