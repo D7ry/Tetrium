@@ -17,7 +17,7 @@ const std::vector<const char*> Tetrium::DEFAULT_INSTANCE_EXTENSIONS = {
     VK_KHR_SURFACE_EXTENSION_NAME,
 #ifdef __linux__
     VK_KHR_DISPLAY_EXTENSION_NAME,
-#endif        // __linux__
+#endif  // __linux__
 #if __APPLE__ // molten vk support
     VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
 #endif // __APPLE__

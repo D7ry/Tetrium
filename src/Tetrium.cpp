@@ -55,8 +55,6 @@ void Tetrium::createFunnyObjects()
     // register lil cow
 }
 
-
-
 void Tetrium::keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
     Tetrium* pThis = reinterpret_cast<Tetrium*>(glfwGetWindowUserPointer(window));
@@ -207,7 +205,6 @@ void Tetrium::framebufferResizeCallback(GLFWwindow* window, int width, int heigh
     auto app = reinterpret_cast<Tetrium*>(glfwGetWindowUserPointer(window));
     app->_framebufferResized = true;
 }
-
 
 void Tetrium::createDevice()
 {
@@ -380,13 +377,17 @@ void Tetrium::createInstance()
 #endif // __APPLE__
     switch (_tetraMode) {
     case TetraMode::kEvenOddHardwareSync:
-        for (const std::string& evenOddExtensionName :
-             EVEN_ODD_HARDWARE_INSTANCE_EXTENSIONS) {
-            instanceExtensions.push_back(evenOddExtensionName.c_str());
+        for (const char* evenOddExtensionName : EVEN_ODD_HARDWARE_INSTANCE_EXTENSIONS) {
+            instanceExtensions.push_back(evenOddExtensionName);
         }
         break;
     default:
         break;
+    }
+
+    INFO("Instance extensions:");
+    for (const char* ext : instanceExtensions) {
+        INFO("{}", ext);
     }
 
     createInfo.enabledExtensionCount = instanceExtensions.size();
@@ -627,8 +628,7 @@ void Tetrium::createSwapChain(Tetrium::SwapChainContext& ctx, const VkSurfaceKHR
     VkSwapchainCounterCreateInfoEXT swapChainCounterCreateInfo{
         .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_COUNTER_CREATE_INFO_EXT,
         .pNext = NULL,
-        .surfaceCounters = VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_BIT_EXT
-    };
+        .surfaceCounters = VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_BIT_EXT};
 
     if (_tetraMode == TetraMode::kEvenOddHardwareSync) {
 #if __linux__
@@ -1151,8 +1151,7 @@ void Tetrium::bindDefaultInputs()
             io.ConfigFlags &= ~ImGuiConfigFlags_NoKeyboard;
             io.MousePos = ImVec2{
                 static_cast<float>(_swapChain.extent.width) / 2,
-                static_cast<float>(_swapChain.extent.height) / 2
-            };
+                static_cast<float>(_swapChain.extent.height) / 2};
             io.WantSetMousePos = true;
         } else {
             io.ConfigFlags |= (ImGuiConfigFlags_NoMouse | ImGuiConfigFlags_NoKeyboard);
