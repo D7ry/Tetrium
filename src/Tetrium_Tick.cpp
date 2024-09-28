@@ -3,6 +3,16 @@
 
 #include "Tetrium.h"
 
+void Tetrium::Run()
+{
+    ASSERT(_window);
+    glfwShowWindow(_window);
+    while (!glfwWindowShouldClose(_window)) {
+        glfwPollEvents();
+        Tick();
+    }
+}
+
 void Tetrium::getMainProjectionMatrix(glm::mat4& projectionMatrix)
 {
     auto& extent = _swapChain.extent;
@@ -26,16 +36,6 @@ void Tetrium::flushEngineUBOStatic(uint8_t frame)
     ubo.timeSinceStartSeconds = _timeSinceStartSeconds;
     ubo.sinWave = (sin(_timeSinceStartSeconds) + 1) / 2.f; // offset to [0, 1]
     memcpy(buf.bufferAddress, &ubo, sizeof(ubo));
-}
-
-void Tetrium::Run()
-{
-    ASSERT(_window);
-    glfwShowWindow(_window);
-    while (!glfwWindowShouldClose(_window)) {
-        glfwPollEvents();
-        Tick();
-    }
 }
 
 void Tetrium::Tick()
@@ -95,7 +95,6 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
         const char* res = string_VkResult(result);
         PANIC("Failed to acquire swap chain image: {}", res);
     }
-
 
     vk::CommandBuffer CB1(_device->graphicsCommandBuffers[frame]);
     //  Record a command buffer which draws the scene onto that image
