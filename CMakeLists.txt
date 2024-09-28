@@ -58,6 +58,8 @@ add_executable(${PROJECT_NAME}
         src/Tetrium_GUI.cpp
         src/Tetrium_EvenOdd.cpp
         src/Tetrium_Tick.cpp
+        src/Tetrium_Windowing.cpp
+        src/Tetrium_Config.cpp
         src/components/TaskQueue.cpp
         src/components/Logging.cpp
         src/components/ShaderUtils.cpp

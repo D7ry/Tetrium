@@ -85,8 +85,8 @@ void Tetrium::checkHardwareEvenOddFrameSupport()
     );
 
     std::unordered_set<std::string> evenOddExtensions(
-        DEFAULTS::Engine::EVEN_ODD_HARDWARE_INSTANCE_EXTENSIONS.begin(),
-        DEFAULTS::Engine::EVEN_ODD_HARDWARE_INSTANCE_EXTENSIONS.end()
+        EVEN_ODD_HARDWARE_INSTANCE_EXTENSIONS.begin(),
+        EVEN_ODD_HARDWARE_INSTANCE_EXTENSIONS.end()
     );
 
     for (VkExtensionProperties& property : extensions) {

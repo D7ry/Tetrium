@@ -10,16 +10,6 @@
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_core.h>
 
-#ifdef __linux__
-// clang-format off
-// direct display utilities
-#include "X11/Xlib.h"
-#include <X11/extensions/Xrandr.h>
-#include "vulkan/vulkan_xlib.h"
-#include "vulkan/vulkan_xlib_xrandr.h"
-// clang-foramt on
-#endif
-
 // vq library
 #include "lib/VQBuffer.h"
 #include "lib/VQDevice.h"
@@ -37,16 +27,23 @@
 #include "components/TextureManager.h"
 #include "components/imgui_widgets/ImGuiWidget.h"
 
-#include "components/imgui_widgets/ImGuiWidgetTetraViewerDemo.h"
 #include "components/imgui_widgets/ImGuiWidgetEvenOddCalibration.h"
+#include "components/imgui_widgets/ImGuiWidgetTetraViewerDemo.h"
 // ecs
 #include "ecs/system/SimpleRenderSystem.h"
 
 class TickContext;
 
-
 class Tetrium
 {
+  private:
+    static const std::vector<const char*> DEFAULT_INSTANCE_EXTENSIONS;
+    static const std::vector<const char*> DEFAULT_DEVICE_EXTENSIONS;
+
+    static const std::vector<const char*> EVEN_ODD_HARDWARE_INSTANCE_EXTENSIONS;
+    static const std::vector<const char*> EVEN_ODD_HARDWARE_DEVICE_EXTENSIONS;
+    static const std::vector<const char*> EVEN_ODD_SOFTWARE_DEVICE_EXTENSIONS;
+
   public:
     // Display mode to present tetracolor outputs.
     enum class TetraMode
@@ -79,7 +76,7 @@ class Tetrium
 
   private:
     /* ---------- Packed Structs ---------- */
-    // context for a single swapchain; 
+    // context for a single swapchain;
     // each window & display manages their separate
     // swapchain context
     struct SwapChainContext
@@ -98,7 +95,8 @@ class Tetrium
     };
 
     // Dedicated display context, used only under `kEvenOddHardwareSync`
-    struct DisplayContext {
+    struct DisplayContext
+    {
         uint32_t refreshrate;
         VkExtent2D extent = {};
         VkDisplayKHR display = {};
@@ -121,8 +119,8 @@ class Tetrium
     // RGB and OCV channel each have their own render context,
     // they are rendered in parallel for each tick.
     //
-    // By the end of rendering, only one channel's render results from the "virtual frame buffer" gets
-    // copied to the actual frame buffer, stored in `SwapChainContext::frameBuffer`
+    // By the end of rendering, only one channel's render results from the "virtual frame buffer"
+    // gets copied to the actual frame buffer, stored in `SwapChainContext::frameBuffer`
     struct VirtualFrameBuffer
     {
         std::vector<VkFramebuffer> frameBuffer;
@@ -133,19 +131,21 @@ class Tetrium
 
     // Render context for RGV/OCV color space
     // Each color space has its own context
-    struct RenderContext {
+    struct RenderContext
+    {
         VkRenderPass renderPass;
         VirtualFrameBuffer virtualFrameBuffer;
     };
 
     /* ---------- Initialization Subroutines ---------- */
+
+    /* ---------- Windowing ---------- */
     std::pair<GLFWmonitor*, GLFWvidmode> cliMonitorModeSelection();
     void initGLFW(const InitOptions& options);
-
-    [[deprecated("Use selectDisplayXlib")]]
-    void selectDisplayDRM(DisplayContext& ctx);
+    [[deprecated("Use selectDisplayXlib")]] void selectDisplayDRM(DisplayContext& ctx);
     void selectDisplayXlib(DisplayContext& ctx);
     void initExclusiveDisplay(DisplayContext& ctx);
+
     void initVulkan();
     void initDefaultStates();
     void createInstance();
@@ -154,7 +154,6 @@ class Tetrium
     vk::RenderPass createRenderPass(const VkFormat imageFormat); // create main render pass
     void createSynchronizationObjects(std::array<SyncPrimitives, NUM_FRAME_IN_FLIGHT>& primitives);
     void createFunnyObjects();
-
 
     /* ---------- Physical Device Selection ---------- */
     bool checkDeviceExtensionSupport(VkPhysicalDevice device);
@@ -180,7 +179,11 @@ class Tetrium
 
     /* ---------- FrameBuffers ---------- */
     void recreateVirtualFrameBuffers();
-    void createVirtualFrameBuffer(VkRenderPass renderPass, const SwapChainContext& swapChain, VirtualFrameBuffer& vfb);
+    void createVirtualFrameBuffer(
+        VkRenderPass renderPass,
+        const SwapChainContext& swapChain,
+        VirtualFrameBuffer& vfb
+    );
     void clearVirtualFrameBuffer(VirtualFrameBuffer& vfb);
 
     /* ---------- Debug Utilities ---------- */
@@ -230,7 +233,8 @@ class Tetrium
     DisplayContext _mainProjectorDisplay;
 
     /* ---------- Render Contexts ---------- */
-    struct {
+    struct
+    {
         RenderContext RGB; // red, green, blue
         RenderContext OCV; // orange, cyan, violet
     } _renderContexts;
@@ -267,27 +271,30 @@ class Tetrium
 
     float _FOV = 90;
     double _timeSinceStartSeconds; // seconds in time since engine start, regardless of pause
-    unsigned long int _timeSinceStartNanoSeconds; // nanoseconds in time since engine start, regardless of pause
-    unsigned long int _numTicks=0;  // how many ticks has happened so far
+    unsigned long int
+        _timeSinceStartNanoSeconds;  // nanoseconds in time since engine start, regardless of pause
+    unsigned long int _numTicks = 0; // how many ticks has happened so far
 
     // even-odd frame
     bool _flipEvenOdd = false; // whether to flip even-odd frame
 
     // context for hardware-based even-odd frame sync
-    struct {
+    struct
+    {
         PFN_vkGetSwapchainCounterEXT vkGetSwapchainCounterEXT = nullptr;
     } _hardWareEvenOddCtx;
 
     // context for software-based even-odd frame sync
-    struct {
+    struct
+    {
         std::chrono::time_point<std::chrono::steady_clock> timeEngineStart;
         uint64_t nanoSecondsPerFrame; // how many nanoseconds in between frames?
                                       // obtained through a precise vulkan API call
-        int timeOffset = 0; // time offset added to the time that's used
-                             // to evaluate current frame, used for the old counter method
+        int timeOffset = 0;           // time offset added to the time that's used
+                                      // to evaluate current frame, used for the old counter method
         uint64_t mostRecentPresentFinish = 0;
         uint32_t lastPresentedImageId = 0; // each image are tagged with an image id,
-                                           // image id corresponds to the tick # 
+                                           // image id corresponds to the tick #
                                            // when the images are presented
                                            // tick # and image id are bijective and they
                                            // strictly increase over time
@@ -295,7 +302,8 @@ class Tetrium
         uint64_t numFramesPresented = 0; // total number of frames that have been presented so far
     } _softwareEvenOddCtx;
 
-    struct {
+    struct
+    {
         uint32_t numDroppedFrames = 0;
         bool currShouldBeEven = true;
     } _evenOddDebugCtx;
