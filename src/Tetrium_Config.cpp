@@ -30,7 +30,7 @@ const std::vector<const char*> Tetrium::DEFAULT_DEVICE_EXTENSIONS = {
     VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME,
 #endif // __APPLE__
        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_timeline_semaphore.html
-    VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME, // for softare side v-sync
+    //VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME, // for softare side v-sync
 };
 
 const std::vector<const char*> Tetrium::EVEN_ODD_HARDWARE_INSTANCE_EXTENSIONS = {

@@ -826,26 +826,26 @@ void Tetrium::createSynchronizationObjects(
         ));
 
         // create vsync semahore as a timeline semaphore
-        VkSemaphoreTypeCreateInfo timelineCreateInfo{
-            .sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO,
-            .pNext = NULL,
-            .semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE,
-            .initialValue = 0,
-        };
-        semaphoreInfo.pNext = &timelineCreateInfo;
-        VK_CHECK_RESULT(
-            vkCreateSemaphore(_device->logicalDevice, &semaphoreInfo, nullptr, &primitive.semaVsync)
-        );
+        // VkSemaphoreTypeCreateInfo timelineCreateInfo{
+        //     .sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO,
+        //     .pNext = NULL,
+        //     .semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE,
+        //     .initialValue = 0,
+        // };
+        // semaphoreInfo.pNext = &timelineCreateInfo;
+        // VK_CHECK_RESULT(
+        //     vkCreateSemaphore(_device->logicalDevice, &semaphoreInfo, nullptr,
+        //     &primitive.semaVsync)
+        // );
         semaphoreInfo.pNext = nullptr; // reset for next loop
     }
     this->_deletionStack.push([this, primitives]() {
         for (size_t i = 0; i < NUM_FRAME_IN_FLIGHT; i++) {
             const SyncPrimitives& primitive = primitives[i];
-            for (auto& sema :
-                 {primitive.semaVsync,
-                  primitive.semaImageCopyFinished,
-                  primitive.semaRenderFinished,
-                  primitive.semaImageAvailable}) {
+            for (auto& sema : {// primitive.semaVsync,
+                               primitive.semaImageCopyFinished,
+                               primitive.semaRenderFinished,
+                               primitive.semaImageAvailable}) {
                 vkDestroySemaphore(this->_device->logicalDevice, sema, nullptr);
             }
             vkDestroyFence(this->_device->logicalDevice, primitive.fenceInFlight, nullptr);
