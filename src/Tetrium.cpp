@@ -564,7 +564,7 @@ void Tetrium::Init(const Tetrium::InitOptions& options)
     { // populate initData
         initCtx.device = this->_device.get();
         initCtx.textureManager = &_textureManager;
-        initCtx.swapChainImageFormat = this->_renderContexts.RGB.swapchain->imageFormat;
+        initCtx.swapChainImageFormat = _swapChain.imageFormat;
         initCtx.renderPass.RGB = _renderContexts.RGB.renderPass;
         initCtx.renderPass.OCV = _renderContexts.OCV.renderPass;
         for (int i = 0; i < _engineUBOStatic.size(); i++) {
@@ -659,8 +659,6 @@ void Tetrium::setupSoftwareEvenOddFrame()
 
     // get refresh cycle
     VkRefreshCycleDurationGOOGLE refreshCycleDuration;
-    ASSERT(_renderContexts.RGB.swapchain->chain);
-    ASSERT(_renderContexts.OCV.swapchain->chain);
     ASSERT(_device->logicalDevice);
 
     PFN_vkGetRefreshCycleDurationGOOGLE ptr = reinterpret_cast<PFN_vkGetRefreshCycleDurationGOOGLE>(
@@ -668,7 +666,7 @@ void Tetrium::setupSoftwareEvenOddFrame()
     );
     ASSERT(ptr);
     VK_CHECK_RESULT(
-        ptr(_device->logicalDevice, _renderContexts.RGB.swapchain->chain, &refreshCycleDuration)
+        ptr(_device->logicalDevice, _swapChain.chain, &refreshCycleDuration)
     );
     ctx.nanoSecondsPerFrame = refreshCycleDuration.refreshDuration;
     ASSERT(ctx.nanoSecondsPerFrame != 0);
@@ -790,11 +788,11 @@ void Tetrium::initVulkan()
     // create context for rgb and ocv rendering
     for (RenderContext* ctx : {&_renderContexts.RGB, &_renderContexts.OCV}) {
         ctx->swapchain = &_swapChain;
-        ctx->renderPass = createRenderPass(ctx->swapchain->imageFormat);
-        createVirtualFrameBuffers(*ctx);
+        ctx->renderPass = createRenderPass(_swapChain.imageFormat);
+        createVirtualFrameBuffer(ctx->renderPass, _swapChain, ctx->virtualFrameBuffer);
         _deletionStack.push([this, ctx] {
             vkDestroyRenderPass(_device->logicalDevice, ctx->renderPass, NULL);
-            clearVirtualFrameBuffers(*ctx);
+            clearVirtualFrameBuffer(ctx->virtualFrameBuffer);
         });
     }
 
@@ -1225,6 +1223,7 @@ void Tetrium::createSwapChain(Tetrium::SwapChainContext& ctx, const VkSurfaceKHR
     ctx.frameBuffer.resize(imageCount);
     vkGetSwapchainImagesKHR(this->_device->logicalDevice, ctx.chain, &imageCount, ctx.image.data());
     ctx.imageFormat = surfaceFormat.format;
+    ctx.numImages = imageCount;
     DEBUG("Swap chain created!");
 }
 
@@ -1246,10 +1245,11 @@ void Tetrium::cleanupSwapChain(SwapChainContext& ctx)
 
 void Tetrium::recreateVirtualFrameBuffers()
 {
-    clearVirtualFrameBuffers(_renderContexts.RGB);
-    clearVirtualFrameBuffers(_renderContexts.OCV);
-    createVirtualFrameBuffers(_renderContexts.RGB);
-    createVirtualFrameBuffers(_renderContexts.OCV);
+    for (RenderContext* ctx : {&_renderContexts.RGB, &_renderContexts.OCV}) {
+        clearVirtualFrameBuffer(ctx->virtualFrameBuffer);
+        createVirtualFrameBuffer(ctx->renderPass, _swapChain, ctx->virtualFrameBuffer);
+    }
+
     _imguiManager.DestroyFrameBuffers(_device->logicalDevice);
     _imguiManager.InitializeFrameBuffer(
         _swapChain.image.size(),
@@ -1519,31 +1519,32 @@ uint32_t findMemoryType(
     throw std::runtime_error("failed to find suitable memory type!");
 }
 
-void Tetrium::createVirtualFrameBuffers(RenderContext& ctx)
+void Tetrium::createVirtualFrameBuffer(
+    VkRenderPass renderPass,
+    const SwapChainContext& swapChain,
+    VirtualFrameBuffer& vfb
+)
 {
     DEBUG("Creating framebuffers..");
-    // iterate through image views and create framebuffers
-    if (ctx.renderPass == VK_NULL_HANDLE) {
-        FATAL("Render pass is null!");
-    }
-    size_t numFrameBuffers = ctx.swapchain->image.size();
+    ASSERT(renderPass != VK_NULL_HANDLE);
+    ASSERT(swapChain.numImages != 0);
+
+    size_t numFrameBuffers = swapChain.numImages;
     ASSERT(numFrameBuffers != 0);
-    VirtualFrameBuffer& vfb = ctx.virtualFrameBuffer;
     vfb.frameBuffer.resize(numFrameBuffers);
     vfb.image.resize(numFrameBuffers);
     vfb.imageView.resize(numFrameBuffers);
     vfb.imageMemory.resize(numFrameBuffers); // Add this line for image memory
-    SwapChainContext& swapchainContext = *ctx.swapchain;
     for (size_t i = 0; i < numFrameBuffers; i++) {
         VkImageCreateInfo imageInfo{};
         imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
         imageInfo.imageType = VK_IMAGE_TYPE_2D;
-        imageInfo.extent.width = swapchainContext.extent.width;
-        imageInfo.extent.height = swapchainContext.extent.height;
+        imageInfo.extent.width = swapChain.extent.width;
+        imageInfo.extent.height = swapChain.extent.height;
         imageInfo.extent.depth = 1;
         imageInfo.mipLevels = 1;
         imageInfo.arrayLayers = 1;
-        imageInfo.format = swapchainContext.imageFormat;
+        imageInfo.format = swapChain.imageFormat;
         imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
         imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
@@ -1580,7 +1581,7 @@ void Tetrium::createVirtualFrameBuffers(RenderContext& ctx)
         viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
         viewInfo.image = vfb.image[i];
         viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        viewInfo.format = swapchainContext.imageFormat;
+        viewInfo.format = swapChain.imageFormat;
         viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         viewInfo.subresourceRange.baseMipLevel = 0;
         viewInfo.subresourceRange.levelCount = 1;
@@ -1591,17 +1592,17 @@ void Tetrium::createVirtualFrameBuffers(RenderContext& ctx)
             != VK_SUCCESS) {
             FATAL("Failed to create custom image view!");
         }
-        VkImageView attachments[] = {vfb.imageView[i], swapchainContext.depthImageView};
+        VkImageView attachments[] = {vfb.imageView[i], swapChain.depthImageView};
         VkFramebufferCreateInfo framebufferInfo{};
         framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        framebufferInfo.renderPass = ctx.renderPass; // each framebuffer is associated with a
-                                                     // render pass; they need to be compatible
-                                                     // i.e. having same number of attachments
-                                                     // and same formats
+        framebufferInfo.renderPass = renderPass; // each framebuffer is associated with a
+                                                 // render pass; they need to be compatible
+                                                 // i.e. having same number of attachments
+                                                 // and same formats
         framebufferInfo.attachmentCount = sizeof(attachments) / sizeof(VkImageView);
         framebufferInfo.pAttachments = attachments;
-        framebufferInfo.width = swapchainContext.extent.width;
-        framebufferInfo.height = swapchainContext.extent.height;
+        framebufferInfo.width = swapChain.extent.width;
+        framebufferInfo.height = swapChain.extent.height;
         framebufferInfo.layers = 1; // number of layers in image arrays
         if (vkCreateFramebuffer(
                 _device->logicalDevice, &framebufferInfo, nullptr, &vfb.frameBuffer[i]
@@ -1612,10 +1613,14 @@ void Tetrium::createVirtualFrameBuffers(RenderContext& ctx)
     }
 }
 
-void Tetrium::clearVirtualFrameBuffers(RenderContext& ctx)
+void Tetrium::clearVirtualFrameBuffer(VirtualFrameBuffer& vfb)
 {
-    size_t numFrameBuffers = ctx.swapchain->frameBuffer.size();
-    VirtualFrameBuffer& vfb = ctx.virtualFrameBuffer;
+    int numFrameBuffers = vfb.frameBuffer.size();
+    ASSERT(vfb.imageView.size() == numFrameBuffers);
+    ASSERT(vfb.frameBuffer.size() == numFrameBuffers);
+    ASSERT(vfb.image.size() == numFrameBuffers);
+    ASSERT(vfb.imageMemory.size() == numFrameBuffers);
+
     for (size_t i = 0; i < numFrameBuffers; i++) {
         vkDestroyFramebuffer(_device->logicalDevice, vfb.frameBuffer[i], NULL);
         vkDestroyImageView(_device->logicalDevice, vfb.imageView[i], NULL);

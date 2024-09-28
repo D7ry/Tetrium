@@ -157,6 +157,7 @@ class Tetrium
         std::vector<VkImage> image;
         std::vector<VkImageView> imageView;
         std::vector<VkFramebuffer> frameBuffer;
+        size_t numImages;
         VkImage depthImage;
         VkDeviceMemory depthImageMemory;
         VkImageView depthImageView;
@@ -246,8 +247,8 @@ class Tetrium
 
     /* ---------- FrameBuffers ---------- */
     void recreateVirtualFrameBuffers();
-    void createVirtualFrameBuffers(RenderContext& ctx);
-    void clearVirtualFrameBuffers(RenderContext& ctx);
+    void createVirtualFrameBuffer(VkRenderPass renderPass, const SwapChainContext& swapChain, VirtualFrameBuffer& vfb);
+    void clearVirtualFrameBuffer(VirtualFrameBuffer& vfb);
 
     /* ---------- Debug Utilities ---------- */
     bool checkValidationLayerSupport();
