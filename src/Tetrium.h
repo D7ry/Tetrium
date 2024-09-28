@@ -217,6 +217,8 @@ class Tetrium
     bool isEvenFrame();
     void setupEvenOddRenderContext(); // set up `_evenOddRenderContexts`
 
+    /* ---------- ImGui ---------- */
+
     /* ---------- Top-level data ---------- */
     VkInstance _instance;
     VkDebugUtilsMessengerEXT _debugMessenger;

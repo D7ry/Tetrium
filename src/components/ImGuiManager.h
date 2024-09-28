@@ -95,8 +95,6 @@ class ImGuiManager
     [[deprecated]]
     std::vector<VkFramebuffer> _imGuiFrameBuffer;
 
-    VkClearValue _imguiClearValue = {0.0f, 0.0f, 0.0f, 0.0f}; // transparent, unused
-
     TextureManager* _textureManager = nullptr;
 
     std::unordered_map<std::string, ImGuiTexture> _imguiTextures;
