@@ -665,9 +665,7 @@ void Tetrium::setupSoftwareEvenOddFrame()
         vkGetInstanceProcAddr(_instance, "vkGetRefreshCycleDurationGOOGLE")
     );
     ASSERT(ptr);
-    VK_CHECK_RESULT(
-        ptr(_device->logicalDevice, _swapChain.chain, &refreshCycleDuration)
-    );
+    VK_CHECK_RESULT(ptr(_device->logicalDevice, _swapChain.chain, &refreshCycleDuration));
     ctx.nanoSecondsPerFrame = refreshCycleDuration.refreshDuration;
     ASSERT(ctx.nanoSecondsPerFrame != 0);
 }
@@ -715,7 +713,10 @@ void Tetrium::checkHardwareEvenOddFrameSupport()
         vkEnumerateInstanceExtensionProperties(nullptr, &numExtensions, extensions.data())
     );
 
-    std::unordered_set<std::string> evenOddExtensions = EVEN_ODD_HARDWARE_INSTANCE_EXTENSIONS;
+    std::unordered_set<std::string> evenOddExtensions(
+        DEFAULTS::Engine::EVEN_ODD_HARDWARE_INSTANCE_EXTENSIONS.begin(),
+        DEFAULTS::Engine::EVEN_ODD_HARDWARE_INSTANCE_EXTENSIONS.end()
+    );
 
     for (VkExtensionProperties& property : extensions) {
         evenOddExtensions.erase(std::string(property.extensionName));
@@ -911,7 +912,8 @@ void Tetrium::createInstance()
     createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     createInfo.pApplicationInfo = &appInfo;
 
-    std::vector<const char*> instanceExtensions = DEFAULT_INSTANCE_EXTENSIONS;
+    std::vector<const char*> instanceExtensions
+        = DEFAULTS::Engine::DEFAULT_INSTANCE_EXTENSIONS;
     // get glfw Extensions
     {
         uint32_t glfwExtensionCount = 0;
@@ -935,7 +937,8 @@ void Tetrium::createInstance()
 #endif // __APPLE__
     switch (_tetraMode) {
     case TetraMode::kEvenOddHardwareSync:
-        for (const std::string& evenOddExtensionName : EVEN_ODD_HARDWARE_INSTANCE_EXTENSIONS) {
+        for (const std::string& evenOddExtensionName :
+             DEFAULTS::Engine::EVEN_ODD_HARDWARE_INSTANCE_EXTENSIONS) {
             instanceExtensions.push_back(evenOddExtensionName.c_str());
         }
         break;
@@ -1106,14 +1109,14 @@ bool Tetrium::isDeviceSuitable(VkPhysicalDevice device)
 
 const std::vector<const char*> Tetrium::getRequiredDeviceExtensions() const
 {
-    std::vector<const char*> extensions = DEFAULT_DEVICE_EXTENSIONS;
+    std::vector<const char*> extensions = DEFAULTS::Engine::DEFAULT_DEVICE_EXTENSIONS;
     if (_tetraMode == TetraMode::kEvenOddHardwareSync) {
-        for (auto extension : EVEN_ODD_HARDWARE_DEVICE_EXTENSIONS) {
+        for (auto extension : DEFAULTS::Engine::EVEN_ODD_HARDWARE_DEVICE_EXTENSIONS) {
             extensions.push_back(extension);
         }
     }
     if (_tetraMode == TetraMode::kEvenOddSoftwareSync) {
-        for (auto extension : EVEN_ODD_SOFTWARE_DEVICE_EXTENSIONS) {
+        for (auto extension : DEFAULTS::Engine::EVEN_ODD_SOFTWARE_DEVICE_EXTENSIONS) {
             extensions.push_back(extension);
         }
     }
