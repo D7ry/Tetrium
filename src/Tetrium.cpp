@@ -849,6 +849,7 @@ void Tetrium::createSynchronizationObjects(
                 vkDestroySemaphore(this->_device->logicalDevice, sema, nullptr);
             }
             vkDestroyFence(this->_device->logicalDevice, primitive.fenceInFlight, nullptr);
+            vkDestroyFence(this->_device->logicalDevice, primitive.fenceRenderFinished, nullptr);
         }
     });
 }

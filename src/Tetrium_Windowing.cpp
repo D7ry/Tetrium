@@ -384,9 +384,12 @@ void Tetrium::initGLFW(const InitOptions& options)
     size_t height = DEFAULTS::WINDOW_HEIGHT;
     // having monitor as nullptr initializes a windowed window
     GLFWmonitor* monitor = nullptr;
-    monitor = glfwGetPrimaryMonitor();
-    // only hardware sync does not require glfw fullscreen
-    if (options.tetraMode != TetraMode::kEvenOddHardwareSync) {
+
+    // software sync pops up a monitor selection window for full-screen
+    // glfw window selection
+    // hardware sync skips the step; the GLFW window is in windowed mode 
+    // and is used only as a controller window
+    if (options.tetraMode == TetraMode::kEvenOddSoftwareSync) {
         auto ret = cliMonitorModeSelection();
         monitor = ret.first;
         auto mode = ret.second;
@@ -396,8 +399,8 @@ void Tetrium::initGLFW(const InitOptions& options)
         glfwWindowHint(GLFW_REFRESH_RATE, mode.refreshRate);
         width = mode.width;
         height = mode.height;
+        fmt::println("Selected {} as full-screen monitor.", glfwGetMonitorName(monitor));
     }
-    fmt::println("Selected {} as full-screen monitor.", glfwGetMonitorName(monitor));
 
     this->_window
         = glfwCreateWindow(width, height, DEFAULTS::Engine::APPLICATION_NAME, monitor, nullptr);
