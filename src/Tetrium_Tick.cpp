@@ -72,12 +72,12 @@ void Tetrium::Tick()
 void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
 {
     SyncPrimitives& sync = _syncProjector[frame];
-
     //  Wait for the previous frame to finish
     PROFILE_SCOPE(&_profiler, "Render Tick");
     vkWaitForFences(_device->logicalDevice, 1, &sync.fenceInFlight, VK_TRUE, UINT64_MAX);
+    vkResetFences(this->_device->logicalDevice, 1, &sync.fenceInFlight);
 
-    //  Acquire an image from the swap chain
+    //  Asynchronously acquire an image from the swap chain
     uint32_t swapchainImageIndex;
     VkResult result = vkAcquireNextImageKHR(
         this->_device->logicalDevice,
@@ -96,8 +96,6 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
         PANIC("Failed to acquire swap chain image: {}", res);
     }
 
-    // lock the fence
-    vkResetFences(this->_device->logicalDevice, 1, &sync.fenceInFlight);
 
     vk::CommandBuffer CB1(_device->graphicsCommandBuffers[frame]);
     //  Record a command buffer which draws the scene onto that image
@@ -176,30 +174,33 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
     CB1.end();
 
     VkSubmitInfo submitInfo{.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO};
-
-    VkSemaphore waitSemaphores[] = {}; // don't need semaphore since we're drawing on virtual fb
-    VkPipelineStageFlags waitStages[]
-        = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT}; // wait for color to be available
     std::array<VkCommandBuffer, 1> submitCommandBuffers = {CB1};
-
-    submitInfo.waitSemaphoreCount = 0;
-    submitInfo.pWaitSemaphores = waitSemaphores;
-    submitInfo.pWaitDstStageMask = waitStages;
     submitInfo.commandBufferCount = static_cast<uint32_t>(submitCommandBuffers.size());
     submitInfo.pCommandBuffers = submitCommandBuffers.data();
-
-    VkSemaphore signalSemaphores[] = {sync.semaRenderFinished};
-    submitInfo.signalSemaphoreCount = 1;
+    VkSemaphore signalSemaphores[0];
+    submitInfo.signalSemaphoreCount = 0;
     submitInfo.pSignalSemaphores = signalSemaphores;
 
-    if (vkQueueSubmit(_device->graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS) {
+    vkResetFences(_device->Get(), 1, &sync.fenceRenderFinished);
+    if (vkQueueSubmit(_device->graphicsQueue, 1, &submitInfo, sync.fenceRenderFinished)
+        != VK_SUCCESS) {
         FATAL("Failed to submit draw command buffer!");
     }
+
+    // for the image transfer to finish, two semas need to be uppsed:
+    // 1. the render from the previous CB has to finish for 2 virtual FBs to be available
+    // 2. the actual FB needs to be available for copying
+    //
+    // for (1) : we use `fenceRenderFinished` -- CPU decides which virtual frame buffer to
+    // commit right before committing
+    // for (2) : we use `semaImageAvailable` -- the GPU waits til the actual swapchain is available
 
     vk::CommandBuffer CB2(_device->graphicsCommandBuffers2[frame]);
     CB2.reset();
     CB2.begin(vk::CommandBufferBeginInfo());
 
+    // important: here we wait for the rendering to finish before copying over image
+    vkWaitForFences(_device->logicalDevice, 1, &sync.fenceRenderFinished, VK_TRUE, UINT64_MAX);
     // choose whether to render the even/odd frame buffer, discarding the other
     bool isEven = isEvenFrame();
     VkImage virtualFramebufferImage
@@ -215,32 +216,23 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
         _evenOddDebugCtx.numDroppedFrames++;
     }
     _evenOddDebugCtx.currShouldBeEven = !isEven; // advance to next frame
-
-    // virtual FB has been copied onto the physical FB, paint ImGui now.
-    ctx->graphics.CB = CB2;
     CB2.end();
 
     // submit CB2
     VkSubmitInfo submitInfo2{.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO};
     std::array<VkCommandBuffer, 1> submitCommandBuffers2 = {CB2};
-    // for the image transfer, two semas need to be uppsed:
-    // 1. the render from the previous CB has to finish for 2 virtual FBs to be available
-    // 2. the actual FB needs to be available for copying
-    VkSemaphore waitSemaphores2[] = {sync.semaImageAvailable, sync.semaRenderFinished};
-    VkPipelineStageFlags waitStages2[] // both sema need to pass before the image transfer happens
-        = {VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT};
+    std::array<VkSemaphore, 1> semaImageAvailable = {sync.semaImageAvailable};
+    std::array<VkPipelineStageFlags, 1> semaImageAvailableStages
+        = {VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT};
+    std::array<VkSemaphore, 1> semaImageCopyFinished = {sync.semaImageCopyFinished};
 
-    submitInfo2.waitSemaphoreCount = 2;
-    submitInfo2.pWaitSemaphores = waitSemaphores2;
-    submitInfo2.pWaitDstStageMask = waitStages2;
+    submitInfo2.waitSemaphoreCount = semaImageAvailable.size();
+    submitInfo2.pWaitSemaphores = semaImageAvailable.data();
+    submitInfo2.pWaitDstStageMask = semaImageAvailableStages.data();
     submitInfo2.commandBufferCount = static_cast<uint32_t>(submitCommandBuffers2.size());
     submitInfo2.pCommandBuffers = submitCommandBuffers2.data();
-
-    VkSemaphore signalSemaphores2[]
-        = {sync.semaImageCopyFinished}; // signal this semaphore
-                                        // for the presentation to happen
-    submitInfo2.signalSemaphoreCount = 1;
-    submitInfo2.pSignalSemaphores = signalSemaphores2;
+    submitInfo2.signalSemaphoreCount = semaImageCopyFinished.size();
+    submitInfo2.pSignalSemaphores = semaImageCopyFinished.data();
 
     if (vkQueueSubmit(_device->graphicsQueue, 1, &submitInfo2, sync.fenceInFlight) != VK_SUCCESS) {
         FATAL("Failed to submit draw command buffer!");
@@ -250,19 +242,15 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
     VkPresentInfoKHR presentInfo{};
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 
-    // wait for sync.semaRenderFinished upped by the previous render command
     presentInfo.waitSemaphoreCount = 1;
-    presentInfo.pWaitSemaphores = signalSemaphores2; // semaImageCopyFinished, virtual fb
-                                                     // is copied over to actual fb, can render
+    presentInfo.pWaitSemaphores = semaImageCopyFinished.data();
 
     VkSwapchainKHR swapChains[] = {_swapChain.chain};
-
     presentInfo.swapchainCount = 1;
     presentInfo.pSwapchains = swapChains;
     presentInfo.pImageIndices = &swapchainImageIndex; // specify which image to present
     presentInfo.pResults = nullptr;                   // Optional: can be used to check if
                                                       // presentation was successful
-                                                      //
 
     uint64_t time = 0;
 #if VIRTUAL_VSYNC
