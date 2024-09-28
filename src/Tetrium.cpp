@@ -558,6 +558,14 @@ void Tetrium::Init(const Tetrium::InitOptions& options)
         });
     }
 
+    if (_tetraMode == TetraMode::kEvenOddHardwareSync
+        || _tetraMode == TetraMode::kEvenOddSoftwareSync) {
+        initEvenOdd();
+    } else {
+        NEEDS_IMPLEMENTATION()
+    }
+
+    // init applications
     InitContext initCtx;
     { // populate initData
         initCtx.device = this->_device.get();
@@ -607,7 +615,6 @@ void Tetrium::createDevice()
     this->_device = std::make_shared<VQDevice>(physicalDevice);
     this->_deletionStack.push([this]() { this->_device->Cleanup(); });
 }
-
 
 void Tetrium::initVulkan()
 {
@@ -687,24 +694,9 @@ void Tetrium::initVulkan()
         _device->logicalDevice,
         _device->queueFamilyIndices.graphicsFamily.value(),
         _device->graphicsQueue,
-        _renderContexts.RGB.virtualFrameBuffer.frameBuffer.size(
-        ) // doesn't matter if it's RGB or OCV
+        _swapChain.numImages
     );
     _imguiManager.InitializeFonts();
-
-    // even-odd specific resource checkup and setup
-    switch (_tetraMode) {
-    case TetraMode::kEvenOddHardwareSync:
-        checkHardwareEvenOddFrameSupport();
-        setupHardwareEvenOddFrame();
-        break;
-    case TetraMode::kEvenOddSoftwareSync:
-        checkSoftwareEvenOddFrameSupport();
-        setupSoftwareEvenOddFrame();
-        break;
-    default:
-        NEEDS_IMPLEMENTATION();
-    }
     this->_deletionStack.push([this]() { this->_imguiManager.Cleanup(_device->logicalDevice); });
 
     INFO("Vulkan initialized.");
@@ -1229,6 +1221,9 @@ void Tetrium::createSynchronizationObjects(
         VK_CHECK_RESULT(
             vkCreateFence(_device->logicalDevice, &fenceInfo, nullptr, &primitive.fenceInFlight)
         );
+        VK_CHECK_RESULT(vkCreateFence(
+            _device->logicalDevice, &fenceInfo, nullptr, &primitive.fenceRenderFinished
+        ));
 
         // create vsync semahore as a timeline semaphore
         VkSemaphoreTypeCreateInfo timelineCreateInfo{

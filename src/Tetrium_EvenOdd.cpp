@@ -1,6 +1,27 @@
 // Even-Odd frame rendering implementations
 #include "Tetrium.h"
 
+void Tetrium::initEvenOdd()
+{
+    switch (_tetraMode) {
+    case TetraMode::kEvenOddHardwareSync:
+        checkHardwareEvenOddFrameSupport();
+        setupHardwareEvenOddFrame();
+        break;
+    case TetraMode::kEvenOddSoftwareSync:
+        checkSoftwareEvenOddFrameSupport();
+        setupSoftwareEvenOddFrame();
+        break;
+    default:
+        break;
+    }
+}
+
+void Tetrium::cleanupEvenOdd()
+{
+    return; // nothing needs to be cleaned up
+}
+
 void Tetrium::setupSoftwareEvenOddFrame()
 {
     DEBUG("Setting up even-odd frame resources...");

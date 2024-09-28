@@ -117,6 +117,7 @@ class Tetrium
         VkSemaphore semaImageCopyFinished;
         VkSemaphore semaVsync;
         VkFence fenceInFlight;
+        VkFence fenceRenderFinished;
     };
 
     // render context for the dual-pass, virtual frame buffer rendering architecture.
@@ -209,6 +210,8 @@ class Tetrium
     void getMainProjectionMatrix(glm::mat4& projectionMatrix);
 
     /* ---------- Even-Odd frame ---------- */
+    void initEvenOdd(); // initialize resources for even-odd rendering
+    void cleanupEvenOdd();
     void checkHardwareEvenOddFrameSupport(); // checks hw support for even-odd rendering
     void setupHardwareEvenOddFrame();        // set up resources for even-odd frame
     void checkSoftwareEvenOddFrameSupport(); // checks sw support for even-odd rendering
