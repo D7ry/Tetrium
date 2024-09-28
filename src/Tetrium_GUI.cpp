@@ -1,6 +1,8 @@
-#include "Tetrium.h"
+// ImGUI subroutine implementations
 
 #include "lib/ImGuiUtils.h"
+
+#include "Tetrium.h"
 
 namespace Tetrium_GUI
 {

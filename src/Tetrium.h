@@ -151,7 +151,6 @@ class Tetrium
     void initVulkan();
     void initDefaultStates();
     void createInstance();
-    void createGlfwWindowSurface();
     void createDevice();
     VkSurfaceKHR createGlfwWindowSurface(GLFWwindow* window);
     vk::RenderPass createRenderPass(const VkFormat imageFormat); // create main render pass
