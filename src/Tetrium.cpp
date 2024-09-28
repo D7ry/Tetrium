@@ -411,21 +411,20 @@ void Tetrium::initGLFW(const InitOptions& options)
     size_t height = DEFAULTS::WINDOW_HEIGHT;
     // having monitor as nullptr initializes a windowed window
     GLFWmonitor* monitor = nullptr;
-    if (options.fullScreen) {
-        monitor = glfwGetPrimaryMonitor();
-        if (options.manualMonitorSelection) {
-            auto ret = cliMonitorModeSelection();
-            monitor = ret.first;
-            auto mode = ret.second;
-            glfwWindowHint(GLFW_RED_BITS, mode.redBits);
-            glfwWindowHint(GLFW_GREEN_BITS, mode.greenBits);
-            glfwWindowHint(GLFW_BLUE_BITS, mode.blueBits);
-            glfwWindowHint(GLFW_REFRESH_RATE, mode.refreshRate);
-            width = mode.width;
-            height = mode.height;
-        }
-        fmt::println("Selected {} as full-screen monitor.", glfwGetMonitorName(monitor));
+    monitor = glfwGetPrimaryMonitor();
+    // only hardware sync does not require glfw fullscreen
+    if (options.tetraMode != TetraMode::kEvenOddHardwareSync) {
+        auto ret = cliMonitorModeSelection();
+        monitor = ret.first;
+        auto mode = ret.second;
+        glfwWindowHint(GLFW_RED_BITS, mode.redBits);
+        glfwWindowHint(GLFW_GREEN_BITS, mode.greenBits);
+        glfwWindowHint(GLFW_BLUE_BITS, mode.blueBits);
+        glfwWindowHint(GLFW_REFRESH_RATE, mode.refreshRate);
+        width = mode.width;
+        height = mode.height;
     }
+    fmt::println("Selected {} as full-screen monitor.", glfwGetMonitorName(monitor));
 
     this->_window
         = glfwCreateWindow(width, height, DEFAULTS::Engine::APPLICATION_NAME, monitor, nullptr);
@@ -512,9 +511,6 @@ void Tetrium::Init(const Tetrium::InitOptions& options)
     _tetraMode = options.tetraMode;
     if (_tetraMode == TetraMode::kDualProjector) {
         NEEDS_IMPLEMENTATION();
-    }
-    if (_tetraMode == TetraMode::kEvenOddSoftwareSync && options.fullScreen == false) {
-        PANIC("Even-odd software sync requires full-screen glfw window.! ");
     }
 #if __APPLE__
     MoltenVKConfig::Setup();

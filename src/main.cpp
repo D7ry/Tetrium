@@ -21,8 +21,6 @@ int main(int argc, char** argv)
     DEBUG("running in debug mode");
     Tetrium::InitOptions options{
         .tetraMode = Tetrium::TetraMode::kEvenOddSoftwareSync,
-        .fullScreen = true,
-        .manualMonitorSelection = true
     };
     Tetrium engine;
     engine.Init(options);

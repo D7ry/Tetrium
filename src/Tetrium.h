@@ -59,9 +59,6 @@ class Tetrium
     struct InitOptions
     {
         TetraMode tetraMode = TetraMode::kEvenOddHardwareSync;
-        bool fullScreen = false;             // full screen mode
-        bool manualMonitorSelection = false; // the user may select a monitor that's not the primary
-                                             // monitor through CLI
     };
 
     // Engine-wide static UBO that gets updated every Tick()
