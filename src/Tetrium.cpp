@@ -423,8 +423,6 @@ void Tetrium::initGLFW(const InitOptions& options)
             glfwWindowHint(GLFW_REFRESH_RATE, mode.refreshRate);
             width = mode.width;
             height = mode.height;
-            width = 1140;
-            height = 912;
         }
         fmt::println("Selected {} as full-screen monitor.", glfwGetMonitorName(monitor));
     }
