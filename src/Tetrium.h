@@ -53,6 +53,7 @@ class Tetrium
         kDualProjector        // use two projectors and superposition the outputs, not implemented
     };
 
+    // Initialization options
     struct InitOptions
     {
         TetraMode tetraMode = TetraMode::kEvenOddHardwareSync;
@@ -147,7 +148,6 @@ class Tetrium
         std::unordered_map<std::string, ImGuiTexture> textures;
     };
 
-    /* ---------- Initialization Subroutines ---------- */
 
     /* ---------- Windowing ---------- */
     std::pair<GLFWmonitor*, GLFWvidmode> cliMonitorModeSelection();
@@ -156,6 +156,7 @@ class Tetrium
     void selectDisplayXlib(DisplayContext& ctx);
     void initExclusiveDisplay(DisplayContext& ctx);
 
+    /* ---------- Initialization Subroutines ---------- */
     void initVulkan();
     void initDefaultStates();
     void createInstance();

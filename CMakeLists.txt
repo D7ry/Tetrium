@@ -54,7 +54,7 @@ project(Tetrium)
 add_executable(${PROJECT_NAME}
         src/lib/Utils.cpp
         src/main.cpp
-        src/Tetrium.cpp
+        src/Tetrium_Bootstrap.cpp
         src/Tetrium_GUI.cpp
         src/Tetrium_EvenOdd.cpp
         src/Tetrium_Tick.cpp
