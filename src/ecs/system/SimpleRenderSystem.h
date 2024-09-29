@@ -51,9 +51,7 @@ class SimpleRenderSystem : public ISystem
     void Init(const InitContext* ctx) override;
     void Tick(const TickContext* ctx) override {};
 
-    // TODO: clean up to make it more DOD
-    void TickRGB(const TickContext* ctx);
-    void TickOCV(const TickContext* ctx);
+    void Tick(const TickContext* ctx, ColorSpace cs);
 
     void Cleanup() override;
 
@@ -74,11 +72,7 @@ class SimpleRenderSystem : public ISystem
         const char* _fragShader;
     };
 
-    struct
-    {
-        RenderSystemContext RGB;
-        RenderSystemContext OCV;
-    } _renderSystemContexts;
+    RenderSystemContext _renderSystemContexts[ColorSpace::ColorSpaceSize];
 
 
     void render(const TickContext* tickCtx, RenderSystemContext& renderCtx);

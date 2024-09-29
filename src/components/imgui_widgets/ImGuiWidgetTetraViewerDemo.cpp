@@ -86,10 +86,12 @@ void ImGuiWidgetTetraViewerDemo::Draw(Tetrium* engine, ColorSpace colorSpace)
         ImGuiTexture tex;
         switch (colorSpace) {
         case ColorSpace::RGB:
-            tex = engine->_imguiManager.GetImGuiTexture(image.path_rgb);
+            tex = engine->getOrLoadImGuiTexture(engine->_imguiCtx, image.path_rgb);
             break;
         case ColorSpace::OCV:
-            tex = engine->_imguiManager.GetImGuiTexture(image.path_ocv);
+            tex = engine->getOrLoadImGuiTexture(engine->_imguiCtx, image.path_ocv);
+            break;
+        default:
             break;
         }
 
@@ -98,7 +100,7 @@ void ImGuiWidgetTetraViewerDemo::Draw(Tetrium* engine, ColorSpace colorSpace)
             ImVec2 availableSize = ImGui::GetContentRegionAvail();
             size = calculateFitSize(tex, availableSize);
         }
-        ImGui::Image(tex.ds, size);
+        ImGui::Image(tex.id, size);
     }
     ImGui::End();
     ImGui::PopStyleColor();

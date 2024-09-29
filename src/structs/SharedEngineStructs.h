@@ -4,6 +4,7 @@
 #include <vulkan/vulkan_core.h>
 
 #include "lib/VQBuffer.h"
+#include "structs/ColorSpace.h"
 class Camera;
 
 struct GraphicsContext
@@ -37,11 +38,7 @@ struct InitContext
     VkFormat swapChainImageFormat;
     TextureManager* textureManager;
 
-    struct
-    {
-        VkRenderPass RGB;
-        VkRenderPass OCV;
-    } renderPass;
+    VkRenderPass renderPasses[ColorSpace::ColorSpaceSize];
 
     // temporary
     // TODO: clean up

@@ -1,6 +1,7 @@
 #pragma once
-enum class ColorSpace
+enum ColorSpace : uint8_t
 {
-    RGB,
-    OCV
+    RGB = 0,
+    OCV = 1,
+    ColorSpaceSize = 2
 };
