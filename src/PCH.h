@@ -1,3 +1,7 @@
+#ifdef __OBJC__
+// skip OBJC for PCH
+#else
+
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include "components/Logging.h"
@@ -25,3 +29,5 @@
 #define IMGUI_ENABLE_FREETYPE
 // enable imvec math operations
 #define IMGUI_DEFINE_MATH_OPERATORS
+
+#endif

@@ -1,7 +1,12 @@
 cmake_minimum_required(VERSION 3.22)
 
+
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 20)
+
+if(APPLE)
+enable_language(OBJC)
+endif()
  
 # imgui
 set(IMPLOT_INCLUDE extern/implot)
@@ -49,7 +54,11 @@ else() #linux
 endif()
 endif()
 
-project(Tetrium)
+if(APPLE)
+    project(Tetrium LANGUAGES CXX OBJC OBJCXX)
+else()
+    project(Tetrium)
+endif()
 
 add_executable(${PROJECT_NAME}
         src/lib/Utils.cpp
@@ -87,6 +96,7 @@ target_sources(${PROJECT_NAME}
     PRIVATE ${STB_IMG_SRC}
 )
 
+
 target_include_directories(${PROJECT_NAME}
     PRIVATE ${STB_INCLUDE}
     PRIVATE ${IMGUI_INCLUDE}
@@ -100,7 +110,20 @@ target_include_directories(${PROJECT_NAME}
 )
 
 
-target_precompile_headers(${PROJECT_NAME} PUBLIC src/PCH.h)
+target_precompile_headers(${PROJECT_NAME} 
+    PRIVATE src/PCH.h
+)
+
+# setup CVDisplayLink for metal frame counter
+if(APPLE)
+    target_sources(${PROJECT_NAME}
+        PRIVATE src/MetalInterface.mm
+    )
+    set_source_files_properties(src/Tetrium_Metal.mm PROPERTIES COMPILE_FLAGS "-x objective-c++")
+
+    #target_link_libraries(${PROJECT_NAME} "-framework Foundation"})
+    target_link_libraries(${PROJECT_NAME} "-framework QuartzCore" "-framework Metal")
+endif()
 
 # vulkan
 if (UNIX)

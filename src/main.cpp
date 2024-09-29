@@ -1,6 +1,7 @@
 #include <iostream>
 
 #include "Tetrium.h"
+#include "MetalInterface.h"
 
 void printGreetingBanner()
 {
@@ -15,9 +16,14 @@ void printGreetingBanner()
 
 int main(int argc, char** argv)
 {
+
+    int i =0 ;
+    //int res = pObjectC(i);
+
     printGreetingBanner();
     INIT_LOGS();
     INFO("Logger initialized.");
+    INFO("{} -> {}",i, res);
     DEBUG("running in debug mode");
     Tetrium::InitOptions options{
         .tetraMode = Tetrium::TetraMode::kEvenOddSoftwareSync
