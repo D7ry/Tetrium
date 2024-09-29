@@ -206,11 +206,5 @@ uint64_t Tetrium::getSurfaceCounterValue()
 
 bool Tetrium::isEvenFrame()
 {
-    bool isEven = getSurfaceCounterValue() % 2 == 0;
-
-    if (_flipEvenOdd) {
-        isEven = !isEven;
-    }
-
-    return isEven;
+    return getSurfaceCounterValue() % 2 == 0;
 }

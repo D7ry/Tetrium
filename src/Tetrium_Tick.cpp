@@ -202,6 +202,9 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
 
         // choose whether to render the even/odd frame buffer, discarding the other
         bool isEven = isEvenFrame();
+        if (_flipEvenOdd) {
+            isEven = !isEven;
+        }
         VkImage virtualFramebufferImage
             = isEven ? _renderContexts[RGB].virtualFrameBuffer.image[swapchainImageIndex]
                      : _renderContexts[OCV].virtualFrameBuffer.image[swapchainImageIndex];

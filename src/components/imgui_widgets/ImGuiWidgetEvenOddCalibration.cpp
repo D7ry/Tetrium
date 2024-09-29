@@ -211,55 +211,115 @@ void ImGuiWidgetEvenOddCalibration::Draw(Tetrium* engine, ColorSpace colorSpace)
     ImGui::Text("Even odd mode: %s", evenOddMode);
     bool isEven = engine->isEvenFrame();
 
-    ImGui::Text("Num Frame: %llu", engine->getSurfaceCounterValue());
+    ImGui::Text("Num Frame: %llu", numFrames);
 
     ImGui::Text("Num Dropped Frame: %u", engine->_evenOddDebugCtx.numDroppedFrames);
+    ImGui::SameLine();
+    if (ImGui::Button("Reset") && colorSpace == ColorSpace::RGB) {
+        engine->_evenOddDebugCtx.numDroppedFrames = 0;
+    }
 
-    if (engine->_tetraMode == Tetrium::TetraMode::kEvenOddSoftwareSync) {
-        int buf = engine->_softwareEvenOddCtx.vsyncFrameOffset;
-        if (ImGui::SliderInt("VSync frame offset", &buf, -10, 10)) {
-            engine->_softwareEvenOddCtx.vsyncFrameOffset = buf;
+    ImGui::SeparatorText("Calibration");
+    const char* colorSpaceStr = colorSpace == RGB ? "RGB" : "CMY";
+    ImGui::Text("Color Space: %s", colorSpaceStr);
+    const char* evenOddStr = isEven ? "Even" : "Odd";
+    ImGui::Text("Current Frame: %s", evenOddStr);
+    if (ImGui::RadioButton("RGB -- Even | CMY -- Odd", !engine->_flipEvenOdd)) {
+        engine->_flipEvenOdd = false;
+    }
+    ImGui::SameLine();
+    if (ImGui::RadioButton("RGB -- Odd | CMY -- Even", engine->_flipEvenOdd)) {
+        engine->_flipEvenOdd = true;
+    }
+
+    { // draw RGB OCV quads
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+        // RGB, what is to be interpreted as OCV
+        ImU32 colors[6] = {
+            IM_COL32(255, 0, 0, 255), // Red
+            IM_COL32(0, 255, 0, 255), // Green
+            IM_COL32(0, 0, 255, 255), // Blue
+                                      //
+            IM_COL32(255, 0, 0, 255), // Red
+            IM_COL32(0, 255, 0, 255), // Green
+            IM_COL32(0, 0, 255, 255), // Blue
+        };
+
+        // Get the window size
+        ImVec2 windowSize = ImGui::GetWindowSize();
+
+        // Calculate the width of each quad
+        float quadWidth = windowSize.x / 6.0f;
+
+        int iBegin;
+        int iEnd;
+        if (colorSpace == ColorSpace::RGB) {
+            iBegin = 0;
+            iEnd = 3;
+        } else { // OCV
+            iBegin = 3;
+            iEnd = 6;
         }
-    }
+        ImVec2 winPos = ImGui::GetWindowPos();
+        ImVec2 cursorPos = ImGui::GetCursorPos();
 
-    if (ImGui::Button("Draw Calibration Window")) {
-        _drawTestWindow = true;
-    }
+        ImVec2 origin = ImVec2{winPos.x, winPos.y + cursorPos.y};
+        // draw black background
+        dl->AddRectFilled(
+            origin,
+            origin + ImVec2{windowSize.x, windowSize.y * 0.5f},
+            IM_COL32(0, 0, 0, 255)
+        );
 
-    if (ImGui::Button("Draw Quad Color Test")) {
-        _drawQuadColorTest = true;
+        // Draw 6 evenly spaced quads
+        for (int i = iBegin; i < iEnd; i++) {
+            ImVec2 p0(i * quadWidth, cursorPos.y);
+            ImVec2 p1((i + 1) * quadWidth, cursorPos.y + windowSize.y * 0.5);
+            p0 += winPos;
+            p1 += winPos;
+            dl->AddRectFilled(p0, p1, colors[i]);
+        }
+        // add text indication
+
     }
+    // if (ImGui::Button("Draw Calibration Window")) {
+    //     _drawTestWindow = true;
+    // }
+
+    // if (ImGui::Button("Draw Quad Color Test")) {
+    //     _drawQuadColorTest = true;
+    // }
 
     if (_drawTestWindow) {
         drawCalibrationWindow(engine, colorSpace);
     }
-    if (_drawQuadColorTest) {
-        drawColorQuadTest();
-    }
+    // if (_drawQuadColorTest) {
+    //     drawColorQuadTest();
+    // }
 
-    ImGui::Text("Stress Test");
-
-    if (_stressTesting) {
-        ImGui::Text("Stress testing with %i threads...", NUM_STRESS_THREADS);
-        ImGui::SameLine();
-        if (ImGui::Button("Stop")) {
-            _stressTesting = false;
-        }
-    } else {
-        if (ImGui::Button("Start")) {
-            for (int i = 0; i < NUM_STRESS_THREADS; i++) {
-                auto stressFunc = [this, i]() {
-                    while (_stressTesting) {
-                        std::cout << "here" << i << std::endl;
-                    }
-                    std::cout << i << "done" << std::endl;
-                };
-                _stressThreads[i] = std::thread(stressFunc);
-                _stressThreads[i].detach();
-            }
-            _stressTesting = true;
-        }
-    }
+    // ImGui::Text("Stress Test");
+    //
+    // if (_stressTesting) {
+    //     ImGui::Text("Stress testing with %i threads...", NUM_STRESS_THREADS);
+    //     ImGui::SameLine();
+    //     if (ImGui::Button("Stop")) {
+    //         _stressTesting = false;
+    //     }
+    // } else {
+    //     if (ImGui::Button("Start")) {
+    //         for (int i = 0; i < NUM_STRESS_THREADS; i++) {
+    //             auto stressFunc = [this, i]() {
+    //                 while (_stressTesting) {
+    //                     std::cout << "here" << i << std::endl;
+    //                 }
+    //                 std::cout << i << "done" << std::endl;
+    //             };
+    //             _stressThreads[i] = std::thread(stressFunc);
+    //             _stressThreads[i].detach();
+    //         }
+    //         _stressTesting = true;
+    //     }
+    // }
 }
 
 int ImGuiWidgetEvenOddCalibration::measureDroppedFrames(Tetrium* engine, int offset, int duration)
