@@ -89,9 +89,9 @@ void Tetrium::drawImGui(ColorSpace colorSpace)
 
     if (ImGui::Begin(DEFAULTS::Engine::APPLICATION_NAME)) {
         if (ImGui::BeginTabBar("Engine Tab")) {
-            if (ImGui::BeginTabItem("General")) {
+            if (ImGui::BeginTabItem((const char*)u8"🏠General")) {
                 ImGui::ShowDemoWindow();
-                ImGui::SeparatorText("Camera");
+                ImGui::SeparatorText("📹Camera");
                 {
                     ImGui::Text(
                         "Position: (%f, %f, %f)",
@@ -110,7 +110,7 @@ void Tetrium::drawImGui(ColorSpace colorSpace)
                 if (ImGui::Button("Reset")) {
                     _mainCamera.SetPosition(0, 0, 0);
                 }
-                ImGui::SeparatorText("Cursor Lock(tab)");
+                ImGui::SeparatorText("🐭Cursor Lock(tab)");
                 if (_windowFocused) {
                     ImGui::Text("Cursor Lock: Active");
                 } else {
@@ -121,29 +121,29 @@ void Tetrium::drawImGui(ColorSpace colorSpace)
                 } else {
                     ImGui::Text("UI Mode: Deactive");
                 }
-                ImGui::SeparatorText("Engine UBO");
+                ImGui::SeparatorText("🚗Engine UBO");
                 _widgetUBOViewer.Draw(this, colorSpace);
                 ImGui::SeparatorText("Graphics Pipeline");
                 _widgetGraphicsPipeline.Draw(this, colorSpace);
                 ImGui::EndTabItem();
             }
 
-            if (ImGui::BeginTabItem("Performance")) {
+            if (ImGui::BeginTabItem("🚀Performance")) {
                 _widgetPerfPlot.Draw(this, colorSpace);
                 ImGui::EndTabItem();
             }
 
-            if (ImGui::BeginTabItem("Device")) {
+            if (ImGui::BeginTabItem("💻Device")) {
                 _widgetDeviceInfo.Draw(this, colorSpace);
                 ImGui::EndTabItem();
             }
 
-            if (ImGui::BeginTabItem("Even-Odd")) {
+            if (ImGui::BeginTabItem("🛸Even-Odd")) {
                 _widgetEvenOdd.Draw(this, colorSpace);
                 ImGui::EndTabItem();
             }
 
-            if (ImGui::BeginTabItem("Tetra Viewer")) {
+            if (ImGui::BeginTabItem("👓Tetra Viewer")) {
                 _widgetTetraViewerDemo.Draw(this, colorSpace);
                 ImGui::EndTabItem();
             }
