@@ -220,15 +220,15 @@ void ImGuiWidgetEvenOddCalibration::Draw(Tetrium* engine, ColorSpace colorSpace)
     }
 
     ImGui::SeparatorText("Calibration");
-    const char* colorSpaceStr = colorSpace == RGB ? "RGB" : "CMY";
+    const char* colorSpaceStr = colorSpace == RGB ? "RGB" : "OCV";
     ImGui::Text("Color Space: %s", colorSpaceStr);
     const char* evenOddStr = isEven ? "Even" : "Odd";
     ImGui::Text("Current Frame: %s", evenOddStr);
-    if (ImGui::RadioButton("RGB -- Even | CMY -- Odd", !engine->_flipEvenOdd)) {
+    if (ImGui::RadioButton("RGB -> Even | OCV -> Odd", !engine->_flipEvenOdd)) {
         engine->_flipEvenOdd = false;
     }
     ImGui::SameLine();
-    if (ImGui::RadioButton("RGB -- Odd | CMY -- Even", engine->_flipEvenOdd)) {
+    if (ImGui::RadioButton("RGB -> Odd | OCV -> Even", engine->_flipEvenOdd)) {
         engine->_flipEvenOdd = true;
     }
 
