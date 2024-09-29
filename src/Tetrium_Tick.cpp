@@ -156,7 +156,7 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
                 CB1.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
                 vkCmdSetViewport(CB1, 0, 1, &viewport);
                 vkCmdSetScissor(CB1, 0, 1, &scissor);
-                _renderer.TickRGB(ctx);
+                _renderer.Tick(ctx, cs);
                 CB1.endRenderPass();
 
                 drawImGui(cs);
