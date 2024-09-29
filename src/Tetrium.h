@@ -256,11 +256,7 @@ class Tetrium
     DisplayContext _mainProjectorDisplay;
 
     /* ---------- Render Contexts ---------- */
-    struct
-    {
-        RenderContext RGB; // red, green, blue
-        RenderContext OCV; // orange, cyan, violet
-    } _renderContexts;
+    RenderContext _renderContexts[ColorSpace::ColorSpaceSize];
 
     /* ---------- Synchronization Primivites ---------- */
     std::array<SyncPrimitives, NUM_FRAME_IN_FLIGHT> _syncProjector;

@@ -17,8 +17,8 @@
 #include <vulkan/vulkan_core.h>
 
 // imgui
-#include "imgui.h"
 #include "components/VulkanUtils.h" // FIXME: this shouldn't be here
+#include "imgui.h"
 
 // Molten VK Config
 #if __APPLE__
@@ -182,8 +182,8 @@ void Tetrium::Init(const Tetrium::InitOptions& options)
         initCtx.device = this->_device.get();
         initCtx.textureManager = &_textureManager;
         initCtx.swapChainImageFormat = _swapChain.imageFormat;
-        initCtx.renderPass.RGB = _renderContexts.RGB.renderPass;
-        initCtx.renderPass.OCV = _renderContexts.OCV.renderPass;
+        initCtx.renderPasses[RGB] = _renderContexts[RGB].renderPass;
+        initCtx.renderPasses[OCV] = _renderContexts[OCV].renderPass;
         for (int i = 0; i < _engineUBOStatic.size(); i++) {
             initCtx.engineUBOStaticDescriptorBufferInfo[i].range = sizeof(EngineUBOStatic);
             initCtx.engineUBOStaticDescriptorBufferInfo[i].buffer = _engineUBOStatic[i].buffer;
@@ -244,7 +244,8 @@ void Tetrium::initVulkan()
     createDepthBuffer(_swapChain);
 
     // create context for rgb and ocv rendering
-    for (RenderContext* ctx : {&_renderContexts.RGB, &_renderContexts.OCV}) {
+    for (ColorSpace cs : {ColorSpace::RGB, ColorSpace::OCV}) {
+        RenderContext* ctx = &_renderContexts[cs];
         ctx->renderPass = createRenderPass(_swapChain.imageFormat);
         createVirtualFrameBuffer(ctx->renderPass, _swapChain, ctx->virtualFrameBuffer);
         _deletionStack.push([this, ctx] {
@@ -254,7 +255,7 @@ void Tetrium::initVulkan()
     }
 
     // create framebuffer for swapchain
-    createSwapchainFrameBuffers(_swapChain, _renderContexts.RGB.renderPass);
+    createSwapchainFrameBuffers(_swapChain, _renderContexts[0].renderPass);
 
     _deletionStack.push([this] { cleanupSwapChain(_swapChain); });
 
@@ -654,7 +655,7 @@ void Tetrium::cleanupSwapChain(SwapChainContext& ctx)
 
 void Tetrium::recreateVirtualFrameBuffers()
 {
-    for (RenderContext* ctx : {&_renderContexts.RGB, &_renderContexts.OCV}) {
+    for (RenderContext* ctx : {&_renderContexts[RGB], &_renderContexts[OCV]}) {
         clearVirtualFrameBuffer(ctx->virtualFrameBuffer);
         createVirtualFrameBuffer(ctx->renderPass, _swapChain, ctx->virtualFrameBuffer);
     }
@@ -682,7 +683,7 @@ void Tetrium::recreateSwapChain(SwapChainContext& ctx)
     this->createSwapChain(ctx, ctx.surface);
     this->createImageViews(ctx);
     this->createDepthBuffer(ctx);
-    this->createSwapchainFrameBuffers(ctx, _renderContexts.RGB.renderPass);
+    this->createSwapchainFrameBuffers(ctx, _renderContexts[RGB].renderPass);
     DEBUG("Swap chain recreated.");
 }
 

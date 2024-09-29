@@ -23,7 +23,7 @@ void SimpleRenderSystem::Init(const InitContext* ctx)
     _renderSystemContexts.RGB._vertShader = ctx->VERTEX_SHADER_SRC;
     _renderSystemContexts.OCV._vertShader = ctx->VERTEX_SHADER_SRC;
 
-    createGraphicsPipeline(ctx->renderPass.RGB, ctx->renderPass.OCV, ctx);
+    createGraphicsPipeline(ctx->renderPasses[RGB], ctx->renderPasses[OCV], ctx);
 }
 
 void SimpleRenderSystem::Cleanup()

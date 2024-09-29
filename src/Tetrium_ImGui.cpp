@@ -222,8 +222,8 @@ void Tetrium::reinitImGuiFrameBuffers(Tetrium::ImGuiContext& ctx)
         _swapChain.extent,
         ctx.renderPass,
         _swapChain.numImages,
-        _renderContexts.RGB.virtualFrameBuffer.imageView,
-        _renderContexts.OCV.virtualFrameBuffer.imageView,
+        _renderContexts[RGB].virtualFrameBuffer.imageView,
+        _renderContexts[OCV].virtualFrameBuffer.imageView,
         ctx.frameBuffers[RGB],
         ctx.frameBuffers[OCV]
     );
@@ -268,8 +268,8 @@ void Tetrium::initImGuiContext(Tetrium::ImGuiContext& ctx)
         _swapChain.extent,
         ctx.renderPass,
         _swapChain.numImages,
-        _renderContexts.RGB.virtualFrameBuffer.imageView,
-        _renderContexts.OCV.virtualFrameBuffer.imageView,
+        _renderContexts[RGB].virtualFrameBuffer.imageView,
+        _renderContexts[OCV].virtualFrameBuffer.imageView,
         ctx.frameBuffers[RGB],
         ctx.frameBuffers[OCV]
     );

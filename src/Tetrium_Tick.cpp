@@ -45,7 +45,6 @@ void Tetrium::Tick()
         std::this_thread::yield();
         return;
     }
-    //PROFILE_SCOPE(&_profiler, "Tick");
     _deltaTimer.Tick();
     {
         {
@@ -91,11 +90,14 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
             VK_NULL_HANDLE,
             &swapchainImageIndex
         );
-        [[unlikely]] if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+        [[unlikely]] if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
+        {
             this->recreateSwapChain(_swapChain);
             recreateVirtualFrameBuffers();
             return;
-        } else [[unlikely]] if (result != VK_SUCCESS) {
+        }
+        else [[unlikely]] if (result != VK_SUCCESS)
+        {
             const char* res = string_VkResult(result);
             PANIC("Failed to acquire swap chain image: {}", res);
         }
@@ -143,10 +145,11 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
             scissor.extent = extend;
 
             // two-pass rendering: render RGB and OCV colors onto two virtual FBs
-            {
-                renderPassBeginInfo.renderPass = _renderContexts.RGB.renderPass;
+            for (ColorSpace cs : {ColorSpace::RGB, ColorSpace::OCV}) {
+                renderPassBeginInfo.renderPass = _renderContexts[cs].renderPass;
                 renderPassBeginInfo.framebuffer
-                    = _renderContexts.RGB.virtualFrameBuffer
+                    = _renderContexts[cs]
+                          .virtualFrameBuffer
                           .frameBuffer[swapchainImageIndex]; // which frame buffer in the
                                                              // swapchain do the pass i.e.
                                                              // all draw calls render to?
@@ -156,24 +159,10 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
                 _renderer.TickRGB(ctx);
                 CB1.endRenderPass();
 
-                drawImGui(ColorSpace::RGB);
-                recordImGuiDrawCommandBuffer(_imguiCtx, ColorSpace::RGB, CB1, extend, swapchainImageIndex);
-            }
-            {
-                renderPassBeginInfo.renderPass = _renderContexts.OCV.renderPass;
-                renderPassBeginInfo.framebuffer
-                    = _renderContexts.OCV.virtualFrameBuffer
-                          .frameBuffer[swapchainImageIndex]; // which frame buffer in the
-                                                             // swapchain do the pass i.e.
-                                                             // all draw calls render to?
-                CB1.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
-                vkCmdSetViewport(CB1, 0, 1, &viewport);
-                vkCmdSetScissor(CB1, 0, 1, &scissor);
-                _renderer.TickOCV(ctx);
-                CB1.endRenderPass();
-
-                drawImGui(ColorSpace::OCV);
-                recordImGuiDrawCommandBuffer(_imguiCtx, ColorSpace::OCV, CB1, extend, swapchainImageIndex);
+                drawImGui(cs);
+                recordImGuiDrawCommandBuffer(
+                    _imguiCtx, cs, CB1, extend, swapchainImageIndex
+                );
             }
         }
 
@@ -214,8 +203,8 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
         // choose whether to render the even/odd frame buffer, discarding the other
         bool isEven = isEvenFrame();
         VkImage virtualFramebufferImage
-            = isEven ? _renderContexts.RGB.virtualFrameBuffer.image[swapchainImageIndex]
-                     : _renderContexts.OCV.virtualFrameBuffer.image[swapchainImageIndex];
+            = isEven ? _renderContexts[RGB].virtualFrameBuffer.image[swapchainImageIndex]
+                     : _renderContexts[OCV].virtualFrameBuffer.image[swapchainImageIndex];
 
         VkImage swapchainFramebufferImage = _swapChain.image[swapchainImageIndex];
         Utils::ImageTransfer::CmdCopyToFB(
@@ -284,8 +273,7 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
             .sType = VK_STRUCTURE_TYPE_PRESENT_TIMES_INFO_GOOGLE,
             .pNext = VK_NULL_HANDLE,
             .swapchainCount = 1,
-            .pTimes = &presentTime
-        };
+            .pTimes = &presentTime};
 
         if (_tetraMode == TetraMode::kEvenOddSoftwareSync) {
             presentInfo.pNext = &presentTimeInfo;
