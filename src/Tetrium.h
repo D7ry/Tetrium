@@ -16,12 +16,12 @@
 
 // structs
 #include "structs/SharedEngineStructs.h"
+#include "structs/ImGuiTexture.h"
 
 // Engine Components
 #include "components/Camera.h"
 #include "components/DeletionStack.h"
 #include "components/DeltaTimer.h"
-#include "components/ImGuiManager.h"
 #include "components/InputManager.h"
 #include "components/Profiler.h"
 #include "components/TextureManager.h"
@@ -137,6 +137,16 @@ class Tetrium
         VirtualFrameBuffer virtualFrameBuffer;
     };
 
+    // Context for imgui rendering
+    // imgui stays as a struct due to its backend's coupling with Vulkan backend.
+    struct ImGuiContext
+    {
+        VkRenderPass renderPass;
+        VkDescriptorPool descriptorPool;
+        std::vector<VkFramebuffer> frameBuffers[ColorSpace::ColorSpaceSize];
+        std::unordered_map<std::string, ImGuiTexture> textures;
+    };
+
     /* ---------- Initialization Subroutines ---------- */
 
     /* ---------- Windowing ---------- */
@@ -218,15 +228,28 @@ class Tetrium
     void setupSoftwareEvenOddFrame();        // set up resources for software-based even-odd frame
     uint64_t getSurfaceCounterValue(); // get the number of frames requested so far from the display
     bool isEvenFrame();
-    void setupEvenOddRenderContext(); // set up `_evenOddRenderContexts`
 
     /* ---------- ImGui ---------- */
+    void initImGuiContext(Tetrium::ImGuiContext& ctx);
+    void destroyImGuiContext(Tetrium::ImGuiContext& ctx);
+    void reinitImGuiFrameBuffers(Tetrium::ImGuiContext& ctx);
+    void recordImGuiDrawCommandBuffer(
+        Tetrium::ImGuiContext& ctx,
+        ColorSpace colorSpace,
+        vk::CommandBuffer cb,
+        vk::Extent2D extent,
+        int swapChainImageIndex
+    );
+    const ImGuiTexture& getOrLoadImGuiTexture(Tetrium::ImGuiContext& ctx, const std::string& texture);
+    void clearImGuiDrawData();
 
     /* ---------- Top-level data ---------- */
     VkInstance _instance;
     VkDebugUtilsMessengerEXT _debugMessenger;
     std::shared_ptr<VQDevice> _device;
+
     SwapChainContext _swapChain;
+    ImGuiContext _imguiCtx;
 
     /* ---------- Prensentation ---------- */
     GLFWwindow* _window;
@@ -311,7 +334,6 @@ class Tetrium
     /* ---------- Engine Components ---------- */
     DeletionStack _deletionStack;
     TextureManager _textureManager;
-    ImGuiManager _imguiManager;
     DeltaTimer _deltaTimer;
     Camera _mainCamera;
     InputManager _inputManager;

@@ -18,7 +18,7 @@
 
 // imgui
 #include "imgui.h"
-#include "lib/ImGuiUtils.h"
+#include "components/VulkanUtils.h" // FIXME: this shouldn't be here
 
 // Molten VK Config
 #if __APPLE__
@@ -270,31 +270,8 @@ void Tetrium::initVulkan()
               : VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL; // virtual fb to be finally transferred to
                                                       // swapchain
 
-    this->_imguiManager.InitializeRenderPass(
-        this->_device->logicalDevice, _swapChain.imageFormat, imguiInitialLayout, imguiFinalLayout
-    );
-    _imguiManager.InitializeFrameBuffer(
-        _swapChain.image.size(),
-        _device->logicalDevice,
-        _renderContexts.RGB.virtualFrameBuffer.imageView,
-        _renderContexts.OCV.virtualFrameBuffer.imageView,
-        _swapChain.extent
-    );
-    this->_imguiManager.InitializeImgui(&_textureManager);
-    this->_imguiManager.InitializeDescriptorPool(
-        DEFAULTS::ImGui::TEXTURE_DESCRIPTOR_POOL_SIZE, _device->logicalDevice
-    );
-    this->_imguiManager.BindVulkanResources(
-        _window,
-        _instance,
-        _device->physicalDevice,
-        _device->logicalDevice,
-        _device->queueFamilyIndices.graphicsFamily.value(),
-        _device->graphicsQueue,
-        _swapChain.numImages
-    );
-    _imguiManager.InitializeFonts();
-    this->_deletionStack.push([this]() { this->_imguiManager.Cleanup(_device->logicalDevice); });
+    initImGuiContext(_imguiCtx);
+    this->_deletionStack.push([this]() { destroyImGuiContext(_imguiCtx); });
 
     INFO("Vulkan initialized.");
 }
@@ -682,14 +659,8 @@ void Tetrium::recreateVirtualFrameBuffers()
         createVirtualFrameBuffer(ctx->renderPass, _swapChain, ctx->virtualFrameBuffer);
     }
 
-    _imguiManager.DestroyFrameBuffers(_device->logicalDevice);
-    _imguiManager.InitializeFrameBuffer(
-        _swapChain.image.size(),
-        _device->logicalDevice,
-        _renderContexts.RGB.virtualFrameBuffer.imageView,
-        _renderContexts.OCV.virtualFrameBuffer.imageView,
-        _swapChain.extent
-    );
+    // imgui's fb are associated with render contexts, so initialize them here
+    reinitImGuiFrameBuffers(_imguiCtx);
 }
 
 void Tetrium::recreateSwapChain(SwapChainContext& ctx)
@@ -1169,7 +1140,7 @@ void Tetrium::bindDefaultInputs()
         [this]() {
             _wantToDrawImGui = !_wantToDrawImGui;
             if (!_wantToDrawImGui) {
-                _imguiManager.ClearImGuiElements();
+                clearImGuiDrawData();
             }
         }
     );

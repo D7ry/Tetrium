@@ -1,24 +1,24 @@
 // ImGUI subroutine implementations
 
 #include "lib/ImGuiUtils.h"
+#include "imgui.h"
+#include "backends/imgui_impl_vulkan.h"
+#include "backends/imgui_impl_glfw.h"
 
 #include "Tetrium.h"
 
 namespace Tetrium_GUI
 {
-void drawCursor(ImGuiManager* imguiManager)
+void drawCursor(const ImGuiTexture& cursorTexture)
 {
     ImGuiIO& io = ImGui::GetIO();
     ImDrawList* drawList = ImGui::GetForegroundDrawList();
 
     ImVec2 mousePos = io.MousePos;
-    // TODO: store all engine imgui assets in a table
-    const ImGuiTexture& cursorTexture
-        = imguiManager->GetImGuiTexture("../assets/textures/engine/cursor.png");
     ImVec2 cursorSize(cursorTexture.width * 2, cursorTexture.height * 2);
     ImVec2 cursorPos(mousePos.x, mousePos.y);
     drawList->AddImage(
-        (ImTextureID)cursorTexture.ds,
+        (ImTextureID)cursorTexture.id,
         cursorPos,
         ImVec2(cursorPos.x + cursorSize.x, cursorPos.y + cursorSize.y)
     );
@@ -57,7 +57,10 @@ void Tetrium::drawImGui(ColorSpace colorSpace)
     // so we need different profiler ID for them.
     const char* profileId = colorSpace == ColorSpace::RGB ? "ImGui Draw RGB" : "ImGui Draw OCV";
     PROFILE_SCOPE(&_profiler, profileId);
-    _imguiManager.BeginImGuiContext();
+
+    ImGui_ImplVulkan_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
 
     // imgui is associated with the glfw window to handle inputs,
     // but its actual fb is associated with the projector display;
@@ -69,13 +72,18 @@ void Tetrium::drawImGui(ColorSpace colorSpace)
             static_cast<float>(_mainProjectorDisplay.extent.width),
             static_cast<float>(_mainProjectorDisplay.extent.height)
         };
-        _imguiManager.forceDisplaySize(projectorDisplaySize);
+        ImGuiIO& io = ImGui::GetIO();
+        io.DisplaySize = projectorDisplaySize;
+        io.DisplayFramebufferScale = {1, 1};
+        ImGui::GetMainViewport()->Size =projectorDisplaySize;
     }
 
     if (!_windowFocused) {
         ImGuiU::DrawCenteredText("Press Tab to enable input", ImVec4(0, 0, 0, 0.8));
     } else if (_uiMode) { // window focused and in ui mode, draw cursor
-        Tetrium_GUI::drawCursor(&_imguiManager);
+        ImGuiTexture cursorTexture
+            = getOrLoadImGuiTexture(_imguiCtx, "../assets/textures/engine/cursor.png");
+        Tetrium_GUI::drawCursor(cursorTexture);
     }
     Tetrium_GUI::drawFootNote();
 
@@ -145,5 +153,5 @@ void Tetrium::drawImGui(ColorSpace colorSpace)
     }
 
     ImGui::End();
-    _imguiManager.EndImGuiContext();
+    ImGui::Render();
 }

@@ -20,7 +20,7 @@ int main(int argc, char** argv)
     INFO("Logger initialized.");
     DEBUG("running in debug mode");
     Tetrium::InitOptions options{
-        .tetraMode = Tetrium::TetraMode::kEvenOddSoftwareSync,
+        .tetraMode = Tetrium::TetraMode::kEvenOddHardwareSync
     };
     Tetrium engine;
     engine.Init(options);

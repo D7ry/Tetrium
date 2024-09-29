@@ -157,7 +157,7 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
                 CB1.endRenderPass();
 
                 drawImGui(ColorSpace::RGB);
-                _imguiManager.RecordCommandBufferRGB(CB1, extend, swapchainImageIndex);
+                recordImGuiDrawCommandBuffer(_imguiCtx, ColorSpace::RGB, CB1, extend, swapchainImageIndex);
             }
             {
                 renderPassBeginInfo.renderPass = _renderContexts.OCV.renderPass;
@@ -173,7 +173,7 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
                 CB1.endRenderPass();
 
                 drawImGui(ColorSpace::OCV);
-                _imguiManager.RecordCommandBufferOCV(CB1, extend, swapchainImageIndex);
+                recordImGuiDrawCommandBuffer(_imguiCtx, ColorSpace::OCV, CB1, extend, swapchainImageIndex);
             }
         }
 

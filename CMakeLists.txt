@@ -60,13 +60,13 @@ add_executable(${PROJECT_NAME}
         src/Tetrium_Tick.cpp
         src/Tetrium_Windowing.cpp
         src/Tetrium_Config.cpp
+        src/Tetrium_ImGui.cpp
         src/components/TaskQueue.cpp
         src/components/Logging.cpp
         src/components/ShaderUtils.cpp
         src/components/DeltaTimer.cpp
         src/components/Camera.cpp
         src/components/VulkanUtils.cpp
-        src/components/ImGuiManager.cpp
         src/components/TextureManager.cpp
         src/components/InputManager.cpp
         src/components/imgui_widgets/ImGuiWidgetPerfPlot.cpp

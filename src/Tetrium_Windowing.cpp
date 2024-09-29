@@ -257,7 +257,7 @@ void Tetrium::initExclusiveDisplay(Tetrium::DisplayContext& ctx)
     ASSERT(foundPlaneIndex);
     DEBUG("plane index: {}; stack index: {}", ctx.planeIndex, stackIndex);
     VkExtent2D extent = modeProperties[selectedModeIndex].parameters.visibleRegion;
-#define FLIP_VERTICAL_HORIZONTAL 1 // flip extent for portrait mode
+#define FLIP_VERTICAL_HORIZONTAL 0 // flip extent for portrait mode
 #if FLIP_VERTICAL_HORIZONTAL
     std::swap(extent.width, extent.height);
 #endif // FLIP_VERTICAL_HORIZONTAL
