@@ -82,8 +82,7 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
 
     { // wait for previous render
         PROFILE_SCOPE(&_profiler, "vkWaitForFences: fenceInFlight");
-        vkWaitForFences(_device->logicalDevice, 1, &sync.fenceInFlight, VK_TRUE, UINT64_MAX);
-        vkResetFences(this->_device->logicalDevice, 1, &sync.fenceInFlight);
+        VK_CHECK_RESULT(vkWaitForFences(_device->logicalDevice, 1, &sync.fenceInFlight, VK_TRUE, UINT64_MAX));
     }
 
     { // Asynchronously acquire an image from the swap chain,
@@ -96,14 +95,17 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
             &swapchainImageIndex
         );
         [[unlikely]] if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-            this->recreateSwapChain(_swapChain);
-            recreateVirtualFrameBuffers();
-            return;
+            _framebufferResized = true;
         } else [[unlikely]] if (result != VK_SUCCESS) {
             const char* res = string_VkResult(result);
             PANIC("Failed to acquire swap chain image: {}", res);
         }
     }
+
+    // NOTE: to prevend deadlock, we want to make sure every fence is scheduled for signaling.
+    // therefore instead of resetting right away, we only reset fence after all control flow
+    // that diverts us away from `vkQueuePresentKHR`. Therefore need to skip `vkAcquireNextImageKHR`
+    vkResetFences(this->_device->logicalDevice, 1, &sync.fenceInFlight);
 
     { // Render RGB, OCV channels onto both frame buffers
         PROFILE_SCOPE(&_profiler, "Record render commands");
@@ -181,7 +183,7 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
             != VK_SUCCESS) {
             FATAL("Failed to submit draw command buffer!");
         }
-        vkWaitForFences(_device->logicalDevice, 1, &sync.fenceRenderFinished, VK_TRUE, UINT64_MAX);
+        VK_CHECK_RESULT(vkWaitForFences(_device->logicalDevice, 1, &sync.fenceRenderFinished, VK_TRUE, 1e9));
     }
 
     std::array<VkSemaphore, 1> semaImageCopyFinished;
