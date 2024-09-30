@@ -85,8 +85,7 @@ void Tetrium::checkHardwareEvenOddFrameSupport()
     );
 
     std::unordered_set<std::string> evenOddExtensions(
-        EVEN_ODD_HARDWARE_INSTANCE_EXTENSIONS.begin(),
-        EVEN_ODD_HARDWARE_INSTANCE_EXTENSIONS.end()
+        EVEN_ODD_HARDWARE_INSTANCE_EXTENSIONS.begin(), EVEN_ODD_HARDWARE_INSTANCE_EXTENSIONS.end()
     );
 
     for (VkExtensionProperties& property : extensions) {
@@ -141,11 +140,15 @@ uint64_t Tetrium::getSurfaceCounterValue()
         uint32_t imageCount;
 #if NEW_VIRTUAL_FRAMECOUNTER
 #if __APPLE__
-        vkGetPastPresentationTimingGOOGLE(
+
+        PFN_vkGetPastPresentationTimingGOOGLE fnPtr = reinterpret_cast<PFN_vkGetPastPresentationTimingGOOGLE >(
+            vkGetInstanceProcAddr(_instance, "vkGetPastPresentationTimingGOOGLE")
+        );
+        fnPtr(
             _device->logicalDevice, _swapChain.chain, &imageCount, nullptr
         );
         std::vector<VkPastPresentationTimingGOOGLE> images(imageCount);
-        vkGetPastPresentationTimingGOOGLE(
+        fnPtr(
             _device->logicalDevice, _swapChain.chain, &imageCount, images.data()
         );
         auto& ctx = _softwareEvenOddCtx;
@@ -204,7 +207,4 @@ uint64_t Tetrium::getSurfaceCounterValue()
     return surfaceCounter;
 }
 
-bool Tetrium::isEvenFrame()
-{
-    return getSurfaceCounterValue() % 2 == 0;
-}
+bool Tetrium::isEvenFrame() { return getSurfaceCounterValue() % 2 == 0; }
