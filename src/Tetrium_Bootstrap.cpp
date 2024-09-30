@@ -271,7 +271,7 @@ void Tetrium::initVulkan()
               : VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL; // virtual fb to be finally transferred to
                                                       // swapchain
 
-    initImGuiContext(_imguiCtx);
+    initImGuiRenderContext(_imguiCtx);
     this->_deletionStack.push([this]() { destroyImGuiContext(_imguiCtx); });
 
     INFO("Vulkan initialized.");

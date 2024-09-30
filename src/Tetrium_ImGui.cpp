@@ -355,13 +355,15 @@ void Tetrium::reinitImGuiFrameBuffers(Tetrium::ImGuiRenderContexts& ctx)
 
 void Tetrium::destroyImGuiContext(Tetrium::ImGuiRenderContexts& ctx)
 {
+    // FIXME: current imgui impl does not support vulkan multi-context shutdown;
+    // not a big problem for now since we only shut down at very end, but 
+    // it leads to ugly validation errors
     ImGui_ImplVulkan_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImPlot::DestroyContext();
     ImGui::DestroyContext();
-
-    for (auto framebuffer : {&ctx.frameBuffers[RGB], &ctx.frameBuffers[OCV]}) {
-        for (auto fb : *framebuffer) {
+    for (ColorSpace cs : {RGB, OCV}) {
+        for (VkFramebuffer fb : ctx.frameBuffers[cs]) {
             vkDestroyFramebuffer(_device->logicalDevice, fb, nullptr);
         }
     }
