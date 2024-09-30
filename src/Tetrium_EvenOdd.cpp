@@ -1,6 +1,26 @@
 // Even-Odd frame rendering implementations
 #include "Tetrium.h"
 
+#if __APPLE__
+#include "MoltenVK/mvk_private_api.h"
+
+namespace MVK
+{
+inline uint32_t GetFrameCounter(VkInstance instance, VkDevice device)
+{
+    // auto func = (PFN_vkGetPerformanceStatisticsMVK
+    // )vkGetInstanceProcAddr(instance, "vkGetPerformanceStatisticsMVK");
+    // ASSERT(func);
+
+    MVKPerformanceStatistics stats;
+    size_t statsSize = sizeof(stats);
+    VK_CHECK_RESULT(vkGetPerformanceStatisticsMVK(device, &stats, &statsSize));
+
+    return stats.queue.retrieveCAMetalDrawable.count;
+}
+} // namespace MVK
+#endif // __APPLE__
+
 void Tetrium::initEvenOdd()
 {
     switch (_tetraMode) {
@@ -85,8 +105,7 @@ void Tetrium::checkHardwareEvenOddFrameSupport()
     );
 
     std::unordered_set<std::string> evenOddExtensions(
-        EVEN_ODD_HARDWARE_INSTANCE_EXTENSIONS.begin(),
-        EVEN_ODD_HARDWARE_INSTANCE_EXTENSIONS.end()
+        EVEN_ODD_HARDWARE_INSTANCE_EXTENSIONS.begin(), EVEN_ODD_HARDWARE_INSTANCE_EXTENSIONS.end()
     );
 
     for (VkExtensionProperties& property : extensions) {
@@ -138,6 +157,7 @@ uint64_t Tetrium::getSurfaceCounterValue()
     uint64_t surfaceCounter;
     switch (_tetraMode) {
     case TetraMode::kEvenOddSoftwareSync: {
+        return MVK::GetFrameCounter(_instance, _device->Get());
         uint32_t imageCount;
 #if NEW_VIRTUAL_FRAMECOUNTER
 #if __APPLE__
@@ -204,7 +224,4 @@ uint64_t Tetrium::getSurfaceCounterValue()
     return surfaceCounter;
 }
 
-bool Tetrium::isEvenFrame()
-{
-    return getSurfaceCounterValue() % 2 == 0;
-}
+bool Tetrium::isEvenFrame() { return getSurfaceCounterValue() % 2 == 0; }
