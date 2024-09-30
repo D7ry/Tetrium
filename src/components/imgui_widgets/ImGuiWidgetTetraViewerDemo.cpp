@@ -68,7 +68,10 @@ void ImGuiWidgetTetraViewerDemo::Draw(Tetrium* engine, ColorSpace colorSpace)
     if (ImGui::Begin("Tetra Viewer", NULL, flags)) {
         if (!_noUI) {
             ImGui::Text("J/K : zoom in/out. H/L: cycle images. F: toggle full screen mode. B: toggle UI");
-            ImGui::Checkbox("Fit Window", &_imageFitWindow);
+            bool fitWindow = _imageFitWindow;
+            if (ImGui::Checkbox("Fit Window", &fitWindow) && colorSpace == RGB) {
+                _imageFitWindow = fitWindow;
+            }
 
             if (ImGui::Combo("Select Image", &selectedImageId, items, NUM_IMAGES)
                 && colorSpace == ColorSpace::RGB) {
