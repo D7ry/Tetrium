@@ -32,6 +32,10 @@ set(SPDLOG_INCLUDE extern/spdlog/include)
 add_subdirectory(extern/glfw)
 set(GLFW_INCLUDE extern/glfw/include)
 
+# ftxui
+add_subdirectory(extern/FTXUI)
+set(FTXUI_INCLUDE extern/FTXUI/include)
+
 # glm
 set(GLM_INCLUDE extern/glm)
 
@@ -96,6 +100,7 @@ target_include_directories(${PROJECT_NAME}
     PRIVATE ${GLM_INCLUDE}
     PRIVATE ${TINY_OBJ_LOADER_INCLUDE}
     PRIVATE ${FREETYPE_INCLUDE_DIRS}
+    PRIVATE ${FTXUI_INCLUDE}
     PRIVATE src
 )
 
@@ -145,6 +150,9 @@ target_link_libraries(${PROJECT_NAME}
     spdlog::spdlog 
     glfw
     ${FREETYPE_LIBRARIES}
+      ftxui::screen
+      ftxui::dom
+      ftxui::component
 )
 
 # debug flag for unix

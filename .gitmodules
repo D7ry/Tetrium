@@ -16,3 +16,6 @@
 [submodule "extern/imgui"]
 	path = extern/imgui
 	url = git@github.com:D7ry/imgui.git
+[submodule "extern/FTXUI"]
+	path = extern/FTXUI
+	url = git@github.com:ArthurSonzogni/FTXUI.git
