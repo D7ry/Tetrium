@@ -2,6 +2,7 @@
 
 #include "lib/ImGuiUtils.h"
 #include "imgui.h"
+#include "implot.h"
 #include "backends/imgui_impl_vulkan.h"
 #include "backends/imgui_impl_glfw.h"
 
@@ -46,11 +47,16 @@ void drawFootNote()
 }; // namespace Tetrium_GUI
 
 // parent function to draw imgui; sets up all contexts and performs drawing.
+// note that the actual "painting" onto the frame buffer doesn't happen.
+// ImGui internally constructs a draw list, that gets painted onto the fb
+// with `recordImGuiDrawCommandBuffer`
 void Tetrium::drawImGui(ColorSpace colorSpace)
 {
     if (!_wantToDrawImGui) {
         return;
     }
+    ImGui::SetCurrentContext(_imguiCtx.ctxImGui[colorSpace]);
+    ImPlot::SetCurrentContext(_imguiCtx.ctxImPlot[colorSpace]);
 
     // ---------- Prologue ----------
     // note that drawImGui is called twice per tick for RGB and OCV space,

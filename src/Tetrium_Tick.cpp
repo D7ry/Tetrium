@@ -1,16 +1,19 @@
 // Tick-time function implementations
+#include "implot.h"
 #include "lib/Utils.h"
 
 #include "Tetrium.h"
 
 void Tetrium::Run()
 {
+    DEBUG("Starting run loop...");
     ASSERT(_window);
     glfwShowWindow(_window);
     while (!glfwWindowShouldClose(_window)) {
         glfwPollEvents();
         Tick();
     }
+    DEBUG("Ending run loop...");
 }
 
 void Tetrium::getMainProjectionMatrix(glm::mat4& projectionMatrix)
@@ -57,6 +60,8 @@ void Tetrium::Tick()
             TickContext tickData{&_mainCamera, deltaTime};
             tickData.profiler = &_profiler;
             flushEngineUBOStatic(_currentFrame);
+            drawImGui(RGB); // populate RGB context
+            drawImGui(OCV); // populate OCV context
             drawFrame(&tickData, _currentFrame);
             _currentFrame = (_currentFrame + 1) % NUM_FRAME_IN_FLIGHT;
         }
@@ -90,14 +95,11 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
             VK_NULL_HANDLE,
             &swapchainImageIndex
         );
-        [[unlikely]] if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
-        {
+        [[unlikely]] if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
             this->recreateSwapChain(_swapChain);
             recreateVirtualFrameBuffers();
             return;
-        }
-        else [[unlikely]] if (result != VK_SUCCESS)
-        {
+        } else [[unlikely]] if (result != VK_SUCCESS) {
             const char* res = string_VkResult(result);
             PANIC("Failed to acquire swap chain image: {}", res);
         }
@@ -159,10 +161,8 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
                 _renderer.Tick(ctx, cs);
                 CB1.endRenderPass();
 
-                drawImGui(cs);
-                recordImGuiDrawCommandBuffer(
-                    _imguiCtx, cs, CB1, extend, swapchainImageIndex
-                );
+                // paint imgui, drawImGui() should have been called already
+                recordImGuiDrawCommandBuffer(_imguiCtx, cs, CB1, extend, swapchainImageIndex);
             }
         }
 
@@ -276,7 +276,8 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
             .sType = VK_STRUCTURE_TYPE_PRESENT_TIMES_INFO_GOOGLE,
             .pNext = VK_NULL_HANDLE,
             .swapchainCount = 1,
-            .pTimes = &presentTime};
+            .pTimes = &presentTime
+        };
 
         if (_tetraMode == TetraMode::kEvenOddSoftwareSync) {
             presentInfo.pNext = &presentTimeInfo;

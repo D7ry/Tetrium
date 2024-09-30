@@ -15,8 +15,8 @@
 #include "lib/VQDevice.h"
 
 // structs
-#include "structs/SharedEngineStructs.h"
 #include "structs/ImGuiTexture.h"
+#include "structs/SharedEngineStructs.h"
 
 // Engine Components
 #include "components/Camera.h"
@@ -32,6 +32,7 @@
 // ecs
 #include "ecs/system/SimpleRenderSystem.h"
 
+class ImPlotContext;
 class TickContext;
 
 class Tetrium
@@ -140,16 +141,17 @@ class Tetrium
 
     // Context for imgui rendering
     // imgui stays as a struct due to its backend's coupling with Vulkan backend.
-    struct ImGuiContext
+    struct ImGuiRenderContexts
     {
         VkRenderPass renderPass;
         VkDescriptorPool descriptorPool;
-        std::vector<VkFramebuffer> frameBuffers[ColorSpace::ColorSpaceSize];
         std::unordered_map<std::string, ImGuiTexture> textures;
+        std::vector<VkFramebuffer> frameBuffers[ColorSpace::ColorSpaceSize];
+        ImGuiContext* ctxImGui[ColorSpace::ColorSpaceSize] = {};
+        ImPlotContext* ctxImPlot[ColorSpace::ColorSpaceSize] = {};
     };
 
-
-    /* ---------- Windowing ---------- */
+    /* ---------- Windowing ---------- */;
     std::pair<GLFWmonitor*, GLFWvidmode> cliMonitorModeSelection();
     void initGLFW(const InitOptions& options);
     [[deprecated("Use selectDisplayXlib")]] void selectDisplayDRM(DisplayContext& ctx);
@@ -231,17 +233,20 @@ class Tetrium
     bool isEvenFrame();
 
     /* ---------- ImGui ---------- */
-    void initImGuiContext(Tetrium::ImGuiContext& ctx);
-    void destroyImGuiContext(Tetrium::ImGuiContext& ctx);
-    void reinitImGuiFrameBuffers(Tetrium::ImGuiContext& ctx);
+    void initImGuiRenderContext(Tetrium::ImGuiRenderContexts& ctx);
+    void destroyImGuiContext(Tetrium::ImGuiRenderContexts& ctx);
+    void reinitImGuiFrameBuffers(Tetrium::ImGuiRenderContexts& ctx);
     void recordImGuiDrawCommandBuffer(
-        Tetrium::ImGuiContext& ctx,
+        Tetrium::ImGuiRenderContexts& ctx,
         ColorSpace colorSpace,
         vk::CommandBuffer cb,
         vk::Extent2D extent,
         int swapChainImageIndex
     );
-    const ImGuiTexture& getOrLoadImGuiTexture(Tetrium::ImGuiContext& ctx, const std::string& texture);
+    const ImGuiTexture& getOrLoadImGuiTexture(
+        Tetrium::ImGuiRenderContexts& ctx,
+        const std::string& texture
+    );
     void clearImGuiDrawData();
 
     /* ---------- Top-level data ---------- */
@@ -250,7 +255,7 @@ class Tetrium
     std::shared_ptr<VQDevice> _device;
 
     SwapChainContext _swapChain;
-    ImGuiContext _imguiCtx;
+    ImGuiRenderContexts _imguiCtx;
 
     /* ---------- Prensentation ---------- */
     GLFWwindow* _window;
