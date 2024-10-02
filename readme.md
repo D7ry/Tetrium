@@ -70,17 +70,17 @@ drawImGui(ColorSpace colorSpace) {
 
 - `CMake`
 - [Vulkan SDK](https://vulkan.lunarg.com/)
+- `make` or `ninja`
 
 ### Hardware Even-odd frame sync
 
 - NVIDIA GPU supporting `VK_EXT_display_surface_counter`
-- refer to [#Linux] for additional instructions
 
 ## Build
 
 ### Apple
 
-set `VULKAN_LIB_PATH` in `CMakeLists.txt` to your own path after installing Vulkan SDK
+set `VULKAN_LIB_PATH` and `MOLTENVK_LIB_PATH` in `CMakeLists.txt` to your own path after installing Vulkan SDK
 
 #### FreeType
 
