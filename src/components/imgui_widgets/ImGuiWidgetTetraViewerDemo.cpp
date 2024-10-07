@@ -27,8 +27,9 @@ void ImGuiWidgetTetraViewerDemo::Draw(Tetrium* engine, ColorSpace colorSpace)
     ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0, 0, 0, 1));
     // image selector
     int selectedImageId = _selectedImageId;
-    const char* items[NUM_IMAGES];
-    for (int i = 0; i < NUM_IMAGES; i++) {
+    int numImages = _images.size();
+    const char* items[numImages];
+    for (int i = 0; i < numImages; i++) {
         items[i] = _images[i].name;
     }
 
@@ -47,12 +48,12 @@ void ImGuiWidgetTetraViewerDemo::Draw(Tetrium* engine, ColorSpace colorSpace)
         }
         if (ImGui::IsKeyPressed(ImGuiKey_L)) {
             _selectedImageId++;
-            _selectedImageId = _selectedImageId % NUM_IMAGES;
+            _selectedImageId = _selectedImageId % numImages;
         }
         if (ImGui::IsKeyPressed(ImGuiKey_H)) {
             _selectedImageId--;
             if (_selectedImageId == -1) { // wrap
-                _selectedImageId = NUM_IMAGES - 1;
+                _selectedImageId = numImages - 1;
             }
         }
     }
@@ -73,7 +74,7 @@ void ImGuiWidgetTetraViewerDemo::Draw(Tetrium* engine, ColorSpace colorSpace)
                 _imageFitWindow = fitWindow;
             }
 
-            if (ImGui::Combo("Select Image", &selectedImageId, items, NUM_IMAGES)
+            if (ImGui::Combo("Select Image", &selectedImageId, items, numImages)
                 && colorSpace == ColorSpace::RGB) {
                 _selectedImageId = selectedImageId;
             }
