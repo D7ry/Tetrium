@@ -153,7 +153,7 @@ class Tetrium
 
     /* ---------- Windowing ---------- */;
     std::pair<GLFWmonitor*, GLFWvidmode> cliMonitorModeSelection();
-    void initGLFW(const InitOptions& options);
+    GLFWwindow* initGLFW(bool promptUserForFullScreenWindow);
     [[deprecated("Use selectDisplayXlib")]] void selectDisplayDRM(DisplayContext& ctx);
     void selectDisplayXlib(DisplayContext& ctx);
     void initExclusiveDisplay(DisplayContext& ctx);
@@ -161,7 +161,7 @@ class Tetrium
     /* ---------- Initialization Subroutines ---------- */
     void initVulkan();
     void initDefaultStates();
-    void createInstance();
+    VkInstance createInstance();
     void createDevice();
     VkSurfaceKHR createGlfwWindowSurface(GLFWwindow* window);
     vk::RenderPass createRenderPass(const VkFormat imageFormat); // create main render pass
@@ -360,3 +360,7 @@ class Tetrium
 
     SimpleRenderSystem _renderer;
 };
+
+
+#define SCHEDULE_DELETE(...) \
+    this->_deletionStack.push([this]() {__VA_ARGS__});

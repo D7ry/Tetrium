@@ -371,7 +371,7 @@ VkSurfaceKHR Tetrium::createGlfwWindowSurface(GLFWwindow* window)
     return surface;
 }
 
-void Tetrium::initGLFW(const InitOptions& options)
+GLFWwindow* Tetrium::initGLFW(bool promptUserForFullScreenWindow)
 {
     glfwInit();
     glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE); // hide window at beginning
@@ -389,7 +389,7 @@ void Tetrium::initGLFW(const InitOptions& options)
     // glfw window selection
     // hardware sync skips the step; the GLFW window is in windowed mode 
     // and is used only as a controller window
-    if (options.tetraMode == TetraMode::kEvenOddSoftwareSync) {
+    if (promptUserForFullScreenWindow) {
         auto ret = cliMonitorModeSelection();
         monitor = ret.first;
         auto mode = ret.second;
@@ -402,14 +402,12 @@ void Tetrium::initGLFW(const InitOptions& options)
         fmt::println("Selected {} as full-screen monitor.", glfwGetMonitorName(monitor));
     }
 
-    this->_window
+    GLFWwindow* window
         = glfwCreateWindow(width, height, DEFAULTS::Engine::APPLICATION_NAME, monitor, nullptr);
-    if (this->_window == nullptr) {
+
+    if (window == nullptr) {
         FATAL("Failed to initialize GLFW windlw!");
     }
-    glfwSetWindowUserPointer(_window, this);
-    _deletionStack.push([this]() {
-        glfwDestroyWindow(this->_window);
-        glfwTerminate();
-    });
+    
+    return window;
 }
