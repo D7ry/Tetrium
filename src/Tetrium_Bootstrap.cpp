@@ -219,7 +219,7 @@ void Tetrium::initVulkan()
 {
     VkSurfaceKHR mainWindowSurface = VK_NULL_HANDLE;
     INFO("Initializing Vulkan...");
-    this->createInstance();
+    _instance = createInstance();
     SCHEDULE_DELETE(vkDestroyInstance(this->_instance, nullptr);)
     this->createDevice();
 
