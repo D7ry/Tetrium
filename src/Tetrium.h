@@ -29,6 +29,7 @@
 
 #include "components/imgui_widgets/ImGuiWidgetEvenOddCalibration.h"
 #include "components/imgui_widgets/ImGuiWidgetTetraViewerDemo.h"
+#include "components/imgui_widgets/ImGuiWidgetColorTile.h"
 // ecs
 #include "ecs/system/SimpleRenderSystem.h"
 
@@ -357,6 +358,7 @@ class Tetrium
     ImGuiWidgetEvenOddCalibration _widgetEvenOdd;
     ImGuiWidgetGraphicsPipeline _widgetGraphicsPipeline;
     ImGuiWidgetTetraViewerDemo _widgetTetraViewerDemo;
+    ImGuiWidgetColorTile _widgetColorTile;
 
     SimpleRenderSystem _renderer;
 };

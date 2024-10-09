@@ -22,18 +22,17 @@ class ImGuiWidgetTetraViewerDemo : public ImGuiWidgetMut
 
     bool _noUI = false;
 
-    static const int NUM_IMAGES = 8;
-    std::array<DemoImage, NUM_IMAGES> _images = {
-        DemoImage{
-            .name = "observer vs noise",
-            .path_rgb = "../assets/textures/observers_vs_noise-even.png",
-            .path_ocv = "../assets/textures/observers_vs_noise-odd.png"
-        },
-        DemoImage{
-            .name = "metamer pair",
-            .path_rgb = "../assets/textures/metamer_pair__even.png",
-            .path_ocv = "../assets/textures/metamer_pair__odd.png"
-        },
+    std::vector<DemoImage> _images = {
+        // DemoImage{
+        //     .name = "observer vs noise",
+        //     .path_rgb = "../assets/textures/observers_vs_noise-even.png",
+        //     .path_ocv = "../assets/textures/observers_vs_noise-odd.png"
+        // },
+        // DemoImage{
+        //     .name = "metamer pair",
+        //     .path_rgb = "../assets/textures/metamer_pair__even.png",
+        //     .path_ocv = "../assets/textures/metamer_pair__odd.png"
+        // },
         DemoImage{
             .name = "govardovskii_common_genes",
             .path_rgb = "../assets/textures/govardovskii_common_genes-rgb.png",

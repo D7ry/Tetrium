@@ -8,6 +8,8 @@
 
 #include "Tetrium.h"
 
+#include "components/imgui_widgets/ImGuiWidgetColorTile.h"
+
 namespace Tetrium_GUI
 {
 void drawCursor(const ImGuiTexture& cursorTexture)
@@ -151,6 +153,11 @@ void Tetrium::drawImGui(ColorSpace colorSpace)
 
             if (ImGui::BeginTabItem("👓Tetra Viewer")) {
                 _widgetTetraViewerDemo.Draw(this, colorSpace);
+                ImGui::EndTabItem();
+            }
+
+            if (ImGui::BeginTabItem("Color Tile")) {
+                _widgetColorTile.Draw(this, colorSpace);
                 ImGui::EndTabItem();
             }
 
