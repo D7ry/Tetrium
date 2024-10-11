@@ -23,6 +23,21 @@ class ImGuiWidgetTetraViewerDemo : public ImGuiWidgetMut
     bool _noUI = false;
 
     std::vector<DemoImage> _images = {
+        DemoImage {
+            .name = "Gradients",
+            .path_rgb = "../assets/textures/gradient_RGB.png",
+            .path_ocv = "../assets/textures/gradient_OCV.png"
+        },
+        DemoImage {
+            .name = "Gamut",
+            .path_rgb = "../assets/textures/gamut_RGB.png",
+            .path_ocv = "../assets/textures/gamut_OCV.png"
+        },
+        DemoImage {
+            .name = "Cubemap",
+            .path_rgb = "../assets/textures/cubemap_RGB.png",
+            .path_ocv = "../assets/textures/cubemap_OCV.png"
+        }
         // DemoImage{
         //     .name = "observer vs noise",
         //     .path_rgb = "../assets/textures/observers_vs_noise-even.png",
@@ -48,11 +63,11 @@ class ImGuiWidgetTetraViewerDemo : public ImGuiWidgetMut
         //     .path_rgb = "../assets/textures/neitz_common_genes-rgb.png",
         //     .path_ocv = "../assets/textures/neitz_common_genes-ocv.png"
         // },
-        DemoImage{
-            .name = "neitz_common_genes rdmclr",
-            .path_rgb = "../assets/textures/neitz_common_genes_rdmclr-rgb.png",
-            .path_ocv = "../assets/textures/neitz_common_genes_rdmclr-ocv.png"
-        },
+        // DemoImage{
+        //     .name = "neitz_common_genes rdmclr",
+        //     .path_rgb = "../assets/textures/neitz_common_genes_rdmclr-rgb.png",
+        //     .path_ocv = "../assets/textures/neitz_common_genes_rdmclr-ocv.png"
+        // },
         // DemoImage{
         //     .name = "stockman_vs_neitz_vs_govardovskii",
         //     .path_rgb = "../assets/textures/stockman_vs_neitz_vs_govardovskii-rgb.png",
