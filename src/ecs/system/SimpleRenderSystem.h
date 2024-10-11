@@ -21,16 +21,19 @@ struct Mesh
 struct MeshComponent : IComponent
 {
     Mesh* mesh;
-    size_t dynamicUBOId; // id, id * sizeof(dynamicUBO) = offset of its own
-                         // dynamic UBO
-    int textureOffset;   // index into the texture array
+    size_t dynamicUBOId;  // id, id * sizeof(dynamicUBO) = offset of its own
+                          // dynamic UBO
+    int textureOffsetRGB; // index into the texture array
+    int textureOffsetOCV; // index into the texture array
 };
 
 // dynamic UBO of phong render, every mesh instance has its own dynamic UBO
 struct UBODynamic
 {
     glm::mat4 model;
-    int textureOffset;
+    bool isRGB;
+    int textureOffsetRGB;
+    int textureOffsetOCV;
 };
 
 // simple blinn-phong rendering system
@@ -40,7 +43,7 @@ class SimpleRenderSystem : public ISystem
   public:
     MeshComponent* MakeMeshInstanceComponent(
         const std::string& meshPath,
-        const std::string& texturePath
+        std::string texturePaths[ColorSpaceSize]
     );
 
     // destroy a mesh instance component that's initialized with
@@ -56,7 +59,6 @@ class SimpleRenderSystem : public ISystem
     void Cleanup() override;
 
   private:
-
     struct UBO
     {
         VQBuffer dynamicUBO;
@@ -68,15 +70,9 @@ class SimpleRenderSystem : public ISystem
         std::array<UBO, NUM_FRAME_IN_FLIGHT> _UBO;
         VkPipeline _pipeline = VK_NULL_HANDLE;
         VkPipelineLayout _pipelineLayout = VK_NULL_HANDLE;
-        const char* _vertShader;
-        const char* _fragShader;
     };
 
     RenderSystemContext _renderSystemContexts[ColorSpace::ColorSpaceSize];
-
-
-    void render(const TickContext* tickCtx, RenderSystemContext& renderCtx);
-
 
     // sysetm holds its own descriptor pool
     VkDescriptorSetLayout _descriptorSetLayout = VK_NULL_HANDLE;

@@ -24,8 +24,6 @@ layout(location = 2) out vec3 fragNormal;
 layout(location = 3) out vec4 fragPos; // frag position in world
 layout(location = 4) out vec4 fragGlobalLightPos; // light position in world
 
-layout(location = 5) flat out int fragTexIndex;
-
 const vec3 globalLightPos = vec3(-6, -3, 0.0);
 
 void main() {
@@ -42,6 +40,7 @@ void main() {
     fragNormal = inNormal;
     fragPos = world_pos;
     fragGlobalLightPos = vec4(globalLightPos, 1.f);
-
-    fragTexIndex = uboDynamic.isRGB ? uboDynamic.textureRGB : uboDynamic.textureOCV;
 }
+
+
+// TODO: is this the best way to render to 2 frames? we're running the same geometry pass twice. Maybe both RGB and OCV should share the geometry pass.

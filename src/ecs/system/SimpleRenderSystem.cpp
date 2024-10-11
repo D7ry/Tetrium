@@ -16,12 +16,6 @@ void SimpleRenderSystem::Init(const InitContext* ctx)
     _textureManager = ctx->textureManager;
     _dynamicUBOAlignmentSize = _device->GetDynamicUBOAlignedSize(sizeof(UBODynamic));
 
-    _renderSystemContexts[RGB]._fragShader = "../shaders/phong/phong_rgb.frag.spv";
-    _renderSystemContexts[OCV]._fragShader = "../shaders/phong/phong_cmy.frag.spv";
-
-    _renderSystemContexts[RGB]._vertShader = "../shaders/phong/phong.vert.spv";
-    _renderSystemContexts[OCV]._vertShader = "../shaders/phong/phong.vert.spv";
-
     createGraphicsPipeline(ctx->renderPasses, ctx);
 }
 
@@ -55,8 +49,9 @@ void SimpleRenderSystem::Cleanup()
     // note: texture is handled by TextureManager so no need to clean that up
 }
 
-void SimpleRenderSystem::render(const TickContext* tickCtx, RenderSystemContext& renderCtx)
+void SimpleRenderSystem::Tick(const TickContext* tickCtx, ColorSpace cs)
 {
+    const RenderSystemContext& renderCtx = _renderSystemContexts[cs];
 
     VkCommandBuffer CB = tickCtx->graphics.CB;
     int frameIdx = tickCtx->graphics.currentFrameInFlight;
@@ -89,12 +84,15 @@ void SimpleRenderSystem::render(const TickContext* tickCtx, RenderSystemContext&
             // needs to be updated when relevant data structures of the instance
             // changes
             // memcpy here will stall the program
-            void* dynamicUBOAddr = reinterpret_cast<void*>(
+            UBODynamic* pUBOdynamic = reinterpret_cast<UBODynamic*>(
                 reinterpret_cast<uintptr_t>(renderCtx._UBO[frameIdx].dynamicUBO.bufferAddress)
                 + dynamicUBOOffset
             );
-            UBODynamic dynamicUBO{transform->GetModelMatrix(), meshInstance->textureOffset};
-            memcpy(dynamicUBOAddr, &dynamicUBO, sizeof(UBODynamic));
+            transform->GetModelMatrix(pUBOdynamic->model);
+            // TODO: the below shouldn't be necessary after first update, verify this.
+            pUBOdynamic->isRGB = cs == ColorSpace::RGB;
+            pUBOdynamic->textureOffsetRGB = meshInstance->textureOffsetRGB;
+            pUBOdynamic->textureOffsetOCV = meshInstance->textureOffsetOCV;
         }
 
         { // bind vertex & index buffer
@@ -109,11 +107,6 @@ void SimpleRenderSystem::render(const TickContext* tickCtx, RenderSystemContext&
             vkCmdDrawIndexed(CB, meshInstance->mesh->indexBuffer.numIndices, 1, 0, 0, 0);
         }
     }
-}
-
-void SimpleRenderSystem::Tick(const TickContext* ctx, ColorSpace cs)
-{
-    render(ctx, _renderSystemContexts[cs]);
 }
 
 void SimpleRenderSystem::buildPipelineForContext(
@@ -168,10 +161,12 @@ void SimpleRenderSystem::buildPipelineForContext(
 
     /////  ---------- shader ---------- /////
 
-    VkShaderModule vertShaderModule
-        = ShaderCreation::createShaderModule(_device->logicalDevice, ctx._vertShader);
-    VkShaderModule fragShaderModule
-        = ShaderCreation::createShaderModule(_device->logicalDevice, ctx._fragShader);
+    VkShaderModule vertShaderModule = ShaderCreation::createShaderModule(
+        _device->logicalDevice, "../shaders/phong/phong_tetra.vert.spv"
+    );
+    VkShaderModule fragShaderModule = ShaderCreation::createShaderModule(
+        _device->logicalDevice, "../shaders/phong/phong_tetra.frag.spv"
+    );
 
     VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
     vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -403,7 +398,7 @@ void SimpleRenderSystem::createGraphicsPipeline(
         uboDynamicBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
         uboDynamicBinding.descriptorCount = 1; // number of values in the array
 
-        uboDynamicBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT; // only used in vertex shader
+        uboDynamicBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
         uboDynamicBinding.pImmutableSamplers = nullptr;            // Optional
     }
     { // combined image sampler array -- fragment
@@ -455,13 +450,17 @@ void SimpleRenderSystem::createGraphicsPipeline(
         }
     }
 
-    buildPipelineForContext(renderPasses[RGB],  _renderSystemContexts[RGB], initData->engineUBOStaticDescriptorBufferInfo);
-    buildPipelineForContext(renderPasses[OCV], _renderSystemContexts[OCV], initData->engineUBOStaticDescriptorBufferInfo);
+    buildPipelineForContext(
+        renderPasses[RGB], _renderSystemContexts[RGB], initData->engineUBOStaticDescriptorBufferInfo
+    );
+    buildPipelineForContext(
+        renderPasses[OCV], _renderSystemContexts[OCV], initData->engineUBOStaticDescriptorBufferInfo
+    );
 }
 
 MeshComponent* SimpleRenderSystem::MakeMeshInstanceComponent(
     const std::string& meshPath,
-    const std::string& texturePath
+    std::string texturePaths[ColorSpaceSize]
 )
 {
     Mesh* mesh = nullptr;
@@ -484,22 +483,6 @@ MeshComponent* SimpleRenderSystem::MakeMeshInstanceComponent(
         }
     }
 
-    { // load or create new texture
-        auto it = _textureDescriptorIndices.find(texturePath);
-        if (it == _textureDescriptorIndices.end()) {
-            // load texture into textures[textureOffset]
-            DEBUG("loading texture into {}", _textureDescriptorInfoIdx);
-            _textureManager->GetDescriptorImageInfo(
-                texturePath, _textureDescriptorInfo[_textureDescriptorInfoIdx]
-            );
-            textureOffset = _textureDescriptorInfoIdx;
-            _textureDescriptorInfoIdx++;
-            updateTextureDescriptorSet();
-        } else {
-            textureOffset = it->second;
-        }
-    }
-
     // reserve a dynamic UBO for this instance
     // note each instance has to have a dynamic ubo, for storing instance data
     // such as texture index and model mat
@@ -519,11 +502,33 @@ MeshComponent* SimpleRenderSystem::MakeMeshInstanceComponent(
         }
     }
 
+    int textureOffsets[ColorSpaceSize];
+
+    for (ColorSpace cs : {RGB, OCV}) { // load or create new texture
+        std::string& texturePath = texturePaths[cs];
+        auto it = _textureDescriptorIndices.find(texturePath);
+        if (it == _textureDescriptorIndices.end()) {
+            // load texture into textures[textureOffset]
+            DEBUG("loading texture into {}", _textureDescriptorInfoIdx);
+            _textureManager->GetDescriptorImageInfo(
+                texturePath, _textureDescriptorInfo[_textureDescriptorInfoIdx]
+            );
+            textureOffset = _textureDescriptorInfoIdx;
+            _textureDescriptorInfoIdx++;
+            updateTextureDescriptorSet(
+            ); // TODO: updateTextureDescriptorSet() may be called at end of for loop
+        } else {
+            textureOffset = it->second;
+        }
+        textureOffsets[cs] = textureOffset;
+    }
+
     // return new component
     MeshComponent* ret = new MeshComponent();
     ret->mesh = mesh;
     ret->dynamicUBOId = dynamicUBOId;
-    ret->textureOffset = textureOffset;
+    ret->textureOffsetRGB = textureOffsets[RGB];
+    ret->textureOffsetOCV = textureOffsets[OCV];
     return ret;
 }
 

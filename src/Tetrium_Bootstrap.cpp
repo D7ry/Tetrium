@@ -41,9 +41,13 @@ void Tetrium::createFunnyObjects()
     // lil cow
     Entity* spot = new Entity("Spot");
 
-    auto meshInstance = _renderer.MakeMeshInstanceComponent(
-        DIRECTORIES::ASSETS + "models/spot.obj", DIRECTORIES::ASSETS + "textures/spot.png"
-    );
+    std::string textures[ColorSpaceSize]
+        = {(DIRECTORIES::ASSETS + "textures/spot.png"), (DIRECTORIES::ASSETS + "textures/spot.png")
+        };
+
+    auto meshInstance
+        = _renderer.MakeMeshInstanceComponent(DIRECTORIES::ASSETS + "models/spot.obj", textures);
+
     // give the lil cow a mesh
     spot->AddComponent(meshInstance);
     // give the lil cow a transform
