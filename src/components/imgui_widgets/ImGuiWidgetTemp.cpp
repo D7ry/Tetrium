@@ -46,5 +46,16 @@ void ImGuiWidgetTemp::drawFakeVideo(Tetrium* engine, ColorSpace colorSpace)
         initFakeVideo(engine);
         _fakeVideoInitialized = true;
     }
-    
+
+    int numFrames = _fakeVideoFrames.size();
+    int currFrameIdx = engine->_numTicks % numFrames;
+
+    const FakeVideoFrame& frame = _fakeVideoFrames[currFrameIdx];
+
+    // draw RGB/OCV frame onto a quad
+
+    if (ImGui::Begin("Fake Video lol")) {
+
+    }
+    ImGui::End(); // Fake Video
 }
