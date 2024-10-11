@@ -1,3 +1,4 @@
+#pragma once
 #include "ImGuiWidget.h"
 #include "structs/ImGuiTexture.h"
 
@@ -13,7 +14,11 @@ class ImGuiWidgetTemp : public ImGuiWidgetMut
     bool _fakeVideoInitialized = false; // ugh
     void initFakeVideo(Tetrium* engine);
     void drawFakeVideo(Tetrium* engine, ColorSpace colorSpace);
-    struct FakeVideoFrame {
+
+    struct FakeVideoFrame
+    {
         ImGuiTexture textures[ColorSpaceSize];
     };
+
+    std::vector<FakeVideoFrame> _fakeVideoFrames;
 };
