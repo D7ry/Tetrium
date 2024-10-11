@@ -100,15 +100,14 @@ class SimpleRenderSystem : public ISystem
     // - descriptors(pool, layout, sets)
     // and the pipeline itself
     void createGraphicsPipeline(
-        const VkRenderPass renderPassRGB,
-        const VkRenderPass renderPassOCV,
+        const VkRenderPass renderPasses[ColorSpaceSize],
         const InitContext* initData
     );
 
     void buildPipelineForContext(
         const VkRenderPass pass,
-        const InitContext* initData,
-        RenderSystemContext& ctx
+        RenderSystemContext& ctx,
+        const std::array<VkDescriptorBufferInfo, NUM_FRAME_IN_FLIGHT>& engineUboInfo
     );
 
     // all phong meshes created

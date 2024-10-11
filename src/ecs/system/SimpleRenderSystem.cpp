@@ -16,14 +16,13 @@ void SimpleRenderSystem::Init(const InitContext* ctx)
     _textureManager = ctx->textureManager;
     _dynamicUBOAlignmentSize = _device->GetDynamicUBOAlignedSize(sizeof(UBODynamic));
 
-    // TODO: fix jank
-    _renderSystemContexts[RGB]._fragShader = ctx->FRAGMENT_SHADER_RGB_SRC;
-    _renderSystemContexts[OCV]._fragShader = ctx->FRAGMENT_SHADER_OCV_SRC;
+    _renderSystemContexts[RGB]._fragShader = "../shaders/phong/phong_rgb.frag.spv";
+    _renderSystemContexts[OCV]._fragShader = "../shaders/phong/phong_cmy.frag.spv";
 
-    _renderSystemContexts[RGB]._vertShader = ctx->VERTEX_SHADER_SRC;
-    _renderSystemContexts[OCV]._vertShader = ctx->VERTEX_SHADER_SRC;
+    _renderSystemContexts[RGB]._vertShader = "../shaders/phong/phong.vert.spv";
+    _renderSystemContexts[OCV]._vertShader = "../shaders/phong/phong.vert.spv";
 
-    createGraphicsPipeline(ctx->renderPasses[RGB], ctx->renderPasses[OCV], ctx);
+    createGraphicsPipeline(ctx->renderPasses, ctx);
 }
 
 void SimpleRenderSystem::Cleanup()
@@ -119,8 +118,8 @@ void SimpleRenderSystem::Tick(const TickContext* ctx, ColorSpace cs)
 
 void SimpleRenderSystem::buildPipelineForContext(
     const VkRenderPass pass,
-    const InitContext* initData,
-    RenderSystemContext& ctx
+    RenderSystemContext& ctx,
+    const std::array<VkDescriptorBufferInfo, NUM_FRAME_IN_FLIGHT>& engineUboInfo
 )
 {
 
@@ -160,7 +159,7 @@ void SimpleRenderSystem::buildPipelineForContext(
         descriptorWrites[0].dstArrayElement = 0;
         descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         descriptorWrites[0].descriptorCount = 1;
-        descriptorWrites[0].pBufferInfo = &initData->engineUBOStaticDescriptorBufferInfo[i];
+        descriptorWrites[0].pBufferInfo = engineUboInfo.data();
 
         vkUpdateDescriptorSets(
             _device->logicalDevice, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr
@@ -384,8 +383,7 @@ void SimpleRenderSystem::buildPipelineForContext(
 }
 
 void SimpleRenderSystem::createGraphicsPipeline(
-    const VkRenderPass renderPassRGB,
-    const VkRenderPass renderPassOCV,
+    const VkRenderPass renderPasses[ColorSpaceSize],
     const InitContext* initData
 )
 {
@@ -457,8 +455,8 @@ void SimpleRenderSystem::createGraphicsPipeline(
         }
     }
 
-    buildPipelineForContext(renderPassRGB, initData, _renderSystemContexts[RGB]);
-    buildPipelineForContext(renderPassOCV, initData, _renderSystemContexts[OCV]);
+    buildPipelineForContext(renderPasses[RGB],  _renderSystemContexts[RGB], initData->engineUBOStaticDescriptorBufferInfo);
+    buildPipelineForContext(renderPasses[OCV], _renderSystemContexts[OCV], initData->engineUBOStaticDescriptorBufferInfo);
 }
 
 MeshComponent* SimpleRenderSystem::MakeMeshInstanceComponent(
