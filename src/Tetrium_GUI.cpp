@@ -98,7 +98,6 @@ void Tetrium::drawImGui(ColorSpace colorSpace)
     if (ImGui::Begin(DEFAULTS::Engine::APPLICATION_NAME)) {
         if (ImGui::BeginTabBar("Engine Tab")) {
             if (ImGui::BeginTabItem((const char*)u8"🏠General")) {
-                ImGui::ShowDemoWindow();
                 ImGui::SeparatorText("📹Camera");
                 {
                     ImGui::Text(
@@ -160,6 +159,11 @@ void Tetrium::drawImGui(ColorSpace colorSpace)
                 _widgetColorTile.Draw(this, colorSpace);
                 ImGui::EndTabItem();
             }
+
+            // we don't use temp stuff lol
+            // if (ImGui::BeginTabItem("Temp Stuff")) {
+            //     _widgetTemp.Draw(this, colorSpace);
+            // }
 
             ImGui::EndTabBar(); // Engine Tab
         }

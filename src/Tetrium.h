@@ -27,9 +27,10 @@
 #include "components/TextureManager.h"
 #include "components/imgui_widgets/ImGuiWidget.h"
 
+#include "components/imgui_widgets/ImGuiWidgetColorTile.h"
 #include "components/imgui_widgets/ImGuiWidgetEvenOddCalibration.h"
 #include "components/imgui_widgets/ImGuiWidgetTetraViewerDemo.h"
-#include "components/imgui_widgets/ImGuiWidgetColorTile.h"
+#include "components/imgui_widgets/ImGuiWidgetTemp.h"
 // ecs
 #include "ecs/system/SimpleRenderSystem.h"
 
@@ -76,6 +77,20 @@ class Tetrium
     void Run();
     void Tick();
     void Cleanup();
+
+    struct AnimationKeyFrame
+    {
+        glm::vec3 position = glm::vec3(0.f);
+        glm::vec3 rotation = glm::vec3(0.f); // yaw pitch roll
+        glm::vec3 scale = glm::vec3(1.f);    // x y z
+    };
+
+    void RegisterAnimatedObject(
+        const std::string& meshPath,
+        const std::string& texturePath,
+        std::unique_ptr<std::vector<AnimationKeyFrame>> keyframes,
+        float timeSecondsPerFrame // how long does each frame take before moving on to the next?
+    );
 
   private:
     /* ---------- Packed Structs ---------- */
@@ -154,7 +169,7 @@ class Tetrium
 
     /* ---------- Windowing ---------- */;
     std::pair<GLFWmonitor*, GLFWvidmode> cliMonitorModeSelection();
-    void initGLFW(const InitOptions& options);
+    GLFWwindow* initGLFW(bool promptUserForFullScreenWindow);
     [[deprecated("Use selectDisplayXlib")]] void selectDisplayDRM(DisplayContext& ctx);
     void selectDisplayXlib(DisplayContext& ctx);
     void initExclusiveDisplay(DisplayContext& ctx);
@@ -162,7 +177,7 @@ class Tetrium
     /* ---------- Initialization Subroutines ---------- */
     void initVulkan();
     void initDefaultStates();
-    void createInstance();
+    VkInstance createInstance();
     void createDevice();
     VkSurfaceKHR createGlfwWindowSurface(GLFWwindow* window);
     vk::RenderPass createRenderPass(const VkFormat imageFormat); // create main render pass
@@ -351,6 +366,7 @@ class Tetrium
     friend class ImGuiWidgetEvenOddCalibration;
     friend class ImGuiWidgetGraphicsPipeline;
     friend class ImGuiWidgetTetraViewerDemo;
+    friend class ImGuiWidgetTemp;
 
     ImGuiWidgetDeviceInfo _widgetDeviceInfo;
     ImGuiWidgetPerfPlot _widgetPerfPlot;
@@ -359,6 +375,9 @@ class Tetrium
     ImGuiWidgetGraphicsPipeline _widgetGraphicsPipeline;
     ImGuiWidgetTetraViewerDemo _widgetTetraViewerDemo;
     ImGuiWidgetColorTile _widgetColorTile;
+    ImGuiWidgetTemp _widgetTemp;
 
     SimpleRenderSystem _renderer;
 };
+
+#define SCHEDULE_DELETE(...) this->_deletionStack.push([this]() { __VA_ARGS__ });

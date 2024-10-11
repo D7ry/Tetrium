@@ -41,9 +41,13 @@ void Tetrium::createFunnyObjects()
     // lil cow
     Entity* spot = new Entity("Spot");
 
-    auto meshInstance = _renderer.MakeMeshInstanceComponent(
-        DIRECTORIES::ASSETS + "models/spot.obj", DIRECTORIES::ASSETS + "textures/spot.png"
-    );
+    std::string textures[ColorSpaceSize]
+        = {(DIRECTORIES::ASSETS + "textures/spot.png"), (DIRECTORIES::ASSETS + "textures/spot.png")
+        };
+
+    auto meshInstance
+        = _renderer.MakeMeshInstanceComponent(DIRECTORIES::ASSETS + "models/spot.obj", textures);
+
     // give the lil cow a mesh
     spot->AddComponent(meshInstance);
     // give the lil cow a transform
@@ -132,8 +136,10 @@ void Tetrium::Init(const Tetrium::InitOptions& options)
 #if __APPLE__
     MoltenVKConfig::Setup();
 #endif // __APPLE__
-    initGLFW(options);
-    ASSERT(_window);
+    _window = initGLFW(options.tetraMode == TetraMode::kEvenOddSoftwareSync);
+    glfwSetWindowUserPointer(_window, this);
+    SCHEDULE_DELETE(glfwDestroyWindow(_window); glfwTerminate();)
+
     { // Input Handling
         auto keyCallback = [](GLFWwindow* window, int key, int scancode, int action, int mods) {
             Tetrium* pThis = reinterpret_cast<Tetrium*>(glfwGetWindowUserPointer(window));
@@ -217,8 +223,10 @@ void Tetrium::initVulkan()
 {
     VkSurfaceKHR mainWindowSurface = VK_NULL_HANDLE;
     INFO("Initializing Vulkan...");
-    this->createInstance();
+    _instance = createInstance();
+    SCHEDULE_DELETE(vkDestroyInstance(this->_instance, nullptr);)
     this->createDevice();
+
     switch (_tetraMode) {
     case TetraMode::kEvenOddHardwareSync:
         this->initExclusiveDisplay(_mainProjectorDisplay);
@@ -300,7 +308,7 @@ bool Tetrium::checkValidationLayerSupport()
     return true;
 }
 
-void Tetrium::createInstance()
+VkInstance Tetrium::createInstance()
 {
     INFO("Creating Vulkan instance...");
     if (DEFAULTS::Engine::ENABLE_VALIDATION_LAYERS) {
@@ -400,14 +408,15 @@ void Tetrium::createInstance()
     createInfo.pNext = &features;
 #endif // NDEBUG
 
-    VkResult result = vkCreateInstance(&createInfo, nullptr, &this->_instance);
+    VkInstance instance;
+    VkResult result = vkCreateInstance(&createInfo, nullptr, &instance);
 
     if (result != VK_SUCCESS) {
         FATAL("Failed to create Vulkan instance; Result: {}", string_VkResult(result));
     }
-    _deletionStack.push([this]() { vkDestroyInstance(this->_instance, nullptr); });
 
     INFO("Vulkan instance created.");
+    return instance;
 }
 
 void Tetrium::populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo)
@@ -606,7 +615,8 @@ void Tetrium::createSwapChain(Tetrium::SwapChainContext& ctx, const VkSurfaceKHR
     VkSwapchainCounterCreateInfoEXT swapChainCounterCreateInfo{
         .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_COUNTER_CREATE_INFO_EXT,
         .pNext = NULL,
-        .surfaceCounters = VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_BIT_EXT};
+        .surfaceCounters = VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_BIT_EXT
+    };
 
     if (_tetraMode == TetraMode::kEvenOddHardwareSync) {
 #if __linux__
@@ -817,7 +827,8 @@ void Tetrium::createSynchronizationObjects(
             for (auto& sema : {// primitive.semaVsync,
                                primitive.semaImageCopyFinished,
                                primitive.semaRenderFinished,
-                               primitive.semaImageAvailable}) {
+                               primitive.semaImageAvailable
+                 }) {
                 vkDestroySemaphore(this->_device->logicalDevice, sema, nullptr);
             }
             vkDestroyFence(this->_device->logicalDevice, primitive.fenceInFlight, nullptr);
@@ -1124,7 +1135,8 @@ void Tetrium::bindDefaultInputs()
             io.ConfigFlags &= ~ImGuiConfigFlags_NoKeyboard;
             io.MousePos = ImVec2{
                 static_cast<float>(_swapChain.extent.width) / 2,
-                static_cast<float>(_swapChain.extent.height) / 2};
+                static_cast<float>(_swapChain.extent.height) / 2
+            };
             io.WantSetMousePos = true;
         } else {
             io.ConfigFlags |= (ImGuiConfigFlags_NoMouse | ImGuiConfigFlags_NoKeyboard);

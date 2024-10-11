@@ -2,6 +2,11 @@ cmake_minimum_required(VERSION 3.22)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 20)
+
+if (APPLE)
+    set(VULKAN_LIB_PATH $ENV{HOME}/lib/VulkanSDK/1.3.290.1/macOS/lib/libvulkan.1.3.290.dylib)
+    set(MOLTENVK_LIB_PATH $ENV{HOME}/lib/VulkanSDK/1.3.290.1/macOS/lib/libMoltenVK.dylib)
+endif()
  
 # imgui
 set(IMPLOT_INCLUDE extern/implot)
@@ -69,6 +74,7 @@ add_executable(${PROJECT_NAME}
         src/components/VulkanUtils.cpp
         src/components/TextureManager.cpp
         src/components/InputManager.cpp
+        src/components/imgui_widgets/ImGuiWidgetTemp.cpp
         src/components/imgui_widgets/ImGuiWidgetPerfPlot.cpp
         src/components/imgui_widgets/ImGuiWidgetDeviceInfo.cpp
         src/components/imgui_widgets/ImGuiWidgetUBOViewer.cpp
@@ -107,8 +113,6 @@ target_precompile_headers(${PROJECT_NAME} PUBLIC src/PCH.h)
 if (UNIX)
     if(APPLE)
         set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)
-        set(VULKAN_LIB_PATH $ENV{HOME}/lib/VulkanSDK/1.3.290.1/macOS/lib/libvulkan.1.3.290.dylib)
-        set(MOLTENVK_LIB_PATH $ENV{HOME}/lib/VulkanSDK/1.3.290.1/macOS/lib/libMoltenVK.dylib)
         include_directories(~/lib/VulkanSDK/1.3.290.1/macOS/include)
         target_link_libraries(${PROJECT_NAME} 
             ${VULKAN_LIB_PATH}
