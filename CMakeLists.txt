@@ -74,6 +74,7 @@ add_executable(${PROJECT_NAME}
         src/components/VulkanUtils.cpp
         src/components/TextureManager.cpp
         src/components/InputManager.cpp
+        src/components/imgui_widgets/ImGuiWidgetTemp.cpp
         src/components/imgui_widgets/ImGuiWidgetPerfPlot.cpp
         src/components/imgui_widgets/ImGuiWidgetDeviceInfo.cpp
         src/components/imgui_widgets/ImGuiWidgetUBOViewer.cpp

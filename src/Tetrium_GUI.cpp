@@ -161,6 +161,10 @@ void Tetrium::drawImGui(ColorSpace colorSpace)
                 ImGui::EndTabItem();
             }
 
+            if (ImGui::BeginTabItem("Temp Stuff")) {
+                _widgetTemp.Draw(this, colorSpace);
+            }
+
             ImGui::EndTabBar(); // Engine Tab
         }
     }

@@ -30,6 +30,7 @@
 #include "components/imgui_widgets/ImGuiWidgetColorTile.h"
 #include "components/imgui_widgets/ImGuiWidgetEvenOddCalibration.h"
 #include "components/imgui_widgets/ImGuiWidgetTetraViewerDemo.h"
+#include "components/imgui_widgets/ImGuiWidgetTemp.h"
 // ecs
 #include "ecs/system/SimpleRenderSystem.h"
 
@@ -365,6 +366,7 @@ class Tetrium
     friend class ImGuiWidgetEvenOddCalibration;
     friend class ImGuiWidgetGraphicsPipeline;
     friend class ImGuiWidgetTetraViewerDemo;
+    friend class ImGuiWidgetTemp;
 
     ImGuiWidgetDeviceInfo _widgetDeviceInfo;
     ImGuiWidgetPerfPlot _widgetPerfPlot;
@@ -373,6 +375,7 @@ class Tetrium
     ImGuiWidgetGraphicsPipeline _widgetGraphicsPipeline;
     ImGuiWidgetTetraViewerDemo _widgetTetraViewerDemo;
     ImGuiWidgetColorTile _widgetColorTile;
+    ImGuiWidgetTemp _widgetTemp;
 
     SimpleRenderSystem _renderer;
 };
