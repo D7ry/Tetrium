@@ -27,9 +27,9 @@
 #include "components/TextureManager.h"
 #include "components/imgui_widgets/ImGuiWidget.h"
 
+#include "components/imgui_widgets/ImGuiWidgetColorTile.h"
 #include "components/imgui_widgets/ImGuiWidgetEvenOddCalibration.h"
 #include "components/imgui_widgets/ImGuiWidgetTetraViewerDemo.h"
-#include "components/imgui_widgets/ImGuiWidgetColorTile.h"
 // ecs
 #include "ecs/system/SimpleRenderSystem.h"
 
@@ -76,6 +76,20 @@ class Tetrium
     void Run();
     void Tick();
     void Cleanup();
+
+    struct AnimationKeyFrame
+    {
+        glm::vec3 position = glm::vec3(0.f);
+        glm::vec3 rotation = glm::vec3(0.f); // yaw pitch roll
+        glm::vec3 scale = glm::vec3(1.f);    // x y z
+    };
+
+    void RegisterAnimatedObject(
+        const std::string& meshPath,
+        const std::string& texturePath,
+        std::unique_ptr<std::vector<AnimationKeyFrame>> keyframes,
+        float timeSecondsPerFrame // how long does each frame take before moving on to the next?
+    );
 
   private:
     /* ---------- Packed Structs ---------- */
@@ -363,6 +377,4 @@ class Tetrium
     SimpleRenderSystem _renderer;
 };
 
-
-#define SCHEDULE_DELETE(...) \
-    this->_deletionStack.push([this]() {__VA_ARGS__});
+#define SCHEDULE_DELETE(...) this->_deletionStack.push([this]() { __VA_ARGS__ });
