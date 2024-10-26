@@ -56,5 +56,5 @@ const std::vector<const char*> Tetrium::EVEN_ODD_SOFTWARE_DEVICE_EXTENSIONS = {
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetRefreshCycleDurationGOOGLE.html
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPastPresentationTimingGOOGLE.html
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPresentTimesInfoGOOGLE.html
-    VK_GOOGLE_DISPLAY_TIMING_EXTENSION_NAME, // for query refresh rate
+    // VK_GOOGLE_DISPLAY_TIMING_EXTENSION_NAME, // for query refresh rate
 };

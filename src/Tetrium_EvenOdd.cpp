@@ -28,16 +28,20 @@ void Tetrium::setupSoftwareEvenOddFrame()
     auto& ctx = _softwareEvenOddCtx;
     ctx.timeEngineStart = std::chrono::steady_clock::now();
 
+
+#if __APPLE__
     // get refresh cycle
     VkRefreshCycleDurationGOOGLE refreshCycleDuration;
     ASSERT(_device->logicalDevice);
-
     PFN_vkGetRefreshCycleDurationGOOGLE ptr = reinterpret_cast<PFN_vkGetRefreshCycleDurationGOOGLE>(
         vkGetInstanceProcAddr(_instance, "vkGetRefreshCycleDurationGOOGLE")
     );
     ASSERT(ptr);
     VK_CHECK_RESULT(ptr(_device->logicalDevice, _swapChain.chain, &refreshCycleDuration));
     ctx.nanoSecondsPerFrame = refreshCycleDuration.refreshDuration;
+#else
+    ctx.nanoSecondsPerFrame = 16666666; // default config
+#endif
     ASSERT(ctx.nanoSecondsPerFrame != 0);
 }
 
@@ -170,7 +174,8 @@ uint64_t Tetrium::getSurfaceCounterValue()
         }
         surfaceCounter = ctx.numFramesPresented;
 #else  // !__APPLE__
-        NEEDS_IMPLEMENTATION(); // only apple device supports software counter so far.
+        //NEEDS_IMPLEMENTATION(); // only apple device supports software counter so far.
+        surfaceCounter = _numTicks; // use numTicks to emulate surface counter
 #endif // __APPLE__
 #else  // ! NEW_VIRTUAL_FRAMECOUNTER
        // old method: count the time
