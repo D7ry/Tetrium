@@ -151,7 +151,8 @@ void Tetrium::drawImGui(ColorSpace colorSpace)
             }
 
             if (ImGui::BeginTabItem("👓Tetra Viewer")) {
-                _widgetTetraViewerDemo.Draw(this, colorSpace);
+                // _widgetTetraViewerDemo.Draw(this, colorSpace);
+                _widgetTetraViewer.Draw(this, colorSpace);
                 ImGui::EndTabItem();
             }
 
