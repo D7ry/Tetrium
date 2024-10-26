@@ -5,6 +5,7 @@
 class ImGuiWidgetTetraViewer : public ImGuiWidgetMut
 {
   public:
+    ImGuiWidgetTetraViewer();
     virtual void Draw(Tetrium* engine, ColorSpace colorSpace) override;
 
   private:
@@ -18,8 +19,11 @@ class ImGuiWidgetTetraViewer : public ImGuiWidgetMut
 
     void refreshTetraImagePicker();
 
+    void drawControlPrompts();
     void drawTetraImagePicker(ColorSpace colorSpace);
     void drawTetraImage(Tetrium* engine, ColorSpace colorSpace, const TetraImageFile& image);
+
+    void pollControls();
 
     std::vector<TetraImageFile> _tetraImages;
 
@@ -28,6 +32,8 @@ class ImGuiWidgetTetraViewer : public ImGuiWidgetMut
     static const char* TETRA_IMAGE_FOLDER_PATH;
 
     // scaling params
-    bool _fullScreen = false;
-    float _zoom = 1.f;
+    bool _fullScreen = false; // full-screen the window
+    float _zoom = 1.f; // zoom factor, disabled when _adaptiveImageSize = true
+    bool _noUI = false; // do not draw any UI elements, only image
+    bool _adaptiveImageSize = false; // automatically scale image size to window size
 };

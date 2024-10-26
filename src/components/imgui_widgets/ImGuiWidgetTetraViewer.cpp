@@ -7,6 +7,27 @@
 
 const char* ImGuiWidgetTetraViewer::TETRA_IMAGE_FOLDER_PATH = "../assets/textures/tetra_images/";
 
+namespace
+{
+ImVec2 calculateFitSize(const ImGuiTexture& texture, const ImVec2& availableSize)
+{
+    float aspectRatio = (float)texture.width / (float)texture.height;
+
+    float scaleWidth = availableSize.x / (float)texture.width;
+    float scaleHeight = availableSize.y / (float)texture.height;
+
+    float scale = std::min(scaleWidth, scaleHeight);
+
+    ImVec2 fitSize;
+    fitSize.x = (float)texture.width * scale;
+    fitSize.y = (float)texture.height * scale;
+
+    return fitSize;
+}
+} // namespace
+
+ImGuiWidgetTetraViewer::ImGuiWidgetTetraViewer() { refreshTetraImagePicker(); }
+
 void ImGuiWidgetTetraViewer::drawTetraImage(
     Tetrium* engine,
     ColorSpace colorSpace,
@@ -17,12 +38,19 @@ void ImGuiWidgetTetraViewer::drawTetraImage(
     ImGuiTexture tex = engine->getOrLoadImGuiTexture(engine->_imguiCtx, imagePath);
 
     ImVec2 size = {(float)tex.width * _zoom, (float)tex.height * _zoom};
+
+    if (_adaptiveImageSize) {
+        ImVec2 availableSize = ImGui::GetContentRegionAvail();
+        size = calculateFitSize(tex, availableSize);
+    }
     ImGui::Image(tex.id, size);
 }
 
 void ImGuiWidgetTetraViewer::Draw(Tetrium* engine, ColorSpace colorSpace)
 {
-
+    if (colorSpace == RGB) {
+        pollControls();
+    }
     ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0, 0, 0, 1));
     ImGuiWindowFlags flags = 0;
     if (_fullScreen) {
@@ -33,7 +61,10 @@ void ImGuiWidgetTetraViewer::Draw(Tetrium* engine, ColorSpace colorSpace)
     }
 
     if (ImGui::Begin("Tetra Viewer", NULL, flags)) {
-        drawTetraImagePicker(colorSpace);
+        if (!_noUI) {
+            drawControlPrompts();
+            drawTetraImagePicker(colorSpace);
+        }
 
         if (_currTetraImage != -1) {
             drawTetraImage(engine, colorSpace, _tetraImages.at(_currTetraImage));
@@ -94,6 +125,8 @@ void ImGuiWidgetTetraViewer::drawTetraImagePicker(ColorSpace colorSpace)
         _shouldRefreshFilePicker = true;
     }
 
+    ImGui::SameLine();
+
     const char* currentTetraImageName
         = _currTetraImage != -1 ? _tetraImages[_currTetraImage].name.c_str() : "Select Tetra Image";
 
@@ -107,5 +140,45 @@ void ImGuiWidgetTetraViewer::drawTetraImagePicker(ColorSpace colorSpace)
         }
 
         ImGui::EndCombo();
+    }
+}
+
+void ImGuiWidgetTetraViewer::drawControlPrompts()
+{
+    ImGui::Text("J/K : zoom in/out. H/L: cycle images. F: toggle full screen mode. B: toggle UI. "
+                "A: Toggle Adaptive Image Sizes");
+}
+
+void ImGuiWidgetTetraViewer::pollControls()
+{
+
+    if (ImGui::IsKeyPressed(ImGuiKey_K)) {
+        _zoom += 0.1;
+    }
+    if (ImGui::IsKeyPressed(ImGuiKey_J)) {
+        _zoom -= 0.1;
+    }
+    if (ImGui::IsKeyPressed(ImGuiKey_F)) {
+        _fullScreen = !_fullScreen;
+    }
+    if (ImGui::IsKeyPressed(ImGuiKey_B)) {
+        _noUI = !_noUI;
+    }
+    if (ImGui::IsKeyPressed(ImGuiKey_A)) {
+        _adaptiveImageSize = !_adaptiveImageSize;
+    }
+
+    int numImages = _tetraImages.size();
+    if (numImages != 0) {
+        if (ImGui::IsKeyPressed(ImGuiKey_L)) {
+            _currTetraImage++;
+            _currTetraImage = _currTetraImage % numImages;
+        }
+        if (ImGui::IsKeyPressed(ImGuiKey_H)) {
+            _currTetraImage--;
+            if (_currTetraImage == -1) { // wrap
+                _currTetraImage = numImages - 1;
+            }
+        }
     }
 }
