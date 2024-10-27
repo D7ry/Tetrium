@@ -29,7 +29,7 @@ void Tetrium::setupSoftwareEvenOddFrame()
     ctx.timeEngineStart = std::chrono::steady_clock::now();
 
 
-#if __APPLE__
+#if 0
     // get refresh cycle
     VkRefreshCycleDurationGOOGLE refreshCycleDuration;
     ASSERT(_device->logicalDevice);
@@ -143,7 +143,7 @@ uint64_t Tetrium::getSurfaceCounterValue()
     case TetraMode::kEvenOddSoftwareSync: {
         uint32_t imageCount;
 #if NEW_VIRTUAL_FRAMECOUNTER
-#if __APPLE__
+#if 0
 
         PFN_vkGetPastPresentationTimingGOOGLE fnPtr = reinterpret_cast<PFN_vkGetPastPresentationTimingGOOGLE >(
             vkGetInstanceProcAddr(_instance, "vkGetPastPresentationTimingGOOGLE")
