@@ -107,7 +107,12 @@ void ImGuiWidgetTetraViewer::refreshTetraImagePicker()
         }
         auto it = images.find(counterPart);
         if (it != images.end()) { // found both part of RGB/OCV image pair -- create tetra image
-            TetraImageFile image{.name = tetraImageName, .paths = {fileName, counterPart}};
+            std::string rgbFileName = fileName;
+            std::string ocvFileName = counterPart;
+            if (!isRGB) { // fileName is actually ocv
+                rgbFileName.swap(ocvFileName);
+            }
+            TetraImageFile image{.name = tetraImageName, .paths = {rgbFileName, ocvFileName}};
             _tetraImages.emplace_back(image);
         } else {
             images.insert(fileName);
