@@ -9,6 +9,8 @@ class ImGuiWidgetEvenOddCalibration : public ImGuiWidgetMut
     void DrawCalibrationProgress(Tetrium* engine);
 
   private:
+    const char* RGV_COLOR_GRADIENT_IMAGE_PATH = "../assets/textures/engine/even_odd_calibration/rgb_gradient.png";
+
     bool _drawTestWindow = false;
     bool _drawQuadColorTest = false;
     void drawCalibrationWindow(Tetrium* engine, ColorSpace colorSpace);
