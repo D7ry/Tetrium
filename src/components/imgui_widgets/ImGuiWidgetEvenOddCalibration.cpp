@@ -94,40 +94,31 @@ void ImGuiWidgetEvenOddCalibration::drawCalibrationWindow(Tetrium* engine, Color
         engine->_evenOddDebugCtx.numDroppedFrames = 0;
     }
 
-    { // draw RGB OCV quads
+    { // draw RGB and OCV gradients
         ImDrawList* dl = ImGui::GetWindowDrawList();
-        // RGB, what is to be interpreted as OCV
-        ImU32 colors[6] = {
-            IM_COL32(255, 0, 0, 255), // Red
-            IM_COL32(0, 255, 0, 255), // Green
-            IM_COL32(0, 0, 255, 255), // Blue
-                                      //
-            IM_COL32(255, 0, 0, 255), // Red
-            IM_COL32(0, 255, 0, 255), // Green
-            IM_COL32(0, 0, 255, 255), // Blue
-        };
 
-        // Get the window size
-        ImVec2 windowSize = ImGui::GetWindowSize();
+        ImVec2 availableSize = ImGui::GetContentRegionAvail();
+        availableSize.x *= 0.5;
 
-        // Calculate the width of each quad
-        float quadWidth = windowSize.x / 6.0f;
+        ImGuiTexture gradientTexture
+            = engine->getOrLoadImGuiTexture(engine->_imguiCtx, RGV_COLOR_GRADIENT_IMAGE_PATH);
 
-        int iBegin;
-        int iEnd;
-        if (colorSpace == ColorSpace::RGB) {
-            iBegin = 0;
-            iEnd = 3;
-        } else { // OCV
-            iBegin = 3;
-            iEnd = 6;
+        // scale the texture
+        float scale = availableSize.x / (float)gradientTexture.width;
+
+        ImVec2 fitSize;
+        fitSize.x = (float)gradientTexture.width * scale;
+        fitSize.y = (float)gradientTexture.height * scale;
+
+        ImVec2 imageBegin = ImGui::GetCursorPos() + ImGui::GetWindowPos();
+
+        if (colorSpace == ColorSpace::OCV) {
+            imageBegin.x += fitSize.x; // RGB is drawn on the lhs
         }
-        // Draw 6 evenly spaced quads
-        for (int i = iBegin; i < iEnd; i++) {
-            ImVec2 p0(i * quadWidth, windowSize.y * 0.4);
-            ImVec2 p1((i + 1) * quadWidth, windowSize.y * 0.9);
-            dl->AddRectFilled(p0, p1, colors[i]);
-        }
+
+        ImVec2 imageEnd(imageBegin.x + fitSize.x, imageBegin.y + fitSize.y);
+
+        dl->AddImage(gradientTexture.id, imageBegin, imageEnd);
     }
 
     ImGui::Checkbox("Flip RGB/OCV", &engine->_flipEvenOdd);
@@ -232,55 +223,36 @@ void ImGuiWidgetEvenOddCalibration::Draw(Tetrium* engine, ColorSpace colorSpace)
         engine->_flipEvenOdd = true;
     }
 
-    { // draw RGB OCV quads
+    { // draw RGB and OCV gradients
         ImDrawList* dl = ImGui::GetWindowDrawList();
-        // RGB, what is to be interpreted as OCV
-        ImU32 colors[6] = {
-            IM_COL32(255, 0, 0, 255), // Red
-            IM_COL32(0, 255, 0, 255), // Green
-            IM_COL32(0, 0, 255, 255), // Blue
-                                      //
-            IM_COL32(255, 0, 0, 255), // Red
-            IM_COL32(0, 255, 0, 255), // Green
-            IM_COL32(0, 0, 255, 255), // Blue
-        };
 
-        // Get the window size
-        ImVec2 windowSize = ImGui::GetWindowSize();
+        ImVec2 availableSize = ImGui::GetContentRegionAvail();
+        availableSize.x *= 0.5;
 
-        // Calculate the width of each quad
-        float quadWidth = windowSize.x / 6.0f;
+        ImGuiTexture gradientTexture
+            = engine->getOrLoadImGuiTexture(engine->_imguiCtx, RGV_COLOR_GRADIENT_IMAGE_PATH);
 
-        int iBegin;
-        int iEnd;
-        if (colorSpace == ColorSpace::RGB) {
-            iBegin = 0;
-            iEnd = 3;
-        } else { // OCV
-            iBegin = 3;
-            iEnd = 6;
-        }
-        ImVec2 winPos = ImGui::GetWindowPos();
-        ImVec2 cursorPos = ImGui::GetCursorPos();
+        // scale the texture
+        float scale = availableSize.x / (float)gradientTexture.width;
 
-        ImVec2 origin = ImVec2{winPos.x, winPos.y + cursorPos.y};
+        ImVec2 fitSize;
+        fitSize.x = (float)gradientTexture.width * scale;
+        fitSize.y = (float)gradientTexture.height * scale;
+
+        ImVec2 imageBegin = ImGui::GetCursorPos() + ImGui::GetWindowPos();
+
         // draw black background
         dl->AddRectFilled(
-            origin,
-            origin + ImVec2{windowSize.x, windowSize.y * 0.5f},
-            IM_COL32(0, 0, 0, 255)
+            imageBegin, imageBegin + ImVec2{fitSize.x * 2, fitSize.y}, IM_COL32(0, 0, 0, 255)
         );
 
-        // Draw 6 evenly spaced quads
-        for (int i = iBegin; i < iEnd; i++) {
-            ImVec2 p0(i * quadWidth, cursorPos.y);
-            ImVec2 p1((i + 1) * quadWidth, cursorPos.y + windowSize.y * 0.5);
-            p0 += winPos;
-            p1 += winPos;
-            dl->AddRectFilled(p0, p1, colors[i]);
+        if (colorSpace == ColorSpace::OCV) {
+            imageBegin.x += fitSize.x; // RGB is drawn on the lhs
         }
-        // add text indication
 
+        ImVec2 imageEnd(imageBegin.x + fitSize.x, imageBegin.y + fitSize.y);
+
+        dl->AddImage(gradientTexture.id, imageBegin, imageEnd);
     }
     // if (ImGui::Button("Draw Calibration Window")) {
     //     _drawTestWindow = true;
