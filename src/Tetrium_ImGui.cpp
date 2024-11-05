@@ -211,14 +211,18 @@ void InitializeFrameBuffer(
     int bufferCount,
     const std::vector<VkImageView>& swapChainImageViewsRGB,
     const std::vector<VkImageView>& swapChainImageViewsOCV,
+    const std::vector<VkImageView>& swapChainImageViews,
     std::vector<VkFramebuffer>& framebufferRGB,
-    std::vector<VkFramebuffer>& framebufferOCV
+    std::vector<VkFramebuffer>& framebufferOCV,
+    std::vector<VkFramebuffer>& framebuffer
 )
 {
     DEBUG("Creating imgui frame buffers...");
     ASSERT(swapChainImageViewsRGB.size() == bufferCount);
     ASSERT(swapChainImageViewsOCV.size() == bufferCount);
 
+    //FIXME: cleanup
+    framebuffer.resize(bufferCount);
     framebufferRGB.resize(bufferCount);
     framebufferOCV.resize(bufferCount);
     VkImageView attachment[1];
@@ -235,6 +239,8 @@ void InitializeFrameBuffer(
         VK_CHECK_RESULT(vkCreateFramebuffer(device, &info, nullptr, &framebufferRGB[i]));
         attachment[0] = swapChainImageViewsOCV[i];
         VK_CHECK_RESULT(vkCreateFramebuffer(device, &info, nullptr, &framebufferOCV[i]));
+        attachment[0] = swapChainImageViews[i];
+        VK_CHECK_RESULT(vkCreateFramebuffer(device, &info, nullptr, &framebuffer[i]));
     }
     DEBUG("Imgui frame buffers created.");
 }
@@ -348,8 +354,10 @@ void Tetrium::reinitImGuiFrameBuffers(Tetrium::ImGuiRenderContexts& ctx)
         _swapChain.numImages,
         _renderContexts[RGB].virtualFrameBuffer.imageView,
         _renderContexts[OCV].virtualFrameBuffer.imageView,
+        _swapChain.imageView,
         ctx.frameBuffers[RGB],
-        ctx.frameBuffers[OCV]
+        ctx.frameBuffers[OCV],
+        ctx.frameBuffer
     );
 }
 
@@ -368,6 +376,10 @@ void Tetrium::destroyImGuiContext(Tetrium::ImGuiRenderContexts& ctx)
         }
     }
 
+    for (VkFramebuffer fb : ctx.frameBuffer) {
+        vkDestroyFramebuffer(_device->logicalDevice, fb, nullptr);
+    }
+
     vkDestroyRenderPass(_device->logicalDevice, ctx.renderPass, nullptr);
     vkDestroyDescriptorPool(_device->logicalDevice, ctx.descriptorPool, nullptr);
 }
@@ -377,11 +389,11 @@ void Tetrium::initImGuiRenderContext(Tetrium::ImGuiRenderContexts& ctx)
     // create render pass
     VkImageLayout imguiInitialLayout, imguiFinalLayout;
     imguiInitialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    imguiFinalLayout
-        = _tetraMode == TetraMode::kDualProjector
-              ? VK_IMAGE_LAYOUT_PRESENT_SRC_KHR       // dual project's two passes directly present
-              : VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL; // virtual fb to be finally transferred to
-                                                      // swapchain
+    imguiFinalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        // = _tetraMode == TetraMode::kDualProjector
+        //       ? VK_IMAGE_LAYOUT_PRESENT_SRC_KHR       // dual project's two passes directly present
+        //       : VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL; // virtual fb to be finally transferred to
+        //                                               // swapchain
     ctx.renderPass = Tetrium_ImGui::createRenderPass(
         _device->Get(), _swapChain.imageFormat, imguiInitialLayout, imguiFinalLayout
     );
@@ -396,8 +408,10 @@ void Tetrium::initImGuiRenderContext(Tetrium::ImGuiRenderContexts& ctx)
         _swapChain.numImages,
         _renderContexts[RGB].virtualFrameBuffer.imageView,
         _renderContexts[OCV].virtualFrameBuffer.imageView,
+        _swapChain.imageView,
         ctx.frameBuffers[RGB],
-        ctx.frameBuffers[OCV]
+        ctx.frameBuffers[OCV],
+        ctx.frameBuffer
     );
 
     ImGui_ImplVulkan_InitInfo initInfo = {};
@@ -458,7 +472,8 @@ void Tetrium::recordImGuiDrawCommandBuffer(
     VkRenderPassBeginInfo renderPassInfo{};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     renderPassInfo.renderPass = ctx.renderPass;
-    renderPassInfo.framebuffer = ctx.frameBuffers[colorSpace][swapChainImageIndex];
+    // renderPassInfo.framebuffer = ctx.frameBuffers[colorSpace][swapChainImageIndex];
+    renderPassInfo.framebuffer = ctx.frameBuffer[swapChainImageIndex];
     renderPassInfo.renderArea.extent = extent;
     renderPassInfo.renderArea.offset = {0, 0};
     renderPassInfo.clearValueCount = 0;

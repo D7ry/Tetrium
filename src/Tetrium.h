@@ -164,7 +164,8 @@ class Tetrium
         VkRenderPass renderPass;
         VkDescriptorPool descriptorPool;
         std::unordered_map<std::string, ImGuiTexture> textures;
-        std::vector<VkFramebuffer> frameBuffers[ColorSpace::ColorSpaceSize];
+        [[deprecated]] std::vector<VkFramebuffer> frameBuffers[ColorSpace::ColorSpaceSize];
+        std::vector<VkFramebuffer> frameBuffer;
         ImGuiContext* ctxImGui[ColorSpace::ColorSpaceSize] = {};
         ImPlotContext* ctxImPlot[ColorSpace::ColorSpaceSize] = {};
     };
@@ -286,6 +287,11 @@ class Tetrium
     // the FB needs to be transformed into either RGB or OCV format 
     RenderContext _renderContextRYGB;
 
+    // render pass that transforms rygb frame buffer in `_renderContextRYGB` into
+    // ROCV even-odd representation on the swapchain frame buffer.
+    VkRenderPass _rocvTransformRenderPass;
+
+
     /* ---------- Synchronization Primivites ---------- */
     std::array<SyncPrimitives, NUM_FRAME_IN_FLIGHT> _syncProjector;
 
@@ -385,7 +391,9 @@ class Tetrium
     ImGuiWidgetColorTile _widgetColorTile;
     ImGuiWidgetTemp _widgetTemp;
 
-    TetraImageDisplaySystem _imageDisplay;
+    struct {
+        TetraImageDisplaySystem imageDisplay;
+    } _rgbyRenderers;
 };
 
 #define SCHEDULE_DELETE(...) this->_deletionStack.push([this]() { __VA_ARGS__ });

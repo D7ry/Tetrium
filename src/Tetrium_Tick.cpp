@@ -82,7 +82,9 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
 
     { // wait for previous render
         PROFILE_SCOPE(&_profiler, "vkWaitForFences: fenceInFlight");
-        VK_CHECK_RESULT(vkWaitForFences(_device->logicalDevice, 1, &sync.fenceInFlight, VK_TRUE, UINT64_MAX));
+        VK_CHECK_RESULT(
+            vkWaitForFences(_device->logicalDevice, 1, &sync.fenceInFlight, VK_TRUE, UINT64_MAX)
+        );
         VK_CHECK_RESULT(vkResetFences(this->_device->logicalDevice, 1, &sync.fenceInFlight));
     }
 
@@ -103,6 +105,7 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
         }
     }
 
+    std::array<VkSemaphore, 1> semaRenderFinished = {sync.semaRenderFinished};
     { // Render RGB, OCV channels onto both frame buffers
         PROFILE_SCOPE(&_profiler, "Record render commands");
 
@@ -145,39 +148,52 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
             scissor.extent = extend;
 
             // 1. rasterize onto RYGB FB
-            
-            
-            // 2. get even-odd info
-
-            // 3. depending on even-odd, transform RYGB into R000, or OCV0
-            // by sampling from RYGB FB and rendering onto a full-screen quad on the FB
-            
-            // 4. paint RGB/OCV ImGUI onto the actual FB
-            // note imgui contents are directly painted onto VFB for now, for showing raw RGB/OCV images
-            // and debugging
-
-
-            for (ColorSpace cs : {ColorSpace::RGB, ColorSpace::OCV}) {
-                renderPassBeginInfo.renderPass = _renderContexts[cs].renderPass;
+            {
+                renderPassBeginInfo.renderPass = _renderContextRYGB.renderPass;
                 renderPassBeginInfo.framebuffer
-                    = _renderContexts[cs]
-                          .virtualFrameBuffer
-                          .frameBuffer[swapchainImageIndex]; // which frame buffer in the
-                                                             // swapchain do the pass i.e.
-                                                             // all draw calls render to?
+                    = _renderContextRYGB.virtualFrameBuffer.frameBuffer[swapchainImageIndex];
+
                 CB1.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
                 vkCmdSetViewport(CB1, 0, 1, &viewport);
                 vkCmdSetScissor(CB1, 0, 1, &scissor);
 
-                if (cs == RGB) {
-                    _imageDisplay.Tick(ctx, "../assets/textures/spot.png");
+                _rgbyRenderers.imageDisplay.Tick(ctx, "../assets/textures/spot.png");
+
+                CB1.endRenderPass();
+            }
+
+            // at this point the RYGB FB contains RYGB channels, now we need to transform it into
+            // even/odd frame representation based on the current frame's even-oddness.
+
+            // 2. get even-odd info
+            bool renderRGB = isEvenFrame();
+            if (_flipEvenOdd) {
+                renderRGB = !renderRGB;
+            }
+
+            // 3. depending on even-odd, transform RYGB into R000, or OCV0
+            // by sampling from RYGB FB and rendering onto a full-screen quad on the FB
+            {
+                renderPassBeginInfo.renderPass = _rocvTransformRenderPass;
+                renderPassBeginInfo.framebuffer = _swapChain.frameBuffer[swapchainImageIndex];
+                CB1.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
+                if (renderRGB) {
+
+                } else {
                 }
 
-                // _renderer.Tick(ctx, cs);
                 CB1.endRenderPass();
+            }
 
-                // paint imgui, drawImGui() should have been called already
-                recordImGuiDrawCommandBuffer(_imguiCtx, cs, CB1, extend, swapchainImageIndex);
+            // 4. paint RGB/OCV ImGUI onto R000 / OCV0 image
+            // note that imGUI contexts for both RGB/OCV are populated -- this is to provide
+            // an interface to show raw colors for easy debugging & development
+            {
+                if (renderRGB) {
+                    recordImGuiDrawCommandBuffer(_imguiCtx, RGB, CB1, extend, swapchainImageIndex);
+                } else {
+                    recordImGuiDrawCommandBuffer(_imguiCtx, OCV, CB1, extend, swapchainImageIndex);
+                }
             }
         }
 
@@ -188,70 +204,15 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
         submitInfo.commandBufferCount = static_cast<uint32_t>(submitCommandBuffers.size());
         submitInfo.pCommandBuffers = submitCommandBuffers.data();
         VkSemaphore signalSemaphores[0];
-        submitInfo.signalSemaphoreCount = 0;
-        submitInfo.pSignalSemaphores = signalSemaphores;
-
-        vkResetFences(_device->Get(), 1, &sync.fenceRenderFinished);
-        if (vkQueueSubmit(_device->graphicsQueue, 1, &submitInfo, sync.fenceRenderFinished)
-            != VK_SUCCESS) {
-            FATAL("Failed to submit draw command buffer!");
-        }
-        VK_CHECK_RESULT(vkWaitForFences(_device->logicalDevice, 1, &sync.fenceRenderFinished, VK_TRUE, UINT64_MAX));
-    }
-
-    std::array<VkSemaphore, 1> semaImageCopyFinished;
-    { // Copy the channel corresponding to even/odd frame onto swapchain framebuffer
-        PROFILE_SCOPE(&_profiler, "Copy to device swapchain");
-        // for the image transfer to finish, two resources needs to be ready:
-        // 1. the render from the previous CB has to finish for 2 virtual FBs to be available
-        // 2. the actual FB needs to be available for copying
-        //
-        // for (1) : we use `fenceRenderFinished` -- CPU decides which virtual frame buffer to
-        // commit right before committing
-        // for (2) : we use `semaImageAvailable` -- the GPU waits til the actual swapchain is
-        // available
-
-        vk::CommandBuffer CB2(_device->graphicsCommandBuffers2[frame]);
-        CB2.reset();
-        CB2.begin(vk::CommandBufferBeginInfo());
-
-        // choose whether to render the even/odd frame buffer, discarding the other
-        bool isEven = isEvenFrame();
-        if (_flipEvenOdd) {
-            isEven = !isEven;
-        }
-        VkImage virtualFramebufferImage
-            = isEven ? _renderContexts[RGB].virtualFrameBuffer.image[swapchainImageIndex]
-                     : _renderContexts[OCV].virtualFrameBuffer.image[swapchainImageIndex];
-
-        VkImage swapchainFramebufferImage = _swapChain.image[swapchainImageIndex];
-        Utils::ImageTransfer::CmdCopyToFB(
-            CB2, virtualFramebufferImage, swapchainFramebufferImage, _swapChain.extent
-        );
-
-        if (isEven != _evenOddDebugCtx.currShouldBeEven) {
-            _evenOddDebugCtx.numDroppedFrames++;
-        }
-        _evenOddDebugCtx.currShouldBeEven = !isEven; // advance to next frame
-        CB2.end();
-
-        // submit CB2
-        VkSubmitInfo submitInfo2{.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO};
-        std::array<VkCommandBuffer, 1> submitCommandBuffers2 = {CB2};
-        std::array<VkSemaphore, 1> semaImageAvailable = {sync.semaImageAvailable};
+        submitInfo.signalSemaphoreCount = semaRenderFinished.size();
+        submitInfo.pSignalSemaphores = semaRenderFinished.data();
+        submitInfo.waitSemaphoreCount = 1;
+        submitInfo.pWaitSemaphores = &sync.semaImageAvailable;
         std::array<VkPipelineStageFlags, 1> semaImageAvailableStages
             = {VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT};
-        semaImageCopyFinished = {sync.semaImageCopyFinished};
+        submitInfo.pWaitDstStageMask = semaImageAvailableStages.data();
 
-        submitInfo2.waitSemaphoreCount = semaImageAvailable.size();
-        submitInfo2.pWaitSemaphores = semaImageAvailable.data();
-        submitInfo2.pWaitDstStageMask = semaImageAvailableStages.data();
-        submitInfo2.commandBufferCount = static_cast<uint32_t>(submitCommandBuffers2.size());
-        submitInfo2.pCommandBuffers = submitCommandBuffers2.data();
-        submitInfo2.signalSemaphoreCount = semaImageCopyFinished.size();
-        submitInfo2.pSignalSemaphores = semaImageCopyFinished.data();
-
-        if (vkQueueSubmit(_device->graphicsQueue, 1, &submitInfo2, sync.fenceInFlight)
+        if (vkQueueSubmit(_device->graphicsQueue, 1, &submitInfo, sync.fenceInFlight)
             != VK_SUCCESS) {
             FATAL("Failed to submit draw command buffer!");
         }
@@ -264,7 +225,7 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
         presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 
         presentInfo.waitSemaphoreCount = 1;
-        presentInfo.pWaitSemaphores = semaImageCopyFinished.data();
+        presentInfo.pWaitSemaphores = semaRenderFinished.data();
 
         VkSwapchainKHR swapChains[] = {_swapChain.chain};
         presentInfo.swapchainCount = 1;

@@ -271,6 +271,8 @@ void Tetrium::initVulkan()
         _renderContextRYGB.renderPass, _swapChain, _renderContextRYGB.virtualFrameBuffer
     );
 
+    _rocvTransformRenderPass = createRenderPass(_swapChain.imageFormat);
+
     // create framebuffer for swapchain
     createSwapchainFrameBuffers(_swapChain, _renderContexts[0].renderPass);
 
@@ -282,11 +284,11 @@ void Tetrium::initVulkan()
     // final layout depends on tetra mode.
     VkImageLayout imguiInitialLayout, imguiFinalLayout;
     imguiInitialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    imguiFinalLayout
-        = _tetraMode == TetraMode::kDualProjector
-              ? VK_IMAGE_LAYOUT_PRESENT_SRC_KHR       // dual project's two passes directly present
-              : VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL; // virtual fb to be finally transferred to
-                                                      // swapchain
+    imguiFinalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        // = _tetraMode == TetraMode::kDualProjector
+        //       ? VK_IMAGE_LAYOUT_PRESENT_SRC_KHR       // dual project's two passes directly present
+        //       : VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL; // virtual fb to be finally transferred to
+        //                                               // swapchain
 
     initImGuiRenderContext(_imguiCtx);
     this->_deletionStack.push([this]() { destroyImGuiContext(_imguiCtx); });

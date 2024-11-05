@@ -1,14 +1,9 @@
 #include "components/ShaderUtils.h"
-#include "components/VulkanUtils.h"
 #include "lib/VQDevice.h"
-#include "lib/VQUtils.h"
-#include "structs/Vertex.h"
 
-#include "components/Camera.h"
 #include "components/TextureManager.h"
 
 #include "TetraImageDisplaySystem.h"
-#include "ecs/component/TransformComponent.h"
 
 void TetraImageDisplaySystem::Init(const InitContext* ctx)
 {
