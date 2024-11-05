@@ -144,7 +144,15 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
             scissor.offset = {0, 0};
             scissor.extent = extend;
 
-            // two-pass rendering: render RGB and OCV colors onto two virtual FBs
+            // rasterize onto RYGB FB
+            
+
+            // migrate RYGB FB onto VFB
+
+            // paint imgui contents onto VFBs
+            // note imgui contents are directly painted onto VFB for now, for showing raw RGB/OCV images
+            // TODO: migrate ImGui painting onto a single pass, and make a separate rendering pipeline that
+            // deals with image rendering onto RGYB
             for (ColorSpace cs : {ColorSpace::RGB, ColorSpace::OCV}) {
                 renderPassBeginInfo.renderPass = _renderContexts[cs].renderPass;
                 renderPassBeginInfo.framebuffer
@@ -156,7 +164,7 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
                 CB1.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
                 vkCmdSetViewport(CB1, 0, 1, &viewport);
                 vkCmdSetScissor(CB1, 0, 1, &scissor);
-                _renderer.Tick(ctx, cs);
+                // _renderer.Tick(ctx, cs);
                 CB1.endRenderPass();
 
                 // paint imgui, drawImGui() should have been called already
