@@ -33,7 +33,8 @@
 #include "components/imgui_widgets/ImGuiWidgetTetraViewer.h"
 #include "components/imgui_widgets/ImGuiWidgetTemp.h"
 // ecs
-#include "ecs/system/SimpleRenderSystem.h"
+#include "ecs/system/TetraRenderSystem.h"
+#include "ecs/system/TetraImageDisplaySystem.h"
 
 class ImPlotContext;
 class TickContext;
@@ -281,6 +282,10 @@ class Tetrium
     /* ---------- Render Contexts ---------- */
     RenderContext _renderContexts[ColorSpace::ColorSpaceSize];
 
+    // ctx for rendering onto the RYGB FB.
+    // the FB needs to be transformed into either RGB or OCV format 
+    RenderContext _renderContextRYGB;
+
     /* ---------- Synchronization Primivites ---------- */
     std::array<SyncPrimitives, NUM_FRAME_IN_FLIGHT> _syncProjector;
 
@@ -380,7 +385,7 @@ class Tetrium
     ImGuiWidgetColorTile _widgetColorTile;
     ImGuiWidgetTemp _widgetTemp;
 
-    SimpleRenderSystem _renderer;
+    TetraImageDisplaySystem _imageDisplay;
 };
 
 #define SCHEDULE_DELETE(...) this->_deletionStack.push([this]() { __VA_ARGS__ });

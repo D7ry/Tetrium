@@ -144,17 +144,19 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
             scissor.offset = {0, 0};
             scissor.extent = extend;
 
-            // rasterize onto RYGB FB
+            // 1. rasterize onto RYGB FB
             
+            
+            // 2. get even-odd info
 
-            // for each of the RGB & OCV VFBs:
-            // render a full-screen quad, and sample from the RYGB FB texture to construct
-            // the right RGB/OCV FB
-
-            // paint imgui contents onto OGB/OCV VFBs
+            // 3. depending on even-odd, transform RYGB into R000, or OCV0
+            // by sampling from RYGB FB and rendering onto a full-screen quad on the FB
+            
+            // 4. paint RGB/OCV ImGUI onto the actual FB
             // note imgui contents are directly painted onto VFB for now, for showing raw RGB/OCV images
-            // TODO: migrate ImGui painting onto a single pass, and make a separate rendering pipeline that
-            // deals with image rendering onto RGYB
+            // and debugging
+
+
             for (ColorSpace cs : {ColorSpace::RGB, ColorSpace::OCV}) {
                 renderPassBeginInfo.renderPass = _renderContexts[cs].renderPass;
                 renderPassBeginInfo.framebuffer
@@ -166,6 +168,11 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
                 CB1.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
                 vkCmdSetViewport(CB1, 0, 1, &viewport);
                 vkCmdSetScissor(CB1, 0, 1, &scissor);
+
+                if (cs == RGB) {
+                    _imageDisplay.Tick(ctx, "../assets/textures/spot.png");
+                }
+
                 // _renderer.Tick(ctx, cs);
                 CB1.endRenderPass();
 
@@ -278,19 +285,19 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
         // this is useful for calculating the virtual frame counter,
         // as we can take the max(frame.id) to get the number of presented frames.
 
-        VkPresentTimeGOOGLE presentTime{(uint32_t)_numTicks, time};
-
-        VkPresentTimesInfoGOOGLE presentTimeInfo{
-            .sType = VK_STRUCTURE_TYPE_PRESENT_TIMES_INFO_GOOGLE,
-            .pNext = VK_NULL_HANDLE,
-            .swapchainCount = 1,
-            .pTimes = &presentTime
-        };
-
-        if (_tetraMode == TetraMode::kEvenOddSoftwareSync) {
-            presentInfo.pNext = &presentTimeInfo;
-        }
-
+        // VkPresentTimeGOOGLE presentTime{(uint32_t)_numTicks, time};
+        //
+        // VkPresentTimesInfoGOOGLE presentTimeInfo{
+        //     .sType = VK_STRUCTURE_TYPE_PRESENT_TIMES_INFO_GOOGLE,
+        //     .pNext = VK_NULL_HANDLE,
+        //     .swapchainCount = 1,
+        //     .pTimes = &presentTime
+        // };
+        //
+        // if (_tetraMode == TetraMode::kEvenOddSoftwareSync) {
+        //     presentInfo.pNext = &presentTimeInfo;
+        // }
+        //
         result = vkQueuePresentKHR(_device->presentationQueue, &presentInfo);
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR
             || this->_framebufferResized) {

@@ -39,6 +39,7 @@ struct InitContext
     TextureManager* textureManager;
 
     VkRenderPass renderPasses[ColorSpace::ColorSpaceSize];
+    VkRenderPass rygbRenderPass;
 
     /**
      * points to initialized buffer of static engine ubo

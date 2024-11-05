@@ -39,23 +39,23 @@
 void Tetrium::createFunnyObjects()
 {
     // lil cow
-    Entity* spot = new Entity("Spot");
+    // Entity* spot = new Entity("Spot");
+    //
+    // std::string textures[ColorSpaceSize]
+    //     = {(DIRECTORIES::ASSETS + "textures/spot.png"), (DIRECTORIES::ASSETS + "textures/spot.png")
+    //     };
 
-    std::string textures[ColorSpaceSize]
-        = {(DIRECTORIES::ASSETS + "textures/spot.png"), (DIRECTORIES::ASSETS + "textures/spot.png")
-        };
-
-    auto meshInstance
-        = _renderer.MakeMeshInstanceComponent(DIRECTORIES::ASSETS + "models/spot.obj", textures);
+    // auto meshInstance
+    //     = _renderer.MakeMeshInstanceComponent(DIRECTORIES::ASSETS + "models/spot.obj", textures);
 
     // give the lil cow a mesh
-    spot->AddComponent(meshInstance);
+    // spot->AddComponent(meshInstance);
     // give the lil cow a transform
-    spot->AddComponent(new TransformComponent());
-    _renderer.AddEntity(spot);
-    spot->GetComponent<TransformComponent>()->rotation.x = 90;
-    spot->GetComponent<TransformComponent>()->rotation.y = 90;
-    spot->GetComponent<TransformComponent>()->position.z = 0.05;
+    // spot->AddComponent(new TransformComponent());
+    // _renderer.AddEntity(spot);
+    // spot->GetComponent<TransformComponent>()->rotation.x = 90;
+    // spot->GetComponent<TransformComponent>()->rotation.y = 90;
+    // spot->GetComponent<TransformComponent>()->position.z = 0.05;
     // register lil cow
 }
 
@@ -190,6 +190,7 @@ void Tetrium::Init(const Tetrium::InitOptions& options)
         initCtx.swapChainImageFormat = _swapChain.imageFormat;
         initCtx.renderPasses[RGB] = _renderContexts[RGB].renderPass;
         initCtx.renderPasses[OCV] = _renderContexts[OCV].renderPass;
+        initCtx.rygbRenderPass = _renderContexts[RGB].renderPass;
         for (int i = 0; i < _engineUBOStatic.size(); i++) {
             initCtx.engineUBOStaticDescriptorBufferInfo[i].range = sizeof(EngineUBOStatic);
             initCtx.engineUBOStaticDescriptorBufferInfo[i].buffer = _engineUBOStatic[i].buffer;
@@ -197,8 +198,10 @@ void Tetrium::Init(const Tetrium::InitOptions& options)
         }
     }
 
-    _renderer.Init(&initCtx);
-    _deletionStack.push([this]() { _renderer.Cleanup(); });
+    
+    _imageDisplay.Init(&initCtx);
+    _deletionStack.push([this]() { _imageDisplay.Cleanup(); });
+    _imageDisplay.LoadTexture("../assets/textures/spot.png"); // just for testing
 
     initDefaultStates();
 
@@ -261,6 +264,12 @@ void Tetrium::initVulkan()
             clearVirtualFrameBuffer(ctx->virtualFrameBuffer);
         });
     }
+
+    // set up context for RYGB
+    _renderContextRYGB.renderPass = createRenderPass(_swapChain.imageFormat);
+    createVirtualFrameBuffer(
+        _renderContextRYGB.renderPass, _swapChain, _renderContextRYGB.virtualFrameBuffer
+    );
 
     // create framebuffer for swapchain
     createSwapchainFrameBuffers(_swapChain, _renderContexts[0].renderPass);
@@ -845,8 +854,7 @@ void Tetrium::Cleanup()
     INFO("Resource cleaned up.");
 }
 
-// create a render pass. The render pass will be pushed onto
-// the deletion stack.
+// create a render pass. The caller is responsible for its deletion
 vk::RenderPass Tetrium::createRenderPass(const VkFormat imageFormat)
 {
     DEBUG("Creating render pass...");
