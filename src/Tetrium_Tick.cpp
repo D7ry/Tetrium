@@ -147,9 +147,11 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
             // rasterize onto RYGB FB
             
 
-            // migrate RYGB FB onto VFB
+            // for each of the RGB & OCV VFBs:
+            // render a full-screen quad, and sample from the RYGB FB texture to construct
+            // the right RGB/OCV FB
 
-            // paint imgui contents onto VFBs
+            // paint imgui contents onto OGB/OCV VFBs
             // note imgui contents are directly painted onto VFB for now, for showing raw RGB/OCV images
             // TODO: migrate ImGui painting onto a single pass, and make a separate rendering pipeline that
             // deals with image rendering onto RGYB
