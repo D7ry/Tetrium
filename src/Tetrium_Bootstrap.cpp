@@ -199,9 +199,9 @@ void Tetrium::Init(const Tetrium::InitOptions& options)
     }
 
     
-    _imageDisplay.Init(&initCtx);
-    _deletionStack.push([this]() { _imageDisplay.Cleanup(); });
-    _imageDisplay.LoadTexture("../assets/textures/spot.png"); // just for testing
+    _rgbyRenderers.imageDisplay.Init(&initCtx);
+    _deletionStack.push([this]() { _rgbyRenderers.imageDisplay.Cleanup(); });
+    _rgbyRenderers.imageDisplay.LoadTexture("../assets/textures/spot.png"); // just for testing
 
     initDefaultStates();
 

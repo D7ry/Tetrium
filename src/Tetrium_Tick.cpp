@@ -174,14 +174,16 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
             // 3. depending on even-odd, transform RYGB into R000, or OCV0
             // by sampling from RYGB FB and rendering onto a full-screen quad on the FB
             {
+                // begin the rocv transform render pass 
+                // the pass takes _renderContextRYGB's frame buffer and maps it onto either RGB or OCV space
                 renderPassBeginInfo.renderPass = _rocvTransformRenderPass;
                 renderPassBeginInfo.framebuffer = _swapChain.frameBuffer[swapchainImageIndex];
                 CB1.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
                 if (renderRGB) {
 
                 } else {
-                }
 
+                }
                 CB1.endRenderPass();
             }
 
