@@ -38,7 +38,6 @@ struct InitContext
     VkFormat swapChainImageFormat;
     TextureManager* textureManager;
 
-    VkRenderPass renderPasses[ColorSpace::ColorSpaceSize];
     VkRenderPass rygbRenderPass;
 
     /**

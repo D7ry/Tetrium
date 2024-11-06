@@ -16,7 +16,8 @@ void SimpleRenderSystem::Init(const InitContext* ctx)
     _textureManager = ctx->textureManager;
     _dynamicUBOAlignmentSize = _device->GetDynamicUBOAlignedSize(sizeof(UBODynamic));
 
-    createGraphicsPipeline(ctx->renderPasses, ctx);
+    NEEDS_IMPLEMENTATION() // TODO: figure out new pipeline creation
+    //createGraphicsPipeline(ctx->renderPasses, ctx);
 }
 
 void SimpleRenderSystem::Cleanup()

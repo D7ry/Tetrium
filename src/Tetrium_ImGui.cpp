@@ -209,22 +209,14 @@ void InitializeFrameBuffer(
     VkExtent2D extent,
     VkRenderPass renderPass,
     int bufferCount,
-    const std::vector<VkImageView>& swapChainImageViewsRGB,
-    const std::vector<VkImageView>& swapChainImageViewsOCV,
     const std::vector<VkImageView>& swapChainImageViews,
-    std::vector<VkFramebuffer>& framebufferRGB,
-    std::vector<VkFramebuffer>& framebufferOCV,
     std::vector<VkFramebuffer>& framebuffer
 )
 {
     DEBUG("Creating imgui frame buffers...");
-    ASSERT(swapChainImageViewsRGB.size() == bufferCount);
-    ASSERT(swapChainImageViewsOCV.size() == bufferCount);
 
-    //FIXME: cleanup
+    // FIXME: cleanup
     framebuffer.resize(bufferCount);
-    framebufferRGB.resize(bufferCount);
-    framebufferOCV.resize(bufferCount);
     VkImageView attachment[1];
     VkFramebufferCreateInfo info = {};
     info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
@@ -235,10 +227,6 @@ void InitializeFrameBuffer(
     info.layers = 1;
 
     for (uint32_t i = 0; i < bufferCount; i++) {
-        attachment[0] = swapChainImageViewsRGB[i];
-        VK_CHECK_RESULT(vkCreateFramebuffer(device, &info, nullptr, &framebufferRGB[i]));
-        attachment[0] = swapChainImageViewsOCV[i];
-        VK_CHECK_RESULT(vkCreateFramebuffer(device, &info, nullptr, &framebufferOCV[i]));
         attachment[0] = swapChainImageViews[i];
         VK_CHECK_RESULT(vkCreateFramebuffer(device, &info, nullptr, &framebuffer[i]));
     }
@@ -352,11 +340,7 @@ void Tetrium::reinitImGuiFrameBuffers(Tetrium::ImGuiRenderContexts& ctx)
         _swapChain.extent,
         ctx.renderPass,
         _swapChain.numImages,
-        _renderContexts[RGB].virtualFrameBuffer.imageView,
-        _renderContexts[OCV].virtualFrameBuffer.imageView,
         _swapChain.imageView,
-        ctx.frameBuffers[RGB],
-        ctx.frameBuffers[OCV],
         ctx.frameBuffer
     );
 }
@@ -364,7 +348,7 @@ void Tetrium::reinitImGuiFrameBuffers(Tetrium::ImGuiRenderContexts& ctx)
 void Tetrium::destroyImGuiContext(Tetrium::ImGuiRenderContexts& ctx)
 {
     // FIXME: current imgui impl does not support vulkan multi-context shutdown;
-    // not a big problem for now since we only shut down at very end, but 
+    // not a big problem for now since we only shut down at very end, but
     // it leads to ugly validation errors
     ImGui_ImplVulkan_Shutdown();
     ImGui_ImplGlfw_Shutdown();
@@ -390,12 +374,14 @@ void Tetrium::initImGuiRenderContext(Tetrium::ImGuiRenderContexts& ctx)
     VkImageLayout imguiInitialLayout, imguiFinalLayout;
     imguiInitialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     imguiFinalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-        // = _tetraMode == TetraMode::kDualProjector
-        //       ? VK_IMAGE_LAYOUT_PRESENT_SRC_KHR       // dual project's two passes directly present
-        //       : VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL; // virtual fb to be finally transferred to
-        //                                               // swapchain
-    ctx.renderPass = Tetrium_ImGui::createRenderPass(
-        _device->Get(), _swapChain.imageFormat, imguiInitialLayout, imguiFinalLayout
+
+    ctx.renderPass = createRenderPass(
+        _device->Get(),
+        imguiInitialLayout,
+        imguiFinalLayout,
+        _swapChain.imageFormat,
+        VK_ATTACHMENT_LOAD_OP_LOAD,
+        VK_ATTACHMENT_STORE_OP_STORE
     );
 
     ctx.descriptorPool = Tetrium_ImGui::createDescriptorPool(
@@ -406,11 +392,7 @@ void Tetrium::initImGuiRenderContext(Tetrium::ImGuiRenderContexts& ctx)
         _swapChain.extent,
         ctx.renderPass,
         _swapChain.numImages,
-        _renderContexts[RGB].virtualFrameBuffer.imageView,
-        _renderContexts[OCV].virtualFrameBuffer.imageView,
         _swapChain.imageView,
-        ctx.frameBuffers[RGB],
-        ctx.frameBuffers[OCV],
         ctx.frameBuffer
     );
 

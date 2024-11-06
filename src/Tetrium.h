@@ -29,11 +29,10 @@
 
 #include "components/imgui_widgets/ImGuiWidgetColorTile.h"
 #include "components/imgui_widgets/ImGuiWidgetEvenOddCalibration.h"
-#include "components/imgui_widgets/ImGuiWidgetTetraViewerDemo.h"
-#include "components/imgui_widgets/ImGuiWidgetTetraViewer.h"
 #include "components/imgui_widgets/ImGuiWidgetTemp.h"
+#include "components/imgui_widgets/ImGuiWidgetTetraViewer.h"
+#include "components/imgui_widgets/ImGuiWidgetTetraViewerDemo.h"
 // ecs
-#include "ecs/system/TetraRenderSystem.h"
 #include "ecs/system/TetraImageDisplaySystem.h"
 
 class ImPlotContext;
@@ -183,9 +182,16 @@ class Tetrium
     VkInstance createInstance();
     void createDevice();
     VkSurfaceKHR createGlfwWindowSurface(GLFWwindow* window);
-    vk::RenderPass createRenderPass(const VkFormat imageFormat); // create main render pass
     void createSynchronizationObjects(std::array<SyncPrimitives, NUM_FRAME_IN_FLIGHT>& primitives);
     void createFunnyObjects();
+    VkRenderPass createRenderPass(
+        VkDevice logicalDevice,
+        VkImageLayout initialLayout,
+        VkImageLayout finalLayout,
+        VkFormat colorFormat,
+        VkAttachmentLoadOp colorLoadOp,
+        VkAttachmentStoreOp colorStoreOp
+    );
 
     /* ---------- Physical Device Selection ---------- */
     bool checkDeviceExtensionSupport(VkPhysicalDevice device);
@@ -241,6 +247,20 @@ class Tetrium
     void flushEngineUBOStatic(uint8_t frame);
     void getMainProjectionMatrix(glm::mat4& projectionMatrix);
 
+    void getFullScreenViewportAndScissor(
+        const SwapChainContext& swapChain,
+        VkViewport& viewport,
+        VkRect2D& scissor
+    );
+
+    void transformRGYBColorSpace(
+        vk::CommandBuffer CB,
+        VirtualFrameBuffer& rgybFrameBuffer,
+        SwapChainContext& physicalSwapChain,
+        uint32_t swapChainImageIndex,
+        ColorSpace colorSpace
+    );
+
     /* ---------- Even-Odd frame ---------- */
     void initEvenOdd(); // initialize resources for even-odd rendering
     void cleanupEvenOdd();
@@ -280,17 +300,13 @@ class Tetrium
     GLFWwindow* _window;
     DisplayContext _mainProjectorDisplay;
 
-    /* ---------- Render Contexts ---------- */
-    RenderContext _renderContexts[ColorSpace::ColorSpaceSize];
-
     // ctx for rendering onto the RYGB FB.
-    // the FB needs to be transformed into either RGB or OCV format 
+    // the FB needs to be transformed into either RGB or OCV format
     RenderContext _renderContextRYGB;
 
     // render pass that transforms rygb frame buffer in `_renderContextRYGB` into
     // ROCV even-odd representation on the swapchain frame buffer.
     VkRenderPass _rocvTransformRenderPass;
-
 
     /* ---------- Synchronization Primivites ---------- */
     std::array<SyncPrimitives, NUM_FRAME_IN_FLIGHT> _syncProjector;
@@ -391,7 +407,8 @@ class Tetrium
     ImGuiWidgetColorTile _widgetColorTile;
     ImGuiWidgetTemp _widgetTemp;
 
-    struct {
+    struct
+    {
         TetraImageDisplaySystem imageDisplay;
     } _rgbyRenderers;
 };

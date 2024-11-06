@@ -74,6 +74,58 @@ void Tetrium::Tick()
     _numTicks++;
 }
 
+// Given the content in rgyb frame buffer,
+// transform the content onto either RGB or OCV representation, and paint onto
+// the swapchain's frame buffer.
+//
+// Internally, the remapping is done by post-processing a full-screen quad:
+// the full-screen quad samples the rgyb FB's texture and performs matmul on the color
+void Tetrium::transformRGYBColorSpace(
+    vk::CommandBuffer CB,
+    VirtualFrameBuffer& rgybFrameBuffer,
+    SwapChainContext& physicalSwapChain,
+    uint32_t swapChainImageIndex,
+    ColorSpace colorSpace
+)
+{
+    // begin transform render pass
+    VkViewport viewport{};
+    VkRect2D scissor{};
+    getFullScreenViewportAndScissor(_swapChain, viewport, scissor);
+
+    vk::Extent2D extend = _swapChain.extent;
+    vk::Rect2D renderArea(VkOffset2D{0, 0}, extend);
+    vk::RenderPassBeginInfo renderPassBeginInfo(
+        {}, {}, renderArea, _clearValues.size(), _clearValues.data(), nullptr
+    );
+
+    renderPassBeginInfo.renderPass = _rocvTransformRenderPass;
+    renderPassBeginInfo.framebuffer = _swapChain.frameBuffer[swapChainImageIndex];
+
+    CB.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
+    vkCmdSetViewport(CB, 0, 1, &viewport);
+    vkCmdSetScissor(CB, 0, 1, &scissor);
+
+    CB.endRenderPass();
+}
+
+void Tetrium::getFullScreenViewportAndScissor(
+    const SwapChainContext& swapChain,
+    VkViewport& viewport,
+    VkRect2D& scissor
+)
+{
+    vk::Extent2D extend = swapChain.extent;
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = static_cast<float>(extend.width);
+    viewport.height = static_cast<float>(extend.height);
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    scissor.offset = {0, 0};
+    scissor.extent = extend;
+}
+
 void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
 {
     SyncPrimitives& sync = _syncProjector[frame];
@@ -136,17 +188,11 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
             );
 
             VkViewport viewport{};
-            viewport.x = 0.0f;
-            viewport.y = 0.0f;
-            viewport.width = static_cast<float>(extend.width);
-            viewport.height = static_cast<float>(extend.height);
-            viewport.minDepth = 0.0f;
-            viewport.maxDepth = 1.0f;
-
             VkRect2D scissor{};
-            scissor.offset = {0, 0};
-            scissor.extent = extend;
+            getFullScreenViewportAndScissor(_swapChain, viewport, scissor);
 
+            vkCmdSetViewport(CB1, 0, 1, &viewport);
+            vkCmdSetScissor(CB1, 0, 1, &scissor);
             // 1. rasterize onto RYGB FB
             {
                 renderPassBeginInfo.renderPass = _renderContextRYGB.renderPass;
@@ -154,8 +200,6 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
                     = _renderContextRYGB.virtualFrameBuffer.frameBuffer[swapchainImageIndex];
 
                 CB1.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
-                vkCmdSetViewport(CB1, 0, 1, &viewport);
-                vkCmdSetScissor(CB1, 0, 1, &scissor);
 
                 _rgbyRenderers.imageDisplay.Tick(ctx, "../assets/textures/spot.png");
 
@@ -174,19 +218,12 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
             // 3. depending on even-odd, transform RYGB into R000, or OCV0
             // by sampling from RYGB FB and rendering onto a full-screen quad on the FB
             {
-                // begin the rocv transform render pass 
-                // the pass takes _renderContextRYGB's frame buffer and maps it onto either RGB or OCV space
-                renderPassBeginInfo.renderPass = _rocvTransformRenderPass;
-                renderPassBeginInfo.framebuffer = _swapChain.frameBuffer[swapchainImageIndex];
-                CB1.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
-                if (renderRGB) {
-
-                } else {
-
-                }
-                CB1.endRenderPass();
             }
 
+            // FIXME: imgui should be painted onto RGYB buffer
+            // TODO: optionally create 3 imgui passes -- one that goes onto RGYB FB for user-space
+            // gui frameworking, the other two goes onto RGB/OCV FB for lower-level control of
+            // presented color for debugging.
             // 4. paint RGB/OCV ImGUI onto R000 / OCV0 image
             // note that imGUI contexts for both RGB/OCV are populated -- this is to provide
             // an interface to show raw colors for easy debugging & development

@@ -88,7 +88,6 @@ add_executable(${PROJECT_NAME}
         src/lib/ImGuiUtils.cpp
         src/structs/Vertex.cpp
         src/ecs/system/SimpleRenderSystem.cpp
-        src/ecs/system/TetraRenderSystem.cpp
         src/ecs/system/TetraImageDisplaySystem.cpp
 )
 
