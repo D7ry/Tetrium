@@ -91,9 +91,9 @@ void Tetrium::getFullScreenViewportAndScissor(
     scissor.extent = extend;
 }
 
-void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
+void Tetrium::drawFrame(TickContext* ctx, uint8_t frameIdx)
 {
-    SyncPrimitives& sync = _syncProjector[frame];
+    SyncPrimitives& sync = _syncProjector[frameIdx];
     VkResult result;
     uint32_t swapchainImageIndex;
 
@@ -126,7 +126,7 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
     { // Render RGB, OCV channels onto both frame buffers
         PROFILE_SCOPE(&_profiler, "Record render commands");
 
-        vk::CommandBuffer CB1(_device->graphicsCommandBuffers[frame]);
+        vk::CommandBuffer CB1(_device->graphicsCommandBuffers[frameIdx]);
         //  Record a command buffer which draws the scene onto that image
         CB1.reset();
 
@@ -139,7 +139,7 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
         }
 
         // update graphics rendering context
-        ctx->graphics.currentFrameInFlight = frame;
+        ctx->graphics.currentFrameInFlight = frameIdx;
         ctx->graphics.currentSwapchainImageIndex = swapchainImageIndex;
         ctx->graphics.CB = CB1;
         ctx->graphics.currentFBextend = _swapChain.extent;
@@ -185,6 +185,7 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
             transformToROCVframeBuffer(
                 _renderContextRYGB.virtualFrameBuffer,
                 _swapChain,
+                frameIdx,
                 swapchainImageIndex,
                 renderRGB ? ColorSpace::RGB : ColorSpace::OCV,
                 CB1

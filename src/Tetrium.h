@@ -263,11 +263,13 @@ class Tetrium
         VkRect2D& scissor
     );
 
-    void initRYGB2ROCVTransform();
+    void initRYGB2ROCVTransform(InitContext* ctx);
+    void cleanupRYGB2ROCVTransform();
 
     void transformToROCVframeBuffer(
         VirtualFrameBuffer& rgybFrameBuffer,
         SwapChainContext& rocvSwapChain,
+        uint32_t frameIdx,
         uint32_t swapChainImageIndex,
         ColorSpace colorSpace,
         vk::CommandBuffer CB

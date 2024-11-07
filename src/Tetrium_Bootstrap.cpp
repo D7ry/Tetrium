@@ -203,6 +203,9 @@ void Tetrium::Init(const Tetrium::InitOptions& options)
     _deletionStack.push([this]() { _rgbyRenderers.imageDisplay.Cleanup(); });
     _rgbyRenderers.imageDisplay.LoadTexture("../assets/textures/spot.png"); // just for testing
 
+    initRYGB2ROCVTransform(&initCtx);
+    SCHEDULE_DELETE(cleanupRYGB2ROCVTransform();)
+
     initDefaultStates();
 
     createFunnyObjects();
@@ -282,7 +285,7 @@ void Tetrium::initVulkan()
         VkSubpassDependency{
             .srcSubpass = VK_SUBPASS_EXTERNAL, // all previous submitted subpass, in this case it's
                                                // `_renderContextRYGB.renderPass`
-            .dstSubpass = 0, // first subpass
+            .dstSubpass = 0,                   // first subpass
             // wait until RYGB pass to paint to the FB to start up fragment shader that handles
             // RGYB -> RGB/OCV transform
             // https://www.reddit.com/r/vulkan/comments/s80reu/subpass_dependencies_what_are_those_and_why_do_i/
@@ -909,7 +912,7 @@ void Tetrium::createVirtualFrameBuffer(
         imageInfo.format = swapChain.imageFormat;
         imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
         imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+        imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
         imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
         imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
