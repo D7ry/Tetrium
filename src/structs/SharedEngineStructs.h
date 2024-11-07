@@ -39,6 +39,7 @@ struct InitContext
     TextureManager* textureManager;
 
     VkRenderPass rygbRenderPass;
+    VkRenderPass rocvTransformRenderPass;
 
     /**
      * points to initialized buffer of static engine ubo

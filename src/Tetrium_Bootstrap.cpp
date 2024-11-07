@@ -192,6 +192,7 @@ void Tetrium::Init(const Tetrium::InitOptions& options)
         initCtx.textureManager = &_textureManager;
         initCtx.swapChainImageFormat = _swapChain.imageFormat;
         initCtx.rygbRenderPass = _renderContextRYGB.renderPass;
+        initCtx.rocvTransformRenderPass = _rocvTransformRenderPass;
         for (int i = 0; i < _engineUBOStatic.size(); i++) {
             initCtx.engineUBOStaticDescriptorBufferInfo[i].range = sizeof(EngineUBOStatic);
             initCtx.engineUBOStaticDescriptorBufferInfo[i].buffer = _engineUBOStatic[i].buffer;

@@ -448,7 +448,7 @@ void Init(const InitContext* ctx, const std::vector<VkImageView>& rgybFrameBuffe
     // NOTE: sampler must be created before pipeline as it's a part of descriptor layout
     createFramebufferSampler(rgybFrameBufferImageView.size());
 
-    createGraphicsPipeline(ctx->rygbRenderPass, rgybFrameBufferImageView, ctx);
+    createGraphicsPipeline(ctx->rocvTransformRenderPass, rgybFrameBufferImageView, ctx);
 }
 
 void Cleanup()
