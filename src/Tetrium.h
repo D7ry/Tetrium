@@ -414,4 +414,3 @@ class Tetrium
     } _rgbyRenderers;
 };
 
-#define SCHEDULE_DELETE(...) this->_deletionStack.push([this]() { __VA_ARGS__ });

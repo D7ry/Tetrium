@@ -212,13 +212,13 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
 
             // 3. depending on even-odd, transform RYGB into R000, or OCV0
             // by sampling from RYGB FB and rendering onto a full-screen quad on the FB
-            // transformRGYBColorSpace(
-            //     CB1,
-            //     _renderContextRYGB.virtualFrameBuffer,
-            //     _swapChain,
-            //     swapchainImageIndex,
-            //     renderRGB ? ColorSpace::RGB : ColorSpace::OCV
-            // );
+            transformRGYBColorSpace(
+                CB1,
+                _renderContextRYGB.virtualFrameBuffer,
+                _swapChain,
+                swapchainImageIndex,
+                renderRGB ? ColorSpace::RGB : ColorSpace::OCV
+            );
 
             // FIXME: imgui should be painted onto RGYB buffer
             // TODO: optionally create 3 imgui passes -- one that goes onto RGYB FB for user-space

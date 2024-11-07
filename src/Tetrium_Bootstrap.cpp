@@ -33,6 +33,8 @@
 #if __linux__
 #endif // __linux__
 
+#define SCHEDULE_DELETE(...) this->_deletionStack.push([this]() { __VA_ARGS__ });
+
 #define VIRTUAL_VSYNC 0
 
 // creates a cow for now
@@ -252,7 +254,7 @@ void Tetrium::initVulkan()
     ASSERT(_swapChain.imageFormat);
     createDepthBuffer(_swapChain);
 
-    // set up context for RYGB
+    // set up context for RYGB off-screen rendering
     _renderContextRYGB.renderPass = createRenderPass(
         _device->logicalDevice,
         VK_IMAGE_LAYOUT_UNDEFINED,
@@ -265,7 +267,10 @@ void Tetrium::initVulkan()
     createVirtualFrameBuffer(
         _renderContextRYGB.renderPass, _swapChain, _renderContextRYGB.virtualFrameBuffer
     );
+    SCHEDULE_DELETE(clearVirtualFrameBuffer(_renderContextRYGB.virtualFrameBuffer);)
 
+    // set up render pass for rocv transfer
+    // the rocv transfer pass directly paints onto swapchain's FB
     _rocvTransformRenderPass = createRenderPass(
         _device->logicalDevice,
         VK_IMAGE_LAYOUT_UNDEFINED,
