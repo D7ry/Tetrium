@@ -190,7 +190,8 @@ class Tetrium
         VkImageLayout finalLayout,
         VkFormat colorFormat,
         VkAttachmentLoadOp colorLoadOp,
-        VkAttachmentStoreOp colorStoreOp
+        VkAttachmentStoreOp colorStoreOp,
+        bool createDepthAttachment
     );
 
     /* ---------- Physical Device Selection ---------- */

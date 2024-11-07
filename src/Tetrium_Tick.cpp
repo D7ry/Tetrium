@@ -88,23 +88,18 @@ void Tetrium::transformRGYBColorSpace(
     ColorSpace colorSpace
 )
 {
-    // begin transform render pass
-    VkViewport viewport{};
-    VkRect2D scissor{};
-    getFullScreenViewportAndScissor(_swapChain, viewport, scissor);
-
     vk::Extent2D extend = _swapChain.extent;
     vk::Rect2D renderArea(VkOffset2D{0, 0}, extend);
     vk::RenderPassBeginInfo renderPassBeginInfo(
-        {}, {}, renderArea, _clearValues.size(), _clearValues.data(), nullptr
+        _rocvTransformRenderPass,
+        physicalSwapChain.frameBuffer[swapChainImageIndex],
+        renderArea,
+        _clearValues.size(),
+        _clearValues.data(),
+        nullptr
     );
 
-    renderPassBeginInfo.renderPass = _rocvTransformRenderPass;
-    renderPassBeginInfo.framebuffer = _swapChain.frameBuffer[swapChainImageIndex];
-
     CB.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
-    vkCmdSetViewport(CB, 0, 1, &viewport);
-    vkCmdSetScissor(CB, 0, 1, &scissor);
 
     CB.endRenderPass();
 }
@@ -194,7 +189,7 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
             vkCmdSetViewport(CB1, 0, 1, &viewport);
             vkCmdSetScissor(CB1, 0, 1, &scissor);
             // 1. rasterize onto RYGB FB
-            {
+            if (true) {
                 renderPassBeginInfo.renderPass = _renderContextRYGB.renderPass;
                 renderPassBeginInfo.framebuffer
                     = _renderContextRYGB.virtualFrameBuffer.frameBuffer[swapchainImageIndex];
@@ -217,8 +212,13 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frame)
 
             // 3. depending on even-odd, transform RYGB into R000, or OCV0
             // by sampling from RYGB FB and rendering onto a full-screen quad on the FB
-            {
-            }
+            // transformRGYBColorSpace(
+            //     CB1,
+            //     _renderContextRYGB.virtualFrameBuffer,
+            //     _swapChain,
+            //     swapchainImageIndex,
+            //     renderRGB ? ColorSpace::RGB : ColorSpace::OCV
+            // );
 
             // FIXME: imgui should be painted onto RGYB buffer
             // TODO: optionally create 3 imgui passes -- one that goes onto RGYB FB for user-space
