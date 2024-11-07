@@ -191,7 +191,16 @@ class Tetrium
         VkFormat colorFormat,
         VkAttachmentLoadOp colorLoadOp,
         VkAttachmentStoreOp colorStoreOp,
-        bool createDepthAttachment
+        bool createDepthAttachment,
+        VkSubpassDependency dependency = VkSubpassDependency{
+            .srcSubpass = VK_SUBPASS_EXTERNAL, // wait for all previous subpasses
+            .dstSubpass = 0,
+            .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, // what to wait
+            .dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, // what to not execute
+            // we care about src and dst access masks only when there's a potential data race.
+            .srcAccessMask = VK_ACCESS_NONE,
+            .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
+        }
     );
 
     /* ---------- Physical Device Selection ---------- */

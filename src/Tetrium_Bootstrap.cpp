@@ -262,7 +262,7 @@ void Tetrium::initVulkan()
         _swapChain.imageFormat,
         VK_ATTACHMENT_LOAD_OP_CLEAR,
         VK_ATTACHMENT_STORE_OP_STORE,
-        true // want color and depth because virtual frame buffer has color and depth
+        true
     );
     createVirtualFrameBuffer(
         _renderContextRYGB.renderPass, _swapChain, _renderContextRYGB.virtualFrameBuffer
@@ -278,7 +278,19 @@ void Tetrium::initVulkan()
         _swapChain.imageFormat,
         VK_ATTACHMENT_LOAD_OP_CLEAR,
         VK_ATTACHMENT_STORE_OP_STORE,
-        true // want color and depth because swapchain FB has color and depth
+        true,
+        VkSubpassDependency{
+            .srcSubpass = VK_SUBPASS_EXTERNAL, // all previous submitted subpass, in this case it's
+                                               // `_renderContextRYGB.renderPass`
+            .dstSubpass = 0, // first subpass
+            // wait until RYGB pass to paint to the FB to start up fragment shader that handles
+            // RGYB -> RGB/OCV transform
+            // https://www.reddit.com/r/vulkan/comments/s80reu/subpass_dependencies_what_are_those_and_why_do_i/
+            .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            .dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+            .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_SHADER_READ_BIT
+        }
     );
 
     // create framebuffer for swapchain
@@ -1090,6 +1102,7 @@ void Tetrium::bindDefaultInputs()
     );
 }
 
+// https://www.saschawillems.de/blog/2018/07/19/vulkan-input-attachments-and-sub-passes/
 VkRenderPass Tetrium::createRenderPass(
     VkDevice logicalDevice,
     VkImageLayout initialLayout,
@@ -1097,7 +1110,8 @@ VkRenderPass Tetrium::createRenderPass(
     VkFormat colorFormat,
     VkAttachmentLoadOp colorLoadOp,
     VkAttachmentStoreOp colorStoreOp,
-    bool createDepthAttachment
+    bool createDepthAttachment,
+    VkSubpassDependency dependency
 )
 {
     INFO("Creating render pass...");
@@ -1119,16 +1133,6 @@ VkRenderPass Tetrium::createRenderPass(
     if (createDepthAttachment) {
         subpass.pDepthStencilAttachment = &depthAttachmentRef;
     }
-
-    // dependency to make sure that the render pass waits for the image to be
-    // available before drawing
-    VkSubpassDependency dependency{};
-    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-    dependency.dstSubpass = 0;
-    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependency.srcAccessMask = 0;
-    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
     // color, and optionally depth attachments
     VkAttachmentDescription attachments[2];
