@@ -150,13 +150,12 @@ void InitializeFrameBuffer(
     VkDevice device,
     VkExtent2D extent,
     VkRenderPass renderPass,
-    int bufferCount,
-    const std::vector<VkImageView>& swapChainImageViews,
+    const std::vector<VkImageView>& imageView,
     std::vector<VkFramebuffer>& framebuffer
 )
 {
     DEBUG("Creating imgui frame buffers...");
-
+    int bufferCount = imageView.size();
     // FIXME: cleanup
     framebuffer.resize(bufferCount);
     VkImageView attachment[1];
@@ -169,7 +168,7 @@ void InitializeFrameBuffer(
     info.layers = 1;
 
     for (uint32_t i = 0; i < bufferCount; i++) {
-        attachment[0] = swapChainImageViews[i];
+        attachment[0] = imageView[i];
         VK_CHECK_RESULT(vkCreateFramebuffer(device, &info, nullptr, &framebuffer[i]));
     }
     DEBUG("Imgui frame buffers created.");
@@ -276,9 +275,8 @@ void Tetrium::reinitImGuiFrameBuffers(Tetrium::ImGuiRenderContexts& ctx)
         _device->Get(),
         _swapChain.extent,
         ctx.renderPass,
-        _swapChain.numImages,
-        _swapChain.imageView,
-        ctx.frameBuffer
+        _renderContextRYGB.virtualFrameBuffer.imageView,
+        _renderContextRYGB.virtualFrameBuffer.frameBuffer
     );
 }
 
@@ -305,7 +303,7 @@ void Tetrium::initImGuiRenderContext(Tetrium::ImGuiRenderContexts& ctx)
     // create render pass
     VkImageLayout imguiInitialLayout, imguiFinalLayout;
     imguiInitialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    imguiFinalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    imguiFinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; // for RYGB conversion pass
 
     ctx.renderPass = createRenderPass(
         _device->Get(),
@@ -324,8 +322,7 @@ void Tetrium::initImGuiRenderContext(Tetrium::ImGuiRenderContexts& ctx)
         _device->Get(),
         _swapChain.extent,
         ctx.renderPass,
-        _swapChain.numImages,
-        _swapChain.imageView,
+        _renderContextRYGB.virtualFrameBuffer.imageView,
         ctx.frameBuffer
     );
 

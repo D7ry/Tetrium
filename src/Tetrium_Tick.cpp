@@ -180,6 +180,12 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frameIdx)
                 renderRGB = !renderRGB;
             }
 
+            // paint ImGui -- both even and odd context should've been populated.
+            if (renderRGB) {
+                recordImGuiDrawCommandBuffer(_imguiCtx, RGB, CB1, extend, swapchainImageIndex);
+            } else {
+                recordImGuiDrawCommandBuffer(_imguiCtx, OCV, CB1, extend, swapchainImageIndex);
+            }
             // 3. depending on even-odd, transform RYGB into R000, or OCV0
             // by sampling from RYGB FB and rendering onto a full-screen quad on the FB
             transformToROCVframeBuffer(
@@ -191,20 +197,6 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frameIdx)
                 CB1
             );
 
-            // FIXME: imgui should be painted onto RGYB buffer
-            // TODO: optionally create 3 imgui passes -- one that goes onto RGYB FB for user-space
-            // gui frameworking, the other two goes onto RGB/OCV FB for lower-level control of
-            // presented color for debugging.
-            // 4. paint RGB/OCV ImGUI onto R000 / OCV0 image
-            // note that imGUI contexts for both RGB/OCV are populated -- this is to provide
-            // an interface to show raw colors for easy debugging & development
-            {
-                if (renderRGB) {
-                    recordImGuiDrawCommandBuffer(_imguiCtx, RGB, CB1, extend, swapchainImageIndex);
-                } else {
-                    recordImGuiDrawCommandBuffer(_imguiCtx, OCV, CB1, extend, swapchainImageIndex);
-                }
-            }
         }
 
         CB1.end();
