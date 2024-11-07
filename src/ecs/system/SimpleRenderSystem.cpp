@@ -153,7 +153,7 @@ void SimpleRenderSystem::buildPipelineForContext(
         descriptorWrites[0].dstArrayElement = 0;
         descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         descriptorWrites[0].descriptorCount = 1;
-        descriptorWrites[0].pBufferInfo = engineUboInfo.data();
+        descriptorWrites[0].pBufferInfo = &engineUboInfo.at(i);
 
         vkUpdateDescriptorSets(
             _device->logicalDevice, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr

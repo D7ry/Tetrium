@@ -83,7 +83,7 @@ void TetraImageDisplaySystem::buildPipelineForContext(
         descriptorWrites[0].dstArrayElement = 0;
         descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         descriptorWrites[0].descriptorCount = 1;
-        descriptorWrites[0].pBufferInfo = engineUboInfo.data();
+        descriptorWrites[0].pBufferInfo = &engineUboInfo.at(i);
 
         descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         descriptorWrites[1].dstSet = ctx._descriptorSets[i];
@@ -91,7 +91,7 @@ void TetraImageDisplaySystem::buildPipelineForContext(
         descriptorWrites[1].dstArrayElement = 0;
         descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         descriptorWrites[1].descriptorCount = 1;
-        descriptorWrites[1].pBufferInfo = systemUboInfo.data();
+        descriptorWrites[1].pBufferInfo = &systemUboInfo.at(i);
 
         vkUpdateDescriptorSets(
             _device->logicalDevice, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr

@@ -16,8 +16,8 @@ enum class BindingLocation : unsigned int
 struct SystemUBOStatic
 {
     glm::mat4 transformMat; // 4x4 transform matrix
-    int frameBufferIdx;
-    int toRGB; // toOCV = !toRGB;
+    int frameBufferIdx;     // which frame in the sampler array to choose from
+    int toRGB;              // toOCV = !toRGB;
 };
 
 VkDescriptorSetLayout _descriptorSetLayout = VK_NULL_HANDLE;
@@ -152,12 +152,6 @@ void createGraphicsPipeline(
         }
     }
 
-    std::array<VkDescriptorBufferInfo, NUM_FRAME_IN_FLIGHT> systemUboInfo;
-    for (int i = 0; i < _systemUBO.size(); i++) {
-        systemUboInfo[i].range = sizeof(SystemUBOStatic);
-        systemUboInfo[i].buffer = _systemUBO[i].buffer;
-        systemUboInfo[i].offset = 0;
-    }
     // update descriptor sets
     for (size_t i = 0; i < NUM_FRAME_IN_FLIGHT; i++) {
         std::array<VkWriteDescriptorSet, 3> descriptorWrites{};
@@ -167,7 +161,12 @@ void createGraphicsPipeline(
         descriptorWrites[0].dstArrayElement = 0;
         descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         descriptorWrites[0].descriptorCount = 1;
-        descriptorWrites[0].pBufferInfo = engineInitCtx->engineUBOStaticDescriptorBufferInfo.data();
+        descriptorWrites[0].pBufferInfo = &engineInitCtx->engineUBOStaticDescriptorBufferInfo.at(i);
+
+        VkDescriptorBufferInfo systemUboInfo{};
+        systemUboInfo.range = sizeof(SystemUBOStatic);
+        systemUboInfo.buffer = _systemUBO[i].buffer;
+        systemUboInfo.offset = 0;
 
         descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         descriptorWrites[1].dstSet = descriptorSets[i];
@@ -175,7 +174,7 @@ void createGraphicsPipeline(
         descriptorWrites[1].dstArrayElement = 0;
         descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         descriptorWrites[1].descriptorCount = 1;
-        descriptorWrites[1].pBufferInfo = systemUboInfo.data();
+        descriptorWrites[1].pBufferInfo = &systemUboInfo;
 
         std::vector<VkDescriptorImageInfo> imageInfo(rgybFrameBufferImageView.size());
         for (int i = 0; i < rgybFrameBufferImageView.size(); i++) {
