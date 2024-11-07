@@ -24,8 +24,8 @@ void main() {
         // [R, 0, 0, 0]
         outColor = vec4(colorROCV.x, 0, 0, 0);
     } else { // toOCV
-        // [0, O, C, V]
-        outColor = vec4(0, colorROCV.y, colorROCV.z, colorROCV.w);
+        // [O, C, V, 0]
+        outColor = vec4(colorROCV.yzw, 0);
     }
 
 }

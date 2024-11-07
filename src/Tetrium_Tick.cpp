@@ -175,7 +175,8 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frameIdx)
             // even/odd frame representation based on the current frame's even-oddness.
 
             // 2. get even-odd info
-            bool renderRGB = isEvenFrame();
+            bool isEven = isEvenFrame();
+            bool renderRGB = isEven;
             if (_flipEvenOdd) {
                 renderRGB = !renderRGB;
             }
@@ -194,9 +195,10 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frameIdx)
                 frameIdx,
                 swapchainImageIndex,
                 renderRGB ? ColorSpace::RGB : ColorSpace::OCV,
-                CB1
+                CB1,
+                (isEven && _evenOddRenderingSettings.blackOutEven)
+                    || (!isEven && _evenOddRenderingSettings.blackOutOdd)
             );
-
         }
 
         CB1.end();

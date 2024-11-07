@@ -271,7 +271,8 @@ class Tetrium
         uint32_t frameIdx,
         uint32_t swapChainImageIndex,
         ColorSpace colorSpace,
-        vk::CommandBuffer CB
+        vk::CommandBuffer CB,
+        bool skip
     );
 
     /* ---------- Even-Odd frame ---------- */
@@ -389,6 +390,11 @@ class Tetrium
         uint32_t numDroppedFrames = 0;
         bool currShouldBeEven = true;
     } _evenOddDebugCtx;
+
+    struct {
+        bool blackOutEven = false;
+        bool blackOutOdd = false;
+    } _evenOddRenderingSettings;
 
     /* ---------- Engine Components ---------- */
     DeletionStack _deletionStack;

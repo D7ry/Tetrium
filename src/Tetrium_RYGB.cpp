@@ -481,7 +481,8 @@ void Tetrium::transformToROCVframeBuffer(
     uint32_t frameIdx,
     uint32_t swapChainImageIndex,
     ColorSpace colorSpace,
-    vk::CommandBuffer CB
+    vk::CommandBuffer CB,
+    bool skip
 )
 {
     Tetrium_RYGB::flushSystemUBO(frameIdx, swapChainImageIndex, colorSpace == RGB ? 1 : 0);
@@ -528,19 +529,21 @@ void Tetrium::transformToROCVframeBuffer(
 
     CB.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
 
-    CB.bindPipeline(vk::PipelineBindPoint::eGraphics, Tetrium_RYGB::pipeline);
-    vkCmdBindDescriptorSets(
-        CB,
-        VK_PIPELINE_BIND_POINT_GRAPHICS,
-        Tetrium_RYGB::pipelineLayout,
-        0,
-        1,
-        &Tetrium_RYGB::descriptorSets[frameIdx],
-        0,
-        nullptr
-    );
+    if (!skip) {
+        CB.bindPipeline(vk::PipelineBindPoint::eGraphics, Tetrium_RYGB::pipeline);
+        vkCmdBindDescriptorSets(
+            CB,
+            VK_PIPELINE_BIND_POINT_GRAPHICS,
+            Tetrium_RYGB::pipelineLayout,
+            0,
+            1,
+            &Tetrium_RYGB::descriptorSets[frameIdx],
+            0,
+            nullptr
+        );
 
-    vkCmdDraw(CB, 3, 1, 0, 0);
+        vkCmdDraw(CB, 3, 1, 0, 0);
+    }
 
     CB.endRenderPass();
 }

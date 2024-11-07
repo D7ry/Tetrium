@@ -113,7 +113,7 @@ void Tetrium::initDefaultStates()
     // configure states
 
     // clear color
-    _clearValues[0].color = {0.5f, 0.3f, 0.1f, 1.f};
+    _clearValues[0].color = {0.0f, 0.0f, 0.0f, 1.f};
     _clearValues[1].depthStencil = vk::ClearDepthStencilValue(1.f, 0.f);
 
     // camera location
