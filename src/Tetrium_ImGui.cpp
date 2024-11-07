@@ -272,11 +272,6 @@ void initFonts()
 
 void Tetrium::reinitImGuiFrameBuffers(Tetrium::ImGuiRenderContexts& ctx)
 {
-    for (auto framebuffer : {&ctx.frameBuffers[RGB], &ctx.frameBuffers[OCV]}) {
-        for (auto fb : *framebuffer) {
-            vkDestroyFramebuffer(_device->logicalDevice, fb, nullptr);
-        }
-    }
     Tetrium_ImGui::InitializeFrameBuffer(
         _device->Get(),
         _swapChain.extent,
@@ -296,11 +291,6 @@ void Tetrium::destroyImGuiContext(Tetrium::ImGuiRenderContexts& ctx)
     ImGui_ImplGlfw_Shutdown();
     ImPlot::DestroyContext();
     ImGui::DestroyContext();
-    for (ColorSpace cs : {RGB, OCV}) {
-        for (VkFramebuffer fb : ctx.frameBuffers[cs]) {
-            vkDestroyFramebuffer(_device->logicalDevice, fb, nullptr);
-        }
-    }
 
     for (VkFramebuffer fb : ctx.frameBuffer) {
         vkDestroyFramebuffer(_device->logicalDevice, fb, nullptr);

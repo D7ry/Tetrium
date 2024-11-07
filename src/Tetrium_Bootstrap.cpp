@@ -200,9 +200,9 @@ void Tetrium::Init(const Tetrium::InitOptions& options)
         }
     }
 
-    _rgbyRenderers.imageDisplay.Init(&initCtx);
-    _deletionStack.push([this]() { _rgbyRenderers.imageDisplay.Cleanup(); });
-    _rgbyRenderers.imageDisplay.LoadTexture("../assets/textures/spot.png"); // just for testing
+    // _rgbyRenderers.imageDisplay.Init(&initCtx);
+    // _deletionStack.push([this]() { _rgbyRenderers.imageDisplay.Cleanup(); });
+    // _rgbyRenderers.imageDisplay.LoadTexture("../assets/textures/spot.png"); // just for testing
 
     initRYGB2ROCVTransform(&initCtx);
     SCHEDULE_DELETE(cleanupRYGB2ROCVTransform();)

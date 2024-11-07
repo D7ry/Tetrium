@@ -166,7 +166,7 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frameIdx)
 
                 CB1.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
 
-                _rgbyRenderers.imageDisplay.Tick(ctx, "../assets/textures/spot.png");
+                // _rgbyRenderers.imageDisplay.Tick(ctx, "../assets/textures/spot.png");
 
                 CB1.endRenderPass();
             }

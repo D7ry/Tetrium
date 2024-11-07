@@ -163,7 +163,6 @@ class Tetrium
         VkRenderPass renderPass;
         VkDescriptorPool descriptorPool;
         std::unordered_map<std::string, ImGuiTexture> textures;
-        [[deprecated]] std::vector<VkFramebuffer> frameBuffers[ColorSpace::ColorSpaceSize];
         std::vector<VkFramebuffer> frameBuffer;
         ImGuiContext* ctxImGui[ColorSpace::ColorSpaceSize] = {};
         ImPlotContext* ctxImPlot[ColorSpace::ColorSpaceSize] = {};
@@ -423,6 +422,6 @@ class Tetrium
 
     struct
     {
-        TetraImageDisplaySystem imageDisplay;
+        [[deprecated]] TetraImageDisplaySystem imageDisplay;
     } _rgbyRenderers;
 };

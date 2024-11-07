@@ -453,6 +453,7 @@ void Init(const InitContext* ctx, const std::vector<VkImageView>& rgybFrameBuffe
 
 void Cleanup()
 {
+    INFO("Cleanup RYGB");
     cleanupSystemUBO();
     cleanupGraphicsPipeline();
     cleanupFramebufferSampler();
