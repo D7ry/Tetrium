@@ -6,7 +6,8 @@ layout(binding = 1) uniform SystemUBOStatic {
     int toRGB; // only takes on value of 0 and 1
 } systemUBOStatic;
 
-layout(binding = 2) uniform sampler2D rygbFrameBufferSampler[3];
+// samplers that samples frame buffer from RYGB pass
+layout(binding = 2) uniform sampler2D rygbFrameBufferSampler[10]; // may not use all samplers
 
 layout(location = 0) out vec4 outColor;
 

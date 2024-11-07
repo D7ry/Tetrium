@@ -85,7 +85,7 @@ void createGraphicsPipeline(
     }
     { // framebuffer texture sampler -- fragment
         samplerLayoutBinding.binding = (int)BindingLocation::FRAMEBUFFER_TEXTURE_SAMPLER;
-        samplerLayoutBinding.descriptorCount = rgybFrameBufferImageView.size();
+        samplerLayoutBinding.descriptorCount = 10;
         samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
         samplerLayoutBinding.pImmutableSamplers = nullptr;
