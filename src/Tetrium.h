@@ -254,12 +254,14 @@ class Tetrium
         VkRect2D& scissor
     );
 
-    void transformRGYBColorSpace(
-        vk::CommandBuffer CB,
+    void initRYGB2ROCVTransform();
+
+    void transformToROCVframeBuffer(
         VirtualFrameBuffer& rgybFrameBuffer,
-        SwapChainContext& physicalSwapChain,
+        SwapChainContext& rocvSwapChain,
         uint32_t swapChainImageIndex,
-        ColorSpace colorSpace
+        ColorSpace colorSpace,
+        vk::CommandBuffer CB
     );
 
     /* ---------- Even-Odd frame ---------- */
@@ -413,4 +415,3 @@ class Tetrium
         TetraImageDisplaySystem imageDisplay;
     } _rgbyRenderers;
 };
-

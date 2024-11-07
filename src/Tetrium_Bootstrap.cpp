@@ -979,7 +979,7 @@ void Tetrium::clearVirtualFrameBuffer(VirtualFrameBuffer& vfb)
     }
 }
 
-void Tetrium::createSwapchainFrameBuffers(SwapChainContext& ctx, VkRenderPass rgbOrOcvPass)
+void Tetrium::createSwapchainFrameBuffers(SwapChainContext& ctx, VkRenderPass renderPass)
 {
     DEBUG("Creating framebuffers..");
     // iterate through image views and create framebuffers
@@ -989,7 +989,7 @@ void Tetrium::createSwapchainFrameBuffers(SwapChainContext& ctx, VkRenderPass rg
         framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         // NOTE: framebuffer DOES NOT need to have a dedicated render pass,
         // just need to be compatible. Therefore we pass either RGB&OCV pass
-        framebufferInfo.renderPass = rgbOrOcvPass;
+        framebufferInfo.renderPass = renderPass;
         framebufferInfo.attachmentCount = sizeof(attachments) / sizeof(VkImageView);
         framebufferInfo.pAttachments = attachments;
         framebufferInfo.width = ctx.extent.width;
@@ -1102,10 +1102,10 @@ VkRenderPass Tetrium::createRenderPass(
 {
     INFO("Creating render pass...");
 
-    // set up subpass
+    // set up color/depth layout
     VkAttachmentReference colorAttachmentRef{};
     colorAttachmentRef.attachment = 0;
-    colorAttachmentRef.layout = initialLayout;
+    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
     // depth attachment ref for subpass, only used when `createDepthAttachment` is true
     VkAttachmentReference depthAttachmentRef{};

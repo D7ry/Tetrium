@@ -66,6 +66,7 @@ add_executable(${PROJECT_NAME}
         src/Tetrium_Windowing.cpp
         src/Tetrium_Config.cpp
         src/Tetrium_ImGui.cpp
+        src/Tetrium_RYGB.cpp
         src/components/TaskQueue.cpp
         src/components/Logging.cpp
         src/components/ShaderUtils.cpp
