@@ -278,7 +278,8 @@ void Tetrium::initVulkan()
     _rocvTransformRenderPass = createRenderPass(
         _device->logicalDevice,
         VK_IMAGE_LAYOUT_UNDEFINED,
-        VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, // ImGui pass runs after
+        //VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
         _swapChain.imageFormat,
         VK_ATTACHMENT_LOAD_OP_CLEAR,
         VK_ATTACHMENT_STORE_OP_STORE,

@@ -275,8 +275,11 @@ void Tetrium::reinitImGuiFrameBuffers(Tetrium::ImGuiRenderContexts& ctx)
         _device->Get(),
         _swapChain.extent,
         ctx.renderPass,
-        _renderContextRYGB.virtualFrameBuffer.imageView,
-        _renderContextRYGB.virtualFrameBuffer.frameBuffer
+        // paint directly to swapchain images
+        _swapChain.imageView,
+        _swapChain.frameBuffer
+        // _renderContextRYGB.virtualFrameBuffer.imageView,
+        // _renderContextRYGB.virtualFrameBuffer.frameBuffer
     );
 }
 
@@ -303,7 +306,8 @@ void Tetrium::initImGuiRenderContext(Tetrium::ImGuiRenderContexts& ctx)
     // create render pass
     VkImageLayout imguiInitialLayout, imguiFinalLayout;
     imguiInitialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    imguiFinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; // for RYGB conversion pass
+    //imguiFinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; // for RYGB conversion pass, if run imgui pass before
+    imguiFinalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR; // if painting to physical fb
 
     ctx.renderPass = createRenderPass(
         _device->Get(),
@@ -322,7 +326,8 @@ void Tetrium::initImGuiRenderContext(Tetrium::ImGuiRenderContexts& ctx)
         _device->Get(),
         _swapChain.extent,
         ctx.renderPass,
-        _renderContextRYGB.virtualFrameBuffer.imageView,
+        //_renderContextRYGB.virtualFrameBuffer.imageView,
+        _swapChain.imageView, // render directly to swapchain
         ctx.frameBuffer
     );
 

@@ -503,18 +503,18 @@ void Tetrium::transformToROCVframeBuffer(
     barrier.subresourceRange.baseArrayLayer = 0;
     barrier.subresourceRange.layerCount = 1;
 
-    // vkCmdPipelineBarrier(
-    //     CB,
-    //     VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-    //     VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-    //     0,
-    //     0,
-    //     nullptr,
-    //     0,
-    //     nullptr,
-    //     1,
-    //     &barrier
-    // );
+    vkCmdPipelineBarrier(
+        CB,
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+        0,
+        0,
+        nullptr,
+        0,
+        nullptr,
+        1,
+        &barrier
+    );
 
     vk::Extent2D extend = _swapChain.extent;
     vk::Rect2D renderArea(VkOffset2D{0, 0}, extend);

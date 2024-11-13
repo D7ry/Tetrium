@@ -181,12 +181,6 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frameIdx)
                 renderRGB = !renderRGB;
             }
 
-            // paint ImGui -- both even and odd context should've been populated.
-            if (renderRGB) {
-                recordImGuiDrawCommandBuffer(_imguiCtx, RGB, CB1, extend, swapchainImageIndex);
-            } else {
-                recordImGuiDrawCommandBuffer(_imguiCtx, OCV, CB1, extend, swapchainImageIndex);
-            }
             // 3. depending on even-odd, transform RYGB into R000, or OCV0
             // by sampling from RYGB FB and rendering onto a full-screen quad on the FB
             transformToROCVframeBuffer(
@@ -199,6 +193,13 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frameIdx)
                 (isEven && _evenOddRenderingSettings.blackOutEven)
                     || (!isEven && _evenOddRenderingSettings.blackOutOdd)
             );
+
+            // paint ImGui -- both even and odd context should've been populated.
+            if (renderRGB) {
+                recordImGuiDrawCommandBuffer(_imguiCtx, RGB, CB1, extend, swapchainImageIndex);
+            } else {
+                recordImGuiDrawCommandBuffer(_imguiCtx, OCV, CB1, extend, swapchainImageIndex);
+            }
         }
 
         CB1.end();
