@@ -33,29 +33,32 @@
 #if __linux__
 #endif // __linux__
 
+#define SCHEDULE_DELETE(...) this->_deletionStack.push([this]() { __VA_ARGS__ });
+
 #define VIRTUAL_VSYNC 0
 
 // creates a cow for now
 void Tetrium::createFunnyObjects()
 {
     // lil cow
-    Entity* spot = new Entity("Spot");
+    // Entity* spot = new Entity("Spot");
+    //
+    // std::string textures[ColorSpaceSize]
+    //     = {(DIRECTORIES::ASSETS + "textures/spot.png"), (DIRECTORIES::ASSETS +
+    //     "textures/spot.png")
+    //     };
 
-    std::string textures[ColorSpaceSize]
-        = {(DIRECTORIES::ASSETS + "textures/spot.png"), (DIRECTORIES::ASSETS + "textures/spot.png")
-        };
-
-    auto meshInstance
-        = _renderer.MakeMeshInstanceComponent(DIRECTORIES::ASSETS + "models/spot.obj", textures);
+    // auto meshInstance
+    //     = _renderer.MakeMeshInstanceComponent(DIRECTORIES::ASSETS + "models/spot.obj", textures);
 
     // give the lil cow a mesh
-    spot->AddComponent(meshInstance);
+    // spot->AddComponent(meshInstance);
     // give the lil cow a transform
-    spot->AddComponent(new TransformComponent());
-    _renderer.AddEntity(spot);
-    spot->GetComponent<TransformComponent>()->rotation.x = 90;
-    spot->GetComponent<TransformComponent>()->rotation.y = 90;
-    spot->GetComponent<TransformComponent>()->position.z = 0.05;
+    // spot->AddComponent(new TransformComponent());
+    // _renderer.AddEntity(spot);
+    // spot->GetComponent<TransformComponent>()->rotation.x = 90;
+    // spot->GetComponent<TransformComponent>()->rotation.y = 90;
+    // spot->GetComponent<TransformComponent>()->position.z = 0.05;
     // register lil cow
 }
 
@@ -110,7 +113,7 @@ void Tetrium::initDefaultStates()
     // configure states
 
     // clear color
-    _clearValues[0].color = {0.5f, 0.3f, 0.1f, 1.f};
+    _clearValues[0].color = {0.0f, 0.0f, 0.0f, 1.f};
     _clearValues[1].depthStencil = vk::ClearDepthStencilValue(1.f, 0.f);
 
     // camera location
@@ -188,8 +191,8 @@ void Tetrium::Init(const Tetrium::InitOptions& options)
         initCtx.device = this->_device.get();
         initCtx.textureManager = &_textureManager;
         initCtx.swapChainImageFormat = _swapChain.imageFormat;
-        initCtx.renderPasses[RGB] = _renderContexts[RGB].renderPass;
-        initCtx.renderPasses[OCV] = _renderContexts[OCV].renderPass;
+        initCtx.rygbRenderPass = _renderContextRYGB.renderPass;
+        initCtx.rocvTransformRenderPass = _rocvTransformRenderPass;
         for (int i = 0; i < _engineUBOStatic.size(); i++) {
             initCtx.engineUBOStaticDescriptorBufferInfo[i].range = sizeof(EngineUBOStatic);
             initCtx.engineUBOStaticDescriptorBufferInfo[i].buffer = _engineUBOStatic[i].buffer;
@@ -197,8 +200,12 @@ void Tetrium::Init(const Tetrium::InitOptions& options)
         }
     }
 
-    _renderer.Init(&initCtx);
-    _deletionStack.push([this]() { _renderer.Cleanup(); });
+    // _rgbyRenderers.imageDisplay.Init(&initCtx);
+    // _deletionStack.push([this]() { _rgbyRenderers.imageDisplay.Cleanup(); });
+    // _rgbyRenderers.imageDisplay.LoadTexture("../assets/textures/spot.png"); // just for testing
+
+    initRYGB2ROCVTransform(&initCtx);
+    SCHEDULE_DELETE(cleanupRYGB2ROCVTransform();)
 
     initDefaultStates();
 
@@ -251,33 +258,51 @@ void Tetrium::initVulkan()
     ASSERT(_swapChain.imageFormat);
     createDepthBuffer(_swapChain);
 
-    // create context for rgb and ocv rendering
-    for (ColorSpace cs : {ColorSpace::RGB, ColorSpace::OCV}) {
-        RenderContext* ctx = &_renderContexts[cs];
-        ctx->renderPass = createRenderPass(_swapChain.imageFormat);
-        createVirtualFrameBuffer(ctx->renderPass, _swapChain, ctx->virtualFrameBuffer);
-        _deletionStack.push([this, ctx] {
-            vkDestroyRenderPass(_device->logicalDevice, ctx->renderPass, NULL);
-            clearVirtualFrameBuffer(ctx->virtualFrameBuffer);
-        });
-    }
+    // set up context for RYGB off-screen rendering
+    _renderContextRYGB.renderPass = createRenderPass(
+        _device->logicalDevice,
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        _swapChain.imageFormat,
+        VK_ATTACHMENT_LOAD_OP_CLEAR,
+        VK_ATTACHMENT_STORE_OP_STORE,
+        true
+    );
+    createVirtualFrameBuffer(
+        _renderContextRYGB.renderPass, _swapChain, _renderContextRYGB.virtualFrameBuffer
+    );
+    SCHEDULE_DELETE(clearVirtualFrameBuffer(_renderContextRYGB.virtualFrameBuffer);)
+
+    // set up render pass for rocv transfer
+    // the rocv transfer pass directly paints onto swapchain's FB
+    _rocvTransformRenderPass = createRenderPass(
+        _device->logicalDevice,
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, // ImGui pass runs after
+        //VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+        _swapChain.imageFormat,
+        VK_ATTACHMENT_LOAD_OP_CLEAR,
+        VK_ATTACHMENT_STORE_OP_STORE,
+        true,
+        VkSubpassDependency{
+            .srcSubpass = VK_SUBPASS_EXTERNAL, // all previous submitted subpass, in this case it's
+                                               // `_renderContextRYGB.renderPass`
+            .dstSubpass = 0,                   // first subpass
+            // wait until RYGB pass to paint to the FB to start up fragment shader that handles
+            // RGYB -> RGB/OCV transform
+            // https://www.reddit.com/r/vulkan/comments/s80reu/subpass_dependencies_what_are_those_and_why_do_i/
+            .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            .dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+            .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_SHADER_READ_BIT
+        }
+    );
 
     // create framebuffer for swapchain
-    createSwapchainFrameBuffers(_swapChain, _renderContexts[0].renderPass);
-
+    createSwapchainFrameBuffers(_swapChain, _rocvTransformRenderPass);
     _deletionStack.push([this] { cleanupSwapChain(_swapChain); });
 
     this->createSynchronizationObjects(_syncProjector);
-
-    // initial layout comes from separate render passes,
-    // final layout depends on tetra mode.
-    VkImageLayout imguiInitialLayout, imguiFinalLayout;
-    imguiInitialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    imguiFinalLayout
-        = _tetraMode == TetraMode::kDualProjector
-              ? VK_IMAGE_LAYOUT_PRESENT_SRC_KHR       // dual project's two passes directly present
-              : VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL; // virtual fb to be finally transferred to
-                                                      // swapchain
 
     initImGuiRenderContext(_imguiCtx);
     this->_deletionStack.push([this]() { destroyImGuiContext(_imguiCtx); });
@@ -665,10 +690,7 @@ void Tetrium::cleanupSwapChain(SwapChainContext& ctx)
 
 void Tetrium::recreateVirtualFrameBuffers()
 {
-    for (RenderContext* ctx : {&_renderContexts[RGB], &_renderContexts[OCV]}) {
-        clearVirtualFrameBuffer(ctx->virtualFrameBuffer);
-        createVirtualFrameBuffer(ctx->renderPass, _swapChain, ctx->virtualFrameBuffer);
-    }
+    // FIXME: add RYGB framebuffer recreation
 
     // imgui's fb are associated with render contexts, so initialize them here
     reinitImGuiFrameBuffers(_imguiCtx);
@@ -693,7 +715,7 @@ void Tetrium::recreateSwapChain(SwapChainContext& ctx)
     this->createSwapChain(ctx, ctx.surface);
     this->createImageViews(ctx);
     this->createDepthBuffer(ctx);
-    this->createSwapchainFrameBuffers(ctx, _renderContexts[RGB].renderPass);
+    this->createSwapchainFrameBuffers(ctx, _rocvTransformRenderPass);
     DEBUG("Swap chain recreated.");
 }
 
@@ -845,81 +867,6 @@ void Tetrium::Cleanup()
     INFO("Resource cleaned up.");
 }
 
-// create a render pass. The render pass will be pushed onto
-// the deletion stack.
-vk::RenderPass Tetrium::createRenderPass(const VkFormat imageFormat)
-{
-    DEBUG("Creating render pass...");
-    VkAttachmentDescription colorAttachment{};
-    colorAttachment.format = imageFormat;
-    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-
-    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-
-    // don't care about stencil
-    colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-
-    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-
-    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-    VkAttachmentReference colorAttachmentRef{};
-    colorAttachmentRef.attachment = 0;
-    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-    VkAttachmentDescription depthAttachment{};
-    depthAttachment.format = VulkanUtils::findDepthFormat(_device->physicalDevice);
-    depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-    depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-    VkAttachmentReference depthAttachmentRef{};
-    depthAttachmentRef.attachment = 1;
-    depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-    // set up subpass
-
-    VkSubpassDescription subpass{};
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &colorAttachmentRef;
-    subpass.pDepthStencilAttachment = &depthAttachmentRef;
-
-    // dependency to make sure that the render pass waits for the image to
-    // be available before drawing
-    VkSubpassDependency dependency{};
-    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-    dependency.dstSubpass = 0;
-    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
-                              | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-    dependency.srcAccessMask = 0;
-    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
-                              | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-    dependency.dstAccessMask
-        = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-
-    std::array<VkAttachmentDescription, 2> attachments = {colorAttachment, depthAttachment};
-
-    VkRenderPassCreateInfo renderPassInfo{};
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-    renderPassInfo.pAttachments = attachments.data();
-    renderPassInfo.subpassCount = 1;
-    renderPassInfo.pSubpasses = &subpass;
-    renderPassInfo.dependencyCount = 1;
-    renderPassInfo.pDependencies = &dependency;
-
-    VkRenderPass pass = VK_NULL_HANDLE;
-    VK_CHECK_RESULT(vkCreateRenderPass(_device->logicalDevice, &renderPassInfo, nullptr, &pass));
-
-    return vk::RenderPass(pass);
-}
-
 uint32_t findMemoryType(
     VkPhysicalDevice physicalDevice,
     uint32_t typeFilter,
@@ -967,7 +914,7 @@ void Tetrium::createVirtualFrameBuffer(
         imageInfo.format = swapChain.imageFormat;
         imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
         imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+        imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
         imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
         imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
@@ -1049,7 +996,7 @@ void Tetrium::clearVirtualFrameBuffer(VirtualFrameBuffer& vfb)
     }
 }
 
-void Tetrium::createSwapchainFrameBuffers(SwapChainContext& ctx, VkRenderPass rgbOrOcvPass)
+void Tetrium::createSwapchainFrameBuffers(SwapChainContext& ctx, VkRenderPass renderPass)
 {
     DEBUG("Creating framebuffers..");
     // iterate through image views and create framebuffers
@@ -1059,7 +1006,7 @@ void Tetrium::createSwapchainFrameBuffers(SwapChainContext& ctx, VkRenderPass rg
         framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         // NOTE: framebuffer DOES NOT need to have a dedicated render pass,
         // just need to be compatible. Therefore we pass either RGB&OCV pass
-        framebufferInfo.renderPass = rgbOrOcvPass;
+        framebufferInfo.renderPass = renderPass;
         framebufferInfo.attachmentCount = sizeof(attachments) / sizeof(VkImageView);
         framebufferInfo.pAttachments = attachments;
         framebufferInfo.width = ctx.extent.width;
@@ -1158,4 +1105,90 @@ void Tetrium::bindDefaultInputs()
             }
         }
     );
+}
+
+// https://www.saschawillems.de/blog/2018/07/19/vulkan-input-attachments-and-sub-passes/
+VkRenderPass Tetrium::createRenderPass(
+    VkDevice logicalDevice,
+    VkImageLayout initialLayout,
+    VkImageLayout finalLayout,
+    VkFormat colorFormat,
+    VkAttachmentLoadOp colorLoadOp,
+    VkAttachmentStoreOp colorStoreOp,
+    bool createDepthAttachment,
+    VkSubpassDependency dependency
+)
+{
+    INFO("Creating render pass...");
+
+    // set up color/depth layout
+    VkAttachmentReference colorAttachmentRef{};
+    colorAttachmentRef.attachment = 0;
+    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    // depth attachment ref for subpass, only used when `createDepthAttachment` is true
+    VkAttachmentReference depthAttachmentRef{};
+    depthAttachmentRef.attachment = 1;
+    depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+    VkSubpassDescription subpass{};
+    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass.colorAttachmentCount = 1;
+    subpass.pColorAttachments = &colorAttachmentRef;
+    if (createDepthAttachment) {
+        subpass.pDepthStencilAttachment = &depthAttachmentRef;
+    }
+
+    // color, and optionally depth attachments
+    VkAttachmentDescription attachments[2];
+    uint32_t attachmentCount = 1; // by default only have color attachment
+    // create color attachment
+    {
+        VkAttachmentDescription& colorAttachment = attachments[0];
+        colorAttachment = {};
+        colorAttachment.format = colorFormat;
+        colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+
+        colorAttachment.loadOp = colorLoadOp;
+        colorAttachment.storeOp = colorStoreOp;
+
+        // don't care about stencil
+        colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+
+        colorAttachment.initialLayout = initialLayout;
+        colorAttachment.finalLayout = finalLayout;
+    }
+    // add in depth attachment when `createDepthAttachment` is set to true
+    // we have already specified above to have depthAttachmentRef for subpass creation
+    if (createDepthAttachment) {
+        VkAttachmentDescription& depthAttachment = attachments[1];
+        depthAttachment = {};
+        depthAttachment = VkAttachmentDescription{};
+        depthAttachment.format = VulkanUtils::findDepthFormat(_device->physicalDevice);
+        depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+        depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        attachmentCount = 2; // update attachment count
+    }
+
+    VkRenderPassCreateInfo renderPassInfo{};
+    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    renderPassInfo.pAttachments = attachments;
+    renderPassInfo.attachmentCount = attachmentCount;
+    renderPassInfo.subpassCount = 1;
+    renderPassInfo.pSubpasses = &subpass;
+    renderPassInfo.dependencyCount = 1;
+    renderPassInfo.pDependencies = &dependency;
+
+    VkRenderPass renderPass;
+    if (vkCreateRenderPass(logicalDevice, &renderPassInfo, nullptr, &renderPass) != VK_SUCCESS) {
+        FATAL("Failed to create render pass!");
+    }
+    INFO("render pass created");
+    return renderPass;
 }

@@ -38,7 +38,8 @@ struct InitContext
     VkFormat swapChainImageFormat;
     TextureManager* textureManager;
 
-    VkRenderPass renderPasses[ColorSpace::ColorSpaceSize];
+    VkRenderPass rygbRenderPass;
+    VkRenderPass rocvTransformRenderPass;
 
     /**
      * points to initialized buffer of static engine ubo

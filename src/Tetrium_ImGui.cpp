@@ -146,81 +146,18 @@ void setupCustomCallbacks(GLFWwindow* window)
     GLFW::prevCallbacks.Monitor = glfwSetMonitorCallback(GLFW::ImGuiCustomMonitorCallback);
 }
 
-VkRenderPass createRenderPass(
-    VkDevice logicalDevice,
-    VkFormat swapChainImageFormat,
-    VkImageLayout initialLayout,
-    VkImageLayout finalLayout
-)
-{
-    INFO("Creating render pass...");
-    VkAttachmentDescription colorAttachment{};
-    colorAttachment.format = swapChainImageFormat;
-    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-
-    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD; // load from previou pass
-    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-
-    // don't care about stencil
-    colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-
-    colorAttachment.initialLayout = initialLayout;
-    colorAttachment.finalLayout = finalLayout;
-
-    // set up subpass
-    VkAttachmentReference colorAttachmentRef{};
-    colorAttachmentRef.attachment = 0;
-    colorAttachmentRef.layout = initialLayout;
-
-    VkSubpassDescription subpass{};
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &colorAttachmentRef;
-
-    // dependency to make sure that the render pass waits for the image to be
-    // available before drawing
-    VkSubpassDependency dependency{};
-    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-    dependency.dstSubpass = 0;
-    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependency.srcAccessMask = 0;
-    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-
-    VkRenderPassCreateInfo renderPassInfo{};
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    renderPassInfo.attachmentCount = 1;
-    renderPassInfo.pAttachments = &colorAttachment;
-    renderPassInfo.subpassCount = 1;
-    renderPassInfo.pSubpasses = &subpass;
-    renderPassInfo.dependencyCount = 1;
-    renderPassInfo.pDependencies = &dependency;
-
-    VkRenderPass renderPass;
-    if (vkCreateRenderPass(logicalDevice, &renderPassInfo, nullptr, &renderPass) != VK_SUCCESS) {
-        FATAL("Failed to create render pass!");
-    }
-    return renderPass;
-}
-
 void InitializeFrameBuffer(
     VkDevice device,
     VkExtent2D extent,
     VkRenderPass renderPass,
-    int bufferCount,
-    const std::vector<VkImageView>& swapChainImageViewsRGB,
-    const std::vector<VkImageView>& swapChainImageViewsOCV,
-    std::vector<VkFramebuffer>& framebufferRGB,
-    std::vector<VkFramebuffer>& framebufferOCV
+    const std::vector<VkImageView>& imageView,
+    std::vector<VkFramebuffer>& framebuffer
 )
 {
     DEBUG("Creating imgui frame buffers...");
-    ASSERT(swapChainImageViewsRGB.size() == bufferCount);
-    ASSERT(swapChainImageViewsOCV.size() == bufferCount);
-
-    framebufferRGB.resize(bufferCount);
-    framebufferOCV.resize(bufferCount);
+    int bufferCount = imageView.size();
+    // FIXME: cleanup
+    framebuffer.resize(bufferCount);
     VkImageView attachment[1];
     VkFramebufferCreateInfo info = {};
     info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
@@ -231,10 +168,8 @@ void InitializeFrameBuffer(
     info.layers = 1;
 
     for (uint32_t i = 0; i < bufferCount; i++) {
-        attachment[0] = swapChainImageViewsRGB[i];
-        VK_CHECK_RESULT(vkCreateFramebuffer(device, &info, nullptr, &framebufferRGB[i]));
-        attachment[0] = swapChainImageViewsOCV[i];
-        VK_CHECK_RESULT(vkCreateFramebuffer(device, &info, nullptr, &framebufferOCV[i]));
+        attachment[0] = imageView[i];
+        VK_CHECK_RESULT(vkCreateFramebuffer(device, &info, nullptr, &framebuffer[i]));
     }
     DEBUG("Imgui frame buffers created.");
 }
@@ -336,36 +271,30 @@ void initFonts()
 
 void Tetrium::reinitImGuiFrameBuffers(Tetrium::ImGuiRenderContexts& ctx)
 {
-    for (auto framebuffer : {&ctx.frameBuffers[RGB], &ctx.frameBuffers[OCV]}) {
-        for (auto fb : *framebuffer) {
-            vkDestroyFramebuffer(_device->logicalDevice, fb, nullptr);
-        }
-    }
     Tetrium_ImGui::InitializeFrameBuffer(
         _device->Get(),
         _swapChain.extent,
         ctx.renderPass,
-        _swapChain.numImages,
-        _renderContexts[RGB].virtualFrameBuffer.imageView,
-        _renderContexts[OCV].virtualFrameBuffer.imageView,
-        ctx.frameBuffers[RGB],
-        ctx.frameBuffers[OCV]
+        // paint directly to swapchain images
+        _swapChain.imageView,
+        _swapChain.frameBuffer
+        // _renderContextRYGB.virtualFrameBuffer.imageView,
+        // _renderContextRYGB.virtualFrameBuffer.frameBuffer
     );
 }
 
 void Tetrium::destroyImGuiContext(Tetrium::ImGuiRenderContexts& ctx)
 {
     // FIXME: current imgui impl does not support vulkan multi-context shutdown;
-    // not a big problem for now since we only shut down at very end, but 
+    // not a big problem for now since we only shut down at very end, but
     // it leads to ugly validation errors
     ImGui_ImplVulkan_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImPlot::DestroyContext();
     ImGui::DestroyContext();
-    for (ColorSpace cs : {RGB, OCV}) {
-        for (VkFramebuffer fb : ctx.frameBuffers[cs]) {
-            vkDestroyFramebuffer(_device->logicalDevice, fb, nullptr);
-        }
+
+    for (VkFramebuffer fb : ctx.frameBuffer) {
+        vkDestroyFramebuffer(_device->logicalDevice, fb, nullptr);
     }
 
     vkDestroyRenderPass(_device->logicalDevice, ctx.renderPass, nullptr);
@@ -377,13 +306,17 @@ void Tetrium::initImGuiRenderContext(Tetrium::ImGuiRenderContexts& ctx)
     // create render pass
     VkImageLayout imguiInitialLayout, imguiFinalLayout;
     imguiInitialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    imguiFinalLayout
-        = _tetraMode == TetraMode::kDualProjector
-              ? VK_IMAGE_LAYOUT_PRESENT_SRC_KHR       // dual project's two passes directly present
-              : VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL; // virtual fb to be finally transferred to
-                                                      // swapchain
-    ctx.renderPass = Tetrium_ImGui::createRenderPass(
-        _device->Get(), _swapChain.imageFormat, imguiInitialLayout, imguiFinalLayout
+    //imguiFinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; // for RYGB conversion pass, if run imgui pass before
+    imguiFinalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR; // if painting to physical fb
+
+    ctx.renderPass = createRenderPass(
+        _device->Get(),
+        imguiInitialLayout,
+        imguiFinalLayout,
+        _swapChain.imageFormat,
+        VK_ATTACHMENT_LOAD_OP_LOAD,
+        VK_ATTACHMENT_STORE_OP_STORE,
+        false // imgui FB has no depth attachment
     );
 
     ctx.descriptorPool = Tetrium_ImGui::createDescriptorPool(
@@ -393,11 +326,9 @@ void Tetrium::initImGuiRenderContext(Tetrium::ImGuiRenderContexts& ctx)
         _device->Get(),
         _swapChain.extent,
         ctx.renderPass,
-        _swapChain.numImages,
-        _renderContexts[RGB].virtualFrameBuffer.imageView,
-        _renderContexts[OCV].virtualFrameBuffer.imageView,
-        ctx.frameBuffers[RGB],
-        ctx.frameBuffers[OCV]
+        //_renderContextRYGB.virtualFrameBuffer.imageView,
+        _swapChain.imageView, // render directly to swapchain
+        ctx.frameBuffer
     );
 
     ImGui_ImplVulkan_InitInfo initInfo = {};
@@ -458,7 +389,8 @@ void Tetrium::recordImGuiDrawCommandBuffer(
     VkRenderPassBeginInfo renderPassInfo{};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     renderPassInfo.renderPass = ctx.renderPass;
-    renderPassInfo.framebuffer = ctx.frameBuffers[colorSpace][swapChainImageIndex];
+    // renderPassInfo.framebuffer = ctx.frameBuffers[colorSpace][swapChainImageIndex];
+    renderPassInfo.framebuffer = ctx.frameBuffer[swapChainImageIndex];
     renderPassInfo.renderArea.extent = extent;
     renderPassInfo.renderArea.offset = {0, 0};
     renderPassInfo.clearValueCount = 0;

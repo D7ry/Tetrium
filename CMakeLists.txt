@@ -66,6 +66,7 @@ add_executable(${PROJECT_NAME}
         src/Tetrium_Windowing.cpp
         src/Tetrium_Config.cpp
         src/Tetrium_ImGui.cpp
+        src/Tetrium_RYGB.cpp
         src/components/TaskQueue.cpp
         src/components/Logging.cpp
         src/components/ShaderUtils.cpp
@@ -88,6 +89,7 @@ add_executable(${PROJECT_NAME}
         src/lib/ImGuiUtils.cpp
         src/structs/Vertex.cpp
         src/ecs/system/SimpleRenderSystem.cpp
+        src/ecs/system/TetraImageDisplaySystem.cpp
 )
 
 target_sources(${PROJECT_NAME} 

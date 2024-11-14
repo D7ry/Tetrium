@@ -210,6 +210,9 @@ void VQDevice::Cleanup() {
         vkFreeCommandBuffers(
             logicalDevice, graphicsCommandPool, graphicsCommandBuffers.size(), graphicsCommandBuffers.data()
         );
+        vkFreeCommandBuffers(
+            logicalDevice, graphicsCommandPool, graphicsCommandBuffers2.size(), graphicsCommandBuffers2.data()
+        );
     }
     if (graphicsCommandPool != VK_NULL_HANDLE) {
         vkDestroyCommandPool(logicalDevice, graphicsCommandPool, nullptr);
