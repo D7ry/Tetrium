@@ -14,8 +14,8 @@ class ImGuiWidgetPhychophysicsScreeningTest : public ImGuiWidgetMut
         const uint32_t NUM_ATTEMPTS = 3; // number of attempts one could try in a screening
         const struct
         {
-            const float FIXATION = 3;
-            const float IDENTIFICATION = 3;
+            const float FIXATION = 1;
+            const float IDENTIFICATION = 1;
             const float ANSWERING = 5;
         } STATE_DURATIONS_SECONDS;
     } SETTINGS;
@@ -73,6 +73,7 @@ class ImGuiWidgetPhychophysicsScreeningTest : public ImGuiWidgetMut
     // game logic
     void newGame();
     void transitionSubjectState(SubjectContext& subject);
+    void endGame(SubjectContext& subject);
 
     // generate a pair of ishihara textures and store them in a subject folder, returns
     // path to generated textures(RGB, OCV) -- the textures are already loaded into GPU memory.

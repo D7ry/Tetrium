@@ -167,7 +167,40 @@ void ImGuiWidgetPhychophysicsScreeningTest::drawAnswerPrompts(
     ColorSpace cs
 )
 {
-    ImGui::Text("answer prompts");
+    ImGuiIO& io = ImGui::GetIO();
+    ImVec2 screenSize = io.DisplaySize;
+    ImVec2 centerPos = ImVec2(screenSize.x * 0.5f, screenSize.y * 0.5f);
+
+    // Adjust these values to fine-tune the layout
+    float buttonSize = 200.0f; // Reduced size for better spacing
+    float horizontalSpacing = 250.0f;
+    float verticalSpacing = 200.0f;
+
+    // Calculate positions for the four buttons in AXBY layout
+    ImVec2 topPos = ImVec2(centerPos.x, centerPos.y - verticalSpacing);           // Y
+    ImVec2 leftPos = ImVec2(centerPos.x - horizontalSpacing, centerPos.y);        // X
+    ImVec2 rightPos = ImVec2(centerPos.x + horizontalSpacing, centerPos.y);       // B
+    ImVec2 bottomPos = ImVec2(centerPos.x, centerPos.y + verticalSpacing);        // A
+
+    ImVec2 positions[4] = {bottomPos, leftPos, rightPos, topPos}; // A, X, B, Y order
+    const char* buttonIds[4] = {"A_BUTTON", "X_BUTTON", "B_BUTTON", "Y_BUTTON"};
+    const char* buttonLabels[4] = {"A", "X", "B", "Y"};
+
+    // Draw the four buttons
+    for (int i = 0; i < 4; i++) {
+        ImGuiTexture tex = engine->getOrLoadImGuiTexture(engine->_imguiCtx, subject.currentAnswerTexturePath[i]);
+
+        ImGui::SetCursorPos(ImVec2(positions[i].x - buttonSize/2, positions[i].y - buttonSize/2));
+        if (ImGui::ImageButton(buttonIds[i], (void*)(intptr_t)tex.id, ImVec2(buttonSize, buttonSize))) {
+            DEBUG("{} button clicked!", buttonLabels[i]);
+            // Handle button click
+        }
+
+        // Add button label
+        ImVec2 textPos = ImVec2(positions[i].x - 10, positions[i].y + buttonSize/2 + 5);
+        ImGui::SetCursorPos(textPos);
+        ImGui::Text("%s", buttonLabels[i]);
+    }
 }
 
 std::pair<std::string, std::string> ImGuiWidgetPhychophysicsScreeningTest::
@@ -207,9 +240,20 @@ void ImGuiWidgetPhychophysicsScreeningTest::transitionSubjectState(SubjectContex
         if (subject.currentSelectedAnswer == subject.correctAnswerTextureIndex) {
             subject.numSuccessAttempts += 1;
         }
+        // end subject
+        if (subject.currentAttempt == SETTINGS.NUM_ATTEMPTS - 1) {
+            endGame(subject);
+        }
         subject.currentAttempt += 1; // to next attempt
         subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.FIXATION;
         subject.state = SubjectState::kFixation;
         break;
     }
+}
+
+void ImGuiWidgetPhychophysicsScreeningTest::endGame(SubjectContext& subject)
+{
+    DEBUG("ending game for subject {}", subject.name);
+    _state = TestState::kIdle;
+    // TODO: data colletion logic + clean up texture resources?
 }
