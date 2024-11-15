@@ -114,33 +114,33 @@ void ImGuiWidgetBlobHunter::initializeBlobPath(
     float centerY = screenSize.y * 0.5f;
     float maxRadius = std::min(screenSize.x, screenSize.y) * 0.4f;
 
-    // for (int i = 0; i < numPoints; ++i) {
-    //     float t = static_cast<float>(i) / numPoints;
-    //     
-    //     // Spiral motion
-    //     float spiralRadius = maxRadius * (1.0f - 0.5f * t);
-    //     float angle = t * 4.0f * glm::pi<float>();
-    //     float spiralX = std::cos(angle) * spiralRadius;
-    //     float spiralY = std::sin(angle) * spiralRadius;
-    //     
-    //     // Sinusoidal waves
-    //     float waveX = std::sin(t * 10.0f * glm::pi<float>()) * (maxRadius * 0.2f);
-    //     float waveY = std::cos(t * 8.0f * glm::pi<float>()) * (maxRadius * 0.2f);
-    //     
-    //     // Random jitter
-    //     float jitterX = (static_cast<float>(rand()) / RAND_MAX - 0.5f) * (maxRadius * 0.1f);
-    //     float jitterY = (static_cast<float>(rand()) / RAND_MAX - 0.5f) * (maxRadius * 0.1f);
-    //     
-    //     // Combine all motions
-    //     float x = centerX + spiralX + waveX + jitterX;
-    //     float y = centerY + spiralY + waveY + jitterY;
-    //     
-    //     // Ensure the point is within the screen bounds
-    //     x = glm::clamp(x, 0.0f, screenSize.x);
-    //     y = glm::clamp(y, 0.0f, screenSize.y);
-    //     
-    //     attempt.blobPath.controlPoints.emplace_back(x, y);
-    // }
+    for (int i = 0; i < numPoints; ++i) {
+        float t = static_cast<float>(i) / numPoints;
+        
+        // Spiral motion
+        float spiralRadius = maxRadius * (1.0f - 0.5f * t);
+        float angle = t * 4.0f * glm::pi<float>();
+        float spiralX = std::cos(angle) * spiralRadius;
+        float spiralY = std::sin(angle) * spiralRadius;
+        
+        // Sinusoidal waves
+        float waveX = std::sin(t * 10.0f * glm::pi<float>()) * (maxRadius * 0.2f);
+        float waveY = std::cos(t * 8.0f * glm::pi<float>()) * (maxRadius * 0.2f);
+        
+        // Random jitter
+        float jitterX = (static_cast<float>(rand()) / RAND_MAX - 0.5f) * (maxRadius * 0.1f);
+        float jitterY = (static_cast<float>(rand()) / RAND_MAX - 0.5f) * (maxRadius * 0.1f);
+        
+        // Combine all motions
+        float x = centerX + spiralX + waveX + jitterX;
+        float y = centerY + spiralY + waveY + jitterY;
+        
+        // Ensure the point is within the screen bounds
+        x = glm::clamp(x, 0.0f, screenSize.x);
+        y = glm::clamp(y, 0.0f, screenSize.y);
+        
+        attempt.blobPath.controlPoints.emplace_back(x, y);
+    }
     
     // Add a few more random points to increase unpredictability
     for (int i = 0; i < 100; ++i) {
