@@ -30,6 +30,7 @@ class TextureManager
     void GetDescriptorImageInfo(const std::string& texturePath, VkDescriptorImageInfo& imageInfo);
 
     void LoadTexture(const std::string& texturePath);
+    void UnLoadTexture(const std::string& texturePath);
 
     Texture GetTexture(const std::string& texturePath);
 

@@ -303,6 +303,11 @@ class Tetrium
         Tetrium::ImGuiRenderContexts& ctx,
         const std::string& texture
     );
+    void unloadImGuiTexture(
+        Tetrium::ImGuiRenderContexts& ctx,
+        const std::string& texture
+    );
+
     void clearImGuiDrawData();
 
     /* ---------- Top-level data ---------- */

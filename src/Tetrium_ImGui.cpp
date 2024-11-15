@@ -306,7 +306,8 @@ void Tetrium::initImGuiRenderContext(Tetrium::ImGuiRenderContexts& ctx)
     // create render pass
     VkImageLayout imguiInitialLayout, imguiFinalLayout;
     imguiInitialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    //imguiFinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; // for RYGB conversion pass, if run imgui pass before
+    // imguiFinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; // for RYGB conversion pass, if
+    // run imgui pass before
     imguiFinalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR; // if painting to physical fb
 
     ctx.renderPass = createRenderPass(
@@ -426,6 +427,14 @@ const ImGuiTexture& Tetrium::getOrLoadImGuiTexture(
     auto res = ctx.textures.insert({texture, tex});
     ASSERT(res.second);
     return res.first->second;
+}
+
+void Tetrium::unloadImGuiTexture(Tetrium::ImGuiRenderContexts& ctx, const std::string& texture) {
+
+    auto it = ctx.textures.find(texture);
+    ASSERT(it != ctx.textures.end());
+    ImGui_ImplVulkan_RemoveTexture(reinterpret_cast<VkDescriptorSet>(it->second.id));
+    _textureManager.UnLoadTexture(texture);
 }
 
 void Tetrium::clearImGuiDrawData()
