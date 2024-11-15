@@ -32,6 +32,7 @@
 #include "components/imgui_widgets/ImGuiWidgetTemp.h"
 #include "components/imgui_widgets/ImGuiWidgetTetraViewer.h"
 #include "components/imgui_widgets/ImGuiWidgetTetraViewerDemo.h"
+#include "components/imgui_widgets/ImGuiWidgetBlobHunter.h"
 // ecs
 #include "ecs/system/TetraImageDisplaySystem.h"
 
@@ -229,7 +230,8 @@ class Tetrium
     void createVirtualFrameBuffer(
         VkRenderPass renderPass,
         const SwapChainContext& swapChain,
-        VirtualFrameBuffer& vfb
+        VirtualFrameBuffer& vfb,
+        uint32_t numFrameBuffers
     );
     void clearVirtualFrameBuffer(VirtualFrameBuffer& vfb);
 
@@ -415,6 +417,7 @@ class Tetrium
     friend class ImGuiWidgetTetraViewerDemo;
     friend class ImGuiWidgetTetraViewer;
     friend class ImGuiWidgetTemp;
+    friend class ImGuiWidgetBlobHunter;
 
     ImGuiWidgetDeviceInfo _widgetDeviceInfo;
     ImGuiWidgetPerfPlot _widgetPerfPlot;
@@ -425,6 +428,9 @@ class Tetrium
     ImGuiWidgetTetraViewer _widgetTetraViewer;
     ImGuiWidgetColorTile _widgetColorTile;
     ImGuiWidgetTemp _widgetTemp;
+
+    ImGuiWidgetBlobHunter _widgetBlobHunter;
+
 
     struct
     {

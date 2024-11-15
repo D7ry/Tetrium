@@ -269,7 +269,7 @@ void Tetrium::initVulkan()
         true
     );
     createVirtualFrameBuffer(
-        _renderContextRYGB.renderPass, _swapChain, _renderContextRYGB.virtualFrameBuffer
+        _renderContextRYGB.renderPass, _swapChain, _renderContextRYGB.virtualFrameBuffer, _swapChain.numImages
     );
     SCHEDULE_DELETE(clearVirtualFrameBuffer(_renderContextRYGB.virtualFrameBuffer);)
 
@@ -889,14 +889,14 @@ uint32_t findMemoryType(
 void Tetrium::createVirtualFrameBuffer(
     VkRenderPass renderPass,
     const SwapChainContext& swapChain,
-    VirtualFrameBuffer& vfb
+    VirtualFrameBuffer& vfb,
+    uint32_t numFrameBuffers
 )
 {
     DEBUG("Creating framebuffers..");
     ASSERT(renderPass != VK_NULL_HANDLE);
     ASSERT(swapChain.numImages != 0);
 
-    size_t numFrameBuffers = swapChain.numImages;
     ASSERT(numFrameBuffers != 0);
     vfb.frameBuffer.resize(numFrameBuffers);
     vfb.image.resize(numFrameBuffers);

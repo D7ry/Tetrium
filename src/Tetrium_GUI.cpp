@@ -1,10 +1,10 @@
 // ImGUI subroutine implementations
 
-#include "lib/ImGuiUtils.h"
+#include "backends/imgui_impl_glfw.h"
+#include "backends/imgui_impl_vulkan.h"
 #include "imgui.h"
 #include "implot.h"
-#include "backends/imgui_impl_vulkan.h"
-#include "backends/imgui_impl_glfw.h"
+#include "lib/ImGuiUtils.h"
 
 #include "Tetrium.h"
 
@@ -83,7 +83,7 @@ void Tetrium::drawImGui(ColorSpace colorSpace)
         ImGuiIO& io = ImGui::GetIO();
         io.DisplaySize = projectorDisplaySize;
         io.DisplayFramebufferScale = {1, 1};
-        ImGui::GetMainViewport()->Size =projectorDisplaySize;
+        ImGui::GetMainViewport()->Size = projectorDisplaySize;
     }
 
     if (!_windowFocused) {
@@ -158,6 +158,11 @@ void Tetrium::drawImGui(ColorSpace colorSpace)
 
             if (ImGui::BeginTabItem("Color Tile")) {
                 _widgetColorTile.Draw(this, colorSpace);
+                ImGui::EndTabItem();
+            }
+
+            if (ImGui::BeginTabItem("🐍Blob Hunter")) {
+                _widgetBlobHunter.Draw(this, colorSpace);
                 ImGui::EndTabItem();
             }
 

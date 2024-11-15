@@ -84,6 +84,7 @@ add_executable(${PROJECT_NAME}
         src/components/imgui_widgets/ImGuiWidgetTetraViewerDemo.cpp
         src/components/imgui_widgets/ImGuiWidgetTetraViewer.cpp
         src/components/imgui_widgets/ImGuiWidgetColorTile.cpp
+        src/components/imgui_widgets/ImGuiWidgetBlobHunter.cpp
         src/lib/VQDevice.cpp
         src/lib/VQUtils.cpp
         src/lib/ImGuiUtils.cpp
