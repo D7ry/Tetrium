@@ -5,9 +5,7 @@
 class ImGuiWidgetPhychophysicsScreeningTest : public ImGuiWidgetMut
 {
   public:
-    virtual void Draw(Tetrium* engine, ColorSpace colorSpace) override {
-
-    }
+    virtual void Draw(Tetrium* engine, ColorSpace colorSpace) override;
 
   private:
     static const struct {
@@ -19,8 +17,20 @@ class ImGuiWidgetPhychophysicsScreeningTest : public ImGuiWidgetMut
         kScreening
     };
 
-    struct ScreeningState {
-        uint32_t currentAttempt; // index to the current attempt
-        uint32_t numSuccessAttempts;
+    enum class SubjectState {
+        kPreparing,
+        kIdentifying,
+        kAnswering
     };
+
+    struct SubjectContext {
+        SubjectState state;
+        uint32_t currentAttempt; // index to the current attempt
+        uint32_t numSuccessAttempts; // # of attempts where the tester identified the right pattern
+    };
+
+    TestState _state;
+
+    void drawIdle(Tetrium* engine, ColorSpace colorSpace);
+    void drawTestForSubject(Tetrium* engine, ColorSpace colorSpace, SubjectContext& subject);
 };

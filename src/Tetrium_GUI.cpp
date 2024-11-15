@@ -57,8 +57,10 @@ void Tetrium::drawImGui(ColorSpace colorSpace)
     if (!_wantToDrawImGui) {
         return;
     }
-    ImGui::SetCurrentContext(_imguiCtx.ctxImGui[colorSpace]);
-    ImPlot::SetCurrentContext(_imguiCtx.ctxImPlot[colorSpace]);
+
+    // TODO: remove OCV context as we now delayed imgui drawing
+    ImGui::SetCurrentContext(_imguiCtx.ctxImGui[ColorSpace::RGB]);
+    ImPlot::SetCurrentContext(_imguiCtx.ctxImPlot[ColorSpace::RGB]);
 
     // ---------- Prologue ----------
     // note that drawImGui is called twice per tick for RGB and OCV space,
@@ -163,6 +165,11 @@ void Tetrium::drawImGui(ColorSpace colorSpace)
 
             if (ImGui::BeginTabItem("🐍Blob Hunter")) {
                 _widgetBlobHunter.Draw(this, colorSpace);
+                ImGui::EndTabItem();
+            }
+
+            if (ImGui::BeginTabItem("⭕️Psychophysics Screening")) {
+                _widgetScreeningTest.Draw(this, colorSpace);
                 ImGui::EndTabItem();
             }
 

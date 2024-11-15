@@ -39,27 +39,25 @@ void ImGuiWidgetBlobHunter::gameplayTick(
     float deltaTime = io.DeltaTime;
 
     // perform logic update
-    if (colorSpace == RGB) {
-        // first attempt
-        if (!session.firstAtttemptInitialized) {
-            session.currentAttempt = newGameAttempt();
-            session.firstAtttemptInitialized = true;
-        }
-        if (session.results.size() > SETTINGS.NUM_ATTEMPTS_PER_SESSION) {
-            DEBUG("ending game for user {}", session.userName);
-            _isInGame = false;
-            return;
-        }
+    // first attempt
+    if (!session.firstAtttemptInitialized) {
+        session.currentAttempt = newGameAttempt();
+        session.firstAtttemptInitialized = true;
+    }
+    if (session.results.size() > SETTINGS.NUM_ATTEMPTS_PER_SESSION) {
+        DEBUG("ending game for user {}", session.userName);
+        _isInGame = false;
+        return;
+    }
 
-        bool outOfTime = attempt.timeLeftSeconds <= 0;
-        if (outOfTime) {
-            // end current attempt, start new attempt
-            DEBUG("start new attempt!");
-            session.results.push_back(GameAttemptResult{.t = attempt.lastTimeCursorOnBlob});
-            attempt = newGameAttempt();
-            ImVec2 screenCenter = ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f);
-            attempt.blobPos = screenCenter; // re-center the blob
-        }
+    bool outOfTime = attempt.timeLeftSeconds <= 0;
+    if (outOfTime) {
+        // end current attempt, start new attempt
+        DEBUG("start new attempt!");
+        session.results.push_back(GameAttemptResult{.t = attempt.lastTimeCursorOnBlob});
+        attempt = newGameAttempt();
+        ImVec2 screenCenter = ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f);
+        attempt.blobPos = screenCenter; // re-center the blob
     }
 
     // perform blob pos test
@@ -70,16 +68,14 @@ void ImGuiWidgetBlobHunter::gameplayTick(
     );
 
     bool hit = distToBlob < SETTINGS.BLOB_SIZE_RADIUS;
-    if (colorSpace == RGB) {
-        if (hit) { // in blob
-            attempt.lastTimeCursorOnBlob = getTimeSecondsNow();
-            attempt.timeLeftSeconds = SETTINGS.ERROR_MARGIN_SECONDS; // reset error margin
-        } else { // out of blob
-            attempt.timeLeftSeconds -= deltaTime;
-        }
-        // nudge blob
-        updateBlobPosition(attempt, deltaTime);
+    if (hit) { // in blob
+        attempt.lastTimeCursorOnBlob = getTimeSecondsNow();
+        attempt.timeLeftSeconds = SETTINGS.ERROR_MARGIN_SECONDS; // reset error margin
+    } else {                                                     // out of blob
+        attempt.timeLeftSeconds -= deltaTime;
     }
+    // nudge blob
+    updateBlobPosition(attempt, deltaTime);
     // draw blob
     ImU32 colorHit = IM_COL32_WHITE;
     ImU32 colorMiss = IM_COL32_BLACK;
@@ -116,41 +112,41 @@ void ImGuiWidgetBlobHunter::initializeBlobPath(
 
     for (int i = 0; i < numPoints; ++i) {
         float t = static_cast<float>(i) / numPoints;
-        
+
         // Spiral motion
         float spiralRadius = maxRadius * (1.0f - 0.5f * t);
         float angle = t * 4.0f * glm::pi<float>();
         float spiralX = std::cos(angle) * spiralRadius;
         float spiralY = std::sin(angle) * spiralRadius;
-        
+
         // Sinusoidal waves
         float waveX = std::sin(t * 10.0f * glm::pi<float>()) * (maxRadius * 0.2f);
         float waveY = std::cos(t * 8.0f * glm::pi<float>()) * (maxRadius * 0.2f);
-        
+
         // Random jitter
         float jitterX = (static_cast<float>(rand()) / RAND_MAX - 0.5f) * (maxRadius * 0.1f);
         float jitterY = (static_cast<float>(rand()) / RAND_MAX - 0.5f) * (maxRadius * 0.1f);
         jitterX = 0;
         jitterY = 0;
-        
+
         // Combine all motions
         float x = centerX + spiralX + waveX + jitterX;
         float y = centerY + spiralY + waveY + jitterY;
-        
+
         // Ensure the point is within the screen bounds
         x = glm::clamp(x, 0.0f, screenSize.x);
         y = glm::clamp(y, 0.0f, screenSize.y);
-        
+
         attempt.blobPath.controlPoints.emplace_back(x, y);
     }
-    
+
     // Add a few more random points to increase unpredictability
     // for (int i = 0; i < 100; ++i) {
     //     float x = static_cast<float>(rand()) / RAND_MAX * screenSize.x;
     //     float y = static_cast<float>(rand()) / RAND_MAX * screenSize.y;
     //     attempt.blobPath.controlPoints.emplace_back(x, y);
     // }
-    
+
     attempt.pathProgress = 0.0f;
 }
 

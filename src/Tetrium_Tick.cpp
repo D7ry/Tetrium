@@ -60,8 +60,6 @@ void Tetrium::Tick()
             TickContext tickData{&_mainCamera, deltaTime};
             tickData.profiler = &_profiler;
             flushEngineUBOStatic(_currentFrame);
-            drawImGui(RGB); // populate RGB context
-            drawImGui(OCV); // populate OCV context
             drawFrame(&tickData, _currentFrame);
             _currentFrame = (_currentFrame + 1) % NUM_FRAME_IN_FLIGHT;
         }
@@ -180,6 +178,7 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frameIdx)
             if (_flipEvenOdd) {
                 renderRGB = !renderRGB;
             }
+            drawImGui(renderRGB ? RGB : OCV);
 
             // 3. depending on even-odd, transform RYGB into R000, or OCV0
             // by sampling from RYGB FB and rendering onto a full-screen quad on the FB
@@ -194,12 +193,9 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frameIdx)
                     || (!isEven && _evenOddRenderingSettings.blackOutOdd)
             );
 
-            // paint ImGui -- both even and odd context should've been populated.
-            if (renderRGB) {
-                recordImGuiDrawCommandBuffer(_imguiCtx, RGB, CB1, extend, swapchainImageIndex);
-            } else {
-                recordImGuiDrawCommandBuffer(_imguiCtx, OCV, CB1, extend, swapchainImageIndex);
-            }
+            // NOTE: we use RGB context for both RGB and OCV drawing as a temp workaround
+            // TODO: refactor so we don't do multi-context anymore
+            recordImGuiDrawCommandBuffer(_imguiCtx, RGB, CB1, extend, swapchainImageIndex);
         }
 
         CB1.end();
