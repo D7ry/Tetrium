@@ -1,6 +1,6 @@
 #pragma once
-#include "structs/ImGuiTexture.h"
 #include "ImGuiWidget.h"
+#include "structs/ImGuiTexture.h"
 
 // for psychophysics screening tests
 class ImGuiWidgetPhychophysicsScreeningTest : public ImGuiWidgetMut
@@ -9,10 +9,11 @@ class ImGuiWidgetPhychophysicsScreeningTest : public ImGuiWidgetMut
     virtual void Draw(Tetrium* engine, ColorSpace colorSpace) override;
 
   private:
-    static const struct
+    const struct
     {
-        const uint32_t NUM_ATTEMPTS; // number of attempts one could try in a screening
-        const struct {
+        const uint32_t NUM_ATTEMPTS = 3; // number of attempts one could try in a screening
+        const struct
+        {
             const float FIXATION = 3;
             const float IDENTIFICATION = 3;
             const float ANSWERING = 5;
@@ -43,11 +44,15 @@ class ImGuiWidgetPhychophysicsScreeningTest : public ImGuiWidgetMut
 
     struct SubjectContext
     {
+        std::string name;
         float currStateRemainderTime; // remaining time before jumping to next state
         SubjectState state;
         uint32_t currentAttempt;     // index to the current attempt
         uint32_t numSuccessAttempts; // # of attempts where the tester identified the right pattern
         std::string currentIshiharaTexturePath[ColorSpace::ColorSpaceSize];
+        std::string currentAnswerTexturePath[4];
+        uint8_t correctAnswerTextureIndex;
+        int currentSelectedAnswer = -1;
         void* pyObject; // python object that keeps states and generates ishihara textures
     };
 
@@ -67,6 +72,10 @@ class ImGuiWidgetPhychophysicsScreeningTest : public ImGuiWidgetMut
 
     // game logic
     void newGame();
+    void transitionSubjectState(SubjectContext& subject);
 
+    // generate a pair of ishihara textures and store them in a subject folder, returns
+    // path to generated textures(RGB, OCV) -- the textures are already loaded into GPU memory.
+    // the caller is responsible for freeing generated resources.
     std::pair<std::string, std::string> generateIshiharaTestTextures(SubjectContext& subject);
 };

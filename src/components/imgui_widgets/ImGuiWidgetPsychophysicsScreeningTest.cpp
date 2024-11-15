@@ -1,3 +1,5 @@
+#include <filesystem>
+
 #include "ImGuiWidgetPsychophysicsScreeningTest.h"
 #include "Tetrium.h"
 
@@ -62,12 +64,23 @@ void ImGuiWidgetPhychophysicsScreeningTest::drawIdle(Tetrium* engine, ColorSpace
 void ImGuiWidgetPhychophysicsScreeningTest::newGame()
 {
     // stall and generate ishihara textures
-    NEEDS_IMPLEMENTATION(); // need to implement ishi
+
     _subject = SubjectContext{
+        .name = "Ren Der Ng",
         .currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.FIXATION,
         .state = SubjectState::kFixation,
         .currentAttempt = 0,
-        .numSuccessAttempts = 0
+        .numSuccessAttempts = 0,
+        .currentIshiharaTexturePath // FIXME: don't use hard-coded ishihara
+        = {"../assets/textures/tetra_images/neitz_common_genes_RGB.png",
+           "../assets/textures/tetra_images/neitz_common_genes_OCV.png"},
+        .currentAnswerTexturePath // FIXME: don't use hard-coded answer texture
+        = {"../assets/textures/tetra_images/neitz_common_genes_RGB.png",
+           "../assets/textures/tetra_images/neitz_common_genes_RGB.png",
+           "../assets/textures/tetra_images/neitz_common_genes_RGB.png",
+           "../assets/textures/tetra_images/neitz_common_genes_RGB.png"},
+        .correctAnswerTextureIndex = 2 // FIXME: don't use hard-coded answer index
+
     };
     _state = TestState::kScreening;
 }
@@ -81,31 +94,7 @@ void ImGuiWidgetPhychophysicsScreeningTest::drawTestForSubject(
     // handle state transition
     subject.currStateRemainderTime -= ImGui::GetIO().DeltaTime;
     if (subject.currStateRemainderTime <= 0) {
-        switch (subject.state) {
-        case SubjectState::kFixation:
-            subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.IDENTIFICATION;
-            subject.state = SubjectState::kIdentification;
-            break;
-        case SubjectState::kIdentification:
-            subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.ANSWERING;
-            // TODO: finish answer presentation logic
-            NEEDS_IMPLEMENTATION()
-            // randomly choose one circle to place the actual answer
-
-            // populate the rest of the circles with wrong answers
-
-
-            
-            subject.state = SubjectState::kAnswer;
-            break;
-        case SubjectState::kAnswer:
-            subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.FIXATION;
-            // TODO: handle case where subject hasn't selected anything
-            NEEDS_IMPLEMENTATION();
-
-            subject.state = SubjectState::kFixation;
-            break;
-        }
+        transitionSubjectState(subject);
     }
 
     switch (subject.state) {
@@ -149,7 +138,8 @@ void ImGuiWidgetPhychophysicsScreeningTest::drawFixGazePage()
     ImVec2 textSize = ImGui::CalcTextSize("Fix Gaze Onto Crosshair");
     float spacing = 20;
     ImVec2 textPos(
-        screenCenter.x - textSize.x * 0.5f, screenCenter.y + textSize.y + spacing + crossHairSize
+        screenCenter.x - textSize.x * 0.5f,
+        screenCenter.y + textSize.y + spacing + crossHairSize
     ); // 20 pixels below crosshair
     ImGui::SetCursorPos(textPos);
     ImGui::Text("Fix Gaze Onto Crosshair");
@@ -177,4 +167,49 @@ void ImGuiWidgetPhychophysicsScreeningTest::drawAnswerPrompts(
     ColorSpace cs
 )
 {
+    ImGui::Text("answer prompts");
+}
+
+std::pair<std::string, std::string> ImGuiWidgetPhychophysicsScreeningTest::
+    generateIshiharaTestTextures(SubjectContext& subject)
+{
+    std::string& subjectName = subject.name;
+    std::string subjectTestDataFolder = "ishihara_plates/" + subjectName;
+
+    // create subject folder if not already existing
+    if (!std::filesystem::exists(subjectTestDataFolder)) {
+        DEBUG("creating ishihara plate directory in {}", subjectTestDataFolder);
+        std::filesystem::create_directory(subjectTestDataFolder);
+    }
+
+    std::string textureFilePrefix = "attempt_" + std::to_string(subject.currentAttempt);
+
+    std::string textureFileRGBName = textureFilePrefix + "_RGB.png";
+    std::string textureFileOCVName = textureFilePrefix + "_OCV.png";
+
+    // call into python file to generate
+    NEEDS_IMPLEMENTATION();
+}
+
+void ImGuiWidgetPhychophysicsScreeningTest::transitionSubjectState(SubjectContext& subject)
+{
+    switch (subject.state) {
+    case SubjectState::kFixation:
+        subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.IDENTIFICATION;
+        subject.state = SubjectState::kIdentification;
+        break;
+    case SubjectState::kIdentification:
+        subject.currentSelectedAnswer = -1;
+        subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.ANSWERING;
+        subject.state = SubjectState::kAnswer;
+        break;
+    case SubjectState::kAnswer:
+        if (subject.currentSelectedAnswer == subject.correctAnswerTextureIndex) {
+            subject.numSuccessAttempts += 1;
+        }
+        subject.currentAttempt += 1; // to next attempt
+        subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.FIXATION;
+        subject.state = SubjectState::kFixation;
+        break;
+    }
 }
