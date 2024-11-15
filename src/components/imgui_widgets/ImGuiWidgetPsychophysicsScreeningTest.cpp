@@ -1,4 +1,24 @@
 #include "ImGuiWidgetPsychophysicsScreeningTest.h"
+#include "Tetrium.h"
+
+namespace
+{
+ImVec2 calculateFitSize(float width, float height, const ImVec2& availableSize)
+{
+    float aspectRatio = (float)width / (float)height;
+
+    float scaleWidth = availableSize.x / (float)width;
+    float scaleHeight = availableSize.y / (float)height;
+
+    float scale = std::min(scaleWidth, scaleHeight);
+
+    ImVec2 fitSize;
+    fitSize.x = (float)width * scale;
+    fitSize.y = (float)height * scale;
+
+    return fitSize;
+}
+} // namespace
 
 void ImGuiWidgetPhychophysicsScreeningTest::Draw(Tetrium* engine, ColorSpace colorSpace)
 {
@@ -41,6 +61,8 @@ void ImGuiWidgetPhychophysicsScreeningTest::drawIdle(Tetrium* engine, ColorSpace
 
 void ImGuiWidgetPhychophysicsScreeningTest::newGame()
 {
+    // stall and generate ishihara textures
+    NEEDS_IMPLEMENTATION(); // need to implement ishi
     _subject = SubjectContext{
         .state = SubjectState::kPreparing, .currentAttempt = 0, .numSuccessAttempts = 0
     };
@@ -57,10 +79,10 @@ void ImGuiWidgetPhychophysicsScreeningTest::drawTestForSubject(
     case SubjectState::kPreparing:
         drawFixGazePage();
         break;
-    case SubjectState::kAnswering:
-        break;
     case SubjectState::kIdentifying:
-
+        drawIshihara(engine, subject, colorSpace);
+        break;
+    case SubjectState::kAnswering:
         break;
     }
 }
@@ -97,4 +119,28 @@ void ImGuiWidgetPhychophysicsScreeningTest::drawFixGazePage()
     ); // 20 pixels below crosshair
     ImGui::SetCursorPos(textPos);
     ImGui::Text("Fix Gaze Onto Crosshair");
+}
+
+// draws an ishihara plate
+void ImGuiWidgetPhychophysicsScreeningTest::drawIshihara(
+    Tetrium* engine,
+    SubjectContext& subject,
+    ColorSpace cs
+)
+{
+    ImGuiTexture tex
+        = engine->getOrLoadImGuiTexture(engine->_imguiCtx, subject.currentIshiharaTexturePath[cs]);
+
+    ImVec2 availSize = ImGui::GetContentRegionAvail();
+    ImVec2 textureFullscreenSize = calculateFitSize(tex.width, tex.height, availSize);
+
+    ImGui::Image(tex.id, textureFullscreenSize);
+}
+
+void ImGuiWidgetPhychophysicsScreeningTest::drawAnswerPrompts(
+    Tetrium* engine,
+    SubjectContext& subject,
+    ColorSpace cs
+)
+{
 }
