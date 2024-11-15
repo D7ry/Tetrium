@@ -64,7 +64,10 @@ void ImGuiWidgetPhychophysicsScreeningTest::newGame()
     // stall and generate ishihara textures
     NEEDS_IMPLEMENTATION(); // need to implement ishi
     _subject = SubjectContext{
-        .state = SubjectState::kPreparing, .currentAttempt = 0, .numSuccessAttempts = 0
+        .currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.FIXATION,
+        .state = SubjectState::kFixation,
+        .currentAttempt = 0,
+        .numSuccessAttempts = 0
     };
     _state = TestState::kScreening;
 }
@@ -75,14 +78,45 @@ void ImGuiWidgetPhychophysicsScreeningTest::drawTestForSubject(
     SubjectContext& subject
 )
 {
+    // handle state transition
+    subject.currStateRemainderTime -= ImGui::GetIO().DeltaTime;
+    if (subject.currStateRemainderTime <= 0) {
+        switch (subject.state) {
+        case SubjectState::kFixation:
+            subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.IDENTIFICATION;
+            subject.state = SubjectState::kIdentification;
+            break;
+        case SubjectState::kIdentification:
+            subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.ANSWERING;
+            // TODO: finish answer presentation logic
+            NEEDS_IMPLEMENTATION()
+            // randomly choose one circle to place the actual answer
+
+            // populate the rest of the circles with wrong answers
+
+
+            
+            subject.state = SubjectState::kAnswer;
+            break;
+        case SubjectState::kAnswer:
+            subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.FIXATION;
+            // TODO: handle case where subject hasn't selected anything
+            NEEDS_IMPLEMENTATION();
+
+            subject.state = SubjectState::kFixation;
+            break;
+        }
+    }
+
     switch (subject.state) {
-    case SubjectState::kPreparing:
+    case SubjectState::kFixation:
         drawFixGazePage();
         break;
-    case SubjectState::kIdentifying:
+    case SubjectState::kIdentification:
         drawIshihara(engine, subject, colorSpace);
         break;
-    case SubjectState::kAnswering:
+    case SubjectState::kAnswer:
+        drawAnswerPrompts(engine, subject, colorSpace);
         break;
     }
 }
