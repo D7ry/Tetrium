@@ -158,6 +158,10 @@ void ImGuiWidgetPhychophysicsScreeningTest::drawIshihara(
     ImVec2 availSize = ImGui::GetContentRegionAvail();
     ImVec2 textureFullscreenSize = calculateFitSize(tex.width, tex.height, availSize);
 
+    // center the texture onto the screen
+    ImVec2 centerPos = ImVec2(availSize.x * 0.5f, availSize.y * 0.5f);
+    ImGui::SetCursorPos(centerPos - textureFullscreenSize * 0.5f);
+
     ImGui::Image(tex.id, textureFullscreenSize);
 }
 
@@ -183,7 +187,6 @@ void ImGuiWidgetPhychophysicsScreeningTest::drawAnswerPrompts(
     ImVec2 bottomPos = ImVec2(centerPos.x, centerPos.y + verticalSpacing);        // A
 
     ImVec2 positions[4] = {bottomPos, leftPos, rightPos, topPos}; // A, X, B, Y order
-    const char* buttonIds[4] = {"A_BUTTON", "X_BUTTON", "B_BUTTON", "Y_BUTTON"};
     const char* buttonLabels[4] = {"A", "X", "B", "Y"};
 
     // Draw the four buttons
@@ -191,7 +194,7 @@ void ImGuiWidgetPhychophysicsScreeningTest::drawAnswerPrompts(
         ImGuiTexture tex = engine->getOrLoadImGuiTexture(engine->_imguiCtx, subject.currentAnswerTexturePath[i]);
 
         ImGui::SetCursorPos(ImVec2(positions[i].x - buttonSize/2, positions[i].y - buttonSize/2));
-        if (ImGui::ImageButton(buttonIds[i], (void*)(intptr_t)tex.id, ImVec2(buttonSize, buttonSize))) {
+        if (ImGui::ImageButton(buttonLabels[i], (void*)(intptr_t)tex.id, ImVec2(buttonSize, buttonSize))) {
             DEBUG("{} button clicked!", buttonLabels[i]);
             // Handle button click
         }
