@@ -71,6 +71,8 @@ drawImGui(ColorSpace colorSpace) {
 - `CMake`
 - [Vulkan SDK](https://vulkan.lunarg.com/)
 - `make` or `ninja`
+- openAL
+- libsndfile
 
 ### Hardware Even-odd frame sync
 

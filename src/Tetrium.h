@@ -26,6 +26,7 @@
 #include "components/Profiler.h"
 #include "components/TextureManager.h"
 #include "components/imgui_widgets/ImGuiWidget.h"
+#include "components/SoundManager.h"
 
 #include "components/imgui_widgets/ImGuiWidgetColorTile.h"
 #include "components/imgui_widgets/ImGuiWidgetEvenOddCalibration.h"
@@ -412,6 +413,7 @@ class Tetrium
     InputManager _inputManager;
     Profiler _profiler;
     TaskQueue _taskQueue;
+    SoundManager _soundManager;
     std::unique_ptr<std::vector<Profiler::Entry>> _lastProfilerData = _profiler.NewProfile();
 
     // ImGui widgets

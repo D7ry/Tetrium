@@ -48,11 +48,19 @@ if (UNIX)
 if (APPLE)
     set(FREETYPE_INCLUDE_DIRS "/opt/homebrew/include/freetype2")
     set(FREETYPE_LIBRARIES "/opt/homebrew/lib/libfreetype.dylib")
+    # hard-coded path for openal-soft
+    set(OPENAL_ROOT_DIR "/opt/homebrew/opt/openal-soft")
+    set(OPENAL_INCLUDE_DIR "${OPENAL_ROOT_DIR}/include")
+    set(OPENAL_LIBRARY "${OPENAL_ROOT_DIR}/lib/libopenal.dylib")
 else() #linux
     set(FREETYPE_INCLUDE_DIRS "/usr/include/freetype2")
     set(FREETYPE_LIBRARIES "/usr/lib/x86_64-linux-gnu/libfreetype.so")
 endif()
 endif()
+
+# openal and sndfile for sound playing
+find_package(OpenAL REQUIRED)
+find_package(SndFile REQUIRED)
 
 project(Tetrium)
 
@@ -68,6 +76,7 @@ add_executable(${PROJECT_NAME}
         src/Tetrium_ImGui.cpp
         src/Tetrium_RYGB.cpp
         src/components/TaskQueue.cpp
+        src/components/SoundManager.cpp
         src/components/Logging.cpp
         src/components/ShaderUtils.cpp
         src/components/DeltaTimer.cpp
@@ -108,6 +117,8 @@ target_include_directories(${PROJECT_NAME}
     PRIVATE ${GLM_INCLUDE}
     PRIVATE ${TINY_OBJ_LOADER_INCLUDE}
     PRIVATE ${FREETYPE_INCLUDE_DIRS}
+    PRIVATE ${OPENAL_INCLUDE_DIR}
+    PRIVATE ${SNDFILE_INCLUDE_DIR}
     PRIVATE src
 )
 
@@ -155,6 +166,8 @@ target_link_libraries(${PROJECT_NAME}
     spdlog::spdlog 
     glfw
     ${FREETYPE_LIBRARIES}
+    ${OPENAL_LIBRARY}
+    ${SNDFILE_LIBRARY}
 )
 
 # debug flag for unix

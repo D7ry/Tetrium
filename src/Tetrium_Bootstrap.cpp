@@ -210,6 +210,11 @@ void Tetrium::Init(const Tetrium::InitOptions& options)
     initDefaultStates();
 
     createFunnyObjects();
+
+    // initialization success, play sound
+    ALuint buffer;
+    _soundManager.loadSound("../assets/sounds/costco.mp3", buffer);
+    _soundManager.playSound(buffer);
 }
 
 void Tetrium::framebufferResizeCallback(GLFWwindow* window, int width, int height)
