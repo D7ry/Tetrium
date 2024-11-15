@@ -130,6 +130,8 @@ void ImGuiWidgetBlobHunter::initializeBlobPath(
         // Random jitter
         float jitterX = (static_cast<float>(rand()) / RAND_MAX - 0.5f) * (maxRadius * 0.1f);
         float jitterY = (static_cast<float>(rand()) / RAND_MAX - 0.5f) * (maxRadius * 0.1f);
+        jitterX = 0;
+        jitterY = 0;
         
         // Combine all motions
         float x = centerX + spiralX + waveX + jitterX;
@@ -143,11 +145,11 @@ void ImGuiWidgetBlobHunter::initializeBlobPath(
     }
     
     // Add a few more random points to increase unpredictability
-    for (int i = 0; i < 100; ++i) {
-        float x = static_cast<float>(rand()) / RAND_MAX * screenSize.x;
-        float y = static_cast<float>(rand()) / RAND_MAX * screenSize.y;
-        attempt.blobPath.controlPoints.emplace_back(x, y);
-    }
+    // for (int i = 0; i < 100; ++i) {
+    //     float x = static_cast<float>(rand()) / RAND_MAX * screenSize.x;
+    //     float y = static_cast<float>(rand()) / RAND_MAX * screenSize.y;
+    //     attempt.blobPath.controlPoints.emplace_back(x, y);
+    // }
     
     attempt.pathProgress = 0.0f;
 }
