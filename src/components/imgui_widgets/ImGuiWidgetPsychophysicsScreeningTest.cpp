@@ -14,6 +14,7 @@ void ImGuiWidgetPhychophysicsScreeningTest::Draw(Tetrium* engine, ColorSpace col
             drawIdle(engine, colorSpace);
             break;
         case TestState::kScreening:
+            drawTestForSubject(engine, colorSpace, _subject);
             break;
         }
     }
@@ -33,11 +34,17 @@ void ImGuiWidgetPhychophysicsScreeningTest::drawIdle(Tetrium* engine, ColorSpace
     ImGui::SetCursorPos(buttonPos);
 
     // Draw the button
-    if (ImGui::Button("Start", buttonSize)) {
-        // Button click handling code goes here
-        // For example:
-        // startGame();
+    if (ImGui::Button("Yuan Test", buttonSize)) {
+        newGame();
     }
+}
+
+void ImGuiWidgetPhychophysicsScreeningTest::newGame()
+{
+    _subject = SubjectContext{
+        .state = SubjectState::kPreparing, .currentAttempt = 0, .numSuccessAttempts = 0
+    };
+    _state = TestState::kScreening;
 }
 
 void ImGuiWidgetPhychophysicsScreeningTest::drawTestForSubject(
@@ -46,4 +53,48 @@ void ImGuiWidgetPhychophysicsScreeningTest::drawTestForSubject(
     SubjectContext& subject
 )
 {
+    switch (subject.state) {
+    case SubjectState::kPreparing:
+        drawFixGazePage();
+        break;
+    case SubjectState::kAnswering:
+        break;
+    case SubjectState::kIdentifying:
+
+        break;
+    }
+}
+
+void ImGuiWidgetPhychophysicsScreeningTest::drawFixGazePage()
+{
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+    ImVec2 screenCenter = ImGui::GetIO().DisplaySize;
+    screenCenter.x *= 0.5f;
+    screenCenter.y *= 0.5f;
+
+    float crossHairSize = 70.f;
+    float crossHairThickness = 10.f;
+    ImU32 crossHairColor = IM_COL32(255, 255, 255, 255); // White color
+
+    drawList->AddLine(
+        ImVec2(screenCenter.x - crossHairSize, screenCenter.y),
+        ImVec2(screenCenter.x + crossHairSize, screenCenter.y),
+        crossHairColor,
+        crossHairThickness
+    );
+    drawList->AddLine(
+        ImVec2(screenCenter.x, screenCenter.y - crossHairSize),
+        ImVec2(screenCenter.x, screenCenter.y + crossHairSize),
+        crossHairColor,
+        crossHairThickness
+    );
+
+    // Add text below crosshair
+    ImVec2 textSize = ImGui::CalcTextSize("Fix Gaze Onto Crosshair");
+    float spacing = 20;
+    ImVec2 textPos(
+        screenCenter.x - textSize.x * 0.5f, screenCenter.y + textSize.y + spacing + crossHairSize
+    ); // 20 pixels below crosshair
+    ImGui::SetCursorPos(textPos);
+    ImGui::Text("Fix Gaze Onto Crosshair");
 }
