@@ -16,3 +16,6 @@
 [submodule "extern/imgui"]
 	path = extern/imgui
 	url = git@github.com:D7ry/imgui.git
+[submodule "extern/TetriumColor"]
+	path = extern/TetriumColor
+	url = git@github.com:imjal/TetriumColor.git
