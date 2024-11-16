@@ -29,7 +29,7 @@ void ImGuiWidgetPerfPlot::ScrollingBuffer::Erase()
     }
 }
 
-void ImGuiWidgetPerfPlot::Draw(const Tetrium* engine, ColorSpace colorSpace)
+void ImGuiWidgetPerfPlot::Draw(Tetrium* engine, ColorSpace colorSpace)
 {
     ImGui::Checkbox("Show Perf Plot", std::addressof(_wantShowPerfPlot));
     double deltaTimeSeconds = engine->_deltaTimer.GetDeltaTimeSeconds();

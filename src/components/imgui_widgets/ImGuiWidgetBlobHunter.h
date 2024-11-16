@@ -3,7 +3,7 @@
 #include <glm/gtx/spline.hpp>
 
 // hunt the blobs, get the scores
-class ImGuiWidgetBlobHunter : public ImGuiWidgetMut
+class ImGuiWidgetBlobHunter : public ImGuiWidget
 {
   public:
     virtual void Draw(Tetrium* engine, ColorSpace colorSpace) override;

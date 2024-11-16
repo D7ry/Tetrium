@@ -37,7 +37,7 @@ void DrawMat4(
     ImGui::PopID();
 }
 
-void ImGuiWidgetUBOViewer::Draw(const Tetrium* engine, ColorSpace colorSpace) {
+void ImGuiWidgetUBOViewer::Draw(Tetrium* engine, ColorSpace colorSpace) {
     const VQBuffer& currentUBO
         = engine->_engineUBOStatic[engine->_currentFrame];
 

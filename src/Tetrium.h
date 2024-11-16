@@ -169,7 +169,7 @@ class Tetrium
         std::vector<VkFramebuffer> frameBuffer;
         ImGuiContext* backendImGuiContext;
         ImPlotContext* backendImPlotContext;
-        std::optional<ImGuiWidgetMut*> activeWidget = std::nullopt;
+        std::optional<ImGuiWidget*> activeWidget = std::nullopt;
     };
 
     /* ---------- Windowing ---------- */;

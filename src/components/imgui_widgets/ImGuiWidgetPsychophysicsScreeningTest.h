@@ -3,7 +3,7 @@
 #include "structs/ImGuiTexture.h"
 
 // for psychophysics screening tests
-class ImGuiWidgetPhychophysicsScreeningTest : public ImGuiWidgetMut
+class ImGuiWidgetPhychophysicsScreeningTest : public ImGuiWidget
 {
   public:
     virtual void Draw(Tetrium* engine, ColorSpace colorSpace) override;

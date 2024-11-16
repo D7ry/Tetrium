@@ -2,7 +2,7 @@
 #include "ImGuiWidget.h"
 
 // prototype demo class to view a tetrachromatic image
-class ImGuiWidgetTetraViewerDemo : public ImGuiWidgetMut
+class ImGuiWidgetTetraViewerDemo : public ImGuiWidget
 {
   private:
     struct DemoImage
