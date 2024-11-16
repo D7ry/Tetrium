@@ -30,51 +30,88 @@ SoundManager::~SoundManager()
     alcCloseDevice(device);
 }
 
-bool SoundManager::loadSound(const std::string& filename, ALuint& buffer)
+void SoundManager::PlaySound(Sound sound)
 {
-    SF_INFO sfInfo;
-    SNDFILE* sndFile = sf_open(filename.c_str(), SFM_READ, &sfInfo);
-    if (!sndFile) {
-        PANIC("Failed to open sound file: " + filename);
-    }
-
-    std::vector<short> samples(sfInfo.frames * sfInfo.channels);
-    if (sf_readf_short(sndFile, samples.data(), sfInfo.frames) < sfInfo.frames) {
-        sf_close(sndFile);
-        PANIC("Failed to read sound file: " + filename);
-    }
-    sf_close(sndFile);
-
-    ALenum format;
-    if (sfInfo.channels == 1) {
-        format = AL_FORMAT_MONO16;
-    } else if (sfInfo.channels == 2) {
-        format = AL_FORMAT_STEREO16;
+    auto it = soundToSourceMap.find(sound);
+    if (it != soundToSourceMap.end()) {
+        ALuint source = it->second;
+        alSourcePlay(source);
     } else {
-        PANIC("Unsupported channel count: " + std::to_string(sfInfo.channels));
+        throw std::runtime_error("Sound not found");
     }
-
-    alGenBuffers(1, &buffer);
-    if (alGetError() != AL_NO_ERROR) {
-        PANIC("Failed to generate OpenAL buffer");
-    }
-
-    alBufferData(buffer, format, samples.data(), samples.size() * sizeof(short), sfInfo.samplerate);
-    if (alGetError() != AL_NO_ERROR) {
-        PANIC("Failed to fill OpenAL buffer with sound data");
-    }
-
-    buffers.push_back(buffer);
-
-    return true;
 }
 
-void SoundManager::playSound(ALuint buffer)
+ALvoid* SoundManager::loadSoundFile(
+    const char* filename,
+    ALsizei* size,
+    ALsizei* freq,
+    ALenum* format
+)
 {
-    ALuint source;
-    alGenSources(1, &source);
-    sources.push_back(source);
+    SF_INFO sfInfo;
+    SNDFILE* sndFile = sf_open(filename, SFM_READ, &sfInfo);
+    if (!sndFile) {
+        PANIC("Failed to open sound file {}", filename);
+    }
 
-    alSourcei(source, AL_BUFFER, buffer);
-    alSourcePlay(source);
+    *size = static_cast<ALsizei>(sfInfo.frames * sfInfo.channels * sizeof(short));
+    *freq = static_cast<ALsizei>(sfInfo.samplerate);
+
+    if (sfInfo.channels == 1) {
+        *format = AL_FORMAT_MONO16;
+    } else if (sfInfo.channels == 2) {
+        *format = AL_FORMAT_STEREO16;
+    } else {
+        sf_close(sndFile);
+        PANIC("Unsupported channel count");
+    }
+
+    short* buffer = static_cast<short*>(malloc(*size));
+    if (!buffer) {
+        sf_close(sndFile);
+        PANIC("Failed to allocate memory for sound data");
+    }
+
+    sf_read_short(sndFile, buffer, sfInfo.frames * sfInfo.channels);
+    sf_close(sndFile);
+
+    return buffer;
+}
+
+void SoundManager::LoadAllSounds()
+{
+    device = alcOpenDevice(nullptr); // Open default device
+    if (!device) {
+        throw std::runtime_error("Failed to open sound device");
+    }
+
+    context = alcCreateContext(device, nullptr); // Create context
+    if (!context || !alcMakeContextCurrent(context)) {
+        if (context)
+            alcDestroyContext(context);
+        alcCloseDevice(device);
+        throw std::runtime_error("Failed to set sound context");
+    }
+
+    for (const auto& [sound, file] : SOUNDS_FILES) {
+        ALuint buffer;
+        alGenBuffers(1, &buffer);
+
+        // Load sound data from file (pseudo-code, replace with actual loading code)
+        ALsizei size, freq;
+        ALenum format;
+        ALvoid* data = loadSoundFile(file, &size, &freq, &format);
+
+        alBufferData(buffer, format, data, size, freq);
+        free(data); // Free the loaded data
+
+        buffers.push_back(buffer);
+
+        ALuint source;
+        alGenSources(1, &source);
+        alSourcei(source, AL_BUFFER, buffer);
+
+        sources.push_back(source);
+        soundToSourceMap[sound] = source;
+    }
 }

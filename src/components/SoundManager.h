@@ -6,15 +6,29 @@
 class SoundManager
 {
   public:
+    enum class Sound
+    {
+        kProgramStart,
+        kVineBoom
+    };
+
+    inline static const std::unordered_map<Sound, const char*> SOUNDS_FILES
+        = {{Sound::kProgramStart, "../assets/sounds/costco.mp3"},
+           {Sound::kVineBoom, "../assets/sounds/vine_boom.mp3"}};
+
     SoundManager();
     ~SoundManager();
 
-    bool loadSound(const std::string& filename, ALuint& buffer);
-    void playSound(ALuint buffer);
+    void PlaySound(Sound sound);
+
+    void LoadAllSounds();
 
   private:
+    ALvoid* loadSoundFile(const char* filename, ALsizei* size, ALsizei* freq, ALenum* format);
+
     ALCdevice* device;
     ALCcontext* context;
     std::vector<ALuint> buffers;
     std::vector<ALuint> sources;
+    std::unordered_map<Sound, ALuint> soundToSourceMap;
 };
