@@ -79,4 +79,7 @@ class ImGuiWidgetPhychophysicsScreeningTest : public ImGuiWidgetMut
     // path to generated textures(RGB, OCV) -- the textures are already loaded into GPU memory.
     // the caller is responsible for freeing generated resources.
     std::pair<std::string, std::string> generateIshiharaTestTextures(SubjectContext& subject);
+
+
+    std::string _nameInputBuffer;
 };

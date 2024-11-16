@@ -3,6 +3,8 @@
 #include "ImGuiWidgetPsychophysicsScreeningTest.h"
 #include "Tetrium.h"
 
+#include "misc/cpp/imgui_stdlib.h"
+
 namespace
 {
 ImVec2 calculateFitSize(float width, float height, const ImVec2& availableSize)
@@ -45,6 +47,7 @@ void ImGuiWidgetPhychophysicsScreeningTest::Draw(Tetrium* engine, ColorSpace col
 
 void ImGuiWidgetPhychophysicsScreeningTest::drawIdle(Tetrium* engine, ColorSpace colorSpace)
 {
+
     const float buttonSpacing = 20.0f;
 
     engine->_soundManager.StartSound(SoundManager::Sound::kMusicGameMenu);
@@ -53,26 +56,62 @@ void ImGuiWidgetPhychophysicsScreeningTest::drawIdle(Tetrium* engine, ColorSpace
 
     // Center the button on the screen
     ImVec2 screenSize = ImGui::GetIO().DisplaySize;
-    ImVec2 buttonPos((screenSize.x - buttonSize.x) * 0.5f, (screenSize.y - buttonSize.y) * 0.5f);
+
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 12.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 5));
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(10, 5));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(10, 10));
+
+    ImGuiTexture tex
+        = engine->getOrLoadImGuiTexture(engine->_imguiCtx, "../assets/textures/BAIR_logo.png");
+    ImVec2 logoSize = ImVec2{(float)tex.width, (float)tex.height};
+
+    ImVec2 elemPos((screenSize.x - logoSize.x) * 0.5f, (screenSize.y - logoSize.y) * 0.5f - 300);
+    // draw the title logo
+    ImGui::SetCursorPos(elemPos);
+    ImGui::Image(tex.id, logoSize);
+
+    // now for the button
+    elemPos = ImVec2(
+        (screenSize.x - buttonSize.x) * 0.5f,
+        (screenSize.y - logoSize.y) * 0.5f - 300 + logoSize.y + 50
+    );
 
     // Set the cursor position for the button
-    ImGui::SetCursorPos(buttonPos);
+    ImGui::SetCursorPos(elemPos);
+    ImGui::Text("Name:");
+    elemPos = elemPos + ImVec2(0, 40);
+    ImGui::SetCursorPos(elemPos);
 
-    // Draw the button
-    if (ImGui::Button("Play", buttonSize)) {
+    // Set the width of the input text box to be the same as the button
+    ImGui::SetNextItemWidth(buttonSize.x);
+    ImGui::InputText("##Input Name", &_nameInputBuffer);
+
+    elemPos = elemPos + ImVec2(0, buttonSize.y + buttonSpacing);
+    ImGui::SetCursorPos(elemPos);
+    bool isNameEmpty = _nameInputBuffer.empty();
+    if (isNameEmpty) {
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+    }
+    if (ImGui::Button("Play", buttonSize) && !isNameEmpty) {
         newGame();
+    }
+    if (isNameEmpty) {
+        ImGui::PopStyleColor(3);
     }
 
     // exit button
-    buttonPos = buttonPos + ImVec2(0, buttonSize.y + buttonSpacing);
-    ImGui::SetCursorPos(buttonPos);
+    elemPos = elemPos + ImVec2(0, buttonSize.y + buttonSpacing);
+    ImGui::SetCursorPos(elemPos);
     if (ImGui::Button("Exit", buttonSize)) {
         engine->_soundManager.StopSound(SoundManager::Sound::kMusicGameMenu);
         engine->_soundManager.PlaySound(SoundManager::Sound::kVineBoom);
         engine->_imguiCtx.activeWidget = std::nullopt;
     }
 
-
+    ImGui::PopStyleVar(4);
 }
 
 void ImGuiWidgetPhychophysicsScreeningTest::newGame()
@@ -80,7 +119,7 @@ void ImGuiWidgetPhychophysicsScreeningTest::newGame()
     // stall and generate ishihara textures
 
     _subject = SubjectContext{
-        .name = "Ren Der Ng",
+        .name = _nameInputBuffer,
         .currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.FIXATION,
         .state = SubjectState::kFixation,
         .currentAttempt = 0,
@@ -195,27 +234,31 @@ void ImGuiWidgetPhychophysicsScreeningTest::drawAnswerPrompts(
     float verticalSpacing = 200.0f;
 
     // Calculate positions for the four buttons in AXBY layout
-    ImVec2 topPos = ImVec2(centerPos.x, centerPos.y - verticalSpacing);           // Y
-    ImVec2 leftPos = ImVec2(centerPos.x - horizontalSpacing, centerPos.y);        // X
-    ImVec2 rightPos = ImVec2(centerPos.x + horizontalSpacing, centerPos.y);       // B
-    ImVec2 bottomPos = ImVec2(centerPos.x, centerPos.y + verticalSpacing);        // A
+    ImVec2 topPos = ImVec2(centerPos.x, centerPos.y - verticalSpacing);     // Y
+    ImVec2 leftPos = ImVec2(centerPos.x - horizontalSpacing, centerPos.y);  // X
+    ImVec2 rightPos = ImVec2(centerPos.x + horizontalSpacing, centerPos.y); // B
+    ImVec2 bottomPos = ImVec2(centerPos.x, centerPos.y + verticalSpacing);  // A
 
     ImVec2 positions[4] = {bottomPos, leftPos, rightPos, topPos}; // A, X, B, Y order
     const char* buttonLabels[4] = {"A", "X", "B", "Y"};
 
     // Draw the four buttons
     for (int i = 0; i < 4; i++) {
-        ImGuiTexture tex = engine->getOrLoadImGuiTexture(engine->_imguiCtx, subject.currentAnswerTexturePath[i]);
+        ImGuiTexture tex
+            = engine->getOrLoadImGuiTexture(engine->_imguiCtx, subject.currentAnswerTexturePath[i]);
 
-        ImGui::SetCursorPos(ImVec2(positions[i].x - buttonSize/2, positions[i].y - buttonSize/2));
-        if (ImGui::ImageButton(buttonLabels[i], (void*)(intptr_t)tex.id, ImVec2(buttonSize, buttonSize))) {
+        ImGui::SetCursorPos(ImVec2(positions[i].x - buttonSize / 2, positions[i].y - buttonSize / 2)
+        );
+        if (ImGui::ImageButton(
+                buttonLabels[i], (void*)(intptr_t)tex.id, ImVec2(buttonSize, buttonSize)
+            )) {
             DEBUG("{} button clicked!", buttonLabels[i]);
             engine->_soundManager.PlaySound(SoundManager::Sound::kVineBoom);
             // Handle button click
         }
 
         // Add button label
-        ImVec2 textPos = ImVec2(positions[i].x - 10, positions[i].y + buttonSize/2 + 5);
+        ImVec2 textPos = ImVec2(positions[i].x - 10, positions[i].y + buttonSize / 2 + 5);
         ImGui::SetCursorPos(textPos);
         ImGui::Text("%s", buttonLabels[i]);
     }
