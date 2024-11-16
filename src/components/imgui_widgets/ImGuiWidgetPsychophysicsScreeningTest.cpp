@@ -45,6 +45,9 @@ void ImGuiWidgetPhychophysicsScreeningTest::Draw(Tetrium* engine, ColorSpace col
 
 void ImGuiWidgetPhychophysicsScreeningTest::drawIdle(Tetrium* engine, ColorSpace colorSpace)
 {
+    const float buttonSpacing = 20.0f;
+
+    engine->_soundManager.StartSound(SoundManager::Sound::kMusicGameMenu);
     // Set the button size
     ImVec2 buttonSize(200, 100);
 
@@ -56,9 +59,20 @@ void ImGuiWidgetPhychophysicsScreeningTest::drawIdle(Tetrium* engine, ColorSpace
     ImGui::SetCursorPos(buttonPos);
 
     // Draw the button
-    if (ImGui::Button("Yuan Test", buttonSize)) {
+    if (ImGui::Button("Play", buttonSize)) {
         newGame();
     }
+
+    // exit button
+    buttonPos = buttonPos + ImVec2(0, buttonSize.y + buttonSpacing);
+    ImGui::SetCursorPos(buttonPos);
+    if (ImGui::Button("Exit", buttonSize)) {
+        engine->_soundManager.StopSound(SoundManager::Sound::kMusicGameMenu);
+        engine->_soundManager.PlaySound(SoundManager::Sound::kVineBoom);
+        engine->_imguiCtx.activeWidget = std::nullopt;
+    }
+
+
 }
 
 void ImGuiWidgetPhychophysicsScreeningTest::newGame()

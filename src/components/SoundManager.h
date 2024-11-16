@@ -9,17 +9,22 @@ class SoundManager
     enum class Sound
     {
         kProgramStart,
-        kVineBoom
+        kVineBoom,
+        kMusicGameMenu,
     };
 
     inline static const std::unordered_map<Sound, const char*> SOUNDS_FILES
         = {{Sound::kProgramStart, "../assets/sounds/costco.mp3"},
-           {Sound::kVineBoom, "../assets/sounds/vine_boom.mp3"}};
+           {Sound::kVineBoom, "../assets/sounds/vine_boom.mp3"},
+           {Sound::kMusicGameMenu, "../assets/sounds/music/powerup.mp3"}};
 
     SoundManager();
     ~SoundManager();
 
     void PlaySound(Sound sound);
+    void StartSound(Sound sound);
+
+    void StopSound(Sound sound);
 
     void LoadAllSounds();
 

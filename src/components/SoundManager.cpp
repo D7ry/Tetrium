@@ -41,6 +41,17 @@ void SoundManager::PlaySound(Sound sound)
     }
 }
 
+void SoundManager::StopSound(Sound sound)
+{
+    auto it = soundToSourceMap.find(sound);
+    if (it != soundToSourceMap.end()) {
+        ALuint source = it->second;
+        alSourceStop(source);
+    } else {
+        PANIC("sound not found");
+    }
+}
+
 ALvoid* SoundManager::loadSoundFile(
     const char* filename,
     ALsizei* size,
@@ -113,5 +124,20 @@ void SoundManager::LoadAllSounds()
 
         sources.push_back(source);
         soundToSourceMap[sound] = source;
+    }
+}
+
+void SoundManager::StartSound(Sound sound)
+{
+    auto it = soundToSourceMap.find(sound);
+    if (it != soundToSourceMap.end()) {
+        ALuint source = it->second;
+        ALint state;
+        alGetSourcei(source, AL_SOURCE_STATE, &state);
+        if (state != AL_PLAYING) {
+            alSourcePlay(source);
+        }
+    } else {
+        PANIC("sound not found");
     }
 }

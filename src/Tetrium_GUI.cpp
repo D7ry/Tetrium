@@ -97,6 +97,10 @@ void Tetrium::drawImGui(ColorSpace colorSpace)
     }
     Tetrium_GUI::drawFootNote();
 
+    if (_imguiCtx.activeWidget.has_value()) {
+        _imguiCtx.activeWidget.value()->Draw(this, colorSpace);
+    }
+
     if (ImGui::Begin(DEFAULTS::Engine::APPLICATION_NAME)) {
         if (ImGui::BeginTabBar("Engine Tab")) {
             if (ImGui::BeginTabItem((const char*)u8"🏠General")) {
@@ -137,6 +141,13 @@ void Tetrium::drawImGui(ColorSpace colorSpace)
                 ImGui::EndTabItem();
             }
 
+            if (ImGui::BeginTabItem("🎨Apps")) {
+                if (ImGui::Button("Psychophysics Screening Test")) {
+                    _imguiCtx.activeWidget = &_widgetScreeningTest;
+                }
+                ImGui::EndTabItem();
+            }
+
             if (ImGui::BeginTabItem("🚀Performance")) {
                 _widgetPerfPlot.Draw(this, colorSpace);
                 ImGui::EndTabItem();
@@ -165,11 +176,6 @@ void Tetrium::drawImGui(ColorSpace colorSpace)
 
             if (ImGui::BeginTabItem("🐍Blob Hunter")) {
                 _widgetBlobHunter.Draw(this, colorSpace);
-                ImGui::EndTabItem();
-            }
-
-            if (ImGui::BeginTabItem("⭕️Psychophysics Screening")) {
-                _widgetScreeningTest.Draw(this, colorSpace);
                 ImGui::EndTabItem();
             }
 

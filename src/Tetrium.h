@@ -169,6 +169,7 @@ class Tetrium
         std::vector<VkFramebuffer> frameBuffer;
         ImGuiContext* ctxImGui[ColorSpace::ColorSpaceSize] = {};
         ImPlotContext* ctxImPlot[ColorSpace::ColorSpaceSize] = {};
+        std::optional<ImGuiWidgetMut*> activeWidget = std::nullopt;
     };
 
     /* ---------- Windowing ---------- */;
