@@ -141,3 +141,26 @@ void SoundManager::StartSound(Sound sound)
         PANIC("sound not found");
     }
 }
+
+void SoundManager::Tick()
+{
+    if (currentMusic.has_value()) {
+        StartSound(currentMusic.value());
+    }
+}
+
+void SoundManager::SetMusic(Sound music)
+{
+    if (currentMusic.has_value() && currentMusic.value() != music) {
+        StopSound(currentMusic.value());
+    }
+    currentMusic = music;
+}
+
+void SoundManager::DisableMusic()
+{
+    if (currentMusic.has_value()) {
+        StopSound(currentMusic.value());
+    }
+    currentMusic = std::nullopt;
+}

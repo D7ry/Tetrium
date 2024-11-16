@@ -49,6 +49,7 @@ void Tetrium::Tick()
         return;
     }
     _deltaTimer.Tick();
+    _soundManager.Tick();
     {
         {
             PROFILE_SCOPE(&_profiler, "Render Loop");

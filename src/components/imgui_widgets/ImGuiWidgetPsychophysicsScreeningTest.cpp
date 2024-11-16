@@ -50,7 +50,7 @@ void ImGuiWidgetPhychophysicsScreeningTest::drawIdle(Tetrium* engine, ColorSpace
 
     const float buttonSpacing = 20.0f;
 
-    engine->_soundManager.StartSound(SoundManager::Sound::kMusicGameMenu);
+    engine->_soundManager.SetMusic(SoundManager::Sound::kMusicGameMenu);
     // Set the button size
     ImVec2 buttonSize(200, 100);
 
@@ -106,7 +106,6 @@ void ImGuiWidgetPhychophysicsScreeningTest::drawIdle(Tetrium* engine, ColorSpace
     elemPos = elemPos + ImVec2(0, buttonSize.y + buttonSpacing);
     ImGui::SetCursorPos(elemPos);
     if (ImGui::Button("Exit", buttonSize)) {
-        engine->_soundManager.StopSound(SoundManager::Sound::kMusicGameMenu);
         engine->_soundManager.PlaySound(SoundManager::Sound::kVineBoom);
         engine->_imguiCtx.activeWidget = std::nullopt;
     }
@@ -144,6 +143,7 @@ void ImGuiWidgetPhychophysicsScreeningTest::drawTestForSubject(
     SubjectContext& subject
 )
 {
+    engine->_soundManager.SetMusic(SoundManager::Sound::kMusicGamePlay);
     // handle state transition
     subject.currStateRemainderTime -= ImGui::GetIO().DeltaTime;
     if (subject.currStateRemainderTime <= 0) {

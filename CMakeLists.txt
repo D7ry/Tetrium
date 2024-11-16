@@ -62,6 +62,9 @@ endif()
 find_package(OpenAL REQUIRED)
 find_package(SndFile REQUIRED)
 
+# embed python 
+find_package(Python3 REQUIRED COMPONENTS Development)
+
 project(Tetrium)
 
 add_executable(${PROJECT_NAME}
@@ -119,6 +122,7 @@ target_include_directories(${PROJECT_NAME}
     PRIVATE ${FREETYPE_INCLUDE_DIRS}
     PRIVATE ${OPENAL_INCLUDE_DIR}
     PRIVATE ${SNDFILE_INCLUDE_DIR}
+    PRIVATE ${Python3_INCLUDE_DIRS}
     PRIVATE src
 )
 
@@ -168,6 +172,7 @@ target_link_libraries(${PROJECT_NAME}
     ${FREETYPE_LIBRARIES}
     ${OPENAL_LIBRARY}
     ${SNDFILE_LIBRARY}
+    ${Python3_LIBRARIES}
 )
 
 # debug flag for unix

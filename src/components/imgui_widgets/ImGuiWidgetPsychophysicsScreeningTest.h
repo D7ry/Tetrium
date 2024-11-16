@@ -81,5 +81,5 @@ class ImGuiWidgetPhychophysicsScreeningTest : public ImGuiWidgetMut
     std::pair<std::string, std::string> generateIshiharaTestTextures(SubjectContext& subject);
 
 
-    std::string _nameInputBuffer;
+    std::string _nameInputBuffer = "ren";
 };

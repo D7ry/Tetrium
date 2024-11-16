@@ -63,10 +63,7 @@ void Tetrium::drawImGui(ColorSpace colorSpace)
     ImPlot::SetCurrentContext(_imguiCtx.ctxImPlot[ColorSpace::RGB]);
 
     // ---------- Prologue ----------
-    // note that drawImGui is called twice per tick for RGB and OCV space,
-    // so we need different profiler ID for them.
-    const char* profileId = colorSpace == ColorSpace::RGB ? "ImGui Draw RGB" : "ImGui Draw OCV";
-    PROFILE_SCOPE(&_profiler, profileId);
+    PROFILE_SCOPE(&_profiler, "ImGui Draw");
 
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplGlfw_NewFrame();
@@ -99,6 +96,8 @@ void Tetrium::drawImGui(ColorSpace colorSpace)
 
     if (_imguiCtx.activeWidget.has_value()) {
         _imguiCtx.activeWidget.value()->Draw(this, colorSpace);
+    } else {
+        _soundManager.DisableMusic();
     }
 
     if (ImGui::Begin(DEFAULTS::Engine::APPLICATION_NAME)) {
