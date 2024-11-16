@@ -196,6 +196,7 @@ void ImGuiWidgetPhychophysicsScreeningTest::drawAnswerPrompts(
         ImGui::SetCursorPos(ImVec2(positions[i].x - buttonSize/2, positions[i].y - buttonSize/2));
         if (ImGui::ImageButton(buttonLabels[i], (void*)(intptr_t)tex.id, ImVec2(buttonSize, buttonSize))) {
             DEBUG("{} button clicked!", buttonLabels[i]);
+            engine->_soundManager.PlaySound(SoundManager::Sound::kVineBoom);
             // Handle button click
         }
 

@@ -37,7 +37,7 @@ void SoundManager::PlaySound(Sound sound)
         ALuint source = it->second;
         alSourcePlay(source);
     } else {
-        throw std::runtime_error("Sound not found");
+        PANIC("sound not found");
     }
 }
 
