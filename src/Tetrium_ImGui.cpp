@@ -28,7 +28,7 @@ struct
     GLFWmonitorfun Monitor = nullptr;
 } prevCallbacks;
 
-void ImGuiCustomWindowFocusCallback(GLFWwindow* window, int focused)
+[[deprecated]] void ImGuiCustomWindowFocusCallback(GLFWwindow* window, int focused)
 {
     for (int i = 0; i < ColorSpace::ColorSpaceSize; ++i) {
         ImGui::SetCurrentContext(ctxImGui[i]);
@@ -40,7 +40,7 @@ void ImGuiCustomWindowFocusCallback(GLFWwindow* window, int focused)
         prevCallbacks.WindowFocus(window, focused);
 }
 
-void ImGuiCustomCursorEnterCallback(GLFWwindow* window, int entered)
+[[deprecated]] void ImGuiCustomCursorEnterCallback(GLFWwindow* window, int entered)
 {
     for (int i = 0; i < ColorSpace::ColorSpaceSize; ++i) {
         ImGui::SetCurrentContext(ctxImGui[i]);
@@ -52,7 +52,7 @@ void ImGuiCustomCursorEnterCallback(GLFWwindow* window, int entered)
         prevCallbacks.CursorEnter(window, entered);
 }
 
-void ImGuiCustomCursorPosCallback(GLFWwindow* window, double xpos, double ypos)
+[[deprecated]] void ImGuiCustomCursorPosCallback(GLFWwindow* window, double xpos, double ypos)
 {
     for (int i = 0; i < ColorSpace::ColorSpaceSize; ++i) {
         ImGui::SetCurrentContext(ctxImGui[i]);
@@ -64,7 +64,12 @@ void ImGuiCustomCursorPosCallback(GLFWwindow* window, double xpos, double ypos)
         prevCallbacks.CursorPos(window, xpos, ypos);
 }
 
-void ImGuiCustomMouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
+[[deprecated]] void ImGuiCustomMouseButtonCallback(
+    GLFWwindow* window,
+    int button,
+    int action,
+    int mods
+)
 {
     for (int i = 0; i < ColorSpace::ColorSpaceSize; ++i) {
         ImGui::SetCurrentContext(ctxImGui[i]);
@@ -76,7 +81,7 @@ void ImGuiCustomMouseButtonCallback(GLFWwindow* window, int button, int action, 
         prevCallbacks.MouseButton(window, button, action, mods);
 }
 
-void ImGuiCustomScrollCallback(GLFWwindow* window, double xoffset, double yoffset)
+[[deprecated]] void ImGuiCustomScrollCallback(GLFWwindow* window, double xoffset, double yoffset)
 {
     for (int i = 0; i < ColorSpace::ColorSpaceSize; ++i) {
         ImGui::SetCurrentContext(ctxImGui[i]);
@@ -88,7 +93,13 @@ void ImGuiCustomScrollCallback(GLFWwindow* window, double xoffset, double yoffse
         prevCallbacks.Scroll(window, xoffset, yoffset);
 }
 
-void ImGuiCustomKeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
+[[deprecated]] void ImGuiCustomKeyCallback(
+    GLFWwindow* window,
+    int key,
+    int scancode,
+    int action,
+    int mods
+)
 {
     for (int i = 0; i < ColorSpace::ColorSpaceSize; ++i) {
         ImGui::SetCurrentContext(ctxImGui[i]);
@@ -100,7 +111,7 @@ void ImGuiCustomKeyCallback(GLFWwindow* window, int key, int scancode, int actio
         prevCallbacks.Key(window, key, scancode, action, mods);
 }
 
-void ImGuiCustomCharCallback(GLFWwindow* window, unsigned int c)
+[[deprecated]] void ImGuiCustomCharCallback(GLFWwindow* window, unsigned int c)
 {
     for (int i = 0; i < ColorSpace::ColorSpaceSize; ++i) {
         ImGui::SetCurrentContext(ctxImGui[i]);
@@ -112,7 +123,7 @@ void ImGuiCustomCharCallback(GLFWwindow* window, unsigned int c)
         prevCallbacks.Char(window, c);
 }
 
-void ImGuiCustomMonitorCallback(GLFWmonitor* monitor, int event)
+[[deprecated]] void ImGuiCustomMonitorCallback(GLFWmonitor* monitor, int event)
 {
     for (int i = 0; i < ColorSpace::ColorSpaceSize; ++i) {
         ImGui::SetCurrentContext(ctxImGui[i]);
@@ -129,7 +140,7 @@ void ImGuiCustomMonitorCallback(GLFWmonitor* monitor, int event)
 // Set up custom callback functions that invokes on both RGB
 // and OCV imgui contexts; Naively binding all callbacks through
 // GLFW doesn't work, as the callbacks do not handle context switching.
-void setupCustomCallbacks(GLFWwindow* window)
+[[deprecated]] void setupCustomCallbacks(GLFWwindow* window)
 {
     // Store previous callbacks and set new ones
     GLFW::prevCallbacks.WindowFocus
@@ -285,7 +296,7 @@ void Tetrium::reinitImGuiFrameBuffers(Tetrium::ImGuiRenderContexts& ctx)
 
 void Tetrium::destroyImGuiContext(Tetrium::ImGuiRenderContexts& ctx)
 {
-    // FIXME: current imgui impl does not support vulkan multi-context shutdown;
+    // NOTE: current imgui impl does not support vulkan multi-context shutdown;
     // not a big problem for now since we only shut down at very end, but
     // it leads to ugly validation errors
     ImGui_ImplVulkan_Shutdown();
@@ -419,7 +430,8 @@ const ImGuiTexture& Tetrium::getOrLoadImGuiTexture(
     return res.first->second;
 }
 
-void Tetrium::unloadImGuiTexture(Tetrium::ImGuiRenderContexts& ctx, const std::string& texture) {
+void Tetrium::unloadImGuiTexture(Tetrium::ImGuiRenderContexts& ctx, const std::string& texture)
+{
 
     auto it = ctx.textures.find(texture);
     ASSERT(it != ctx.textures.end());
