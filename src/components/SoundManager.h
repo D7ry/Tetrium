@@ -18,7 +18,8 @@ class SoundManager
         = {{Sound::kProgramStart, "../assets/sounds/costco.mp3"},
            {Sound::kVineBoom, "../assets/sounds/vine_boom.mp3"},
            {Sound::kMusicGameMenu, "../assets/sounds/music/wii.mp3"},
-           {Sound::kMusicGamePlay, "../assets/sounds/music/sneaky.mp3"},
+           // {Sound::kMusicGamePlay, "../assets/sounds/music/sneaky.mp3"},
+           {Sound::kMusicGamePlay, "../assets/sounds/music/powerup.mp3"},
         };
 
 

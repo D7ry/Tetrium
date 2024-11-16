@@ -24,7 +24,7 @@ ImVec2 calculateFitSize(float width, float height, const ImVec2& availableSize)
 }
 } // namespace
 
-void ImGuiWidgetPhychophysicsScreeningTest::Draw(Tetrium* engine, ColorSpace colorSpace)
+void ImGuiWidgetPsychophysicsScreeningTest::Draw(Tetrium* engine, ColorSpace colorSpace)
 {
 
     ImGui::SetNextWindowPos(ImVec2(0, 0));
@@ -45,7 +45,7 @@ void ImGuiWidgetPhychophysicsScreeningTest::Draw(Tetrium* engine, ColorSpace col
     ImGui::End();
 }
 
-void ImGuiWidgetPhychophysicsScreeningTest::drawIdle(Tetrium* engine, ColorSpace colorSpace)
+void ImGuiWidgetPsychophysicsScreeningTest::drawIdle(Tetrium* engine, ColorSpace colorSpace)
 {
 
     const float buttonSpacing = 20.0f;
@@ -113,7 +113,7 @@ void ImGuiWidgetPhychophysicsScreeningTest::drawIdle(Tetrium* engine, ColorSpace
     ImGui::PopStyleVar(4);
 }
 
-void ImGuiWidgetPhychophysicsScreeningTest::newGame()
+void ImGuiWidgetPsychophysicsScreeningTest::newGame()
 {
     // stall and generate ishihara textures
 
@@ -137,7 +137,7 @@ void ImGuiWidgetPhychophysicsScreeningTest::newGame()
     _state = TestState::kScreening;
 }
 
-void ImGuiWidgetPhychophysicsScreeningTest::drawTestForSubject(
+void ImGuiWidgetPsychophysicsScreeningTest::drawTestForSubject(
     Tetrium* engine,
     ColorSpace colorSpace,
     SubjectContext& subject
@@ -149,6 +149,7 @@ void ImGuiWidgetPhychophysicsScreeningTest::drawTestForSubject(
     if (subject.currStateRemainderTime <= 0) {
         transitionSubjectState(subject);
     }
+    ASSERT(subject.currStateRemainderTime > 0);
 
     switch (subject.state) {
     case SubjectState::kFixation:
@@ -163,7 +164,7 @@ void ImGuiWidgetPhychophysicsScreeningTest::drawTestForSubject(
     }
 }
 
-void ImGuiWidgetPhychophysicsScreeningTest::drawFixGazePage()
+void ImGuiWidgetPsychophysicsScreeningTest::drawFixGazePage()
 {
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     ImVec2 screenCenter = ImGui::GetIO().DisplaySize;
@@ -199,7 +200,7 @@ void ImGuiWidgetPhychophysicsScreeningTest::drawFixGazePage()
 }
 
 // draws an ishihara plate
-void ImGuiWidgetPhychophysicsScreeningTest::drawIshihara(
+void ImGuiWidgetPsychophysicsScreeningTest::drawIshihara(
     Tetrium* engine,
     SubjectContext& subject,
     ColorSpace cs
@@ -218,7 +219,7 @@ void ImGuiWidgetPhychophysicsScreeningTest::drawIshihara(
     ImGui::Image(tex.id, textureFullscreenSize);
 }
 
-void ImGuiWidgetPhychophysicsScreeningTest::drawAnswerPrompts(
+void ImGuiWidgetPsychophysicsScreeningTest::drawAnswerPrompts(
     Tetrium* engine,
     SubjectContext& subject,
     ColorSpace cs
@@ -264,7 +265,7 @@ void ImGuiWidgetPhychophysicsScreeningTest::drawAnswerPrompts(
     }
 }
 
-std::pair<std::string, std::string> ImGuiWidgetPhychophysicsScreeningTest::
+std::pair<std::string, std::string> ImGuiWidgetPsychophysicsScreeningTest::
     generateIshiharaTestTextures(SubjectContext& subject)
 {
     std::string& subjectName = subject.name;
@@ -285,7 +286,7 @@ std::pair<std::string, std::string> ImGuiWidgetPhychophysicsScreeningTest::
     NEEDS_IMPLEMENTATION();
 }
 
-void ImGuiWidgetPhychophysicsScreeningTest::transitionSubjectState(SubjectContext& subject)
+void ImGuiWidgetPsychophysicsScreeningTest::transitionSubjectState(SubjectContext& subject)
 {
     switch (subject.state) {
     case SubjectState::kFixation:
@@ -312,7 +313,7 @@ void ImGuiWidgetPhychophysicsScreeningTest::transitionSubjectState(SubjectContex
     }
 }
 
-void ImGuiWidgetPhychophysicsScreeningTest::endGame(SubjectContext& subject)
+void ImGuiWidgetPsychophysicsScreeningTest::endGame(SubjectContext& subject)
 {
     DEBUG("ending game for subject {}", subject.name);
     _state = TestState::kIdle;

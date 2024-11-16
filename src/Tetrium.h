@@ -257,6 +257,7 @@ class Tetrium
 
     /* ---------- Render-Time Functions ---------- */
     void drawFrame(TickContext* tickData, uint8_t frame);
+    void drawMainMenu(ColorSpace colorSpace);
     void drawImGui(ColorSpace colorSpace);
     void flushEngineUBOStatic(uint8_t frame);
     void getMainProjectionMatrix(glm::mat4& projectionMatrix);
@@ -427,7 +428,7 @@ class Tetrium
     friend class ImGuiWidgetTetraViewer;
     friend class ImGuiWidgetTemp;
     friend class ImGuiWidgetBlobHunter;
-    friend class ImGuiWidgetPhychophysicsScreeningTest;
+    friend class ImGuiWidgetPsychophysicsScreeningTest;
 
     ImGuiWidgetDeviceInfo _widgetDeviceInfo;
     ImGuiWidgetPerfPlot _widgetPerfPlot;
@@ -440,7 +441,7 @@ class Tetrium
     ImGuiWidgetTemp _widgetTemp;
 
     ImGuiWidgetBlobHunter _widgetBlobHunter;
-    ImGuiWidgetPhychophysicsScreeningTest _widgetScreeningTest;
+    ImGuiWidgetPsychophysicsScreeningTest _widgetScreeningTest;
 
 
     struct

@@ -48,54 +48,8 @@ void drawFootNote()
 
 }; // namespace Tetrium_GUI
 
-// parent function to draw imgui; sets up all contexts and performs drawing.
-// note that the actual "painting" onto the frame buffer doesn't happen.
-// ImGui internally constructs a draw list, that gets painted onto the fb
-// with `recordImGuiDrawCommandBuffer`
-void Tetrium::drawImGui(ColorSpace colorSpace)
+void Tetrium::drawMainMenu(ColorSpace colorSpace)
 {
-    if (!_wantToDrawImGui) {
-        return;
-    }
-
-    // ---------- Prologue ----------
-    PROFILE_SCOPE(&_profiler, "ImGui Draw");
-
-    ImGui_ImplVulkan_NewFrame();
-    ImGui_ImplGlfw_NewFrame();
-    ImGui::NewFrame();
-
-    // imgui is associated with the glfw window to handle inputs,
-    // but its actual fb is associated with the projector display;
-    // so we need to manually re-adjust the display size for the scissors/
-    // viewports/clipping to be consistent
-    bool imguiDisplaySizeOverride = _tetraMode == TetraMode::kEvenOddHardwareSync;
-    if (imguiDisplaySizeOverride) {
-        ImVec2 projectorDisplaySize{
-            static_cast<float>(_mainProjectorDisplay.extent.width),
-            static_cast<float>(_mainProjectorDisplay.extent.height)
-        };
-        ImGuiIO& io = ImGui::GetIO();
-        io.DisplaySize = projectorDisplaySize;
-        io.DisplayFramebufferScale = {1, 1};
-        ImGui::GetMainViewport()->Size = projectorDisplaySize;
-    }
-
-    if (!_windowFocused) {
-        ImGuiU::DrawCenteredText("Press Tab to enable input", ImVec4(0, 0, 0, 0.8));
-    } else if (_uiMode) { // window focused and in ui mode, draw cursor
-        ImGuiTexture cursorTexture
-            = getOrLoadImGuiTexture(_imguiCtx, "../assets/textures/engine/cursor.png");
-        Tetrium_GUI::drawCursor(cursorTexture);
-    }
-    Tetrium_GUI::drawFootNote();
-
-    if (_imguiCtx.activeWidget.has_value()) {
-        _imguiCtx.activeWidget.value()->Draw(this, colorSpace);
-    } else {
-        _soundManager.DisableMusic();
-    }
-
     if (ImGui::Begin(DEFAULTS::Engine::APPLICATION_NAME)) {
         if (ImGui::BeginTabBar("Engine Tab")) {
             if (ImGui::BeginTabItem((const char*)u8"🏠General")) {
@@ -184,5 +138,56 @@ void Tetrium::drawImGui(ColorSpace colorSpace)
     }
 
     ImGui::End();
+}
+
+// parent function to draw imgui; sets up all contexts and performs drawing.
+// note that the actual "painting" onto the frame buffer doesn't happen.
+// ImGui internally constructs a draw list, that gets painted onto the fb
+// with `recordImGuiDrawCommandBuffer`
+void Tetrium::drawImGui(ColorSpace colorSpace)
+{
+    if (!_wantToDrawImGui) {
+        return;
+    }
+
+    // ---------- Prologue ----------
+    PROFILE_SCOPE(&_profiler, "ImGui Draw");
+
+    ImGui_ImplVulkan_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+
+    // imgui is associated with the glfw window to handle inputs,
+    // but its actual fb is associated with the projector display;
+    // so we need to manually re-adjust the display size for the scissors/
+    // viewports/clipping to be consistent
+    bool imguiDisplaySizeOverride = _tetraMode == TetraMode::kEvenOddHardwareSync;
+    if (imguiDisplaySizeOverride) {
+        ImVec2 projectorDisplaySize{
+            static_cast<float>(_mainProjectorDisplay.extent.width),
+            static_cast<float>(_mainProjectorDisplay.extent.height)
+        };
+        ImGuiIO& io = ImGui::GetIO();
+        io.DisplaySize = projectorDisplaySize;
+        io.DisplayFramebufferScale = {1, 1};
+        ImGui::GetMainViewport()->Size = projectorDisplaySize;
+    }
+
+    if (!_windowFocused) {
+        ImGuiU::DrawCenteredText("Press Tab to enable input", ImVec4(0, 0, 0, 0.8));
+    } else if (_uiMode) { // window focused and in ui mode, draw cursor
+        ImGuiTexture cursorTexture
+            = getOrLoadImGuiTexture(_imguiCtx, "../assets/textures/engine/cursor.png");
+        Tetrium_GUI::drawCursor(cursorTexture);
+    }
+    Tetrium_GUI::drawFootNote();
+
+    if (_imguiCtx.activeWidget.has_value()) {
+        _imguiCtx.activeWidget.value()->Draw(this, colorSpace);
+    } else {
+        _soundManager.DisableMusic();
+        drawMainMenu(colorSpace);
+    }
+
     ImGui::Render();
 }

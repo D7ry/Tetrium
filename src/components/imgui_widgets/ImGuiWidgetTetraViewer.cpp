@@ -48,9 +48,7 @@ void ImGuiWidgetTetraViewer::drawTetraImage(
 
 void ImGuiWidgetTetraViewer::Draw(Tetrium* engine, ColorSpace colorSpace)
 {
-    if (colorSpace == RGB) {
-        pollControls();
-    }
+    pollControls();
     ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0, 0, 0, 1));
     ImGuiWindowFlags flags = 0;
     if (_fullScreen) {
@@ -126,7 +124,7 @@ void ImGuiWidgetTetraViewer::drawTetraImagePicker(ColorSpace colorSpace)
         refreshTetraImagePicker();
         _shouldRefreshFilePicker = false;
     }
-    if (ImGui::Button("Load Images") && colorSpace == RGB) {
+    if (ImGui::Button("Load Images")) {
         _shouldRefreshFilePicker = true;
     }
 

@@ -194,8 +194,6 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frameIdx)
                     || (!isEven && _evenOddRenderingSettings.blackOutOdd)
             );
 
-            // NOTE: we use RGB context for both RGB and OCV drawing as a temp workaround
-            // TODO: refactor so we don't do multi-context anymore
             recordImGuiDrawCommandBuffer(_imguiCtx, RGB, CB1, extend, swapchainImageIndex);
         }
 
