@@ -11,8 +11,8 @@ namespace Tetrium_ImGui
 {
 // context arrays that gets populated after Tetrium::initImGuiContext() is called
 // stores the same data as `Tetrium::_imguiCtx.ctxImGui` and `Tetrium::_imguiCtx.ctxImPlot`
-static ImGuiContext* ctxImGui[ColorSpace::ColorSpaceSize] = {};
-static ImPlotContext* ctxImPlot[ColorSpace::ColorSpaceSize] = {};
+[[deprecated]] static ImGuiContext* ctxImGui[ColorSpace::ColorSpaceSize] = {};
+[[deprecated]] static ImPlotContext* ctxImPlot[ColorSpace::ColorSpaceSize] = {};
 
 namespace GLFW
 {
@@ -348,30 +348,23 @@ void Tetrium::initImGuiRenderContext(Tetrium::ImGuiRenderContexts& ctx)
 
     IMGUI_CHECKVERSION();
 
-    // initialize imgui contexts for both
-    for (ColorSpace cs : {RGB, OCV}) {
-        ctx.ctxImGui[cs] = ImGui::CreateContext();
-        ctx.ctxImPlot[cs] = ImPlot::CreateContext();
-        ImGui::SetCurrentContext(ctx.ctxImGui[cs]);
-        ImPlot::SetCurrentContext(ctx.ctxImPlot[cs]);
+    ctx.backendImGuiContext = ImGui::CreateContext();
+    ctx.backendImPlotContext = ImPlot::CreateContext();
+    ImGui::SetCurrentContext(ctx.backendImGuiContext);
+    ImPlot::SetCurrentContext(ctx.backendImPlotContext);
 
-        ImGui_ImplGlfw_InitForVulkan(_window, false);
-        ImGui_ImplVulkan_Init(&initInfo);
+    bool installCallbacks = true;
+    ImGui_ImplGlfw_InitForVulkan(_window, installCallbacks);
+    ImGui_ImplVulkan_Init(&initInfo);
 
-        ImGuiIO& io = ImGui::GetIO();
-        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
-        io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
-        ImGui::StyleColorsDark();
+    ImGuiIO& io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
+    ImGui::StyleColorsDark();
 
-        Tetrium_ImGui::setupImGuiStyle();
-        Tetrium_ImGui::initFonts();
+    Tetrium_ImGui::setupImGuiStyle();
+    Tetrium_ImGui::initFonts();
 
-        // store the context pointers
-        Tetrium_ImGui::ctxImGui[cs] = ctx.ctxImGui[cs];
-        Tetrium_ImGui::ctxImPlot[cs] = ctx.ctxImPlot[cs];
-    }
-
-    Tetrium_ImGui::setupCustomCallbacks(_window);
     DEBUG("imgui context initialized");
 }
 
@@ -383,9 +376,6 @@ void Tetrium::recordImGuiDrawCommandBuffer(
     int swapChainImageIndex
 )
 {
-    // assuming drawImGui() has been invoked for both colorSpace
-    ImGui::SetCurrentContext(_imguiCtx.ctxImGui[colorSpace]);
-    ImPlot::SetCurrentContext(_imguiCtx.ctxImPlot[colorSpace]);
 
     VkRenderPassBeginInfo renderPassInfo{};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;

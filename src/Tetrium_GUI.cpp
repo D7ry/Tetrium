@@ -58,10 +58,6 @@ void Tetrium::drawImGui(ColorSpace colorSpace)
         return;
     }
 
-    // TODO: remove OCV context as we now delayed imgui drawing
-    ImGui::SetCurrentContext(_imguiCtx.ctxImGui[ColorSpace::RGB]);
-    ImPlot::SetCurrentContext(_imguiCtx.ctxImPlot[ColorSpace::RGB]);
-
     // ---------- Prologue ----------
     PROFILE_SCOPE(&_profiler, "ImGui Draw");
 

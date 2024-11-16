@@ -167,8 +167,8 @@ class Tetrium
         VkDescriptorPool descriptorPool;
         std::unordered_map<std::string, ImGuiTexture> textures;
         std::vector<VkFramebuffer> frameBuffer;
-        ImGuiContext* ctxImGui[ColorSpace::ColorSpaceSize] = {};
-        ImPlotContext* ctxImPlot[ColorSpace::ColorSpaceSize] = {};
+        ImGuiContext* backendImGuiContext;
+        ImPlotContext* backendImPlotContext;
         std::optional<ImGuiWidgetMut*> activeWidget = std::nullopt;
     };
 

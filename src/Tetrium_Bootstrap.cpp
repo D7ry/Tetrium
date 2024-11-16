@@ -271,6 +271,7 @@ void Tetrium::initVulkan()
         VK_ATTACHMENT_STORE_OP_STORE,
         true
     );
+    SCHEDULE_DELETE(vkDestroyRenderPass(_device->logicalDevice, _renderContextRYGB.renderPass, nullptr);)
     createVirtualFrameBuffer(
         _renderContextRYGB.renderPass, _swapChain, _renderContextRYGB.virtualFrameBuffer, _swapChain.numImages
     );
@@ -300,6 +301,7 @@ void Tetrium::initVulkan()
             .dstAccessMask = VK_ACCESS_SHADER_READ_BIT
         }
     );
+    SCHEDULE_DELETE(vkDestroyRenderPass(_device->logicalDevice, _rocvTransformRenderPass, nullptr);)
 
     // create framebuffer for swapchain
     createSwapchainFrameBuffers(_swapChain, _rocvTransformRenderPass);
