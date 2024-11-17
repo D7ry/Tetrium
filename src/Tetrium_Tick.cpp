@@ -1,6 +1,4 @@
 // Tick-time function implementations
-#include "implot.h"
-#include "lib/Utils.h"
 
 #include "Tetrium.h"
 
@@ -234,30 +232,6 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frameIdx)
                                                           // presentation was successful
 
         uint64_t time = 0;
-#if VIRTUAL_VSYNC
-        if (_softwareEvenOddCtx.mostRecentPresentFinish) {
-            time = _softwareEvenOddCtx.mostRecentPresentFinish
-                   + _softwareEvenOddCtx.nanoSecondsPerFrame * _softwareEvenOddCtx.vsyncFrameOffset;
-        }
-#endif // VIRTUAL_VSYNC
-
-        // label each frame with the tick number
-        // this is useful for calculating the virtual frame counter,
-        // as we can take the max(frame.id) to get the number of presented frames.
-
-        // VkPresentTimeGOOGLE presentTime{(uint32_t)_numTicks, time};
-        //
-        // VkPresentTimesInfoGOOGLE presentTimeInfo{
-        //     .sType = VK_STRUCTURE_TYPE_PRESENT_TIMES_INFO_GOOGLE,
-        //     .pNext = VK_NULL_HANDLE,
-        //     .swapchainCount = 1,
-        //     .pTimes = &presentTime
-        // };
-        //
-        // if (_tetraMode == TetraMode::kEvenOddSoftwareSync) {
-        //     presentInfo.pNext = &presentTimeInfo;
-        // }
-        //
         result = vkQueuePresentKHR(_device->presentationQueue, &presentInfo);
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR
             || this->_framebufferResized) {

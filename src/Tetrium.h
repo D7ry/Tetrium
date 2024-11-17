@@ -386,14 +386,6 @@ class Tetrium
                                       // obtained through a precise vulkan API call
         int timeOffset = 0;           // time offset added to the time that's used
                                       // to evaluate current frame, used for the old counter method
-        uint64_t mostRecentPresentFinish = 0;
-        uint32_t lastPresentedImageId = 0; // each image are tagged with an image id,
-                                           // image id corresponds to the tick #
-                                           // when the images are presented
-                                           // tick # and image id are bijective and they
-                                           // strictly increase over time
-        int vsyncFrameOffset = 0;
-        uint64_t numFramesPresented = 0; // total number of frames that have been presented so far
     } _softwareEvenOddCtx;
 
     struct
