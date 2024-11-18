@@ -38,6 +38,10 @@
 // ecs
 #include "ecs/system/TetraImageDisplaySystem.h"
 
+// Applications
+#include "apps/App.h"
+#include "apps/AppScreeningTest.h"
+
 class ImPlotContext;
 class TickContext;
 
@@ -169,7 +173,6 @@ class Tetrium
         std::vector<VkFramebuffer> frameBuffer;
         ImGuiContext* backendImGuiContext;
         ImPlotContext* backendImPlotContext;
-        std::optional<ImGuiWidget*> activeWidget = std::nullopt;
     };
 
     /* ---------- Windowing ---------- */;
@@ -262,6 +265,8 @@ class Tetrium
     void flushEngineUBOStatic(uint8_t frame);
     void getMainProjectionMatrix(glm::mat4& projectionMatrix);
 
+    void drawAppsImGui(ColorSpace colorSpace);
+
     void getFullScreenViewportAndScissor(
         const SwapChainContext& swapChain,
         VkViewport& viewport,
@@ -290,6 +295,7 @@ class Tetrium
     void setupSoftwareEvenOddFrame();        // set up resources for software-based even-odd frame
     uint64_t getSurfaceCounterValue(); // get the number of frames requested so far from the display
     bool isEvenFrame();
+    ColorSpace getCurrentColorSpace();
 
     /* ---------- ImGui ---------- */
     void initImGuiRenderContext(Tetrium::ImGuiRenderContexts& ctx);
@@ -440,4 +446,9 @@ class Tetrium
     {
         [[deprecated]] TetraImageDisplaySystem imageDisplay;
     } _rgbyRenderers;
+
+    std::vector<TetriumApp::App> apps;
+    std::optional<TetriumApp::App*> _primaryApp = std::nullopt;
+
+    TetriumApp::AppScreeningTest _appScreeningTest;
 };

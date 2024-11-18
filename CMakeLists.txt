@@ -104,6 +104,8 @@ add_executable(${PROJECT_NAME}
         src/structs/Vertex.cpp
         src/ecs/system/SimpleRenderSystem.cpp
         src/ecs/system/TetraImageDisplaySystem.cpp
+
+        src/apps/AppScreeningTest.cpp
 )
 
 target_sources(${PROJECT_NAME} 

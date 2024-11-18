@@ -3,23 +3,18 @@
 #include <AL/al.h>
 #include <AL/alc.h>
 
+#include "structs/SharedEngineStructs.h"
+
 class SoundManager
 {
   public:
-    enum class Sound
-    {
-        kProgramStart,
-        kVineBoom,
-        kMusicGameMenu,
-        kMusicGamePlay,
-    };
 
     inline static const std::unordered_map<Sound, const char*> SOUNDS_FILES
         = {{Sound::kProgramStart, "../assets/sounds/costco.mp3"},
            {Sound::kVineBoom, "../assets/sounds/vine_boom.mp3"},
            {Sound::kMusicGameMenu, "../assets/sounds/music/wii.mp3"},
-           // {Sound::kMusicGamePlay, "../assets/sounds/music/sneaky.mp3"},
-           {Sound::kMusicGamePlay, "../assets/sounds/music/powerup.mp3"},
+           {Sound::kMusicGamePlay, "../assets/sounds/music/sneaky.mp3"},
+           // {Sound::kMusicGamePlay, "../assets/sounds/music/powerup.mp3"},
         };
 
 

@@ -1,17 +1,22 @@
 #pragma once
-#include "ImGuiWidget.h"
-#include "structs/ImGuiTexture.h"
 
-// for psychophysics screening tests
-class ImGuiWidgetPsychophysicsScreeningTest : public ImGuiWidget
+#include "App.h"
+
+namespace TetriumApp
+{
+class AppScreeningTest : public App
 {
   public:
-    virtual void Draw(Tetrium* engine, ColorSpace colorSpace) override;
+    virtual void Init(TetriumApp::InitContext& ctx) override {};
+    virtual void Cleanup(TetriumApp::CleanupContext& ctx) override {};
+
+    virtual void TickImGui(const TetriumApp::TickContextImGui& ctx) override;
 
   private:
     const struct
     {
         const uint32_t NUM_ATTEMPTS = 3; // number of attempts one could try in a screening
+
         const struct
         {
             const float FIXATION = 1;
@@ -62,17 +67,23 @@ class ImGuiWidgetPsychophysicsScreeningTest : public ImGuiWidget
 
   private:
     // draw subroutines
-    void drawIdle(Tetrium* engine, ColorSpace colorSpace);
-    void drawTestForSubject(Tetrium* engine, ColorSpace colorSpace, SubjectContext& subject);
+    void drawIdle(const TetriumApp::TickContextImGui& ctx);
+
+    void drawTestForSubject(SubjectContext& subject, const TetriumApp::TickContextImGui& ctx);
+
+    void drawIshihara(SubjectContext& subject, const TetriumApp::TickContextImGui& ctx);
+
+    void drawAnswerPrompts(SubjectContext& subject, const TetriumApp::TickContextImGui& ctx);
+
     void drawFixGazePage();
-    void drawIshihara(Tetrium* engine, SubjectContext& subject, ColorSpace cs);
-    void drawAnswerPrompts(Tetrium* engine, SubjectContext& subject, ColorSpace cs);
 
     ImGuiTexture GetAnswerPromptTextureDigit(uint32_t digit);
 
     // game logic
     void newGame();
+
     void transitionSubjectState(SubjectContext& subject);
+
     void endGame(SubjectContext& subject);
 
     // generate a pair of ishihara textures and store them in a subject folder, returns
@@ -80,6 +91,6 @@ class ImGuiWidgetPsychophysicsScreeningTest : public ImGuiWidget
     // the caller is responsible for freeing generated resources.
     std::pair<std::string, std::string> generateIshiharaTestTextures(SubjectContext& subject);
 
-
     std::string _nameInputBuffer = "ren";
 };
+} // namespace TetriumApp

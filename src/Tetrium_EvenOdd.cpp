@@ -166,3 +166,11 @@ uint64_t Tetrium::getSurfaceCounterValue()
 }
 
 bool Tetrium::isEvenFrame() { return getSurfaceCounterValue() % 2 == 0; }
+
+ColorSpace Tetrium::getCurrentColorSpace() {
+    ColorSpace cs = isEvenFrame() ? ColorSpace::RGB : ColorSpace::OCV;
+    if (_flipEvenOdd) {
+        cs = cs == ColorSpace::RGB ? ColorSpace::OCV : ColorSpace::RGB;
+    }
+    return cs;
+}

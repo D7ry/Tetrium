@@ -212,7 +212,7 @@ void Tetrium::Init(const Tetrium::InitOptions& options)
     createFunnyObjects();
 
     _soundManager.LoadAllSounds();
-    _soundManager.PlaySound(SoundManager::Sound::kProgramStart);
+    _soundManager.PlaySound(Sound::kProgramStart);
 }
 
 void Tetrium::framebufferResizeCallback(GLFWwindow* window, int width, int height)

@@ -1,9 +1,9 @@
 #include <filesystem>
 
-#include "ImGuiWidgetPsychophysicsScreeningTest.h"
-#include "Tetrium.h"
+#include "imgui.h"
+#include "misc/cpp/imgui_stdlib.h" // for string input text
 
-#include "misc/cpp/imgui_stdlib.h"
+#include "AppScreeningTest.h"
 
 namespace
 {
@@ -24,9 +24,10 @@ ImVec2 calculateFitSize(float width, float height, const ImVec2& availableSize)
 }
 } // namespace
 
-void ImGuiWidgetPsychophysicsScreeningTest::Draw(Tetrium* engine, ColorSpace colorSpace)
+namespace TetriumApp
 {
-
+void TetriumApp::AppScreeningTest::TickImGui(const TetriumApp::TickContextImGui& ctx)
+{
     ImGui::SetNextWindowPos(ImVec2(0, 0));
     ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
     auto flags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse
@@ -35,22 +36,21 @@ void ImGuiWidgetPsychophysicsScreeningTest::Draw(Tetrium* engine, ColorSpace col
     if (ImGui::Begin("PsydoIsochromatic Test", NULL, flags)) {
         switch (_state) {
         case TestState::kIdle:
-            drawIdle(engine, colorSpace);
+            drawIdle(ctx);
             break;
         case TestState::kScreening:
-            drawTestForSubject(engine, colorSpace, _subject);
+            drawTestForSubject(_subject, ctx);
             break;
         }
     }
     ImGui::End();
 }
 
-void ImGuiWidgetPsychophysicsScreeningTest::drawIdle(Tetrium* engine, ColorSpace colorSpace)
+void TetriumApp::AppScreeningTest::drawIdle(const TetriumApp::TickContextImGui& ctx)
 {
-
+    ctx.controls.musicOverride = Sound::kMusicGameMenu;
     const float buttonSpacing = 20.0f;
 
-    engine->_soundManager.SetMusic(SoundManager::Sound::kMusicGameMenu);
     // Set the button size
     ImVec2 buttonSize(200, 100);
 
@@ -62,8 +62,7 @@ void ImGuiWidgetPsychophysicsScreeningTest::drawIdle(Tetrium* engine, ColorSpace
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(10, 5));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(10, 10));
 
-    ImGuiTexture tex
-        = engine->getOrLoadImGuiTexture(engine->_imguiCtx, "../assets/textures/BAIR_logo.png");
+    ImGuiTexture tex = ctx.apis.GetImGuiTexture("../assets/textures/BAIR_logo.png");
     ImVec2 logoSize = ImVec2{(float)tex.width, (float)tex.height};
 
     ImVec2 elemPos((screenSize.x - logoSize.x) * 0.5f, (screenSize.y - logoSize.y) * 0.5f - 300);
@@ -106,15 +105,132 @@ void ImGuiWidgetPsychophysicsScreeningTest::drawIdle(Tetrium* engine, ColorSpace
     elemPos = elemPos + ImVec2(0, buttonSize.y + buttonSpacing);
     ImGui::SetCursorPos(elemPos);
     if (ImGui::Button("Exit", buttonSize)) {
-        engine->_soundManager.PlaySound(SoundManager::Sound::kVineBoom);
-        engine->_imguiCtx.activeWidget = std::nullopt;
+        ctx.apis.PlaySound(Sound::kVineBoom);
+        ctx.controls.wantExit = true;
     }
 
     ImGui::PopStyleVar(4);
 }
 
-void ImGuiWidgetPsychophysicsScreeningTest::newGame()
+void AppScreeningTest::drawIshihara(
+    SubjectContext& subject,
+    const TetriumApp::TickContextImGui& ctx
+)
 {
+    ImGuiTexture tex = ctx.apis.GetImGuiTexture(subject.currentIshiharaTexturePath[ctx.colorSpace]);
+
+    ImVec2 availSize = ImGui::GetContentRegionAvail();
+    ImVec2 textureFullscreenSize = calculateFitSize(tex.width, tex.height, availSize);
+
+    // center the texture onto the screen
+    ImVec2 centerPos = ImVec2(availSize.x * 0.5f, availSize.y * 0.5f);
+    ImGui::SetCursorPos(centerPos - textureFullscreenSize * 0.5f);
+
+    ImGui::Image(tex.id, textureFullscreenSize);
+}
+
+void AppScreeningTest::drawTestForSubject(
+    SubjectContext& subject,
+    const TetriumApp::TickContextImGui& ctx
+)
+
+{
+    ctx.controls.musicOverride = Sound::kMusicGamePlay;
+    // handle state transition
+    subject.currStateRemainderTime -= ImGui::GetIO().DeltaTime;
+    if (subject.currStateRemainderTime <= 0) {
+        transitionSubjectState(subject);
+    }
+    ASSERT(subject.currStateRemainderTime > 0);
+
+    switch (subject.state) {
+    case SubjectState::kFixation:
+        drawFixGazePage();
+        break;
+    case SubjectState::kIdentification:
+        drawIshihara(subject, ctx);
+        break;
+    case SubjectState::kAnswer:
+        drawAnswerPrompts(subject, ctx);
+        break;
+    }
+}
+
+void AppScreeningTest::drawAnswerPrompts(
+    SubjectContext& subject,
+    const TetriumApp::TickContextImGui& ctx
+)
+{
+
+    ImGuiIO& io = ImGui::GetIO();
+    ImVec2 screenSize = io.DisplaySize;
+    ImVec2 centerPos = ImVec2(screenSize.x * 0.5f, screenSize.y * 0.5f);
+
+    // Adjust these values to fine-tune the layout
+    float buttonSize = 200.0f; // Reduced size for better spacing
+    float horizontalSpacing = 250.0f;
+    float verticalSpacing = 200.0f;
+
+    // Calculate positions for the four buttons in AXBY layout
+    ImVec2 topPos = ImVec2(centerPos.x, centerPos.y - verticalSpacing);     // Y
+    ImVec2 leftPos = ImVec2(centerPos.x - horizontalSpacing, centerPos.y);  // X
+    ImVec2 rightPos = ImVec2(centerPos.x + horizontalSpacing, centerPos.y); // B
+    ImVec2 bottomPos = ImVec2(centerPos.x, centerPos.y + verticalSpacing);  // A
+
+    ImVec2 positions[4] = {bottomPos, leftPos, rightPos, topPos}; // A, X, B, Y order
+    const char* buttonLabels[4] = {"A", "X", "B", "Y"};
+
+    // Draw the four buttons
+    for (int i = 0; i < 4; i++) {
+        ImGuiTexture tex = ctx.apis.GetImGuiTexture(subject.currentAnswerTexturePath[i]);
+
+        ImGui::SetCursorPos(ImVec2(positions[i].x - buttonSize / 2, positions[i].y - buttonSize / 2)
+        );
+        if (ImGui::ImageButton(
+                buttonLabels[i], (void*)(intptr_t)tex.id, ImVec2(buttonSize, buttonSize)
+            )) {
+            DEBUG("{} button clicked!", buttonLabels[i]);
+            ctx.apis.PlaySound(Sound::kVineBoom);
+            // Handle button click
+        }
+
+        // Add button label
+        ImVec2 textPos = ImVec2(positions[i].x - 10, positions[i].y + buttonSize / 2 + 5);
+        ImGui::SetCursorPos(textPos);
+        ImGui::Text("%s", buttonLabels[i]);
+    }
+}
+
+void AppScreeningTest::transitionSubjectState(SubjectContext& subject)
+{
+    switch (subject.state) {
+    case SubjectState::kFixation:
+        subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.IDENTIFICATION;
+        subject.state = SubjectState::kIdentification;
+        break;
+    case SubjectState::kIdentification:
+        subject.currentSelectedAnswer = -1;
+        subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.ANSWERING;
+        subject.state = SubjectState::kAnswer;
+        break;
+    case SubjectState::kAnswer:
+        if (subject.currentSelectedAnswer == subject.correctAnswerTextureIndex) {
+            subject.numSuccessAttempts += 1;
+        }
+        // end subject
+        if (subject.currentAttempt == SETTINGS.NUM_ATTEMPTS - 1) {
+            endGame(subject);
+        }
+        subject.currentAttempt += 1; // to next attempt
+        subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.FIXATION;
+        subject.state = SubjectState::kFixation;
+        break;
+    }
+}
+
+void AppScreeningTest::newGame()
+{
+
     // stall and generate ishihara textures
 
     _subject = SubjectContext{
@@ -137,34 +253,36 @@ void ImGuiWidgetPsychophysicsScreeningTest::newGame()
     _state = TestState::kScreening;
 }
 
-void ImGuiWidgetPsychophysicsScreeningTest::drawTestForSubject(
-    Tetrium* engine,
-    ColorSpace colorSpace,
+void AppScreeningTest::endGame(SubjectContext& subject)
+{
+    DEBUG("ending game for subject {}", subject.name);
+    _state = TestState::kIdle;
+    // TODO: data colletion logic + clean up texture resources?
+}
+
+std::pair<std::string, std::string> AppScreeningTest::generateIshiharaTestTextures(
     SubjectContext& subject
 )
 {
-    engine->_soundManager.SetMusic(SoundManager::Sound::kMusicGamePlay);
-    // handle state transition
-    subject.currStateRemainderTime -= ImGui::GetIO().DeltaTime;
-    if (subject.currStateRemainderTime <= 0) {
-        transitionSubjectState(subject);
-    }
-    ASSERT(subject.currStateRemainderTime > 0);
+    std::string& subjectName = subject.name;
+    std::string subjectTestDataFolder = "ishihara_plates/" + subjectName;
 
-    switch (subject.state) {
-    case SubjectState::kFixation:
-        drawFixGazePage();
-        break;
-    case SubjectState::kIdentification:
-        drawIshihara(engine, subject, colorSpace);
-        break;
-    case SubjectState::kAnswer:
-        drawAnswerPrompts(engine, subject, colorSpace);
-        break;
+    // create subject folder if not already existing
+    if (!std::filesystem::exists(subjectTestDataFolder)) {
+        DEBUG("creating ishihara plate directory in {}", subjectTestDataFolder);
+        std::filesystem::create_directory(subjectTestDataFolder);
     }
+
+    std::string textureFilePrefix = "attempt_" + std::to_string(subject.currentAttempt);
+
+    std::string textureFileRGBName = textureFilePrefix + "_RGB.png";
+    std::string textureFileOCVName = textureFilePrefix + "_OCV.png";
+
+    // call into python file to generate
+    NEEDS_IMPLEMENTATION();
 }
 
-void ImGuiWidgetPsychophysicsScreeningTest::drawFixGazePage()
+void AppScreeningTest::drawFixGazePage()
 {
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     ImVec2 screenCenter = ImGui::GetIO().DisplaySize;
@@ -198,124 +316,4 @@ void ImGuiWidgetPsychophysicsScreeningTest::drawFixGazePage()
     ImGui::SetCursorPos(textPos);
     ImGui::Text("Fix Gaze Onto Crosshair");
 }
-
-// draws an ishihara plate
-void ImGuiWidgetPsychophysicsScreeningTest::drawIshihara(
-    Tetrium* engine,
-    SubjectContext& subject,
-    ColorSpace cs
-)
-{
-    ImGuiTexture tex
-        = engine->getOrLoadImGuiTexture(engine->_imguiCtx, subject.currentIshiharaTexturePath[cs]);
-
-    ImVec2 availSize = ImGui::GetContentRegionAvail();
-    ImVec2 textureFullscreenSize = calculateFitSize(tex.width, tex.height, availSize);
-
-    // center the texture onto the screen
-    ImVec2 centerPos = ImVec2(availSize.x * 0.5f, availSize.y * 0.5f);
-    ImGui::SetCursorPos(centerPos - textureFullscreenSize * 0.5f);
-
-    ImGui::Image(tex.id, textureFullscreenSize);
-}
-
-void ImGuiWidgetPsychophysicsScreeningTest::drawAnswerPrompts(
-    Tetrium* engine,
-    SubjectContext& subject,
-    ColorSpace cs
-)
-{
-    ImGuiIO& io = ImGui::GetIO();
-    ImVec2 screenSize = io.DisplaySize;
-    ImVec2 centerPos = ImVec2(screenSize.x * 0.5f, screenSize.y * 0.5f);
-
-    // Adjust these values to fine-tune the layout
-    float buttonSize = 200.0f; // Reduced size for better spacing
-    float horizontalSpacing = 250.0f;
-    float verticalSpacing = 200.0f;
-
-    // Calculate positions for the four buttons in AXBY layout
-    ImVec2 topPos = ImVec2(centerPos.x, centerPos.y - verticalSpacing);     // Y
-    ImVec2 leftPos = ImVec2(centerPos.x - horizontalSpacing, centerPos.y);  // X
-    ImVec2 rightPos = ImVec2(centerPos.x + horizontalSpacing, centerPos.y); // B
-    ImVec2 bottomPos = ImVec2(centerPos.x, centerPos.y + verticalSpacing);  // A
-
-    ImVec2 positions[4] = {bottomPos, leftPos, rightPos, topPos}; // A, X, B, Y order
-    const char* buttonLabels[4] = {"A", "X", "B", "Y"};
-
-    // Draw the four buttons
-    for (int i = 0; i < 4; i++) {
-        ImGuiTexture tex
-            = engine->getOrLoadImGuiTexture(engine->_imguiCtx, subject.currentAnswerTexturePath[i]);
-
-        ImGui::SetCursorPos(ImVec2(positions[i].x - buttonSize / 2, positions[i].y - buttonSize / 2)
-        );
-        if (ImGui::ImageButton(
-                buttonLabels[i], (void*)(intptr_t)tex.id, ImVec2(buttonSize, buttonSize)
-            )) {
-            DEBUG("{} button clicked!", buttonLabels[i]);
-            engine->_soundManager.PlaySound(SoundManager::Sound::kVineBoom);
-            // Handle button click
-        }
-
-        // Add button label
-        ImVec2 textPos = ImVec2(positions[i].x - 10, positions[i].y + buttonSize / 2 + 5);
-        ImGui::SetCursorPos(textPos);
-        ImGui::Text("%s", buttonLabels[i]);
-    }
-}
-
-std::pair<std::string, std::string> ImGuiWidgetPsychophysicsScreeningTest::
-    generateIshiharaTestTextures(SubjectContext& subject)
-{
-    std::string& subjectName = subject.name;
-    std::string subjectTestDataFolder = "ishihara_plates/" + subjectName;
-
-    // create subject folder if not already existing
-    if (!std::filesystem::exists(subjectTestDataFolder)) {
-        DEBUG("creating ishihara plate directory in {}", subjectTestDataFolder);
-        std::filesystem::create_directory(subjectTestDataFolder);
-    }
-
-    std::string textureFilePrefix = "attempt_" + std::to_string(subject.currentAttempt);
-
-    std::string textureFileRGBName = textureFilePrefix + "_RGB.png";
-    std::string textureFileOCVName = textureFilePrefix + "_OCV.png";
-
-    // call into python file to generate
-    NEEDS_IMPLEMENTATION();
-}
-
-void ImGuiWidgetPsychophysicsScreeningTest::transitionSubjectState(SubjectContext& subject)
-{
-    switch (subject.state) {
-    case SubjectState::kFixation:
-        subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.IDENTIFICATION;
-        subject.state = SubjectState::kIdentification;
-        break;
-    case SubjectState::kIdentification:
-        subject.currentSelectedAnswer = -1;
-        subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.ANSWERING;
-        subject.state = SubjectState::kAnswer;
-        break;
-    case SubjectState::kAnswer:
-        if (subject.currentSelectedAnswer == subject.correctAnswerTextureIndex) {
-            subject.numSuccessAttempts += 1;
-        }
-        // end subject
-        if (subject.currentAttempt == SETTINGS.NUM_ATTEMPTS - 1) {
-            endGame(subject);
-        }
-        subject.currentAttempt += 1; // to next attempt
-        subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.FIXATION;
-        subject.state = SubjectState::kFixation;
-        break;
-    }
-}
-
-void ImGuiWidgetPsychophysicsScreeningTest::endGame(SubjectContext& subject)
-{
-    DEBUG("ending game for subject {}", subject.name);
-    _state = TestState::kIdle;
-    // TODO: data colletion logic + clean up texture resources?
-}
+} // namespace TetriumApp

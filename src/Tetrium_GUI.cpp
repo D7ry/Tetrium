@@ -48,6 +48,39 @@ void drawFootNote()
 
 }; // namespace Tetrium_GUI
 
+void Tetrium::drawAppsImGui(ColorSpace colorSpace)
+{
+    if (_primaryApp.has_value()) {
+
+        TetriumApp::App* app = _primaryApp.value();
+        TetriumApp::TickContextImGui ctxImGui{
+            .colorSpace = colorSpace,
+            .apis = {
+                .GetImGuiTexture = [this](const std::string& texture) -> ImGuiTexture {
+                    return getOrLoadImGuiTexture(_imguiCtx, texture);
+                },
+                .UnloadImGuiTexture
+                = [this](const std::string& texture) { unloadImGuiTexture(_imguiCtx, texture); },
+                .PlaySound = [this](Sound sound) { _soundManager.PlaySound(sound); },
+            },
+            .controls = {.wantExit = false, .musicOverride = std::nullopt}
+        };
+
+        app->TickImGui(ctxImGui);
+
+        if (ctxImGui.controls.wantExit) {
+            _primaryApp = std::nullopt;
+        }
+        if (ctxImGui.controls.musicOverride.has_value()) {
+            _soundManager.SetMusic(ctxImGui.controls.musicOverride.value());
+        } else {
+            _soundManager.DisableMusic(); // FIXME: do we need a main menu music??
+        }
+    } else {
+        _soundManager.DisableMusic(); // FIXME: do we need a main menu music??
+    }
+}
+
 void Tetrium::drawMainMenu(ColorSpace colorSpace)
 {
     if (ImGui::Begin(DEFAULTS::Engine::APPLICATION_NAME)) {
@@ -92,7 +125,7 @@ void Tetrium::drawMainMenu(ColorSpace colorSpace)
 
             if (ImGui::BeginTabItem("🎨Apps")) {
                 if (ImGui::Button("Psychophysics Screening Test")) {
-                    _imguiCtx.activeWidget = &_widgetScreeningTest;
+                    _primaryApp = &_appScreeningTest;
                 }
                 ImGui::EndTabItem();
             }
@@ -182,12 +215,8 @@ void Tetrium::drawImGui(ColorSpace colorSpace)
     }
     Tetrium_GUI::drawFootNote();
 
-    if (_imguiCtx.activeWidget.has_value()) {
-        _imguiCtx.activeWidget.value()->Draw(this, colorSpace);
-    } else {
-        _soundManager.DisableMusic();
-        drawMainMenu(colorSpace);
-    }
+    drawMainMenu(colorSpace);
+    drawAppsImGui(colorSpace);
 
     ImGui::Render();
 }
