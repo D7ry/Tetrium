@@ -35,6 +35,8 @@ void TetriumApp::AppScreeningTest::TickImGui(const TetriumApp::TickContextImGui&
     ImGui::SetNextWindowBgAlpha(1);
     if (ImGui::Begin("PsydoIsochromatic Test", NULL, flags)) {
         switch (_state) {
+        case TestState::kSettings: // draw both settings and idle
+            drawSettingsWindow(ctx);
         case TestState::kIdle:
             drawIdle(ctx);
             break;
@@ -44,6 +46,25 @@ void TetriumApp::AppScreeningTest::TickImGui(const TetriumApp::TickContextImGui&
         }
     }
     ImGui::End();
+}
+
+void TetriumApp::AppScreeningTest::drawSettingsWindow(const TetriumApp::TickContextImGui& ctx)
+{
+    // draw a settings pop-up window
+    if (ImGui::BeginPopup("Settings", ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::SliderInt("Num Attempts", &SETTINGS.NUM_ATTEMPTS, 1, 10);
+        ImGui::Text("Duration of Fixation (seconds)");
+        ImGui::InputFloat("##Fixation", &SETTINGS.STATE_DURATIONS_SECONDS.FIXATION);
+        ImGui::Text("Duration of Identification (seconds)");
+        ImGui::InputFloat("##Identification", &SETTINGS.STATE_DURATIONS_SECONDS.IDENTIFICATION);
+        ImGui::Text("Duration of Answering (seconds)");
+        ImGui::InputFloat("##Answering", &SETTINGS.STATE_DURATIONS_SECONDS.ANSWERING);
+        if (ImGui::Button("Close")) {
+            ImGui::CloseCurrentPopup();
+            _state = TestState::kIdle;
+        }
+        ImGui::EndPopup();
+    }
 }
 
 void TetriumApp::AppScreeningTest::drawIdle(const TetriumApp::TickContextImGui& ctx)
@@ -99,6 +120,14 @@ void TetriumApp::AppScreeningTest::drawIdle(const TetriumApp::TickContextImGui& 
     }
     if (isNameEmpty) {
         ImGui::PopStyleColor(3);
+    }
+
+    // settings button
+    elemPos = elemPos + ImVec2(0, buttonSize.y + buttonSpacing);
+    ImGui::SetCursorPos(elemPos);
+    if (ImGui::Button("Settings", buttonSize)) {
+        ImGui::OpenPopup("Settings");
+        _state = TestState::kSettings;
     }
 
     // exit button

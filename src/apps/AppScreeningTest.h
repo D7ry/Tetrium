@@ -13,21 +13,22 @@ class AppScreeningTest : public App
     virtual void TickImGui(const TetriumApp::TickContextImGui& ctx) override;
 
   private:
-    const struct
+    struct
     {
-        const uint32_t NUM_ATTEMPTS = 3; // number of attempts one could try in a screening
+        int NUM_ATTEMPTS = 3; // number of attempts one could try in a screening
 
-        const struct
+        struct
         {
-            const float FIXATION = 1;
-            const float IDENTIFICATION = 1;
-            const float ANSWERING = 5;
+            float FIXATION = 1;
+            float IDENTIFICATION = 1;
+            float ANSWERING = 5;
         } STATE_DURATIONS_SECONDS;
     } SETTINGS;
 
     enum class TestState
     {
         kIdle, // no test going on, the user needs to begin the test
+        kSettings, // settings window
         kScreening
     };
 
@@ -68,6 +69,8 @@ class AppScreeningTest : public App
   private:
     // draw subroutines
     void drawIdle(const TetriumApp::TickContextImGui& ctx);
+
+    void drawSettingsWindow(const TetriumApp::TickContextImGui& ctx);
 
     void drawTestForSubject(SubjectContext& subject, const TetriumApp::TickContextImGui& ctx);
 

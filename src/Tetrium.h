@@ -34,7 +34,6 @@
 #include "components/imgui_widgets/ImGuiWidgetTetraViewer.h"
 #include "components/imgui_widgets/ImGuiWidgetTetraViewerDemo.h"
 #include "components/imgui_widgets/ImGuiWidgetBlobHunter.h"
-#include "components/imgui_widgets/ImGuiWidgetPsychophysicsScreeningTest.h"
 // ecs
 #include "ecs/system/TetraImageDisplaySystem.h"
 
@@ -426,7 +425,6 @@ class Tetrium
     friend class ImGuiWidgetTetraViewer;
     friend class ImGuiWidgetTemp;
     friend class ImGuiWidgetBlobHunter;
-    friend class ImGuiWidgetPsychophysicsScreeningTest;
 
     ImGuiWidgetDeviceInfo _widgetDeviceInfo;
     ImGuiWidgetPerfPlot _widgetPerfPlot;
@@ -439,7 +437,6 @@ class Tetrium
     ImGuiWidgetTemp _widgetTemp;
 
     ImGuiWidgetBlobHunter _widgetBlobHunter;
-    ImGuiWidgetPsychophysicsScreeningTest _widgetScreeningTest;
 
 
     struct
