@@ -14,6 +14,7 @@ class SoundManager
            {Sound::kVineBoom, "../assets/sounds/vine_boom.mp3"},
            {Sound::kMusicGameMenu, "../assets/sounds/music/wii.mp3"},
            {Sound::kMusicGamePlay, "../assets/sounds/music/sneaky.mp3"},
+           {Sound::kCorrectAnswer, "../assets/sounds/correct.mp3"},
            // {Sound::kMusicGamePlay, "../assets/sounds/music/powerup.mp3"},
         };
 

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "TetriumColor/PseudoIsochromaticPlateGenerator.h"
+
 #include "App.h"
 
 namespace TetriumApp
@@ -27,16 +29,17 @@ class AppScreeningTest : public App
 
     enum class TestState
     {
-        kIdle, // no test going on, the user needs to begin the test
+        kIdle,     // no test going on, the user needs to begin the test
         kSettings, // settings window
-        kScreening
+        kScreening,
+        kScreenResult // show the result of the screening
     };
 
     enum class SubjectState
     {
         kFixation,
         kIdentification,
-        kAnswer
+        kAnswer,
     };
 
     enum class AnswerKind
@@ -48,6 +51,14 @@ class AppScreeningTest : public App
         kDontKnow
     };
 
+    struct SubjectPromptContext
+    {
+        std::string currentIshiharaTexturePath[ColorSpace::ColorSpaceSize];
+        std::string currentAnswerTexturePath[4];
+        int correctAnswerTextureIndex;
+        int currentSelectedAnswer = -1;
+    };
+
     struct SubjectContext
     {
         std::string name;
@@ -55,10 +66,7 @@ class AppScreeningTest : public App
         SubjectState state;
         uint32_t currentAttempt;     // index to the current attempt
         uint32_t numSuccessAttempts; // # of attempts where the tester identified the right pattern
-        std::string currentIshiharaTexturePath[ColorSpace::ColorSpaceSize];
-        std::string currentAnswerTexturePath[4];
-        uint8_t correctAnswerTextureIndex;
-        int currentSelectedAnswer = -1;
+        SubjectPromptContext prompt;
         void* pyObject; // python object that keeps states and generates ishihara textures
     };
 
@@ -73,6 +81,8 @@ class AppScreeningTest : public App
     void drawSettingsWindow(const TetriumApp::TickContextImGui& ctx);
 
     void drawTestForSubject(SubjectContext& subject, const TetriumApp::TickContextImGui& ctx);
+
+    void drawSubjectResult(SubjectContext& subject, const TetriumApp::TickContextImGui& ctx);
 
     void drawIshihara(SubjectContext& subject, const TetriumApp::TickContextImGui& ctx);
 
@@ -92,8 +102,15 @@ class AppScreeningTest : public App
     // generate a pair of ishihara textures and store them in a subject folder, returns
     // path to generated textures(RGB, OCV) -- the textures are already loaded into GPU memory.
     // the caller is responsible for freeing generated resources.
-    std::pair<std::string, std::string> generateIshiharaTestTextures(SubjectContext& subject);
+    std::pair<std::string, std::string> generateIshiharaTestTextures(
+        SubjectContext& subject,
+        int number
+    );
 
     std::string _nameInputBuffer = "ren";
+
+    TetriumColor::PseudoIsochromaticPlateGenerator* _plateGenerator = nullptr;
+
+    void populatePromptContext(SubjectContext& subject);
 };
 } // namespace TetriumApp

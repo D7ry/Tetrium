@@ -55,6 +55,7 @@ class App
   public:
     virtual void Init(TetriumApp::InitContext& ctx) = 0;
     virtual void Cleanup(TetriumApp::CleanupContext& ctx) = 0;
+    virtual ~App() {}
 
     // TickImGui() and TickVulkan() are only called if the app is active
     // i.e. we expect the app to render to the screen

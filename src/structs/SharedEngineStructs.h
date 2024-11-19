@@ -57,4 +57,7 @@ enum class Sound
     kVineBoom,
     kMusicGameMenu,
     kMusicGamePlay,
+
+    kCorrectAnswer,
+    kWrongAnswer = kVineBoom,
 };
