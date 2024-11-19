@@ -190,7 +190,6 @@ void AppScreeningTest::drawAnswerPrompts(
     const TetriumApp::TickContextImGui& ctx
 )
 {
-
     ImGuiIO& io = ImGui::GetIO();
     ImVec2 screenSize = io.DisplaySize;
     ImVec2 centerPos = ImVec2(screenSize.x * 0.5f, screenSize.y * 0.5f);
@@ -228,6 +227,15 @@ void AppScreeningTest::drawAnswerPrompts(
         ImGui::SetCursorPos(textPos);
         ImGui::Text("%s", buttonLabels[i]);
     }
+
+    // draw progress bar showing time left
+    float totalTime = SETTINGS.STATE_DURATIONS_SECONDS.ANSWERING;
+    float progress = subject.currStateRemainderTime / totalTime;
+    ImVec2 progressBarSize = ImVec2(800, 40); // Width and height of the progress bar
+    ImVec2 progressBarPos
+        = ImVec2(centerPos.x - progressBarSize.x * 0.5f, topPos.y -300);
+    ImGui::SetCursorPos(progressBarPos);
+    ImGui::ProgressBar(progress, progressBarSize);
 }
 
 void AppScreeningTest::transitionSubjectState(SubjectContext& subject)
