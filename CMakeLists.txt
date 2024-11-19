@@ -43,6 +43,9 @@ set(GLM_INCLUDE extern/glm)
 # tinyobjloader
 set(TINY_OBJ_LOADER_INCLUDE extern/tinyobjloader)
 
+# tetriumColor
+add_subdirectory(extern/TetriumColor)
+
 # freetype
 if (UNIX)
 if (APPLE)
@@ -62,8 +65,6 @@ endif()
 find_package(OpenAL REQUIRED)
 find_package(SndFile REQUIRED)
 
-# embed python 
-find_package(Python3 REQUIRED COMPONENTS Development)
 
 project(Tetrium)
 
@@ -113,6 +114,7 @@ target_sources(${PROJECT_NAME}
 )
 
 target_include_directories(${PROJECT_NAME}
+    PRIVATE ${TETRIUMCOLOR_INCLUDE}
     PRIVATE ${STB_INCLUDE}
     PRIVATE ${IMGUI_INCLUDE}
     PRIVATE ${IMPLOT_INCLUDE}
@@ -123,7 +125,6 @@ target_include_directories(${PROJECT_NAME}
     PRIVATE ${FREETYPE_INCLUDE_DIRS}
     PRIVATE ${OPENAL_INCLUDE_DIR}
     PRIVATE ${SNDFILE_INCLUDE_DIR}
-    PRIVATE ${Python3_INCLUDE_DIRS}
     PRIVATE src
 )
 
@@ -170,10 +171,10 @@ endif() # WIN32
 target_link_libraries(${PROJECT_NAME} 
     spdlog::spdlog 
     glfw
+    TetriumColor
     ${FREETYPE_LIBRARIES}
     ${OPENAL_LIBRARY}
     ${SNDFILE_LIBRARY}
-    ${Python3_LIBRARIES}
 )
 
 # debug flag for unix

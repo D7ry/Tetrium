@@ -13,8 +13,16 @@ void printGreetingBanner()
 
 }
 
+#include "TetriumColor/PseudoIsochromaticPlateGenerator.h"
 int main(int argc, char** argv)
 {
+    PseudoIsochromaticPlateGenerator generator(
+        "data/transform_dirs.txt",
+        "data/pregenerated_filenames.txt",
+        100
+    );
+
+    exit(0);
     printGreetingBanner();
     INIT_LOGS();
     INFO("Logger initialized.");
