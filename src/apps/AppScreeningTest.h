@@ -107,7 +107,7 @@ class AppScreeningTest : public App
         int number
     );
 
-    std::string _nameInputBuffer = "ren";
+    std::string _nameInputBuffer = "tian";
 
     TetriumColor::PseudoIsochromaticPlateGenerator* _plateGenerator = nullptr;
 

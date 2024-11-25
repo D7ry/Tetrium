@@ -417,6 +417,7 @@ void AppScreeningTest::drawFixGazePage()
     ImGui::Text("Fix Gaze Onto Crosshair");
 }
 
+// FIXME: make each ishihara plate unique -- probably using time as filename??
 std::pair<std::string, std::string> AppScreeningTest::generateIshiharaTestTextures(
     SubjectContext& subject,
     int number

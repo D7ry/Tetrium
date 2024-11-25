@@ -119,8 +119,7 @@ void Tetrium::checkHardwareEvenOddFrameSupport()
 // whether to use the new virtual frame counter
 // the old counter uses a nanosecond-precision timer,
 // the new counter takes the max of the image id so far presented.
-// TODO: profile precision of the new counter vs. old counter
-#define FAKE_SOFTWARE_FRAME_COUNTER 0
+#define FAKE_SOFTWARE_FRAME_COUNTER 1
 
 uint64_t Tetrium::getSurfaceCounterValue()
 {

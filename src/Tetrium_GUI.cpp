@@ -124,8 +124,15 @@ void Tetrium::drawMainMenu(ColorSpace colorSpace)
             }
 
             if (ImGui::BeginTabItem("🎨Apps")) {
-                if (ImGui::Button("Psychophysics Screening Test")) {
-                    _primaryApp = &_appScreeningTest;
+                // show all apps
+                for (auto& [appName, app] : _appMap) {
+                    if (ImGui::Button(appName.c_str())) {
+                        if (_primaryApp.has_value() && _primaryApp.value() != app) {
+                            _primaryApp.value()->OnClose();
+                        }
+                        _primaryApp = app;
+                        app->OnOpen();
+                    }
                 }
                 ImGui::EndTabItem();
             }

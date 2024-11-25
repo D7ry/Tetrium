@@ -213,6 +213,14 @@ void Tetrium::Init(const Tetrium::InitOptions& options)
 
     _soundManager.LoadAllSounds();
     _soundManager.PlaySound(Sound::kProgramStart);
+
+    TetriumApp::InitContext appInitCtx{.device = _device->logicalDevice};
+
+    // init apps
+    for (auto& [appName, app] : _appMap) {
+        app->Init(appInitCtx);
+    }
+
 }
 
 void Tetrium::framebufferResizeCallback(GLFWwindow* window, int width, int height)
@@ -271,9 +279,14 @@ void Tetrium::initVulkan()
         VK_ATTACHMENT_STORE_OP_STORE,
         true
     );
-    SCHEDULE_DELETE(vkDestroyRenderPass(_device->logicalDevice, _renderContextRYGB.renderPass, nullptr);)
+    SCHEDULE_DELETE(
+        vkDestroyRenderPass(_device->logicalDevice, _renderContextRYGB.renderPass, nullptr);
+    )
     createVirtualFrameBuffer(
-        _renderContextRYGB.renderPass, _swapChain, _renderContextRYGB.virtualFrameBuffer, _swapChain.numImages
+        _renderContextRYGB.renderPass,
+        _swapChain,
+        _renderContextRYGB.virtualFrameBuffer,
+        _swapChain.numImages
     );
     SCHEDULE_DELETE(clearVirtualFrameBuffer(_renderContextRYGB.virtualFrameBuffer);)
 
@@ -283,7 +296,7 @@ void Tetrium::initVulkan()
         _device->logicalDevice,
         VK_IMAGE_LAYOUT_UNDEFINED,
         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, // ImGui pass runs after
-        //VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+        // VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
         _swapChain.imageFormat,
         VK_ATTACHMENT_LOAD_OP_CLEAR,
         VK_ATTACHMENT_STORE_OP_STORE,
@@ -868,6 +881,11 @@ void Tetrium::createSynchronizationObjects(
 void Tetrium::Cleanup()
 {
     INFO("Cleaning up...");
+    TetriumApp::CleanupContext appCleanupCtx{.device = _device->logicalDevice};
+    for (auto& [appName, app] : _appMap) {
+        app->Cleanup(appCleanupCtx);
+    }
+    
     _deletionStack.flush();
     INFO("Resource cleaned up.");
 }
@@ -1196,4 +1214,12 @@ VkRenderPass Tetrium::createRenderPass(
     }
     INFO("render pass created");
     return renderPass;
+}
+
+void Tetrium::RegisterApp(TetriumApp::App* app, const std::string& name)
+{
+    if (_appMap.find(name) != _appMap.end()) {
+        PANIC("App with name {} already exists!", name);
+    }
+    _appMap[name] = app;
 }

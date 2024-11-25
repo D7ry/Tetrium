@@ -85,6 +85,8 @@ class Tetrium
     void Tick();
     void Cleanup();
 
+    void RegisterApp(TetriumApp::App* app, const std::string& appName);
+
     struct AnimationKeyFrame
     {
         glm::vec3 position = glm::vec3(0.f);
@@ -444,8 +446,7 @@ class Tetrium
         [[deprecated]] TetraImageDisplaySystem imageDisplay;
     } _rgbyRenderers;
 
-    std::vector<TetriumApp::App> apps;
-    std::optional<TetriumApp::App*> _primaryApp = std::nullopt;
+    std::unordered_map<std::string, TetriumApp::App*> _appMap;
 
-    TetriumApp::AppScreeningTest _appScreeningTest;
+    std::optional<TetriumApp::App*> _primaryApp = std::nullopt;
 };

@@ -2,6 +2,7 @@
 
 #include "Tetrium.h"
 #include "TetriumColor/TetriumColor.h"
+
 void printGreetingBanner()
 {
     // cool banner
@@ -12,33 +13,35 @@ void printGreetingBanner()
     std::cout << asciiLine << std::endl;
 }
 
-
-
 int main(int argc, char** argv)
 {
-    // std::vector<std::string> transformDirs{
-    //     "../extern/TetriumColor/TetriumColor/Assets/ColorSpaceTransforms/Neitz_530_559-RGBO"
-    // };
-    // std::vector<std::string> pregeneratedMetamers{
-    //     "../extern/TetriumColor/TetriumColor/Assets/PreGeneratedMetamers/Neitz_530_559-RGBO.pkl"
-    // };
-    //
-    // PseudoIsochromaticPlateGenerator generator(transformDirs, pregeneratedMetamers, 8);
-    // generator.NewPlate("plate_RGB.png", "plate_OCV.png", 27);
-
     printGreetingBanner();
     INIT_LOGS();
     INFO("Logger initialized.");
     DEBUG("running in debug mode");
+
+    std::vector<std::pair<TetriumApp::App*, const char*>> apps = {
+        {new TetriumApp::AppScreeningTest(), "Screening Test"},
+    };
+
     TetriumColor::Init();
 
     Tetrium::InitOptions options{.tetraMode = Tetrium::TetraMode::kEvenOddSoftwareSync};
     Tetrium engine;
+
+    for (auto& [app, appName] : apps) {
+        engine.RegisterApp(app, appName);
+    }
+
     engine.Init(options);
     engine.Run();
     engine.Cleanup();
 
     TetriumColor::Cleanup();
+
+    for (auto& [app, appName] : apps) {
+        delete app;
+    }
 
     return 0;
 }
