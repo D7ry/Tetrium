@@ -91,7 +91,7 @@ void Tetrium::drawMainMenu(ColorSpace colorSpace)
 
     if (ImGui::Begin(DEFAULTS::Engine::APPLICATION_NAME, NULL, fullScreenFlags)) {
         if (ImGui::BeginTabBar("Engine Tab")) {
-            if (ImGui::BeginTabItem((const char*)u8"🏠General")) {
+            /* if (ImGui::BeginTabItem((const char*)u8"🏠General")) {
                 ImGui::SeparatorText("📹Camera");
                 {
                     ImGui::Text(
@@ -127,7 +127,7 @@ void Tetrium::drawMainMenu(ColorSpace colorSpace)
                 ImGui::SeparatorText("Graphics Pipeline");
                 _widgetGraphicsPipeline.Draw(this, colorSpace);
                 ImGui::EndTabItem();
-            }
+            } */
 
             if (ImGui::BeginTabItem("🎨Apps")) {
                 // show all apps

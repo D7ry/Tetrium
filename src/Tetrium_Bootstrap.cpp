@@ -17,8 +17,8 @@
 #include <vulkan/vulkan_core.h>
 
 // imgui
-#include "lib/VulkanUtils.h"
 #include "imgui.h"
+#include "lib/VulkanUtils.h"
 
 // Molten VK Config
 #if __APPLE__
@@ -222,7 +222,13 @@ void Tetrium::Init(const Tetrium::InitOptions& options)
             .imageFormat = vk::Format(_swapChain.imageFormat),
             .extent = _swapChain.extent,
         },
-        .textureManager = &_textureManager,
+        .api = {
+            .LoadAndGetTextureDescriptorImageInfo = [this](const std::string& texture) {
+                vk::DescriptorImageInfo info;
+                this->_textureManager.GetDescriptorImageInfo(texture, info);
+                return info;
+            },
+        },
     };
 
     // init apps
@@ -1085,16 +1091,20 @@ void Tetrium::createDepthBuffer(SwapChainContext& ctx)
 void Tetrium::bindDefaultInputs()
 {
     // const int CAMERA_SPEED = 3;
-    // _inputManager.RegisterCallback(GLFW_KEY_W, InputManager::KeyCallbackCondition::HOLD, [this]() {
+    // _inputManager.RegisterCallback(GLFW_KEY_W, InputManager::KeyCallbackCondition::HOLD, [this]()
+    // {
     //     _mainCamera.Move(_deltaTimer.GetDeltaTime() * CAMERA_SPEED, 0, 0);
     // });
-    // _inputManager.RegisterCallback(GLFW_KEY_S, InputManager::KeyCallbackCondition::HOLD, [this]() {
+    // _inputManager.RegisterCallback(GLFW_KEY_S, InputManager::KeyCallbackCondition::HOLD, [this]()
+    // {
     //     _mainCamera.Move(-_deltaTimer.GetDeltaTime() * CAMERA_SPEED, 0, 0);
     // });
-    // _inputManager.RegisterCallback(GLFW_KEY_A, InputManager::KeyCallbackCondition::HOLD, [this]() {
+    // _inputManager.RegisterCallback(GLFW_KEY_A, InputManager::KeyCallbackCondition::HOLD, [this]()
+    // {
     //     _mainCamera.Move(0, _deltaTimer.GetDeltaTime() * CAMERA_SPEED, 0);
     // });
-    // _inputManager.RegisterCallback(GLFW_KEY_D, InputManager::KeyCallbackCondition::HOLD, [this]() {
+    // _inputManager.RegisterCallback(GLFW_KEY_D, InputManager::KeyCallbackCondition::HOLD, [this]()
+    // {
     //     _mainCamera.Move(0, -_deltaTimer.GetDeltaTime() * CAMERA_SPEED, 0);
     // });
     // _inputManager.RegisterCallback(

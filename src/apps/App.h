@@ -14,7 +14,10 @@ struct InitContext
         vk::Format imageFormat;
         vk::Extent2D extent;
     } swapchain;
-    TextureManager* textureManager;
+
+    struct {
+        std::function<vk::DescriptorImageInfo(const std::string&)> LoadAndGetTextureDescriptorImageInfo;
+    } api;
 };
 
 struct CleanupContext
@@ -63,8 +66,11 @@ class App
   public:
     virtual void Init(TetriumApp::InitContext& ctx) = 0;
     virtual void Cleanup(TetriumApp::CleanupContext& ctx) = 0;
-    virtual void OnClose() {};
+
+    // Called when the app is opened i.e. becomes the primary app
     virtual void OnOpen() {};
+    // Called when the app is closed i.e. no longer the primary app
+    virtual void OnClose() {};
     virtual ~App() {}
 
     // TickImGui() and TickVulkan() are only called if the app is active

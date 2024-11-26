@@ -5,8 +5,6 @@
 #include "structs/Vertex.h"
 
 #include "components/ShaderUtils.h"
-#include "components/TextureManager.h" // FIXME: fix dependency hell
-#include "lib/VulkanUtils.h"
 
 #include "AppTetraHueSphere.h"
 
@@ -249,6 +247,8 @@ void AppTetraHueSphere::Init(TetriumApp::InitContext& ctx)
     _clearValues[1].depthStencil = vk::ClearDepthStencilValue(1.f, 0.f);
 
     initRasterization(ctx);
+
+    _rasterizationCtx.camera.SetPosition(-0.75, 0, 0);
 };
 
 void AppTetraHueSphere::cleanupRenderContext(
@@ -445,22 +445,17 @@ void AppTetraHueSphere::initRasterization(TetriumApp::InitContext& initCtx)
             );
 
             // sampler
-            VkDescriptorImageInfo imageInfoUglyRGB;
-            VkDescriptorImageInfo imageInfoUglyOCV;
-            vk::DescriptorImageInfo imageInfoPrettyRGB;
-            vk::DescriptorImageInfo imageInfoPrettyOCV;
-            initCtx.textureManager->GetDescriptorImageInfo(
-                HUE_SPHERE_UGLY_TEXTURE_PATH_RGB, imageInfoUglyRGB
+            vk::DescriptorImageInfo imageInfoUglyRGB = initCtx.api.LoadAndGetTextureDescriptorImageInfo(
+                HUE_SPHERE_UGLY_TEXTURE_PATH_RGB
             );
-            initCtx.textureManager->GetDescriptorImageInfo(
-                HUE_SPHERE_UGLY_TEXTURE_PATH_OCV, imageInfoUglyOCV
+            vk::DescriptorImageInfo imageInfoUglyOCV = initCtx.api.LoadAndGetTextureDescriptorImageInfo(
+                HUE_SPHERE_UGLY_TEXTURE_PATH_OCV
             );
-
-            initCtx.textureManager->GetDescriptorImageInfo(
-                HUE_SPHERE_PRETTY_TEXTURE_PATH_RGB, imageInfoPrettyRGB
+            vk::DescriptorImageInfo imageInfoPrettyRGB = initCtx.api.LoadAndGetTextureDescriptorImageInfo(
+                HUE_SPHERE_PRETTY_TEXTURE_PATH_RGB
             );
-            initCtx.textureManager->GetDescriptorImageInfo(
-                HUE_SPHERE_PRETTY_TEXTURE_PATH_OCV, imageInfoPrettyOCV
+            vk::DescriptorImageInfo imageInfoPrettyOCV = initCtx.api.LoadAndGetTextureDescriptorImageInfo(
+                HUE_SPHERE_PRETTY_TEXTURE_PATH_OCV
             );
 
             std::array<vk::DescriptorImageInfo, SAMPLER_DESCRIPTOR_COUNT> imageInfos

@@ -406,7 +406,7 @@ class Tetrium
     DeletionStack _deletionStack;
     TextureManager _textureManager;
     DeltaTimer _deltaTimer;
-    Camera _mainCamera;
+    Camera _mainCamera; // FIXME: this should be a component
     InputManager _inputManager;
     Profiler _profiler;
     TaskQueue _taskQueue;
