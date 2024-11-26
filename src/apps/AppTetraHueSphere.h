@@ -65,9 +65,20 @@ class AppTetraHueSphere : public App
         glm::mat4 proj; // proj matrix
         
         glm::mat4 model = glm::mat4(1); // model matrix
-        int isRGB; // 1 -> RGB, 0 -> OCV
+        int textureIndex; // [0, 1, 2, 3] -> [uglyRGB, uglyOCV, prettyRGB, prettyOCV]
     };
 
+    struct Mesh
+    {
+        VQBuffer vertexBuffer;
+        VQBufferIndex indexBuffer;
+    };
+
+    enum class RenderMeshType
+    {
+        UglySphere = 0,
+        PrettySphere = 1
+    };
     struct
     {
         std::array<VQBuffer, NUM_FRAME_IN_FLIGHT> UBOBuffer;
@@ -81,16 +92,15 @@ class AppTetraHueSphere : public App
             std::vector<vk::DescriptorSet> sets;
         } descriptors;
 
-        struct 
-        {
-            VQBuffer vertexBuffer;
-            VQBufferIndex indexBuffer;
-        } hueSphereMesh;
+        Mesh prettySphereMesh;
+        Mesh uglySphereMesh;
 
         Camera camera;
         TransformComponent hueSpheretransform = TransformComponent::Identity();
 
         float fov = 90;
+
+        RenderMeshType renderMeshType = RenderMeshType::PrettySphere;
     } _rasterizationCtx;
 
 };

@@ -28,15 +28,25 @@ const char* FRAGMENT_SHADER_PATH = "../assets/apps/AppTetraHueSphere/shader.frag
 
 // const char* HUE_SPHERE_MODEL_PATH = "../assets/apps/AppTetraHueSphere/ugly_sphere.obj";
 
-const char* HUE_SPHERE_MODEL_PATH = "../assets/apps/AppTetraHueSphere/fibonacci_sampled.obj";
-const char* HUE_SPHERE_TEXTURE_PATH_RGB = "../assets/apps/AppTetraHueSphere/RGB.png";
-const char* HUE_SPHERE_TEXTURE_PATH_OCV = "../assets/apps/AppTetraHueSphere/OCV.png";
+const char* HUE_SPHERE_UGLY_MODEL_PATH = "../assets/apps/AppTetraHueSphere/fibonacci_sampled.obj";
+const char* HUE_SPHERE_UGLY_TEXTURE_PATH_RGB = "../assets/apps/AppTetraHueSphere/RGB.png";
+const char* HUE_SPHERE_UGLY_TEXTURE_PATH_OCV = "../assets/apps/AppTetraHueSphere/OCV.png";
+
+const char* HUE_SPHERE_PRETTY_MODEL_PATH = "../assets/apps/AppTetraHueSphere/cubemap_sampled.obj";
+const char* HUE_SPHERE_PRETTY_TEXTURE_PATH_RGB
+    = "../assets/apps/AppTetraHueSphere/cube_map_RGB.png";
+const char* HUE_SPHERE_PRETTY_TEXTURE_PATH_OCV
+    = "../assets/apps/AppTetraHueSphere/cube_map_OCV.png";
 } // namespace
 
 void AppTetraHueSphere::TickImGui(const TetriumApp::TickContextImGui& ctx)
 {
     if (ImGui::Begin("TetraHueSphere")) {
-        ImGui::Text("Hello, TetraHueSphere!");
+        // radio button for mesh type
+        ImGui::Text("Mesh Type");
+        ImGui::RadioButton("Ugly Sphere", (int*)&_rasterizationCtx.renderMeshType, 0);
+        ImGui::SameLine();
+        ImGui::RadioButton("Pretty Sphere", (int*)&_rasterizationCtx.renderMeshType, 1);
 
         RenderContext& renderCtx = _renderContexts[ctx.currentFrameInFlight];
         // color & depth stencil clear value sliders
@@ -112,7 +122,13 @@ void AppTetraHueSphere::TickVulkan(TetriumApp::TickContextVulkan& ctx)
         projectionMatrix[1][1] *= -1; // invert for vulkan coord system
         pUBO->proj = projectionMatrix;
         pUBO->model = _rasterizationCtx.hueSpheretransform.GetModelMatrix();
-        pUBO->isRGB = ctx.colorSpace == ColorSpace::RGB ? 1 : 0;
+
+        // [0, 1, 2, 3] -> [uglyRGB, uglyOCV, prettyRGB, prettyOCV]
+        int texIndex = _rasterizationCtx.renderMeshType == RenderMeshType::PrettySphere ? 2 : 0;
+        if (ctx.colorSpace == ColorSpace::OCV) {
+            texIndex += 1;
+        }
+        pUBO->textureIndex = texIndex;
     }
 
     auto CB = ctx.commandBuffer;
@@ -141,14 +157,13 @@ void AppTetraHueSphere::TickVulkan(TetriumApp::TickContextVulkan& ctx)
         nullptr
     );
 
-    CB.bindVertexBuffers(0, vk::Buffer(_rasterizationCtx.hueSphereMesh.vertexBuffer.buffer), {0});
-    CB.bindIndexBuffer(
-        vk::Buffer(_rasterizationCtx.hueSphereMesh.indexBuffer.buffer),
-        0,
-        vk::IndexType(VQ_BUFFER_INDEX_TYPE)
-    );
+    Mesh& mesh = _rasterizationCtx.renderMeshType == RenderMeshType::PrettySphere
+                     ? _rasterizationCtx.prettySphereMesh
+                     : _rasterizationCtx.uglySphereMesh;
+    CB.bindVertexBuffers(0, vk::Buffer(mesh.vertexBuffer.buffer), {0});
+    CB.bindIndexBuffer(vk::Buffer(mesh.indexBuffer.buffer), 0, vk::IndexType(VQ_BUFFER_INDEX_TYPE));
 
-    CB.drawIndexed(_rasterizationCtx.hueSphereMesh.indexBuffer.numIndices, 1, 0, 0, 0);
+    CB.drawIndexed(mesh.indexBuffer.numIndices, 1, 0, 0, 0);
 
     CB.endRenderPass();
 }
@@ -402,7 +417,7 @@ void AppTetraHueSphere::initRasterization(TetriumApp::InitContext& initCtx)
     // bind & allocate descriptor sets
     {
         const size_t UBO_DESCRIPTOR_COUNT = 1;
-        const size_t SAMPLER_DESCRIPTOR_COUNT = 2; // 2 textures -- RGB / OCV of the sphere
+        const size_t SAMPLER_DESCRIPTOR_COUNT = 4; // [uglyRGB, uglyOCV, prettyRGB, prettyOCV]
 
         vk::DescriptorSetLayoutBinding uboLayoutBinding(
             (uint32_t)BindingLocation::UBO,
@@ -475,17 +490,26 @@ void AppTetraHueSphere::initRasterization(TetriumApp::InitContext& initCtx)
             );
 
             // sampler
-            VkDescriptorImageInfo imageInfoRGB;
-            VkDescriptorImageInfo imageInfoOCV;
+            VkDescriptorImageInfo imageInfoUglyRGB;
+            VkDescriptorImageInfo imageInfoUglyOCV;
+            vk::DescriptorImageInfo imageInfoPrettyRGB;
+            vk::DescriptorImageInfo imageInfoPrettyOCV;
             initCtx.textureManager->GetDescriptorImageInfo(
-                HUE_SPHERE_TEXTURE_PATH_RGB, imageInfoRGB
+                HUE_SPHERE_UGLY_TEXTURE_PATH_RGB, imageInfoUglyRGB
             );
             initCtx.textureManager->GetDescriptorImageInfo(
-                HUE_SPHERE_TEXTURE_PATH_OCV, imageInfoOCV
+                HUE_SPHERE_UGLY_TEXTURE_PATH_OCV, imageInfoUglyOCV
+            );
+
+            initCtx.textureManager->GetDescriptorImageInfo(
+                HUE_SPHERE_PRETTY_TEXTURE_PATH_RGB, imageInfoPrettyRGB
+            );
+            initCtx.textureManager->GetDescriptorImageInfo(
+                HUE_SPHERE_PRETTY_TEXTURE_PATH_OCV, imageInfoPrettyOCV
             );
 
             std::array<vk::DescriptorImageInfo, SAMPLER_DESCRIPTOR_COUNT> imageInfos
-                = {imageInfoRGB, imageInfoOCV};
+                = {imageInfoUglyRGB, imageInfoUglyOCV, imageInfoPrettyRGB, imageInfoPrettyOCV};
 
             descriptorWrites[1] = vk::WriteDescriptorSet(
                 _rasterizationCtx.descriptors.sets[i],
@@ -638,10 +662,17 @@ void AppTetraHueSphere::initRasterization(TetriumApp::InitContext& initCtx)
     // load in hue sphere model
     {
         VQUtils::meshToBuffer(
-            HUE_SPHERE_MODEL_PATH,
+            HUE_SPHERE_UGLY_MODEL_PATH,
             initCtx.device,
-            _rasterizationCtx.hueSphereMesh.vertexBuffer,
-            _rasterizationCtx.hueSphereMesh.indexBuffer
+            _rasterizationCtx.uglySphereMesh.vertexBuffer,
+            _rasterizationCtx.uglySphereMesh.indexBuffer
+        );
+
+        VQUtils::meshToBuffer(
+            HUE_SPHERE_PRETTY_MODEL_PATH,
+            initCtx.device,
+            _rasterizationCtx.prettySphereMesh.vertexBuffer,
+            _rasterizationCtx.prettySphereMesh.indexBuffer
         );
     }
 }
@@ -676,8 +707,11 @@ void AppTetraHueSphere::cleanupRasterization(TetriumApp::CleanupContext& cleanup
     }
 
     // Destroy vertex and index buffers
-    _rasterizationCtx.hueSphereMesh.vertexBuffer.Cleanup();
-    _rasterizationCtx.hueSphereMesh.indexBuffer.Cleanup();
+    _rasterizationCtx.prettySphereMesh.vertexBuffer.Cleanup();
+    _rasterizationCtx.prettySphereMesh.indexBuffer.Cleanup();
+
+    _rasterizationCtx.uglySphereMesh.vertexBuffer.Cleanup();
+    _rasterizationCtx.uglySphereMesh.indexBuffer.Cleanup();
 }
 
 } // namespace TetriumApp
