@@ -125,8 +125,8 @@ void Tetrium::initDefaultStates()
     _inputManager.SetActive(_windowFocused);
     _uiMode = true;
 
-    ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoMouse;
-    ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoKeyboard;
+    // ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoMouse;
+    // ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoKeyboard;
 };
 
 void Tetrium::Init(const Tetrium::InitOptions& options)
