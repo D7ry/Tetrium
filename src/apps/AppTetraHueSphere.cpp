@@ -18,8 +18,8 @@ namespace
 {
 // FIXME: figure out a way to resize fb
 // by recreating fb on imgui window resize callback
-const int FB_WIDTH = 1024;
-const int FB_HEIGHT = 1024;
+unsigned int FB_WIDTH = 1024;
+unsigned int FB_HEIGHT = 1024;
 
 static const VkFormat FB_IMAGE_FORMAT = VK_FORMAT_R8G8B8A8_SRGB;
 
@@ -50,12 +50,34 @@ void AppTetraHueSphere::TickImGui(const TetriumApp::TickContextImGui& ctx)
             NULL,
             ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove
                 | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus
+                | ImGuiWindowFlags_NoScrollWithMouse
         )) {
+
+        ImGui::Columns(2, "TetraHueSphereColumns", true);
         // radio button for mesh type
         ImGui::Text("Mesh Type");
-        ImGui::RadioButton("Ugly Sphere", (int*)&_rasterizationCtx.renderMeshType, 0);
+        ImGui::RadioButton(
+            "Ugly Sphere", (int*)&_rasterizationCtx.renderMeshType, (int)RenderMeshType::UglySphere
+        );
         ImGui::SameLine();
-        ImGui::RadioButton("Pretty Sphere", (int*)&_rasterizationCtx.renderMeshType, 1);
+        ImGui::RadioButton(
+            "Pretty Sphere",
+            (int*)&_rasterizationCtx.renderMeshType,
+            (int)RenderMeshType::PrettySphere
+        );
+
+        ImGui::SliderFloat("Sphere Rotation Speed", &_rasterizationCtx.sphereRotationSpeed, 0.f, 5.f);
+
+        ImGui::Text("Projection Type");
+        ImGui::RadioButton(
+            "Orthographic",
+            (int*)&_rasterizationCtx.projectionType,
+            (int)ProjectionType::Orthographic
+        );
+        ImGui::SameLine();
+        ImGui::RadioButton(
+            "Perspective", (int*)&_rasterizationCtx.projectionType, (int)ProjectionType::Perspective
+        );
 
         RenderContext& renderCtx = _renderContexts[ctx.currentFrameInFlight];
         // color & depth stencil clear value sliders
@@ -66,20 +88,6 @@ void AppTetraHueSphere::TickImGui(const TetriumApp::TickContextImGui& ctx)
         glm::vec3 pos = _rasterizationCtx.camera.GetPosition();
 
         ImGui::Text("Camera Position: (%.2f, %.2f, %.2f)", pos.x, pos.y, pos.z);
-        bool positionChanged = false;
-        if (ImGui::SliderFloat("Camera X", &pos.x, -10.f, 10.f)) {
-            positionChanged = true;
-        }
-        if (ImGui::SliderFloat("Camera Y", &pos.y, -10.f, 10.f)) {
-            positionChanged = true;
-        }
-        if (ImGui::SliderFloat("Camera Z", &pos.z, -10.f, 10.f)) {
-            positionChanged = true;
-        }
-
-        if (positionChanged) {
-            _rasterizationCtx.camera.SetPosition(pos.x, pos.y, pos.z);
-        }
         ImGui::SliderFloat("Camera FOV", &_rasterizationCtx.fov, 1.f, 130.f);
 
         // ImGui::Text("Hue Sphere Transform");
@@ -96,19 +104,48 @@ void AppTetraHueSphere::TickImGui(const TetriumApp::TickContextImGui& ctx)
         //     _rasterizationCtx.hueSpheretransform.position = hueSpherePos;
         // }
 
+        ImGui::NextColumn();
         // okay to sample image here -- imgui raster pass stalls until the rendering to
         // this image is complete
         ImGui::Image(renderCtx.fb.GetImGuiTextureId(), ImVec2(FB_WIDTH, FB_HEIGHT));
 
-        if (ImGui::Button("Close")) {
-            ctx.controls.wantExit = true;
+        // mouse control
+        if (ImGui::IsItemHovered()) {
+            // if (io.MouseWheel != 0) {
+            //     _rasterizationCtx.camera.Move(io.MouseWheel * 0.2, 0, 0);
+            // };
+            if (io.MouseDown[0]) {
+                _rasterizationCtx.camera.ModRotation(-io.MouseDelta.x, -io.MouseDelta.y, 0);
+            }
+            // minecraft movement controls
+            if (io.KeysDown[ImGuiKey_Space]) {
+                _rasterizationCtx.camera.Move(0, 0, io.DeltaTime);
+            }
+            if (io.KeyShift) {
+                _rasterizationCtx.camera.Move(0, 0, -io.DeltaTime);
+            }
+            if (io.KeysDown[ImGuiKey_W]) {
+                _rasterizationCtx.camera.Move(io.DeltaTime, 0, 0);
+            }
+            if (io.KeysDown[ImGuiKey_S]) {
+                _rasterizationCtx.camera.Move(-io.DeltaTime, 0, 0);
+            }
+            if (io.KeysDown[ImGuiKey_A]) {
+                _rasterizationCtx.camera.Move(0, io.DeltaTime, 0);
+            }
+            if (io.KeysDown[ImGuiKey_D]) {
+                _rasterizationCtx.camera.Move(0, -io.DeltaTime, 0);
+            }
         }
+
+        ImGui::Columns();
     }
     ImGui::End();
 
     // rotate hue sphere
 
-    _rasterizationCtx.hueSpheretransform.rotation.z += io.DeltaTime * 10.f;
+    _rasterizationCtx.hueSpheretransform.rotation.z
+        += io.DeltaTime * _rasterizationCtx.sphereRotationSpeed * 50.f;
 }
 
 void AppTetraHueSphere::TickVulkan(TetriumApp::TickContextVulkan& ctx)
@@ -123,12 +160,17 @@ void AppTetraHueSphere::TickVulkan(TetriumApp::TickContextVulkan& ctx)
 
         vk::Extent2D extent = vk::Extent2D(FB_WIDTH, FB_HEIGHT);
 
-        glm::mat4 projectionMatrix = glm::perspective(
-            glm::radians(_rasterizationCtx.fov),
-            extent.width / static_cast<float>(extent.height),
-            DEFAULTS::ZNEAR,
-            DEFAULTS::ZFAR
-        );
+        glm::mat4 projectionMatrix
+            = _rasterizationCtx.projectionType == ProjectionType::Perspective
+                  ? glm::perspective(
+                        glm::radians(_rasterizationCtx.fov),
+                        extent.width / static_cast<float>(extent.height),
+                        DEFAULTS::ZNEAR,
+                        DEFAULTS::ZFAR
+                    )
+
+                  : glm::ortho(-1.f, 1.f, -1.f, 1.f, DEFAULTS::ZNEAR, DEFAULTS::ZFAR);
+
         projectionMatrix[1][1] *= -1; // invert for vulkan coord system
         pUBO->proj = projectionMatrix;
         pUBO->model = _rasterizationCtx.hueSpheretransform.GetModelMatrix();
@@ -192,6 +234,8 @@ void AppTetraHueSphere::Cleanup(TetriumApp::CleanupContext& ctx)
 
 void AppTetraHueSphere::Init(TetriumApp::InitContext& ctx)
 {
+    FB_WIDTH = ctx.swapchain.extent.width / 2;
+    FB_HEIGHT = ctx.swapchain.extent.height;
     DEBUG("Initializing TetraHueSphere...");
     initRenderPass(ctx);
 

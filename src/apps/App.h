@@ -12,6 +12,7 @@ struct InitContext
     VQDevice& device;
     struct {
         vk::Format imageFormat;
+        vk::Extent2D extent;
     } swapchain;
     TextureManager* textureManager;
 };

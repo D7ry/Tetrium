@@ -65,7 +65,7 @@ void Tetrium::createFunnyObjects()
 void Tetrium::keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
     Tetrium* pThis = reinterpret_cast<Tetrium*>(glfwGetWindowUserPointer(window));
-    if (key == GLFW_KEY_P && action == GLFW_PRESS) {
+    if (key == GLFW_KEY_SLASH && action == GLFW_PRESS) {
         _paused = !_paused;
     }
     _inputManager.OnKeyInput(window, key, scancode, action, mods);
@@ -123,7 +123,7 @@ void Tetrium::initDefaultStates()
     // by default, unlock cursor, disable imgui inputs, disable input handling
     _windowFocused = false;
     _inputManager.SetActive(_windowFocused);
-    _uiMode = false;
+    _uiMode = true;
 
     ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoMouse;
     ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoKeyboard;
@@ -220,6 +220,7 @@ void Tetrium::Init(const Tetrium::InitOptions& options)
         .device = device,
         .swapchain = {
             .imageFormat = vk::Format(_swapChain.imageFormat),
+            .extent = _swapChain.extent,
         },
         .textureManager = &_textureManager,
     };
@@ -1083,29 +1084,29 @@ void Tetrium::createDepthBuffer(SwapChainContext& ctx)
 // currently for perf reasons we're leaving it as is.
 void Tetrium::bindDefaultInputs()
 {
-    const int CAMERA_SPEED = 3;
-    _inputManager.RegisterCallback(GLFW_KEY_W, InputManager::KeyCallbackCondition::HOLD, [this]() {
-        _mainCamera.Move(_deltaTimer.GetDeltaTime() * CAMERA_SPEED, 0, 0);
-    });
-    _inputManager.RegisterCallback(GLFW_KEY_S, InputManager::KeyCallbackCondition::HOLD, [this]() {
-        _mainCamera.Move(-_deltaTimer.GetDeltaTime() * CAMERA_SPEED, 0, 0);
-    });
-    _inputManager.RegisterCallback(GLFW_KEY_A, InputManager::KeyCallbackCondition::HOLD, [this]() {
-        _mainCamera.Move(0, _deltaTimer.GetDeltaTime() * CAMERA_SPEED, 0);
-    });
-    _inputManager.RegisterCallback(GLFW_KEY_D, InputManager::KeyCallbackCondition::HOLD, [this]() {
-        _mainCamera.Move(0, -_deltaTimer.GetDeltaTime() * CAMERA_SPEED, 0);
-    });
-    _inputManager.RegisterCallback(
-        GLFW_KEY_LEFT_CONTROL,
-        InputManager::KeyCallbackCondition::HOLD,
-        [this]() { _mainCamera.Move(0, 0, -CAMERA_SPEED * _deltaTimer.GetDeltaTime()); }
-    );
-    _inputManager.RegisterCallback(
-        GLFW_KEY_SPACE,
-        InputManager::KeyCallbackCondition::HOLD,
-        [this]() { _mainCamera.Move(0, 0, CAMERA_SPEED * _deltaTimer.GetDeltaTime()); }
-    );
+    // const int CAMERA_SPEED = 3;
+    // _inputManager.RegisterCallback(GLFW_KEY_W, InputManager::KeyCallbackCondition::HOLD, [this]() {
+    //     _mainCamera.Move(_deltaTimer.GetDeltaTime() * CAMERA_SPEED, 0, 0);
+    // });
+    // _inputManager.RegisterCallback(GLFW_KEY_S, InputManager::KeyCallbackCondition::HOLD, [this]() {
+    //     _mainCamera.Move(-_deltaTimer.GetDeltaTime() * CAMERA_SPEED, 0, 0);
+    // });
+    // _inputManager.RegisterCallback(GLFW_KEY_A, InputManager::KeyCallbackCondition::HOLD, [this]() {
+    //     _mainCamera.Move(0, _deltaTimer.GetDeltaTime() * CAMERA_SPEED, 0);
+    // });
+    // _inputManager.RegisterCallback(GLFW_KEY_D, InputManager::KeyCallbackCondition::HOLD, [this]() {
+    //     _mainCamera.Move(0, -_deltaTimer.GetDeltaTime() * CAMERA_SPEED, 0);
+    // });
+    // _inputManager.RegisterCallback(
+    //     GLFW_KEY_LEFT_CONTROL,
+    //     InputManager::KeyCallbackCondition::HOLD,
+    //     [this]() { _mainCamera.Move(0, 0, -CAMERA_SPEED * _deltaTimer.GetDeltaTime()); }
+    // );
+    // _inputManager.RegisterCallback(
+    //     GLFW_KEY_SPACE,
+    //     InputManager::KeyCallbackCondition::HOLD,
+    //     [this]() { _mainCamera.Move(0, 0, CAMERA_SPEED * _deltaTimer.GetDeltaTime()); }
+    // );
     // ui mode toggle
     _inputManager.RegisterCallback(GLFW_KEY_U, InputManager::KeyCallbackCondition::PRESS, [this]() {
         _uiMode = !_uiMode;
@@ -1121,11 +1122,8 @@ void Tetrium::bindDefaultInputs()
         } else {
             io.ConfigFlags |= (ImGuiConfigFlags_NoMouse | ImGuiConfigFlags_NoKeyboard);
         }
-        // io.WantSetMousePos = _uiMode;
+        io.WantSetMousePos = _uiMode;
     });
-    _inputManager.RegisterCallback(
-        GLFW_KEY_ESCAPE, InputManager::KeyCallbackCondition::PRESS, [this]() {}
-    );
     // close app with "`" key
     _inputManager.RegisterCallback(
         GLFW_KEY_GRAVE_ACCENT,

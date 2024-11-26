@@ -67,6 +67,13 @@ class AppTetraHueSphere : public App
         UglySphere = 0,
         PrettySphere = 1
     };
+
+    enum class ProjectionType
+    {
+        Perspective = 0,
+        Orthographic = 1
+    };
+
     struct
     {
         std::array<VQBuffer, NUM_FRAME_IN_FLIGHT> UBOBuffer;
@@ -86,9 +93,12 @@ class AppTetraHueSphere : public App
         Camera camera;
         TransformComponent hueSpheretransform = TransformComponent::Identity();
 
+        float sphereRotationSpeed = 1.f;
+
         float fov = 90;
 
         RenderMeshType renderMeshType = RenderMeshType::PrettySphere;
+        ProjectionType projectionType = ProjectionType::Perspective;
     } _rasterizationCtx;
 
 };
