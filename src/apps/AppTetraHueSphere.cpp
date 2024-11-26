@@ -20,14 +20,12 @@ const int FB_HEIGHT = 1024;
 
 static const VkFormat FB_IMAGE_FORMAT = VK_FORMAT_R8G8B8A8_SRGB;
 
-const char* VERTEX_SHADER_PATH = "../shaders/hue_sphere.vert.spv";
-const char* FRAGMENT_SHADER_PATH = "../shaders/hue_sphere.frag.spv";
+const char* VERTEX_SHADER_PATH = "../assets/apps/AppTetraHueSphere/shader.vert.spv";
+const char* FRAGMENT_SHADER_PATH = "../assets/apps/AppTetraHueSphere/shader.frag.spv";
 
-// TODO: group assets by apps
-const char* HUE_SPHERE_MODEL_PATH = "../assets/models/ugly_sphere.obj";
-
-const char* HUE_SPHERE_TEXTURE_PATH_RGB = "../assets/textures/apps/AppTetraHueSphere/RGB.png";
-const char* HUE_SPHERE_TEXTURE_PATH_OCV = "../assets/textures/apps/AppTetraHueSphere/OCV.png";
+const char* HUE_SPHERE_MODEL_PATH = "../assets/apps/AppTetraHueSphere/ugly_sphere.obj";
+const char* HUE_SPHERE_TEXTURE_PATH_RGB = "../assets/apps/AppTetraHueSphere/RGB.png";
+const char* HUE_SPHERE_TEXTURE_PATH_OCV = "../assets/apps/AppTetraHueSphere/OCV.png";
 
 void AppTetraHueSphere::TickImGui(const TetriumApp::TickContextImGui& ctx)
 {
@@ -56,6 +54,8 @@ void AppTetraHueSphere::TickVulkan(TetriumApp::TickContextVulkan& ctx)
     RenderContext& renderCtx = _renderContexts[ctx.currentFrameInFlight];
     // render to the correct framebuffer&texture
 
+    
+
     CB.beginRenderPass(
         vk::RenderPassBeginInfo(
             _renderPass,
@@ -67,6 +67,9 @@ void AppTetraHueSphere::TickVulkan(TetriumApp::TickContextVulkan& ctx)
         vk::SubpassContents::eInline
     );
     CB.bindPipeline(vk::PipelineBindPoint::eGraphics, _rasterizationCtx.pipeline);
+
+    CB.setViewport(0, vk::Viewport(0.f, 0.f, FB_WIDTH, FB_HEIGHT, 0.f, 1.f));
+    CB.setScissor(0, vk::Rect2D({0, 0}, {FB_WIDTH, FB_HEIGHT}));
     CB.bindDescriptorSets(
         vk::PipelineBindPoint::eGraphics,
         _rasterizationCtx.pipelineLayout,
@@ -548,7 +551,7 @@ void AppTetraHueSphere::initRasterization(TetriumApp::InitContext& initCtx)
             &viewportState,                   // pViewportState
             &rasterizer,                      // pRasterizationState
             &multisampling,                   // pMultisampleState
-            nullptr,                          // pDepthStencilState
+            &depthStencil,                    // pDepthStencilState
             &colorBlending,                   // pColorBlendState
             &dynamicState,                    // pDynamicState
             _rasterizationCtx.pipelineLayout, // layout
