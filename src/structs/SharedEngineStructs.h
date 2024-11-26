@@ -58,6 +58,8 @@ enum class Sound
     kMusicGameMenu,
     kMusicGamePlay,
 
+    kMusicInterstellar,
+
     kCorrectAnswer,
     kWrongAnswer = kVineBoom,
 };

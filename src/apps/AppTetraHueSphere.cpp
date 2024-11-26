@@ -21,6 +21,7 @@ unsigned int FB_HEIGHT = 1024;
 
 static const VkFormat FB_IMAGE_FORMAT = VK_FORMAT_R8G8B8A8_SRGB;
 
+// TODO: get rid of this
 const char* VERTEX_SHADER_PATH = "../assets/apps/AppTetraHueSphere/shader.vert.spv";
 const char* FRAGMENT_SHADER_PATH = "../assets/apps/AppTetraHueSphere/shader.frag.spv";
 
@@ -39,6 +40,7 @@ const char* HUE_SPHERE_PRETTY_TEXTURE_PATH_OCV
 
 void AppTetraHueSphere::TickImGui(const TetriumApp::TickContextImGui& ctx)
 {
+    ctx.controls.musicOverride = Sound::kMusicInterstellar;
     ImGuiIO& io = ImGui::GetIO();
     ImGui::SetNextWindowPos(ImVec2(0, 0));
     ImGui::SetNextWindowSize(io.DisplaySize);
