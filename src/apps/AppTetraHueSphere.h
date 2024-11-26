@@ -1,5 +1,6 @@
 #pragma once
 
+#include "lib/VQDeviceImage.h"
 #include "App.h"
 
 namespace TetriumApp
@@ -15,15 +16,8 @@ class AppTetraHueSphere : public App
     virtual void TickImGui(const TetriumApp::TickContextImGui& ctx) override;
 
   private:
-    struct VulkanImage
-    {
-        VkImage image = VK_NULL_HANDLE;
-        VkImageView view = VK_NULL_HANDLE;
-        VkDeviceMemory memory = VK_NULL_HANDLE;
-    };
 
-
-    VulkanImage _depthImage;
+    VQDeviceImage _depthImage;
 
     std::array<vk::ClearValue, 2> _clearValues; // [color, depthStencil]
     vk::RenderPass _renderPass = VK_NULL_HANDLE;
@@ -35,7 +29,7 @@ class AppTetraHueSphere : public App
         // class
         vk::Framebuffer frameBuffer = VK_NULL_HANDLE;
         vk::Sampler sampler = VK_NULL_HANDLE;
-        VulkanImage image;
+        VQDeviceImage deviceImage;
         void* imguiTextureId = nullptr;
     };
 

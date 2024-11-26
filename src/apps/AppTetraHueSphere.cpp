@@ -1,7 +1,7 @@
 #include "backends/imgui_impl_vulkan.h"
 #include "imgui.h"
 
-#include "components/VulkanUtils.h"
+#include "lib/VulkanUtils.h"
 
 #include "AppTetraHueSphere.h"
 
@@ -38,7 +38,6 @@ void AppTetraHueSphere::TickVulkan(TetriumApp::TickContextVulkan& ctx)
 
     RenderContext& renderCtx = _renderContexts[ctx.currentFrameInFlight];
     // render to the correct framebuffer&texture
-
 
     // push render semaphore TODO: do we need semahpore here? since the cb is already scheduled
     ctx.commandBuffer.beginRenderPass(
@@ -78,6 +77,7 @@ void AppTetraHueSphere::Init(TetriumApp::InitContext& ctx)
 void AppTetraHueSphere::initRenderContexts(RenderContext& ctx, TetriumApp::InitContext& initCtx)
 {
     VirtualFrameBuffer& fb = ctx.fb;
+    vk::Device device = initCtx.device.logicalDevice;
 
     // create image & image view
     {
@@ -88,32 +88,33 @@ void AppTetraHueSphere::initRenderContexts(RenderContext& ctx, TetriumApp::InitC
             FB_HEIGHT,
             imageFormat,
             VK_IMAGE_TILING_OPTIMAL,
-            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, // sampled by imgui
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-            fb.image.image,
-            fb.image.memory,
+            fb.deviceImage.image,
+            fb.deviceImage.memory,
             initCtx.device.physicalDevice,
-            initCtx.device.device
+            initCtx.device.logicalDevice
         );
-
-        VkDevice device = initCtx.device.device;
-        fb.image.view = VulkanUtils::createImageView(
-            fb.image.image, device, imageFormat, VK_IMAGE_ASPECT_COLOR_BIT
+        fb.deviceImage.view = VulkanUtils::createImageView(
+            fb.deviceImage.image,
+            initCtx.device.logicalDevice,
+            imageFormat,
+            VK_IMAGE_ASPECT_COLOR_BIT
         );
     }
 
     // create fb
     {
         ASSERT(_renderPass != VK_NULL_HANDLE);
-        std::array<vk::ImageView, 2> attachments = {fb.image.view, _depthImage.view};
-        ASSERT(fb.image.view != VK_NULL_HANDLE);
+        std::array<vk::ImageView, 2> attachments = {fb.deviceImage.view, _depthImage.view};
+        ASSERT(fb.deviceImage.view != VK_NULL_HANDLE);
         ASSERT(_depthImage.view != VK_NULL_HANDLE);
 
         vk::FramebufferCreateInfo fbCreateInfo(
             {}, _renderPass, attachments.size(), attachments.data(), FB_WIDTH, FB_HEIGHT, 1
         );
 
-        fb.frameBuffer = initCtx.device.device.createFramebuffer(fbCreateInfo);
+        fb.frameBuffer = device.createFramebuffer(fbCreateInfo);
     }
 
     // create sampler
@@ -136,18 +137,19 @@ void AppTetraHueSphere::initRenderContexts(RenderContext& ctx, TetriumApp::InitC
         samplerInfo.minLod = 0.0f;
         samplerInfo.maxLod = 0.0f;
 
-        fb.sampler = initCtx.device.device.createSampler(samplerInfo);
+        fb.sampler = device.createSampler(samplerInfo);
     }
 
     // create imgui texture
     //
     fb.imguiTextureId = ImGui_ImplVulkan_AddTexture(
-        fb.sampler, fb.image.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+        fb.sampler, fb.deviceImage.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
     );
 }
 
 void AppTetraHueSphere::initRenderPass(TetriumApp::InitContext& initCtx)
 {
+    vk::Device device = initCtx.device.logicalDevice;
     DEBUG("Creating render pass...");
     // set up color/depth layout
     VkAttachmentReference colorAttachmentRef{};
@@ -223,7 +225,7 @@ void AppTetraHueSphere::initRenderPass(TetriumApp::InitContext& initCtx)
 
     renderPassInfo.pDependencies = &dependency;
 
-    _renderPass = initCtx.device.device.createRenderPass(renderPassInfo, nullptr);
+    _renderPass = device.createRenderPass(renderPassInfo, nullptr);
 
     ASSERT(_renderPass != VK_NULL_HANDLE);
     DEBUG("render pass created");
@@ -234,6 +236,7 @@ void AppTetraHueSphere::initDepthImage(TetriumApp::InitContext& initCtx)
     DEBUG("Creating depth buffer...");
     VkFormat depthFormat = static_cast<VkFormat>(initCtx.device.depthFormat);
 
+    // TODO: vulkanUtils needs refactoring
     VulkanUtils::createImage(
         FB_WIDTH,
         FB_HEIGHT,
@@ -244,10 +247,10 @@ void AppTetraHueSphere::initDepthImage(TetriumApp::InitContext& initCtx)
         _depthImage.image,
         _depthImage.memory,
         initCtx.device.physicalDevice,
-        initCtx.device.device
+        initCtx.device.logicalDevice
     );
 
-    VkDevice device = initCtx.device.device;
+    VkDevice device = initCtx.device.logicalDevice;
     _depthImage.view = VulkanUtils::createImageView(
         _depthImage.image, device, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT
     );

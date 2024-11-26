@@ -85,7 +85,6 @@ add_executable(${PROJECT_NAME}
         src/components/ShaderUtils.cpp
         src/components/DeltaTimer.cpp
         src/components/Camera.cpp
-        src/components/VulkanUtils.cpp
         src/components/TextureManager.cpp
         src/components/InputManager.cpp
         src/components/imgui_widgets/ImGuiWidgetTemp.cpp
@@ -98,6 +97,9 @@ add_executable(${PROJECT_NAME}
         src/components/imgui_widgets/ImGuiWidgetTetraViewer.cpp
         src/components/imgui_widgets/ImGuiWidgetColorTile.cpp
         src/components/imgui_widgets/ImGuiWidgetBlobHunter.cpp
+
+        src/lib/VulkanUtils.cpp
+        src/lib/VQDeviceImage.cpp
         src/lib/VQDevice.cpp
         src/lib/VQUtils.cpp
         src/lib/ImGuiUtils.cpp

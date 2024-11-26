@@ -1,5 +1,6 @@
 #pragma once
 
+#include "lib/VQDevice.h"
 #include "structs/ImGuiTexture.h"
 #include "structs/SharedEngineStructs.h"
 
@@ -8,11 +9,7 @@ namespace TetriumApp
 
 struct InitContext
 {
-    struct {
-        vk::Device device; // same as CleanupContext::device
-        vk::PhysicalDevice physicalDevice;
-        vk::Format depthFormat;
-    } device;
+    VQDevice& device;
     struct {
         vk::Format imageFormat;
     } swapchain;

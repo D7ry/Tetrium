@@ -5,6 +5,9 @@
 #include <set>
 #include <vulkan/vulkan_core.h>
 
+
+#include "VulkanUtils.h"
+
 void VQDevice::CreateLogicalDeviceAndQueue(const std::vector<const char*>& extensions) {
     if (!this->queueFamilyIndices.isComplete()) {
         FATAL("Queue family indices incomplete! Call InitQueueFamilyIndices().");
@@ -155,6 +158,8 @@ VQDevice::VQDevice(VkPhysicalDevice physicalDevice) {
             }
         }
     }
+
+    this->depthFormat = VulkanUtils::findDepthFormat(physicalDevice);
 }
 
 void VQDevice::CreateBufferInPlace(

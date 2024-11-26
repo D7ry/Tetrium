@@ -84,7 +84,7 @@ void copyBuffer(
 
 VkImageView createImageView(
     VkImage& textureImage,
-    VkDevice& logicalDevice,
+    VkDevice logicalDevice,
     VkFormat format = VK_FORMAT_R8G8B8A8_SRGB,
     VkImageAspectFlags flags = VK_IMAGE_ASPECT_COLOR_BIT
 );

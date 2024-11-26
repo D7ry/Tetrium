@@ -136,7 +136,7 @@ void VulkanUtils::copyBuffer(
 
 VkImageView VulkanUtils::createImageView(
     VkImage& textureImage,
-    VkDevice& logicalDevice,
+    VkDevice logicalDevice,
     VkFormat format,
     VkImageAspectFlags flags
 ) {

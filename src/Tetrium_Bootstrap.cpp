@@ -17,7 +17,7 @@
 #include <vulkan/vulkan_core.h>
 
 // imgui
-#include "components/VulkanUtils.h" // FIXME: this shouldn't be here
+#include "lib/VulkanUtils.h"
 #include "imgui.h"
 
 // Molten VK Config
@@ -215,12 +215,9 @@ void Tetrium::Init(const Tetrium::InitOptions& options)
     _soundManager.PlaySound(Sound::kProgramStart);
 
     DEBUG("swapchain image format: {}", string_VkFormat(_swapChain.imageFormat));
+    VQDevice& device = *_device.get();
     TetriumApp::InitContext appInitCtx{
-        .device = {
-            .device = _device->logicalDevice,
-            .physicalDevice = _device->physicalDevice,
-            .depthFormat = vk::Format(VulkanUtils::findDepthFormat(_device->physicalDevice)),
-        },
+        .device = device,
         .swapchain = {
             .imageFormat = vk::Format(_swapChain.imageFormat),
         },

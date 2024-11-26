@@ -66,6 +66,8 @@ struct VQDevice
 
     VkCommandPool graphicsCommandPool = VK_NULL_HANDLE;
 
+    VkFormat depthFormat = VK_FORMAT_UNDEFINED;
+
     /** @brief Contains queue family indices */
     QueueFamilyIndices queueFamilyIndices;
 
