@@ -83,7 +83,13 @@ void Tetrium::drawAppsImGui(ColorSpace colorSpace, int currentFrameInFlight)
 
 void Tetrium::drawMainMenu(ColorSpace colorSpace)
 {
-    if (ImGui::Begin(DEFAULTS::Engine::APPLICATION_NAME)) {
+    int fullScreenFlags = ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove
+                          | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus;
+
+    ImGui::SetNextWindowPos(ImVec2(0, 0));
+    ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
+
+    if (ImGui::Begin(DEFAULTS::Engine::APPLICATION_NAME, NULL, fullScreenFlags)) {
         if (ImGui::BeginTabBar("Engine Tab")) {
             if (ImGui::BeginTabItem((const char*)u8"🏠General")) {
                 ImGui::SeparatorText("📹Camera");
@@ -163,10 +169,10 @@ void Tetrium::drawMainMenu(ColorSpace colorSpace)
                 ImGui::EndTabItem();
             }
 
-            if (ImGui::BeginTabItem("🐍Blob Hunter")) {
-                _widgetBlobHunter.Draw(this, colorSpace);
-                ImGui::EndTabItem();
-            }
+            // if (ImGui::BeginTabItem("🐍Blob Hunter")) {
+            //     _widgetBlobHunter.Draw(this, colorSpace);
+            //     ImGui::EndTabItem();
+            // }
 
             // we don't use temp stuff lol
             // if (ImGui::BeginTabItem("Temp Stuff")) {

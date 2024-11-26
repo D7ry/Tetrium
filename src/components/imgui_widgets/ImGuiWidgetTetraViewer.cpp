@@ -137,7 +137,7 @@ void ImGuiWidgetTetraViewer::drawTetraImagePicker(ColorSpace colorSpace)
         for (int i = 0; i < _tetraImages.size(); i++) {
             TetraImageFile& image = _tetraImages.at(i);
             bool imageSelected = _currTetraImage == i;
-            if (ImGui::Selectable(image.name.c_str(), imageSelected) && colorSpace == RGB) {
+            if (ImGui::Selectable(image.name.c_str(), imageSelected)) {
                 _currTetraImage = i;
             }
         }
