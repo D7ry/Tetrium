@@ -13,6 +13,9 @@
 namespace TetriumApp
 {
 
+// localize scope
+namespace
+{
 // FIXME: figure out a way to resize fb
 // by recreating fb on imgui window resize callback
 const int FB_WIDTH = 1024;
@@ -26,6 +29,7 @@ const char* FRAGMENT_SHADER_PATH = "../assets/apps/AppTetraHueSphere/shader.frag
 const char* HUE_SPHERE_MODEL_PATH = "../assets/apps/AppTetraHueSphere/ugly_sphere.obj";
 const char* HUE_SPHERE_TEXTURE_PATH_RGB = "../assets/apps/AppTetraHueSphere/RGB.png";
 const char* HUE_SPHERE_TEXTURE_PATH_OCV = "../assets/apps/AppTetraHueSphere/OCV.png";
+} // namespace
 
 void AppTetraHueSphere::TickImGui(const TetriumApp::TickContextImGui& ctx)
 {
@@ -37,6 +41,40 @@ void AppTetraHueSphere::TickImGui(const TetriumApp::TickContextImGui& ctx)
         ImGui::ColorEdit4("Clear Color", (float*)&_clearValues[0].color);
         ImGui::SliderFloat("Clear Depth", &_clearValues[1].depthStencil.depth, 0.f, 1.f);
 
+        // camera control;
+        glm::vec3 pos = _rasterizationCtx.camera.GetPosition();
+
+        ImGui::Text("Camera Position: (%.2f, %.2f, %.2f)", pos.x, pos.y, pos.z);
+        bool positionChanged = false;
+        if (ImGui::SliderFloat("Camera X", &pos.x, -10.f, 10.f)) {
+            positionChanged = true;
+        }
+        if (ImGui::SliderFloat("Camera Y", &pos.y, -10.f, 10.f)) {
+            positionChanged = true;
+        }
+        if (ImGui::SliderFloat("Camera Z", &pos.z, -10.f, 10.f)) {
+            positionChanged = true;
+        }
+
+        if (positionChanged) {
+            _rasterizationCtx.camera.SetPosition(pos.x, pos.y, pos.z);
+        }
+
+        // ImGui::Text("Hue Sphere Transform");
+        //
+        // // slider for hue sphere transform
+        // glm::vec3 hueSpherePos = _rasterizationCtx.hueSpheretransform.position;
+        // if (ImGui::SliderFloat("Hue Sphere X", &hueSpherePos.x, -10.f, 10.f)) {
+        //     _rasterizationCtx.hueSpheretransform.position = hueSpherePos;
+        // }
+        // if (ImGui::SliderFloat("Hue Sphere Y", &hueSpherePos.y, -10.f, 10.f)) {
+        //     _rasterizationCtx.hueSpheretransform.position = hueSpherePos;
+        // }
+        // if (ImGui::SliderFloat("Hue Sphere Z", &hueSpherePos.z, -10.f, 10.f)) {
+        //     _rasterizationCtx.hueSpheretransform.position = hueSpherePos;
+        // }
+
+
         ImGui::Image(renderCtx.fb.imguiTextureId, ImVec2(FB_WIDTH, FB_HEIGHT));
 
         if (ImGui::Button("Close")) {
@@ -44,17 +82,42 @@ void AppTetraHueSphere::TickImGui(const TetriumApp::TickContextImGui& ctx)
         }
     }
     ImGui::End();
+
+    // rotate hue sphere
+    ImGuiIO& io = ImGui::GetIO();
+
+    _rasterizationCtx.hueSpheretransform.rotation.z += io.DeltaTime * 10.f;
 }
 
 void AppTetraHueSphere::TickVulkan(TetriumApp::TickContextVulkan& ctx)
 {
     // DEBUG("ticking vulkan: {}", ctx.currentFrameInFlight);
+    // flush UBO
+    // TODO: cleanup
+    {
+        UBO* pUBO = reinterpret_cast<UBO*>(
+            _rasterizationCtx.UBOBuffer.at(ctx.currentFrameInFlight).bufferAddress
+        );
+
+        pUBO->view = _rasterizationCtx.camera.GetViewMatrix();
+
+        vk::Extent2D extent = vk::Extent2D(FB_WIDTH, FB_HEIGHT);
+
+        glm::mat4 projectionMatrix = glm::perspective(
+            glm::radians(90.f),
+            extent.width / static_cast<float>(extent.height),
+            DEFAULTS::ZNEAR,
+            DEFAULTS::ZFAR
+        );
+        projectionMatrix[1][1] *= -1; // invert for vulkan coord system
+        pUBO->proj = projectionMatrix;
+        pUBO->model = _rasterizationCtx.hueSpheretransform.GetModelMatrix();
+        pUBO->isRGB = ctx.colorSpace == ColorSpace::RGB ? 1 : 0;
+    }
 
     auto CB = ctx.commandBuffer;
     RenderContext& renderCtx = _renderContexts[ctx.currentFrameInFlight];
     // render to the correct framebuffer&texture
-
-    
 
     CB.beginRenderPass(
         vk::RenderPassBeginInfo(
@@ -93,6 +156,7 @@ void AppTetraHueSphere::TickVulkan(TetriumApp::TickContextVulkan& ctx)
 void AppTetraHueSphere::Cleanup(TetriumApp::CleanupContext& ctx)
 {
     DEBUG("Cleaning up TetraHueSphere...");
+    cleanupRasterization(ctx);
     for (RenderContext& renderCtx : _renderContexts) {
         cleanupRenderContext(renderCtx, ctx);
     }

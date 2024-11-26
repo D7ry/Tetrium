@@ -4,6 +4,7 @@
 #include "lib/VQDeviceImage.h"
 
 #include "components/Camera.h" // FIXME: fix dependency hell
+#include "ecs/component/TransformComponent.h" // FIXME: fix dependency hell
 
 namespace TetriumApp
 {
@@ -64,6 +65,7 @@ class AppTetraHueSphere : public App
         glm::mat4 proj; // proj matrix
         
         glm::mat4 model = glm::mat4(1); // model matrix
+        int isRGB; // 1 -> RGB, 0 -> OCV
     };
 
     struct
@@ -86,6 +88,7 @@ class AppTetraHueSphere : public App
         } hueSphereMesh;
 
         Camera camera;
+        TransformComponent hueSpheretransform = TransformComponent::Identity();
     } _rasterizationCtx;
 
 };
