@@ -10,13 +10,13 @@ class SoundManager
   public:
 
     inline static const std::unordered_map<Sound, const char*> SOUNDS_FILES
-        = {{Sound::kProgramStart, "../assets/sounds/costco.mp3"},
-           {Sound::kVineBoom, "../assets/sounds/vine_boom.mp3"},
-           {Sound::kMusicGameMenu, "../assets/sounds/music/wii.mp3"},
-           {Sound::kMusicGamePlay, "../assets/sounds/music/sneaky.mp3"},
-           {Sound::kCorrectAnswer, "../assets/sounds/correct.mp3"},
-           {Sound::kMusicInterstellar, "../assets/sounds/music/spin.mp3"},
-           // {Sound::kMusicGamePlay, "../assets/sounds/music/powerup.mp3"},
+        = {{Sound::kProgramStart, "../assets/sounds/costco.wav"},
+           {Sound::kVineBoom, "../assets/sounds/vine_boom.wav"},
+           {Sound::kMusicGameMenu, "../assets/sounds/music/wii.wav"},
+           {Sound::kMusicGamePlay, "../assets/sounds/music/sneaky.wav"},
+           {Sound::kCorrectAnswer, "../assets/sounds/correct.wav"},
+           {Sound::kMusicInterstellar, "../assets/sounds/music/spin.wav"},
+           // {Sound::kMusicGamePlay, "../assets/sounds/music/powerup.wav"},
         };
 
 
