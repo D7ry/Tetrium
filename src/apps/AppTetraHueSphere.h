@@ -8,29 +8,47 @@ namespace TetriumApp
 class AppTetraHueSphere : public App
 {
   public:
-    virtual void Init(TetriumApp::InitContext& ctx) override {
-        DEBUG("Initializing TetraHueSphere...");
+    virtual void Init(TetriumApp::InitContext& ctx) override;
+    virtual void Cleanup(TetriumApp::CleanupContext& ctx) override;
 
-        // create feamebuffer and bind to texture
-        // ImGui_ImplVulkan_AddTexture
-
-    };
-    virtual void Cleanup(TetriumApp::CleanupContext& ctx) override {
-        DEBUG("Cleaning up TetraHueSphere...");
-
-    };
-
-    virtual void TickVulkan(TetriumApp::TickContextVulkan& ctx) override {
-        // render to the correct framebuffer&texture
-        
-
-        // push render semaphore
-
-    }
-
+    virtual void TickVulkan(TetriumApp::TickContextVulkan& ctx) override;
     virtual void TickImGui(const TetriumApp::TickContextImGui& ctx) override;
 
   private:
+    struct VulkanImage
+    {
+        VkImage image = VK_NULL_HANDLE;
+        VkImageView view = VK_NULL_HANDLE;
+        VkDeviceMemory memory = VK_NULL_HANDLE;
+    };
+
+    VulkanImage _depthImage;
+
+    vk::RenderPass _renderPass = VK_NULL_HANDLE;
+
+    // framebuffer to render the hue sphere onto
+    struct VirtualFrameBuffer
+    {
+        // TODO: if we do enough amount of 3d rendering we may abstract it away into a separate
+        // class
+        vk::Framebuffer frameBuffer = VK_NULL_HANDLE;
+        vk::Sampler sampler = VK_NULL_HANDLE;
+        VulkanImage image;
+        void* imguiTextureId = nullptr;
+    };
+
+    // context for one frame rendeirng
+    struct RenderContext
+    {
+        VirtualFrameBuffer fb;
+    };
+
+    void initRenderContexts(RenderContext& ctx, TetriumApp::InitContext& initCtx);
+    void initRenderPass(TetriumApp::InitContext& initCtx);
+
+    void initDepthImage(TetriumApp::InitContext& initCtx);
+
+    std::array<RenderContext, NUM_FRAME_IN_FLIGHT> _renderContexts;
 };
 
 } // namespace TetriumApp

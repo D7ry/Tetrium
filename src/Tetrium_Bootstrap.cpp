@@ -214,13 +214,22 @@ void Tetrium::Init(const Tetrium::InitOptions& options)
     _soundManager.LoadAllSounds();
     _soundManager.PlaySound(Sound::kProgramStart);
 
-    TetriumApp::InitContext appInitCtx{.device = _device->logicalDevice};
+    DEBUG("swapchain image format: {}", string_VkFormat(_swapChain.imageFormat));
+    TetriumApp::InitContext appInitCtx{
+        .device = {
+            .device = _device->logicalDevice,
+            .physicalDevice = _device->physicalDevice,
+            .depthFormat = vk::Format(VulkanUtils::findDepthFormat(_device->physicalDevice)),
+        },
+        .swapchain = {
+            .imageFormat = vk::Format(_swapChain.imageFormat),
+        },
+    };
 
     // init apps
     for (auto& [appName, app] : _appMap) {
         app->Init(appInitCtx);
     }
-
 }
 
 void Tetrium::framebufferResizeCallback(GLFWwindow* window, int width, int height)
@@ -838,8 +847,7 @@ void Tetrium::createSynchronizationObjects(
              {&primitive.semaImageAvailable,
               &primitive.semaRenderFinished,
               &primitive.semaImageCopyFinished,
-              &primitive.semaAppVulkanFinished
-              }) {
+              &primitive.semaAppVulkanFinished}) {
             VK_CHECK_RESULT(vkCreateSemaphore(_device->logicalDevice, &semaphoreInfo, nullptr, sema)
             );
         }
@@ -888,7 +896,7 @@ void Tetrium::Cleanup()
     for (auto& [appName, app] : _appMap) {
         app->Cleanup(appCleanupCtx);
     }
-    
+
     _deletionStack.flush();
     INFO("Resource cleaned up.");
 }

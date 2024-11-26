@@ -8,7 +8,14 @@ namespace TetriumApp
 
 struct InitContext
 {
-    vk::Device device; // same as CleanupContext::device
+    struct {
+        vk::Device device; // same as CleanupContext::device
+        vk::PhysicalDevice physicalDevice;
+        vk::Format depthFormat;
+    } device;
+    struct {
+        vk::Format imageFormat;
+    } swapchain;
 };
 
 struct CleanupContext
