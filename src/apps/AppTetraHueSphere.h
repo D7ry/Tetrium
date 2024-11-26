@@ -39,9 +39,12 @@ class AppTetraHueSphere : public App
         VirtualFrameBuffer fb;
     };
 
-    void initRenderContexts(RenderContext& ctx, TetriumApp::InitContext& initCtx);
+    void initRenderContext(RenderContext& ctx, TetriumApp::InitContext& initCtx);
+    void cleanupRenderContext(RenderContext& ctx, TetriumApp::CleanupContext& cleanupCtx);
+
     void initRenderPass(TetriumApp::InitContext& initCtx);
 
+    void cleanupDepthImage(TetriumApp::CleanupContext& cleanupCtx);
     void initDepthImage(TetriumApp::InitContext& initCtx);
 
     std::array<RenderContext, NUM_FRAME_IN_FLIGHT> _renderContexts;

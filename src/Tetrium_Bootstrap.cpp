@@ -889,7 +889,7 @@ void Tetrium::createSynchronizationObjects(
 void Tetrium::Cleanup()
 {
     INFO("Cleaning up...");
-    TetriumApp::CleanupContext appCleanupCtx{.device = _device->logicalDevice};
+    TetriumApp::CleanupContext appCleanupCtx{.device = *_device.get()};
     for (auto& [appName, app] : _appMap) {
         app->Cleanup(appCleanupCtx);
     }

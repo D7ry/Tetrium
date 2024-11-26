@@ -13,6 +13,8 @@ namespace TetriumApp
 const int FB_WIDTH = 1024;
 const int FB_HEIGHT = 1024;
 
+static const VkFormat FB_IMAGE_FORMAT = VK_FORMAT_R8G8B8A8_SRGB;
+
 void AppTetraHueSphere::TickImGui(const TetriumApp::TickContextImGui& ctx)
 {
     if (ImGui::Begin("TetraHueSphere")) {
@@ -39,7 +41,6 @@ void AppTetraHueSphere::TickVulkan(TetriumApp::TickContextVulkan& ctx)
     RenderContext& renderCtx = _renderContexts[ctx.currentFrameInFlight];
     // render to the correct framebuffer&texture
 
-    // push render semaphore TODO: do we need semahpore here? since the cb is already scheduled
     ctx.commandBuffer.beginRenderPass(
         vk::RenderPassBeginInfo(
             _renderPass,
@@ -57,16 +58,26 @@ void AppTetraHueSphere::TickVulkan(TetriumApp::TickContextVulkan& ctx)
 void AppTetraHueSphere::Cleanup(TetriumApp::CleanupContext& ctx)
 {
     DEBUG("Cleaning up TetraHueSphere...");
+    for (RenderContext& renderCtx : _renderContexts) {
+        cleanupRenderContext(renderCtx, ctx);
+    }
+
+    cleanupDepthImage(ctx);
+
+    vk::Device device = ctx.device.logicalDevice;
+    device.destroyRenderPass(_renderPass);
+
 };
 
 void AppTetraHueSphere::Init(TetriumApp::InitContext& ctx)
 {
     DEBUG("Initializing TetraHueSphere...");
     initRenderPass(ctx);
+
     initDepthImage(ctx);
     // create all render contexts
     for (int i = 0; i < NUM_FRAME_IN_FLIGHT; i++) {
-        initRenderContexts(_renderContexts[i], ctx);
+        initRenderContext(_renderContexts[i], ctx);
     }
 
     // init clear values here
@@ -74,7 +85,20 @@ void AppTetraHueSphere::Init(TetriumApp::InitContext& ctx)
     _clearValues[1].depthStencil = vk::ClearDepthStencilValue(1.f, 0.f);
 };
 
-void AppTetraHueSphere::initRenderContexts(RenderContext& ctx, TetriumApp::InitContext& initCtx)
+void AppTetraHueSphere::cleanupRenderContext(
+    RenderContext& ctx,
+    TetriumApp::CleanupContext& cleanupCtx
+)
+{
+    vk::Device device = cleanupCtx.device.logicalDevice;
+    device.destroyFramebuffer(ctx.fb.frameBuffer);
+    device.destroySampler(ctx.fb.sampler);
+    device.destroyImageView(ctx.fb.deviceImage.view);
+    device.destroyImage(ctx.fb.deviceImage.image);
+    device.freeMemory(ctx.fb.deviceImage.memory);
+}
+
+void AppTetraHueSphere::initRenderContext(RenderContext& ctx, TetriumApp::InitContext& initCtx)
 {
     VirtualFrameBuffer& fb = ctx.fb;
     vk::Device device = initCtx.device.logicalDevice;
@@ -82,7 +106,7 @@ void AppTetraHueSphere::initRenderContexts(RenderContext& ctx, TetriumApp::InitC
     // create image & image view
     {
         // TODO: do we need to use swapchain's image format??
-        VkFormat imageFormat = static_cast<VkFormat>(initCtx.swapchain.imageFormat);
+        VkFormat imageFormat = FB_IMAGE_FORMAT;
         VulkanUtils::createImage(
             FB_WIDTH,
             FB_HEIGHT,
@@ -174,7 +198,7 @@ void AppTetraHueSphere::initRenderPass(TetriumApp::InitContext& initCtx)
     {
         VkAttachmentDescription& colorAttachment = attachments[0];
         colorAttachment = {};
-        colorAttachment.format = static_cast<VkFormat>(initCtx.swapchain.imageFormat);
+        colorAttachment.format = FB_IMAGE_FORMAT;
         colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
 
         colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
@@ -236,7 +260,6 @@ void AppTetraHueSphere::initDepthImage(TetriumApp::InitContext& initCtx)
     DEBUG("Creating depth buffer...");
     VkFormat depthFormat = static_cast<VkFormat>(initCtx.device.depthFormat);
 
-    // TODO: vulkanUtils needs refactoring
     VulkanUtils::createImage(
         FB_WIDTH,
         FB_HEIGHT,
@@ -255,4 +278,13 @@ void AppTetraHueSphere::initDepthImage(TetriumApp::InitContext& initCtx)
         _depthImage.image, device, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT
     );
 }
+
+void AppTetraHueSphere::cleanupDepthImage(TetriumApp::CleanupContext& cleanupCtx)
+{
+    vk::Device device = cleanupCtx.device.logicalDevice;
+    device.destroyImageView(_depthImage.view);
+    device.destroyImage(_depthImage.image);
+    device.freeMemory(_depthImage.memory);
+}
+
 } // namespace TetriumApp

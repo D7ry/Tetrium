@@ -17,7 +17,7 @@ struct InitContext
 
 struct CleanupContext
 {
-    vk::Device device; // same as InitContext::device
+    VQDevice& device;
 };
 
 struct TickContextImGui
