@@ -1,6 +1,11 @@
 #include "backends/imgui_impl_vulkan.h"
 #include "imgui.h"
 
+#include "lib/VQUtils.h"
+#include "structs/Vertex.h"
+
+#include "components/ShaderUtils.h"
+#include "components/TextureManager.h" // FIXME: fix dependency hell
 #include "lib/VulkanUtils.h"
 
 #include "AppTetraHueSphere.h"
@@ -14,6 +19,15 @@ const int FB_WIDTH = 1024;
 const int FB_HEIGHT = 1024;
 
 static const VkFormat FB_IMAGE_FORMAT = VK_FORMAT_R8G8B8A8_SRGB;
+
+const char* VERTEX_SHADER_PATH = "../shaders/hue_sphere.vert.spv";
+const char* FRAGMENT_SHADER_PATH = "../shaders/hue_sphere.frag.spv";
+
+// TODO: group assets by apps
+const char* HUE_SPHERE_MODEL_PATH = "../assets/models/ugly_sphere.obj";
+
+const char* HUE_SPHERE_TEXTURE_PATH_RGB = "../assets/textures/apps/AppTetraHueSphere/RGB.png";
+const char* HUE_SPHERE_TEXTURE_PATH_OCV = "../assets/textures/apps/AppTetraHueSphere/OCV.png";
 
 void AppTetraHueSphere::TickImGui(const TetriumApp::TickContextImGui& ctx)
 {
@@ -38,10 +52,11 @@ void AppTetraHueSphere::TickVulkan(TetriumApp::TickContextVulkan& ctx)
 {
     // DEBUG("ticking vulkan: {}", ctx.currentFrameInFlight);
 
+    auto CB = ctx.commandBuffer;
     RenderContext& renderCtx = _renderContexts[ctx.currentFrameInFlight];
     // render to the correct framebuffer&texture
 
-    ctx.commandBuffer.beginRenderPass(
+    CB.beginRenderPass(
         vk::RenderPassBeginInfo(
             _renderPass,
             renderCtx.fb.frameBuffer,
@@ -51,8 +66,25 @@ void AppTetraHueSphere::TickVulkan(TetriumApp::TickContextVulkan& ctx)
         ),
         vk::SubpassContents::eInline
     );
+    CB.bindPipeline(vk::PipelineBindPoint::eGraphics, _rasterizationCtx.pipeline);
+    CB.bindDescriptorSets(
+        vk::PipelineBindPoint::eGraphics,
+        _rasterizationCtx.pipelineLayout,
+        0,
+        _rasterizationCtx.descriptors.sets[ctx.currentFrameInFlight],
+        nullptr
+    );
 
-    ctx.commandBuffer.endRenderPass();
+    CB.bindVertexBuffers(0, vk::Buffer(_rasterizationCtx.hueSphereMesh.vertexBuffer.buffer), {0});
+    CB.bindIndexBuffer(
+        vk::Buffer(_rasterizationCtx.hueSphereMesh.indexBuffer.buffer),
+        0,
+        vk::IndexType(VQ_BUFFER_INDEX_TYPE)
+    );
+
+    CB.drawIndexed(_rasterizationCtx.hueSphereMesh.indexBuffer.numIndices, 1, 0, 0, 0);
+
+    CB.endRenderPass();
 }
 
 void AppTetraHueSphere::Cleanup(TetriumApp::CleanupContext& ctx)
@@ -66,23 +98,24 @@ void AppTetraHueSphere::Cleanup(TetriumApp::CleanupContext& ctx)
 
     vk::Device device = ctx.device.logicalDevice;
     device.destroyRenderPass(_renderPass);
-
 };
 
 void AppTetraHueSphere::Init(TetriumApp::InitContext& ctx)
 {
     DEBUG("Initializing TetraHueSphere...");
+    initDepthImage(ctx);
     initRenderPass(ctx);
 
-    initDepthImage(ctx);
-    // create all render contexts
+    // create all render contexts,
+    // NOTE: fb creation requires render pass to be created
     for (int i = 0; i < NUM_FRAME_IN_FLIGHT; i++) {
         initRenderContext(_renderContexts[i], ctx);
     }
 
-    // init clear values here
     _clearValues[0].color = {0.0f, 0.0f, 0.0f, 1.f};
     _clearValues[1].depthStencil = vk::ClearDepthStencilValue(1.f, 0.f);
+
+    initRasterization(ctx);
 };
 
 void AppTetraHueSphere::cleanupRenderContext(
@@ -165,7 +198,6 @@ void AppTetraHueSphere::initRenderContext(RenderContext& ctx, TetriumApp::InitCo
     }
 
     // create imgui texture
-    //
     fb.imguiTextureId = ImGui_ImplVulkan_AddTexture(
         fb.sampler, fb.deviceImage.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
     );
@@ -287,4 +319,266 @@ void AppTetraHueSphere::cleanupDepthImage(TetriumApp::CleanupContext& cleanupCtx
     device.freeMemory(_depthImage.memory);
 }
 
+void AppTetraHueSphere::initRasterization(TetriumApp::InitContext& initCtx)
+{
+    vk::Device device = initCtx.device.logicalDevice;
+    // allocate device memory for UBO
+    {
+        for (VQBuffer& buffer : _rasterizationCtx.UBOBuffer) {
+            buffer = initCtx.device.CreateBuffer(
+                sizeof(UBO),
+                VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+            );
+        }
+    }
+
+    // bind & allocate descriptor sets
+    {
+        const size_t UBO_DESCRIPTOR_COUNT = 1;
+        const size_t SAMPLER_DESCRIPTOR_COUNT = 2; // 2 textures -- RGB / OCV of the sphere
+
+        vk::DescriptorSetLayoutBinding uboLayoutBinding(
+            (uint32_t)BindingLocation::UBO,
+            vk::DescriptorType::eUniformBuffer,
+            UBO_DESCRIPTOR_COUNT,
+            vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment
+        );
+
+        vk::DescriptorSetLayoutBinding samplerLayoutBinding(
+            (uint32_t)BindingLocation::TEXTURE_SAMPLER,
+            vk::DescriptorType::eCombinedImageSampler,
+            SAMPLER_DESCRIPTOR_COUNT,
+            vk::ShaderStageFlagBits::eFragment
+        );
+        std::array<vk::DescriptorSetLayoutBinding, 2> bindings
+            = {uboLayoutBinding, samplerLayoutBinding};
+
+        vk::DescriptorSetLayoutCreateInfo layoutInfo({}, bindings.size(), bindings.data());
+
+        vk::Device device = initCtx.device.logicalDevice;
+        _rasterizationCtx.descriptors.setLayout = device.createDescriptorSetLayout(layoutInfo);
+
+        // create descriptor pool
+        vk::DescriptorPoolSize poolSizeUBO(
+            vk::DescriptorType::eUniformBuffer, NUM_FRAME_IN_FLIGHT * UBO_DESCRIPTOR_COUNT
+        );
+        vk::DescriptorPoolSize poolSizeSampler(
+            vk::DescriptorType::eCombinedImageSampler,
+            NUM_FRAME_IN_FLIGHT * SAMPLER_DESCRIPTOR_COUNT
+        );
+
+        std::array<vk::DescriptorPoolSize, 2> poolSizes = {poolSizeUBO, poolSizeSampler};
+        vk::DescriptorPoolCreateInfo poolCreateInfo(
+            {}, NUM_FRAME_IN_FLIGHT, poolSizes.size(), poolSizes.data()
+        );
+
+        _rasterizationCtx.descriptors.pool = device.createDescriptorPool(poolCreateInfo);
+
+        // allocate NUM_FRAME_IN_FLIGHT descriptor sets
+        std::vector<vk::DescriptorSetLayout> layouts(
+            NUM_FRAME_IN_FLIGHT, _rasterizationCtx.descriptors.setLayout
+        );
+
+        vk::DescriptorSetAllocateInfo allocInfo(
+            _rasterizationCtx.descriptors.pool, NUM_FRAME_IN_FLIGHT, layouts.data()
+        );
+
+        _rasterizationCtx.descriptors.sets = device.allocateDescriptorSets(allocInfo);
+        // must have allocated the correct number of descriptor sets
+        ASSERT(_rasterizationCtx.descriptors.sets.size() == NUM_FRAME_IN_FLIGHT);
+
+        // update descriptor sets to be pointing to the correct buffers
+        for (int i = 0; i < NUM_FRAME_IN_FLIGHT; i++) {
+            std::array<vk::WriteDescriptorSet, 2> descriptorWrites;
+
+            // UBO
+            vk::DescriptorBufferInfo bufferInfo(
+                _rasterizationCtx.UBOBuffer[i].buffer, 0, sizeof(UBO)
+            );
+
+            descriptorWrites[0] = vk::WriteDescriptorSet(
+                _rasterizationCtx.descriptors.sets[i],
+                (uint32_t)BindingLocation::UBO,
+                0,
+                1,
+                vk::DescriptorType::eUniformBuffer,
+                nullptr,
+                &bufferInfo,
+                nullptr
+            );
+
+            // sampler
+            VkDescriptorImageInfo imageInfoRGB;
+            VkDescriptorImageInfo imageInfoOCV;
+            initCtx.textureManager->GetDescriptorImageInfo(
+                HUE_SPHERE_TEXTURE_PATH_RGB, imageInfoRGB
+            );
+            initCtx.textureManager->GetDescriptorImageInfo(
+                HUE_SPHERE_TEXTURE_PATH_OCV, imageInfoOCV
+            );
+
+            std::array<vk::DescriptorImageInfo, SAMPLER_DESCRIPTOR_COUNT> imageInfos
+                = {imageInfoRGB, imageInfoOCV};
+
+            descriptorWrites[1] = vk::WriteDescriptorSet(
+                _rasterizationCtx.descriptors.sets[i],
+                (uint32_t)BindingLocation::TEXTURE_SAMPLER,
+                0,
+                imageInfos.size(),
+                vk::DescriptorType::eCombinedImageSampler,
+                imageInfos.data(),
+                nullptr,
+                nullptr
+            );
+
+            device.updateDescriptorSets(descriptorWrites, nullptr);
+        }
+    }
+
+    // build graphics pipeline
+    {
+        // shader modules
+        vk::ShaderModule vertShaderModule
+            = ShaderCreation::createShaderModule(initCtx.device.logicalDevice, VERTEX_SHADER_PATH);
+        vk::ShaderModule fragShaderModule = ShaderCreation::createShaderModule(
+            initCtx.device.logicalDevice, FRAGMENT_SHADER_PATH
+        );
+
+        std::array<vk::PipelineShaderStageCreateInfo, 2> shaderStages
+            = {vk::PipelineShaderStageCreateInfo(
+                   {}, vk::ShaderStageFlagBits::eVertex, vertShaderModule, "main"
+               ),
+               vk::PipelineShaderStageCreateInfo(
+                   {}, vk::ShaderStageFlagBits::eFragment, fragShaderModule, "main"
+               )};
+
+        // vertex input
+        vk::VertexInputBindingDescription bindingDescription = Vertex::GetBindingDescription();
+        auto attributeDescriptions = Vertex::GetAttributeDescriptions();
+
+        vk::PipelineVertexInputStateCreateInfo vertexInputInfo(
+            {}, 1, &bindingDescription, attributeDescriptions.size(), attributeDescriptions.data()
+        );
+
+        vk::PipelineInputAssemblyStateCreateInfo inputAssembly(
+            {}, vk::PrimitiveTopology::eTriangleList, VK_FALSE
+        );
+
+        vk::PipelineDepthStencilStateCreateInfo depthStencil(
+            {}, VK_TRUE, VK_TRUE, vk::CompareOp::eLess, VK_FALSE, VK_FALSE
+        );
+
+        // viewport + scissor
+        std::vector<vk::DynamicState> dynamicStates
+            = {vk::DynamicState::eViewport, vk::DynamicState::eScissor};
+
+        vk::PipelineDynamicStateCreateInfo dynamicState(
+            {}, dynamicStates.size(), dynamicStates.data()
+        );
+
+        vk::Viewport viewport(0.f, 0.f, (float)FB_WIDTH, (float)FB_HEIGHT, 0.f, 1.f);
+        vk::Rect2D scissor({0, 0}, {FB_WIDTH, FB_HEIGHT});
+        vk::PipelineViewportStateCreateInfo viewportState({}, 1, &viewport, 1, &scissor);
+
+        // rasterizer
+        vk::PipelineRasterizationStateCreateInfo rasterizer(
+            vk::PipelineRasterizationStateCreateFlags(),
+            VK_FALSE, // depthClampEnable
+            VK_FALSE, // rasterizerDiscardEnable
+            vk::PolygonMode::eFill,
+            vk::CullModeFlagBits::eNone,
+            vk::FrontFace::eCounterClockwise,
+            VK_FALSE, // depthBiasEnable
+            0.0f,     // depthBiasConstantFactor
+            0.0f,     // depthBiasClamp
+            0.0f,     // depthBiasSlopeFactor
+            1.0f      // lineWidth
+        );
+
+        vk::PipelineMultisampleStateCreateInfo multisampling(
+            vk::PipelineMultisampleStateCreateFlags(),
+            vk::SampleCountFlagBits::e1,
+            VK_FALSE, // sampleShadingEnable
+            1.0f,     // minSampleShading
+            nullptr,  // pSampleMask
+            VK_FALSE, // alphaToCoverageEnable
+            VK_FALSE  // alphaToOneEnable
+        );
+
+        vk::PipelineColorBlendAttachmentState colorBlendAttachment(
+            VK_FALSE, // blendEnable
+            vk::BlendFactor::eOne,
+            vk::BlendFactor::eZero,
+            vk::BlendOp::eAdd,
+            vk::BlendFactor::eOne,
+            vk::BlendFactor::eZero,
+            vk::BlendOp::eAdd,
+            vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG
+                | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA
+        );
+
+        vk::PipelineColorBlendStateCreateInfo colorBlending(
+            vk::PipelineColorBlendStateCreateFlags(),
+            VK_FALSE, // logicOpEnable
+            vk::LogicOp::eCopy,
+            1,
+            &colorBlendAttachment,
+            {0.0f, 0.0f, 0.0f, 0.0f} // blendConstants
+        );
+
+        vk::PipelineLayoutCreateInfo pipelineLayoutInfo(
+            vk::PipelineLayoutCreateFlags(), 1, &_rasterizationCtx.descriptors.setLayout, 0, nullptr
+        );
+
+        if (device.createPipelineLayout(
+                &pipelineLayoutInfo, nullptr, &_rasterizationCtx.pipelineLayout
+            )
+            != vk::Result::eSuccess) {
+            FATAL("Failed to create pipeline layout!");
+        }
+
+        vk::GraphicsPipelineCreateInfo pipelineInfo(
+            vk::PipelineCreateFlags(),        // flags
+            2,                                // stageCount
+            shaderStages.data(),              // pStages
+            &vertexInputInfo,                 // pVertexInputState
+            &inputAssembly,                   // pInputAssemblyState
+            nullptr,                          // pTessellationState
+            &viewportState,                   // pViewportState
+            &rasterizer,                      // pRasterizationState
+            &multisampling,                   // pMultisampleState
+            nullptr,                          // pDepthStencilState
+            &colorBlending,                   // pColorBlendState
+            &dynamicState,                    // pDynamicState
+            _rasterizationCtx.pipelineLayout, // layout
+            _renderPass,                      // renderPass
+            0,                                // subpass
+            vk::Pipeline(),                   // basePipelineHandle
+            -1                                // basePipelineIndex
+        );
+
+        if (device.createGraphicsPipelines(
+                nullptr, 1, &pipelineInfo, nullptr, &_rasterizationCtx.pipeline
+            )
+            != vk::Result::eSuccess) {
+            FATAL("Failed to create graphics pipeline!");
+        }
+
+        device.destroyShaderModule(fragShaderModule, nullptr);
+        device.destroyShaderModule(vertShaderModule, nullptr);
+    }
+
+    // load in hue sphere model
+    {
+        VQUtils::meshToBuffer(
+            HUE_SPHERE_MODEL_PATH,
+            initCtx.device,
+            _rasterizationCtx.hueSphereMesh.vertexBuffer,
+            _rasterizationCtx.hueSphereMesh.indexBuffer
+        );
+    }
+}
+
+void AppTetraHueSphere::cleanupRasterization(TetriumApp::CleanupContext& cleanupCtx) {}
 } // namespace TetriumApp

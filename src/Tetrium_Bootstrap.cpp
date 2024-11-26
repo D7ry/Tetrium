@@ -221,6 +221,7 @@ void Tetrium::Init(const Tetrium::InitOptions& options)
         .swapchain = {
             .imageFormat = vk::Format(_swapChain.imageFormat),
         },
+        .textureManager = &_textureManager,
     };
 
     // init apps

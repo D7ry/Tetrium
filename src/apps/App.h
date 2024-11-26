@@ -13,6 +13,7 @@ struct InitContext
     struct {
         vk::Format imageFormat;
     } swapchain;
+    TextureManager* textureManager;
 };
 
 struct CleanupContext

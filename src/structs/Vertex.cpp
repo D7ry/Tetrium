@@ -6,13 +6,13 @@ VkFormat FormatVec3 = VK_FORMAT_R32G32B32_SFLOAT;
 VkFormat FormatVec2 = VK_FORMAT_R32G32_SFLOAT;
 VkFormat FormatVec1 = VK_FORMAT_R32_SFLOAT;
 
-VkVertexInputBindingDescription Vertex::GetBindingDescription() {
+VkVertexInputBindingDescription Vertex::GetBindingDescription()
+{
     // specifies number of bytes between data entries, and whether to move to
     // the next data entry after each vertex or instance
     VkVertexInputBindingDescription bindingDescription{};
     bindingDescription.binding = 0;
-    bindingDescription.stride
-        = sizeof(Vertex); // size of a single vertex object
+    bindingDescription.stride = sizeof(Vertex); // size of a single vertex object
     bindingDescription.inputRate
         = VK_VERTEX_INPUT_RATE_VERTEX; // set to VK_VERTEX_INPUT_RATE_INSTANCE
                                        // for instanced rendering(later)
@@ -20,13 +20,12 @@ VkVertexInputBindingDescription Vertex::GetBindingDescription() {
     return bindingDescription;
 }
 
-const std::array<VkVertexInputAttributeDescription, 4>* Vertex::
-    GetAttributeDescriptions() {
+const std::array<VkVertexInputAttributeDescription, 4>* Vertex::GetAttributeDescriptionsPtr()
+{
     static bool initialized = false;
     // specifies how to extract a vertex attribute from a chunk of vertex data
     // originating from a binding description
-    static std::array<VkVertexInputAttributeDescription, 4>
-        attributeDescriptions;
+    static std::array<VkVertexInputAttributeDescription, 4> attributeDescriptions;
     if (!initialized) {
         // layout(location = 0) in vec3 inPosition;
         attributeDescriptions[0].binding = 0;
@@ -60,19 +59,32 @@ const std::array<VkVertexInputAttributeDescription, 4>* Vertex::
     return std::addressof(attributeDescriptions);
 }
 
-const std::array<VkVertexInputAttributeDescription, 9>* Vertex::
-    GetAttributeDescriptionsInstanced() {
+const std::array<vk::VertexInputAttributeDescription, 4> Vertex::GetAttributeDescriptions() {
+    auto attributeDescriptions = Vertex::GetAttributeDescriptionsPtr();
+
+    std::array<vk::VertexInputAttributeDescription, 4> vkAttributeDescriptions;
+
+    for (size_t i = 0; i < attributeDescriptions->size(); i++) {
+        vkAttributeDescriptions[i].binding = attributeDescriptions->at(i).binding;
+        vkAttributeDescriptions[i].location = attributeDescriptions->at(i).location;
+        vkAttributeDescriptions[i].format = vk::Format(attributeDescriptions->at(i).format);
+        vkAttributeDescriptions[i].offset = attributeDescriptions->at(i).offset;
+    }
+    return vkAttributeDescriptions;
+}
+
+const std::array<VkVertexInputAttributeDescription, 9>* Vertex::GetAttributeDescriptionsInstanced()
+{
     static bool initialized = false;
-    static std::array<VkVertexInputAttributeDescription, 9>
-        attributeDescriptionsInstanced;
+    static std::array<VkVertexInputAttributeDescription, 9> attributeDescriptionsInstanced;
     if (!initialized) {
         // copy from the original attrDescription array
         const std::array<VkVertexInputAttributeDescription, 4>* attrDescription
-            = Vertex::GetAttributeDescriptions();
+            = Vertex::GetAttributeDescriptionsPtr();
         // copy over the first 4 elements from attrDescription
         memcpy(
-            attributeDescriptionsInstanced.data(),               // dst
-            attrDescription->data(),                             // src
+            attributeDescriptionsInstanced.data(),                   // dst
+            attrDescription->data(),                                 // src
             attrDescription->size() * sizeof(attrDescription->at(0)) // bytes
         );
         // initialize the rest 2
@@ -106,8 +118,7 @@ const std::array<VkVertexInputAttributeDescription, 9>* Vertex::
             attributeDescriptionsInstanced[8].binding = 1;
             attributeDescriptionsInstanced[8].location = 8;
             attributeDescriptionsInstanced[8].format = VK_FORMAT_R32_UINT; // int
-            attributeDescriptionsInstanced[8].offset
-                = 4 * sizeof(glm::vec4);
+            attributeDescriptionsInstanced[8].offset = 4 * sizeof(glm::vec4);
         }
 
         initialized = true;
@@ -116,8 +127,8 @@ const std::array<VkVertexInputAttributeDescription, 9>* Vertex::
     return std::addressof(attributeDescriptionsInstanced);
 };
 
-const std::array<VkVertexInputBindingDescription, 2>* Vertex::
-    GetBindingDescriptionsInstanced() {
+const std::array<VkVertexInputBindingDescription, 2>* Vertex::GetBindingDescriptionsInstanced()
+{
     static std::array<VkVertexInputBindingDescription, 2> bindingDescriptionsInstanced;
 
     static bool initialized = false;
