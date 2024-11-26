@@ -52,6 +52,7 @@ void AppTetraHueSphere::TickImGui(const TetriumApp::TickContextImGui& ctx)
         )) {
 
         ImGui::Columns(2, "TetraHueSphereColumns", true);
+        ImGui::SeparatorText("Mesh Settings");
         // radio button for mesh type
         ImGui::Text("Mesh Type");
         ImGui::RadioButton(
@@ -64,7 +65,11 @@ void AppTetraHueSphere::TickImGui(const TetriumApp::TickContextImGui& ctx)
             (int)RenderMeshType::PrettySphere
         );
 
-        ImGui::SliderFloat("Sphere Rotation Speed", &_rasterizationCtx.sphereRotationSpeed, 0.f, 5.f);
+        ImGui::SliderFloat(
+            "Sphere Rotation Speed", &_rasterizationCtx.sphereRotationSpeed, 0.f, 5.f
+        );
+
+        ImGui::SeparatorText("Projection Settings");
 
         ImGui::Text("Projection Type");
         ImGui::RadioButton(
@@ -77,16 +82,19 @@ void AppTetraHueSphere::TickImGui(const TetriumApp::TickContextImGui& ctx)
             "Perspective", (int*)&_rasterizationCtx.projectionType, (int)ProjectionType::Perspective
         );
 
+        ImGui::SliderFloat("Orthographic Width", &_rasterizationCtx.orthoWidth, 0.1f, 10.f);
+        ImGui::SliderFloat("Perspective FOV", &_rasterizationCtx.perspectiveFOV, 1.f, 130.f);
+
         RenderContext& renderCtx = _renderContexts[ctx.currentFrameInFlight];
-        // color & depth stencil clear value sliders
-        ImGui::ColorEdit4("Clear Color", (float*)&_clearValues[0].color);
-        ImGui::SliderFloat("Clear Depth", &_clearValues[1].depthStencil.depth, 0.f, 1.f);
 
         // camera control;
         glm::vec3 pos = _rasterizationCtx.camera.GetPosition();
 
         ImGui::Text("Camera Position: (%.2f, %.2f, %.2f)", pos.x, pos.y, pos.z);
-        ImGui::SliderFloat("Camera FOV", &_rasterizationCtx.fov, 1.f, 130.f);
+        ImGui::SameLine();
+        if (ImGui::Button("Reset")) {
+            _rasterizationCtx.camera.SetPosition(0, 0, 0);
+        }
 
         // ImGui::Text("Hue Sphere Transform");
         //
@@ -101,6 +109,11 @@ void AppTetraHueSphere::TickImGui(const TetriumApp::TickContextImGui& ctx)
         // if (ImGui::SliderFloat("Hue Sphere Z", &hueSpherePos.z, -10.f, 10.f)) {
         //     _rasterizationCtx.hueSpheretransform.position = hueSpherePos;
         // }
+        
+        ImGui::SeparatorText("Rendering");
+        // color & depth stencil clear value sliders
+        ImGui::ColorEdit4("Clear Color", (float*)&_clearValues[0].color);
+        ImGui::SliderFloat("Clear Depth", &_clearValues[1].depthStencil.depth, 0.f, 1.f);
 
         ImGui::NextColumn();
         // okay to sample image here -- imgui raster pass stalls until the rendering to
@@ -158,16 +171,25 @@ void AppTetraHueSphere::TickVulkan(TetriumApp::TickContextVulkan& ctx)
 
         vk::Extent2D extent = vk::Extent2D(FB_WIDTH, FB_HEIGHT);
 
-        glm::mat4 projectionMatrix
-            = _rasterizationCtx.projectionType == ProjectionType::Perspective
-                  ? glm::perspective(
-                        glm::radians(_rasterizationCtx.fov),
-                        extent.width / static_cast<float>(extent.height),
-                        DEFAULTS::ZNEAR,
-                        DEFAULTS::ZFAR
-                    )
+        float aspectRatio = static_cast<float>(extent.width) / static_cast<float>(extent.height);
+        float orthoWidth = _rasterizationCtx.orthoWidth;
+        float orthoHeight = orthoWidth / aspectRatio; // Calculate height based on aspect ratio
 
-                  : glm::ortho(-1.f, 1.f, -1.f, 1.f, DEFAULTS::ZNEAR, DEFAULTS::ZFAR);
+        glm::mat4 projectionMatrix = _rasterizationCtx.projectionType == ProjectionType::Perspective
+                                         ? glm::perspective(
+                                               glm::radians(_rasterizationCtx.perspectiveFOV),
+                                               aspectRatio,
+                                               DEFAULTS::ZNEAR,
+                                               DEFAULTS::ZFAR
+                                           )
+                                         : glm::ortho(
+                                               -orthoWidth / 2.0f,  // left
+                                               orthoWidth / 2.0f,   // right
+                                               -orthoHeight / 2.0f, // bottom
+                                               orthoHeight / 2.0f,  // top
+                                               DEFAULTS::ZNEAR,     // near
+                                               DEFAULTS::ZFAR       // far
+                                           );
 
         projectionMatrix[1][1] *= -1; // invert for vulkan coord system
         pUBO->proj = projectionMatrix;
@@ -243,7 +265,7 @@ void AppTetraHueSphere::Init(TetriumApp::InitContext& ctx)
         initRenderContext(_renderContexts[i], ctx);
     }
 
-    _clearValues[0].color = {0.0f, 0.0f, 0.0f, 1.f};
+    _clearValues[0].color = {0.0f, 0.0f, 0.0f, 0.f};
     _clearValues[1].depthStencil = vk::ClearDepthStencilValue(1.f, 0.f);
 
     initRasterization(ctx);
@@ -445,18 +467,20 @@ void AppTetraHueSphere::initRasterization(TetriumApp::InitContext& initCtx)
             );
 
             // sampler
-            vk::DescriptorImageInfo imageInfoUglyRGB = initCtx.api.LoadAndGetTextureDescriptorImageInfo(
-                HUE_SPHERE_UGLY_TEXTURE_PATH_RGB
-            );
-            vk::DescriptorImageInfo imageInfoUglyOCV = initCtx.api.LoadAndGetTextureDescriptorImageInfo(
-                HUE_SPHERE_UGLY_TEXTURE_PATH_OCV
-            );
-            vk::DescriptorImageInfo imageInfoPrettyRGB = initCtx.api.LoadAndGetTextureDescriptorImageInfo(
-                HUE_SPHERE_PRETTY_TEXTURE_PATH_RGB
-            );
-            vk::DescriptorImageInfo imageInfoPrettyOCV = initCtx.api.LoadAndGetTextureDescriptorImageInfo(
-                HUE_SPHERE_PRETTY_TEXTURE_PATH_OCV
-            );
+            vk::DescriptorImageInfo imageInfoUglyRGB
+                = initCtx.api.LoadAndGetTextureDescriptorImageInfo(HUE_SPHERE_UGLY_TEXTURE_PATH_RGB
+                );
+            vk::DescriptorImageInfo imageInfoUglyOCV
+                = initCtx.api.LoadAndGetTextureDescriptorImageInfo(HUE_SPHERE_UGLY_TEXTURE_PATH_OCV
+                );
+            vk::DescriptorImageInfo imageInfoPrettyRGB
+                = initCtx.api.LoadAndGetTextureDescriptorImageInfo(
+                    HUE_SPHERE_PRETTY_TEXTURE_PATH_RGB
+                );
+            vk::DescriptorImageInfo imageInfoPrettyOCV
+                = initCtx.api.LoadAndGetTextureDescriptorImageInfo(
+                    HUE_SPHERE_PRETTY_TEXTURE_PATH_OCV
+                );
 
             std::array<vk::DescriptorImageInfo, SAMPLER_DESCRIPTOR_COUNT> imageInfos
                 = {imageInfoUglyRGB, imageInfoUglyOCV, imageInfoPrettyRGB, imageInfoPrettyOCV};
