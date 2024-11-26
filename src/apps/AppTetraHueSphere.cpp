@@ -31,11 +31,11 @@ const char* HUE_SPHERE_UGLY_MODEL_PATH = "../assets/apps/AppTetraHueSphere/fibon
 const char* HUE_SPHERE_UGLY_TEXTURE_PATH_RGB = "../assets/apps/AppTetraHueSphere/RGB.png";
 const char* HUE_SPHERE_UGLY_TEXTURE_PATH_OCV = "../assets/apps/AppTetraHueSphere/OCV.png";
 
-const char* HUE_SPHERE_PRETTY_MODEL_PATH = "../assets/apps/AppTetraHueSphere/cubemap_sampled.obj";
+const char* HUE_SPHERE_PRETTY_MODEL_PATH = "../assets/apps/AppTetraHueSphere/pretty_sphere.obj";
 const char* HUE_SPHERE_PRETTY_TEXTURE_PATH_RGB
-    = "../assets/apps/AppTetraHueSphere/cube_map_RGB.png";
+    = "../assets/apps/AppTetraHueSphere/RGB.png";
 const char* HUE_SPHERE_PRETTY_TEXTURE_PATH_OCV
-    = "../assets/apps/AppTetraHueSphere/cube_map_OCV.png";
+    = "../assets/apps/AppTetraHueSphere/OCV.png";
 } // namespace
 
 void AppTetraHueSphere::TickImGui(const TetriumApp::TickContextImGui& ctx)
