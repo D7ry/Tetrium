@@ -26,7 +26,9 @@ static const VkFormat FB_IMAGE_FORMAT = VK_FORMAT_R8G8B8A8_SRGB;
 const char* VERTEX_SHADER_PATH = "../assets/apps/AppTetraHueSphere/shader.vert.spv";
 const char* FRAGMENT_SHADER_PATH = "../assets/apps/AppTetraHueSphere/shader.frag.spv";
 
-const char* HUE_SPHERE_MODEL_PATH = "../assets/apps/AppTetraHueSphere/ugly_sphere.obj";
+// const char* HUE_SPHERE_MODEL_PATH = "../assets/apps/AppTetraHueSphere/ugly_sphere.obj";
+
+const char* HUE_SPHERE_MODEL_PATH = "../assets/apps/AppTetraHueSphere/fibonacci_sampled.obj";
 const char* HUE_SPHERE_TEXTURE_PATH_RGB = "../assets/apps/AppTetraHueSphere/RGB.png";
 const char* HUE_SPHERE_TEXTURE_PATH_OCV = "../assets/apps/AppTetraHueSphere/OCV.png";
 } // namespace
@@ -59,6 +61,7 @@ void AppTetraHueSphere::TickImGui(const TetriumApp::TickContextImGui& ctx)
         if (positionChanged) {
             _rasterizationCtx.camera.SetPosition(pos.x, pos.y, pos.z);
         }
+        ImGui::SliderFloat("Camera FOV", &_rasterizationCtx.fov, 1.f, 130.f);
 
         // ImGui::Text("Hue Sphere Transform");
         //
@@ -73,7 +76,6 @@ void AppTetraHueSphere::TickImGui(const TetriumApp::TickContextImGui& ctx)
         // if (ImGui::SliderFloat("Hue Sphere Z", &hueSpherePos.z, -10.f, 10.f)) {
         //     _rasterizationCtx.hueSpheretransform.position = hueSpherePos;
         // }
-
 
         ImGui::Image(renderCtx.fb.imguiTextureId, ImVec2(FB_WIDTH, FB_HEIGHT));
 
@@ -91,9 +93,7 @@ void AppTetraHueSphere::TickImGui(const TetriumApp::TickContextImGui& ctx)
 
 void AppTetraHueSphere::TickVulkan(TetriumApp::TickContextVulkan& ctx)
 {
-    // DEBUG("ticking vulkan: {}", ctx.currentFrameInFlight);
     // flush UBO
-    // TODO: cleanup
     {
         UBO* pUBO = reinterpret_cast<UBO*>(
             _rasterizationCtx.UBOBuffer.at(ctx.currentFrameInFlight).bufferAddress
@@ -104,7 +104,7 @@ void AppTetraHueSphere::TickVulkan(TetriumApp::TickContextVulkan& ctx)
         vk::Extent2D extent = vk::Extent2D(FB_WIDTH, FB_HEIGHT);
 
         glm::mat4 projectionMatrix = glm::perspective(
-            glm::radians(90.f),
+            glm::radians(_rasterizationCtx.fov),
             extent.width / static_cast<float>(extent.height),
             DEFAULTS::ZNEAR,
             DEFAULTS::ZFAR
@@ -327,7 +327,6 @@ void AppTetraHueSphere::initRenderPass(TetriumApp::InitContext& initCtx)
         depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     }
 
-    // TODO: refine dependency here
     VkSubpassDependency dependency = VkSubpassDependency{
         .srcSubpass = VK_SUBPASS_EXTERNAL, // wait for all previous subpasses
         .dstSubpass = 0,
@@ -647,5 +646,38 @@ void AppTetraHueSphere::initRasterization(TetriumApp::InitContext& initCtx)
     }
 }
 
-void AppTetraHueSphere::cleanupRasterization(TetriumApp::CleanupContext& cleanupCtx) {}
+void AppTetraHueSphere::cleanupRasterization(TetriumApp::CleanupContext& cleanupCtx)
+{
+    vk::Device device = cleanupCtx.device.logicalDevice;
+
+    // Destroy pipeline
+    if (_rasterizationCtx.pipeline) {
+        device.destroyPipeline(_rasterizationCtx.pipeline);
+    }
+
+    // Destroy pipeline layout
+    if (_rasterizationCtx.pipelineLayout) {
+        device.destroyPipelineLayout(_rasterizationCtx.pipelineLayout);
+    }
+
+    // Destroy descriptor pool
+    if (_rasterizationCtx.descriptors.pool) {
+        device.destroyDescriptorPool(_rasterizationCtx.descriptors.pool);
+    }
+
+    // Destroy descriptor set layout
+    if (_rasterizationCtx.descriptors.setLayout) {
+        device.destroyDescriptorSetLayout(_rasterizationCtx.descriptors.setLayout);
+    }
+
+    // Destroy UBO buffers
+    for (VQBuffer& buffer : _rasterizationCtx.UBOBuffer) {
+        buffer.Cleanup();
+    }
+
+    // Destroy vertex and index buffers
+    _rasterizationCtx.hueSphereMesh.vertexBuffer.Cleanup();
+    _rasterizationCtx.hueSphereMesh.indexBuffer.Cleanup();
+}
+
 } // namespace TetriumApp

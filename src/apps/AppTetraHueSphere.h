@@ -89,6 +89,8 @@ class AppTetraHueSphere : public App
 
         Camera camera;
         TransformComponent hueSpheretransform = TransformComponent::Identity();
+
+        float fov = 90;
     } _rasterizationCtx;
 
 };
