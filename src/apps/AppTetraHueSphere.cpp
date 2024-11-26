@@ -98,7 +98,7 @@ void AppTetraHueSphere::TickImGui(const TetriumApp::TickContextImGui& ctx)
 
         // okay to sample image here -- imgui raster pass stalls until the rendering to
         // this image is complete
-        ImGui::Image(renderCtx.fb.imguiTextureId, ImVec2(FB_WIDTH, FB_HEIGHT));
+        ImGui::Image(renderCtx.fb.GetImGuiTextureId(), ImVec2(FB_WIDTH, FB_HEIGHT));
 
         if (ImGui::Button("Close")) {
             ctx.controls.wantExit = true;
@@ -148,7 +148,7 @@ void AppTetraHueSphere::TickVulkan(TetriumApp::TickContextVulkan& ctx)
     CB.beginRenderPass(
         vk::RenderPassBeginInfo(
             _renderPass,
-            renderCtx.fb.frameBuffer,
+            renderCtx.fb.GetFrameBuffer(),
             vk::Rect2D({0, 0}, {FB_WIDTH, FB_HEIGHT}),
             _clearValues.size(),
             _clearValues.data()
@@ -186,8 +186,6 @@ void AppTetraHueSphere::Cleanup(TetriumApp::CleanupContext& ctx)
         cleanupRenderContext(renderCtx, ctx);
     }
 
-    cleanupDepthImage(ctx);
-
     vk::Device device = ctx.device.logicalDevice;
     device.destroyRenderPass(_renderPass);
 };
@@ -195,7 +193,6 @@ void AppTetraHueSphere::Cleanup(TetriumApp::CleanupContext& ctx)
 void AppTetraHueSphere::Init(TetriumApp::InitContext& ctx)
 {
     DEBUG("Initializing TetraHueSphere...");
-    initDepthImage(ctx);
     initRenderPass(ctx);
 
     // create all render contexts,
@@ -215,83 +212,19 @@ void AppTetraHueSphere::cleanupRenderContext(
     TetriumApp::CleanupContext& cleanupCtx
 )
 {
-    vk::Device device = cleanupCtx.device.logicalDevice;
-    device.destroyFramebuffer(ctx.fb.frameBuffer);
-    device.destroySampler(ctx.fb.sampler);
-    device.destroyImageView(ctx.fb.deviceImage.view);
-    device.destroyImage(ctx.fb.deviceImage.image);
-    device.freeMemory(ctx.fb.deviceImage.memory);
+    ctx.fb.Cleanup(cleanupCtx.device.logicalDevice);
 }
 
 void AppTetraHueSphere::initRenderContext(RenderContext& ctx, TetriumApp::InitContext& initCtx)
 {
-    VirtualFrameBuffer& fb = ctx.fb;
-    vk::Device device = initCtx.device.logicalDevice;
-
-    // create image & image view
-    {
-        // TODO: do we need to use swapchain's image format??
-        VkFormat imageFormat = FB_IMAGE_FORMAT;
-        VulkanUtils::createImage(
-            FB_WIDTH,
-            FB_HEIGHT,
-            imageFormat,
-            VK_IMAGE_TILING_OPTIMAL,
-            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, // sampled by imgui
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-            fb.deviceImage.image,
-            fb.deviceImage.memory,
-            initCtx.device.physicalDevice,
-            initCtx.device.logicalDevice
-        );
-        fb.deviceImage.view = VulkanUtils::createImageView(
-            fb.deviceImage.image,
-            initCtx.device.logicalDevice,
-            imageFormat,
-            VK_IMAGE_ASPECT_COLOR_BIT
-        );
-    }
-
-    // create fb
-    {
-        ASSERT(_renderPass != VK_NULL_HANDLE);
-        std::array<vk::ImageView, 2> attachments = {fb.deviceImage.view, _depthImage.view};
-        ASSERT(fb.deviceImage.view != VK_NULL_HANDLE);
-        ASSERT(_depthImage.view != VK_NULL_HANDLE);
-
-        vk::FramebufferCreateInfo fbCreateInfo(
-            {}, _renderPass, attachments.size(), attachments.data(), FB_WIDTH, FB_HEIGHT, 1
-        );
-
-        fb.frameBuffer = device.createFramebuffer(fbCreateInfo);
-    }
-
-    // create sampler
-    {
-        VkSamplerCreateInfo samplerInfo{};
-        samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-        samplerInfo.magFilter = VK_FILTER_LINEAR;
-        samplerInfo.minFilter = VK_FILTER_LINEAR;
-        samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        samplerInfo.anisotropyEnable = VK_FALSE;
-        samplerInfo.maxAnisotropy = 0;
-        samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-        samplerInfo.unnormalizedCoordinates = VK_FALSE;
-        samplerInfo.compareEnable = VK_FALSE;
-        samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-        samplerInfo.mipLodBias = 0.0f;
-        samplerInfo.minLod = 0.0f;
-        samplerInfo.maxLod = 0.0f;
-
-        fb.sampler = device.createSampler(samplerInfo);
-    }
-
-    // create imgui texture
-    fb.imguiTextureId = ImGui_ImplVulkan_AddTexture(
-        fb.sampler, fb.deviceImage.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+    ctx.fb.Init(
+        initCtx.device.logicalDevice,
+        initCtx.device.physicalDevice,
+        _renderPass,
+        FB_WIDTH,
+        FB_HEIGHT,
+        FB_IMAGE_FORMAT,
+        initCtx.device.depthFormat
     );
 }
 
@@ -376,38 +309,6 @@ void AppTetraHueSphere::initRenderPass(TetriumApp::InitContext& initCtx)
 
     ASSERT(_renderPass != VK_NULL_HANDLE);
     DEBUG("render pass created");
-}
-
-void AppTetraHueSphere::initDepthImage(TetriumApp::InitContext& initCtx)
-{
-    DEBUG("Creating depth buffer...");
-    VkFormat depthFormat = static_cast<VkFormat>(initCtx.device.depthFormat);
-
-    VulkanUtils::createImage(
-        FB_WIDTH,
-        FB_HEIGHT,
-        depthFormat,
-        VK_IMAGE_TILING_OPTIMAL,
-        VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        _depthImage.image,
-        _depthImage.memory,
-        initCtx.device.physicalDevice,
-        initCtx.device.logicalDevice
-    );
-
-    VkDevice device = initCtx.device.logicalDevice;
-    _depthImage.view = VulkanUtils::createImageView(
-        _depthImage.image, device, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT
-    );
-}
-
-void AppTetraHueSphere::cleanupDepthImage(TetriumApp::CleanupContext& cleanupCtx)
-{
-    vk::Device device = cleanupCtx.device.logicalDevice;
-    device.destroyImageView(_depthImage.view);
-    device.destroyImage(_depthImage.image);
-    device.freeMemory(_depthImage.memory);
 }
 
 void AppTetraHueSphere::initRasterization(TetriumApp::InitContext& initCtx)

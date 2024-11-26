@@ -109,6 +109,8 @@ add_executable(${PROJECT_NAME}
 
         src/apps/AppScreeningTest.cpp
         src/apps/AppTetraHueSphere.cpp
+
+        src/apps/app_components/TextureFrameBuffer.cpp
 )
 
 target_sources(${PROJECT_NAME} 

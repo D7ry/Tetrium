@@ -6,6 +6,8 @@
 #include "components/Camera.h" // FIXME: fix dependency hell
 #include "ecs/component/TransformComponent.h" // FIXME: fix dependency hell
 
+#include "app_components/TextureFrameBuffer.h"
+
 namespace TetriumApp
 {
 
@@ -19,33 +21,19 @@ class AppTetraHueSphere : public App
     virtual void TickImGui(const TetriumApp::TickContextImGui& ctx) override;
 
   private:
-    VQDeviceImage _depthImage;
-
     std::array<vk::ClearValue, 2> _clearValues; // [color, depthStencil]
     vk::RenderPass _renderPass = VK_NULL_HANDLE;
 
-    // framebuffer to render the hue sphere onto
-    struct VirtualFrameBuffer
-    {
-        vk::Framebuffer frameBuffer = VK_NULL_HANDLE;
-        vk::Sampler sampler = VK_NULL_HANDLE;
-        VQDeviceImage deviceImage = {};
-        void* imguiTextureId = nullptr;
-    };
-
-    // context for one frame rendeirng
+    // context for one frame rendering
     struct RenderContext
     {
-        VirtualFrameBuffer fb;
+        TextureFrameBuffer fb;
     };
 
     void initRenderContext(RenderContext& ctx, TetriumApp::InitContext& initCtx);
     void cleanupRenderContext(RenderContext& ctx, TetriumApp::CleanupContext& cleanupCtx);
 
     void initRenderPass(TetriumApp::InitContext& initCtx);
-
-    void cleanupDepthImage(TetriumApp::CleanupContext& cleanupCtx);
-    void initDepthImage(TetriumApp::InitContext& initCtx);
 
     void initRasterization(TetriumApp::InitContext& initCtx);
     void cleanupRasterization(TetriumApp::CleanupContext& cleanupCtx);
