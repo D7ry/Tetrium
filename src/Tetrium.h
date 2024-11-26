@@ -304,7 +304,6 @@ class Tetrium
     void reinitImGuiFrameBuffers(Tetrium::ImGuiRenderContexts& ctx);
     void recordImGuiDrawCommandBuffer(
         Tetrium::ImGuiRenderContexts& ctx,
-        ColorSpace colorSpace,
         vk::CommandBuffer cb,
         vk::Extent2D extent,
         int swapChainImageIndex
@@ -360,9 +359,6 @@ class Tetrium
     // and movement / camera inputs disables
     bool _uiMode = true;
 
-    // whether we want to draw imgui, set to false disables
-    // all imgui windows
-    bool _wantToDrawImGui = true;
     // engine level pause, toggle with P key
     bool _paused = false;
 

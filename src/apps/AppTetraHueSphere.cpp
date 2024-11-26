@@ -41,7 +41,16 @@ const char* HUE_SPHERE_PRETTY_TEXTURE_PATH_OCV
 
 void AppTetraHueSphere::TickImGui(const TetriumApp::TickContextImGui& ctx)
 {
-    if (ImGui::Begin("TetraHueSphere")) {
+    ImGuiIO& io = ImGui::GetIO();
+    ImGui::SetNextWindowPos(ImVec2(0, 0));
+    ImGui::SetNextWindowSize(io.DisplaySize);
+
+    if (ImGui::Begin(
+            "TetraHueSphere",
+            NULL,
+            ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove
+                | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus
+        )) {
         // radio button for mesh type
         ImGui::Text("Mesh Type");
         ImGui::RadioButton("Ugly Sphere", (int*)&_rasterizationCtx.renderMeshType, 0);
@@ -87,6 +96,8 @@ void AppTetraHueSphere::TickImGui(const TetriumApp::TickContextImGui& ctx)
         //     _rasterizationCtx.hueSpheretransform.position = hueSpherePos;
         // }
 
+        // okay to sample image here -- imgui raster pass stalls until the rendering to
+        // this image is complete
         ImGui::Image(renderCtx.fb.imguiTextureId, ImVec2(FB_WIDTH, FB_HEIGHT));
 
         if (ImGui::Button("Close")) {
@@ -96,7 +107,6 @@ void AppTetraHueSphere::TickImGui(const TetriumApp::TickContextImGui& ctx)
     ImGui::End();
 
     // rotate hue sphere
-    ImGuiIO& io = ImGui::GetIO();
 
     _rasterizationCtx.hueSpheretransform.rotation.z += io.DeltaTime * 10.f;
 }

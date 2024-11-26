@@ -316,7 +316,7 @@ void Tetrium::initImGuiRenderContext(Tetrium::ImGuiRenderContexts& ctx)
 {
     // create render pass
     VkImageLayout imguiInitialLayout, imguiFinalLayout;
-    imguiInitialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    imguiInitialLayout = VK_IMAGE_LAYOUT_UNDEFINED; // for first pass
     // imguiFinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; // for RYGB conversion pass, if
     // run imgui pass before
     imguiFinalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR; // if painting to physical fb
@@ -326,7 +326,7 @@ void Tetrium::initImGuiRenderContext(Tetrium::ImGuiRenderContexts& ctx)
         imguiInitialLayout,
         imguiFinalLayout,
         _swapChain.imageFormat,
-        VK_ATTACHMENT_LOAD_OP_LOAD,
+        VK_ATTACHMENT_LOAD_OP_CLEAR,
         VK_ATTACHMENT_STORE_OP_STORE,
         false // imgui FB has no depth attachment
     );
@@ -381,31 +381,29 @@ void Tetrium::initImGuiRenderContext(Tetrium::ImGuiRenderContexts& ctx)
 
 void Tetrium::recordImGuiDrawCommandBuffer(
     Tetrium::ImGuiRenderContexts& ctx,
-    ColorSpace colorSpace, // FIXME: remove this unused arg
     vk::CommandBuffer cb,
     vk::Extent2D extent,
     int swapChainImageIndex
 )
 {
 
-    VkRenderPassBeginInfo renderPassInfo{};
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    renderPassInfo.renderPass = ctx.renderPass;
-    // renderPassInfo.framebuffer = ctx.frameBuffers[colorSpace][swapChainImageIndex];
-    renderPassInfo.framebuffer = ctx.frameBuffer[swapChainImageIndex];
-    renderPassInfo.renderArea.extent = extent;
-    renderPassInfo.renderArea.offset = {0, 0};
-    renderPassInfo.clearValueCount = 0;
-    renderPassInfo.pClearValues = nullptr;
+    vk::RenderPassBeginInfo renderPassInfo(
+        ctx.renderPass,
+        ctx.frameBuffer[swapChainImageIndex],
+        vk::Rect2D({0, 0}, extent),
+        _clearValues.size(),
+        _clearValues.data()
+    );
 
-    vkCmdBeginRenderPass(cb, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+    cb.beginRenderPass(renderPassInfo, vk::SubpassContents::eInline);
 
     ImDrawData* drawData = ImGui::GetDrawData();
     if (drawData == nullptr) {
         FATAL("Draw data is null!");
     }
     ImGui_ImplVulkan_RenderDrawData(drawData, cb);
-    vkCmdEndRenderPass(cb);
+
+    cb.endRenderPass();
 }
 
 const ImGuiTexture& Tetrium::getOrLoadImGuiTexture(

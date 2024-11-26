@@ -1126,14 +1126,15 @@ void Tetrium::bindDefaultInputs()
     _inputManager.RegisterCallback(
         GLFW_KEY_ESCAPE, InputManager::KeyCallbackCondition::PRESS, [this]() {}
     );
-    // flip imgui draw with "`" key
+    // close app with "`" key
     _inputManager.RegisterCallback(
         GLFW_KEY_GRAVE_ACCENT,
         InputManager::KeyCallbackCondition::PRESS,
         [this]() {
-            _wantToDrawImGui = !_wantToDrawImGui;
-            if (!_wantToDrawImGui) {
-                clearImGuiDrawData();
+            if (_primaryApp.has_value()) {
+                _primaryApp.value()->OnClose();
+                _primaryApp = std::nullopt;
+                _soundManager.DisableMusic();
             }
         }
     );

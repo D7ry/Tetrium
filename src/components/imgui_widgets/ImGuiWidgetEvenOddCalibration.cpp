@@ -226,13 +226,11 @@ void ImGuiWidgetEvenOddCalibration::Draw(Tetrium* engine, ColorSpace colorSpace)
     bool blackOutEven = engine->_evenOddRenderingSettings.blackOutEven;
     bool blackOutOdd = engine->_evenOddRenderingSettings.blackOutOdd;
 
-    if (ImGui::Checkbox("Black Out Even Frames", &blackOutEven)
-        && colorSpace == RGB) {
+    if (ImGui::Checkbox("Black Out Even Frames", &blackOutEven)) {
         engine->_evenOddRenderingSettings.blackOutEven = blackOutEven;
     }
 
-    if (ImGui::Checkbox("Black Out Odd Frames", &blackOutOdd)
-        && colorSpace == RGB) {
+    if (ImGui::Checkbox("Black Out Odd Frames", &blackOutOdd)) {
         engine->_evenOddRenderingSettings.blackOutOdd = blackOutOdd;
     }
 

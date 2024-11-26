@@ -70,15 +70,14 @@ void Tetrium::drawAppsImGui(ColorSpace colorSpace, int currentFrameInFlight)
         app->TickImGui(ctxImGui);
 
         if (ctxImGui.controls.wantExit) {
+            _primaryApp.value()->OnClose();
             _primaryApp = std::nullopt;
-        }
-        if (ctxImGui.controls.musicOverride.has_value()) {
-            _soundManager.SetMusic(ctxImGui.controls.musicOverride.value());
+            _soundManager.DisableMusic();
         } else {
-            _soundManager.DisableMusic(); // FIXME: do we need a main menu music??
+            if (ctxImGui.controls.musicOverride.has_value()) {
+                _soundManager.SetMusic(ctxImGui.controls.musicOverride.value());
+            }
         }
-    } else {
-        _soundManager.DisableMusic(); // FIXME: do we need a main menu music??
     }
 }
 
@@ -187,9 +186,6 @@ void Tetrium::drawMainMenu(ColorSpace colorSpace)
 // with `recordImGuiDrawCommandBuffer`
 void Tetrium::drawImGui(ColorSpace colorSpace, int currentFrameInFlight)
 {
-    if (!_wantToDrawImGui) {
-        return;
-    }
 
     // ---------- Prologue ----------
     PROFILE_SCOPE(&_profiler, "ImGui Draw");
@@ -223,8 +219,11 @@ void Tetrium::drawImGui(ColorSpace colorSpace, int currentFrameInFlight)
     }
     Tetrium_GUI::drawFootNote();
 
-    drawMainMenu(colorSpace);
-    drawAppsImGui(colorSpace, currentFrameInFlight);
+    if (_primaryApp.has_value()) {
+        drawAppsImGui(colorSpace, currentFrameInFlight);
+    } else {
+        drawMainMenu(colorSpace);
+    }
 
     ImGui::Render();
 }

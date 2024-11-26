@@ -162,16 +162,17 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frameIdx)
         { // main render pass
             vk::Extent2D extend = _swapChain.extent;
             vk::Rect2D renderArea(VkOffset2D{0, 0}, extend);
-            vk::RenderPassBeginInfo renderPassBeginInfo(
-                {}, {}, renderArea, _clearValues.size(), _clearValues.data(), nullptr
-            );
-
             VkViewport viewport{};
             VkRect2D scissor{};
             getFullScreenViewportAndScissor(_swapChain, viewport, scissor);
 
             vkCmdSetViewport(CB1, 0, 1, &viewport);
             vkCmdSetScissor(CB1, 0, 1, &scissor);
+#if 0 // legacy code, to be referenced when migrating to ROCV in app
+            vk::RenderPassBeginInfo renderPassBeginInfo(
+                {}, {}, renderArea, _clearValues.size(), _clearValues.data(), nullptr
+            );
+
             // 1. rasterize onto RYGB FB
             if (true) {
                 renderPassBeginInfo.renderPass = _renderContextRYGB.renderPass;
@@ -200,8 +201,9 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frameIdx)
                 (isEven && _evenOddRenderingSettings.blackOutEven)
                     || (!isEven && _evenOddRenderingSettings.blackOutOdd)
             );
+#endif
 
-            recordImGuiDrawCommandBuffer(_imguiCtx, RGB, CB1, extend, swapchainImageIndex);
+            recordImGuiDrawCommandBuffer(_imguiCtx, CB1, extend, swapchainImageIndex);
         }
 
         CB1.end();
