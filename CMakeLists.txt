@@ -55,15 +55,23 @@ if (APPLE)
     set(OPENAL_ROOT_DIR "/opt/homebrew/opt/openal-soft")
     set(OPENAL_INCLUDE_DIR "${OPENAL_ROOT_DIR}/include")
     set(OPENAL_LIBRARY "${OPENAL_ROOT_DIR}/lib/libopenal.dylib")
+    find_package(SndFile REQUIRED)
 else() #linux
     set(FREETYPE_INCLUDE_DIRS "/usr/include/freetype2")
     set(FREETYPE_LIBRARIES "/usr/lib/x86_64-linux-gnu/libfreetype.so")
+    # NOTE: openal is a bit cursed, need to debug package pathing
+    set(OPENAL_LIBRARY "/usr/lib/x86_64-linux-gnu/libopenal.so")
+    set(OPENAL_INCLUDE_DIR "/usr/include/")
+    #FIXME: sndfile is also cursed
+    set(SNDFILE_LIBRARY "/usr/lib/x86_64-linux-gnu/libsndfile.so")
+    set(SNDFILE_INCLUDE_DIR "/usr/include/")
 endif()
 endif()
 
 # openal and sndfile for sound playing
 find_package(OpenAL REQUIRED)
-find_package(SndFile REQUIRED)
+
+
 
 
 project(Tetrium)
