@@ -141,7 +141,8 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frameIdx)
         }
         CBApp.end();
 
-        drawImGui(colorSpace);
+        // TODO: should this be placed here?
+        drawImGui(colorSpace, frameIdx);
 
         vk::CommandBuffer CB1(_device->graphicsCommandBuffers[frameIdx]);
         //  Record a command buffer which draws the scene onto that image

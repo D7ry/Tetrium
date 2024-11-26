@@ -262,11 +262,11 @@ class Tetrium
     /* ---------- Render-Time Functions ---------- */
     void drawFrame(TickContext* tickData, uint8_t frame);
     void drawMainMenu(ColorSpace colorSpace);
-    void drawImGui(ColorSpace colorSpace);
+    void drawImGui(ColorSpace colorSpace, int currentFrameInFlight);
     void flushEngineUBOStatic(uint8_t frame);
     void getMainProjectionMatrix(glm::mat4& projectionMatrix);
 
-    void drawAppsImGui(ColorSpace colorSpace);
+    void drawAppsImGui(ColorSpace colorSpace, int currentFrameInFlight);
 
     void getFullScreenViewportAndScissor(
         const SwapChainContext& swapChain,

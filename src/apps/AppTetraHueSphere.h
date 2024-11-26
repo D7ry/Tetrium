@@ -22,8 +22,10 @@ class AppTetraHueSphere : public App
         VkDeviceMemory memory = VK_NULL_HANDLE;
     };
 
+
     VulkanImage _depthImage;
 
+    std::array<vk::ClearValue, 2> _clearValues; // [color, depthStencil]
     vk::RenderPass _renderPass = VK_NULL_HANDLE;
 
     // framebuffer to render the hue sphere onto

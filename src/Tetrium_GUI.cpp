@@ -48,12 +48,13 @@ void drawFootNote()
 
 }; // namespace Tetrium_GUI
 
-void Tetrium::drawAppsImGui(ColorSpace colorSpace)
+void Tetrium::drawAppsImGui(ColorSpace colorSpace, int currentFrameInFlight)
 {
     if (_primaryApp.has_value()) {
 
         TetriumApp::App* app = _primaryApp.value();
         TetriumApp::TickContextImGui ctxImGui{
+            .currentFrameInFlight = currentFrameInFlight,
             .colorSpace = colorSpace,
             .apis = {
                 .GetImGuiTexture = [this](const std::string& texture) -> ImGuiTexture {
@@ -184,7 +185,7 @@ void Tetrium::drawMainMenu(ColorSpace colorSpace)
 // note that the actual "painting" onto the frame buffer doesn't happen.
 // ImGui internally constructs a draw list, that gets painted onto the fb
 // with `recordImGuiDrawCommandBuffer`
-void Tetrium::drawImGui(ColorSpace colorSpace)
+void Tetrium::drawImGui(ColorSpace colorSpace, int currentFrameInFlight)
 {
     if (!_wantToDrawImGui) {
         return;
@@ -223,7 +224,7 @@ void Tetrium::drawImGui(ColorSpace colorSpace)
     Tetrium_GUI::drawFootNote();
 
     drawMainMenu(colorSpace);
-    drawAppsImGui(colorSpace);
+    drawAppsImGui(colorSpace, currentFrameInFlight);
 
     ImGui::Render();
 }

@@ -18,6 +18,13 @@ void AppTetraHueSphere::TickImGui(const TetriumApp::TickContextImGui& ctx)
     if (ImGui::Begin("TetraHueSphere")) {
         ImGui::Text("Hello, TetraHueSphere!");
 
+        RenderContext& renderCtx = _renderContexts[ctx.currentFrameInFlight];
+        // color & depth stencil clear value sliders
+        ImGui::ColorEdit4("Clear Color", (float*)&_clearValues[0].color);
+        ImGui::SliderFloat("Clear Depth", &_clearValues[1].depthStencil.depth, 0.f, 1.f);
+
+        ImGui::Image(renderCtx.fb.imguiTextureId, ImVec2(FB_WIDTH, FB_HEIGHT));
+
         if (ImGui::Button("Close")) {
             ctx.controls.wantExit = true;
         }
@@ -27,10 +34,11 @@ void AppTetraHueSphere::TickImGui(const TetriumApp::TickContextImGui& ctx)
 
 void AppTetraHueSphere::TickVulkan(TetriumApp::TickContextVulkan& ctx)
 {
-    DEBUG("ticking vulkan: {}", ctx.currentFrameInFlight);
+    // DEBUG("ticking vulkan: {}", ctx.currentFrameInFlight);
 
     RenderContext& renderCtx = _renderContexts[ctx.currentFrameInFlight];
     // render to the correct framebuffer&texture
+
 
     // push render semaphore TODO: do we need semahpore here? since the cb is already scheduled
     ctx.commandBuffer.beginRenderPass(
@@ -38,8 +46,8 @@ void AppTetraHueSphere::TickVulkan(TetriumApp::TickContextVulkan& ctx)
             _renderPass,
             renderCtx.fb.frameBuffer,
             vk::Rect2D({0, 0}, {FB_WIDTH, FB_HEIGHT}),
-            0,
-            nullptr
+            _clearValues.size(),
+            _clearValues.data()
         ),
         vk::SubpassContents::eInline
     );
@@ -61,6 +69,10 @@ void AppTetraHueSphere::Init(TetriumApp::InitContext& ctx)
     for (int i = 0; i < NUM_FRAME_IN_FLIGHT; i++) {
         initRenderContexts(_renderContexts[i], ctx);
     }
+
+    // init clear values here
+    _clearValues[0].color = {0.0f, 0.0f, 0.0f, 1.f};
+    _clearValues[1].depthStencil = vk::ClearDepthStencilValue(1.f, 0.f);
 };
 
 void AppTetraHueSphere::initRenderContexts(RenderContext& ctx, TetriumApp::InitContext& initCtx)

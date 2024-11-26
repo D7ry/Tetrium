@@ -25,6 +25,7 @@ struct CleanupContext
 
 struct TickContextImGui
 {
+    int currentFrameInFlight;
     ColorSpace colorSpace;
 
     struct
