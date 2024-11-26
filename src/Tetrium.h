@@ -26,14 +26,19 @@
 #include "components/Profiler.h"
 #include "components/TextureManager.h"
 #include "components/imgui_widgets/ImGuiWidget.h"
+#include "components/SoundManager.h"
 
 #include "components/imgui_widgets/ImGuiWidgetColorTile.h"
 #include "components/imgui_widgets/ImGuiWidgetEvenOddCalibration.h"
 #include "components/imgui_widgets/ImGuiWidgetTemp.h"
 #include "components/imgui_widgets/ImGuiWidgetTetraViewer.h"
 #include "components/imgui_widgets/ImGuiWidgetTetraViewerDemo.h"
+#include "components/imgui_widgets/ImGuiWidgetBlobHunter.h"
 // ecs
 #include "ecs/system/TetraImageDisplaySystem.h"
+
+// Applications
+#include "apps/App.h"
 
 class ImPlotContext;
 class TickContext;
@@ -78,6 +83,8 @@ class Tetrium
     void Run();
     void Tick();
     void Cleanup();
+
+    void RegisterApp(TetriumApp::App* app, const std::string& appName);
 
     struct AnimationKeyFrame
     {
@@ -129,6 +136,7 @@ class Tetrium
         VkSemaphore semaImageAvailable;
         VkSemaphore semaRenderFinished;
         VkSemaphore semaImageCopyFinished;
+        VkSemaphore semaAppVulkanFinished;
         VkSemaphore semaVsync;
         VkFence fenceInFlight;
         VkFence fenceRenderFinished;
@@ -164,8 +172,8 @@ class Tetrium
         VkDescriptorPool descriptorPool;
         std::unordered_map<std::string, ImGuiTexture> textures;
         std::vector<VkFramebuffer> frameBuffer;
-        ImGuiContext* ctxImGui[ColorSpace::ColorSpaceSize] = {};
-        ImPlotContext* ctxImPlot[ColorSpace::ColorSpaceSize] = {};
+        ImGuiContext* backendImGuiContext;
+        ImPlotContext* backendImPlotContext;
     };
 
     /* ---------- Windowing ---------- */;
@@ -229,7 +237,8 @@ class Tetrium
     void createVirtualFrameBuffer(
         VkRenderPass renderPass,
         const SwapChainContext& swapChain,
-        VirtualFrameBuffer& vfb
+        VirtualFrameBuffer& vfb,
+        uint32_t numFrameBuffers
     );
     void clearVirtualFrameBuffer(VirtualFrameBuffer& vfb);
 
@@ -252,9 +261,12 @@ class Tetrium
 
     /* ---------- Render-Time Functions ---------- */
     void drawFrame(TickContext* tickData, uint8_t frame);
-    void drawImGui(ColorSpace colorSpace);
+    void drawMainMenu(ColorSpace colorSpace);
+    void drawImGui(ColorSpace colorSpace, int currentFrameInFlight);
     void flushEngineUBOStatic(uint8_t frame);
     void getMainProjectionMatrix(glm::mat4& projectionMatrix);
+
+    void drawAppsImGui(ColorSpace colorSpace, int currentFrameInFlight);
 
     void getFullScreenViewportAndScissor(
         const SwapChainContext& swapChain,
@@ -284,6 +296,7 @@ class Tetrium
     void setupSoftwareEvenOddFrame();        // set up resources for software-based even-odd frame
     uint64_t getSurfaceCounterValue(); // get the number of frames requested so far from the display
     bool isEvenFrame();
+    ColorSpace getCurrentColorSpace();
 
     /* ---------- ImGui ---------- */
     void initImGuiRenderContext(Tetrium::ImGuiRenderContexts& ctx);
@@ -291,7 +304,6 @@ class Tetrium
     void reinitImGuiFrameBuffers(Tetrium::ImGuiRenderContexts& ctx);
     void recordImGuiDrawCommandBuffer(
         Tetrium::ImGuiRenderContexts& ctx,
-        ColorSpace colorSpace,
         vk::CommandBuffer cb,
         vk::Extent2D extent,
         int swapChainImageIndex
@@ -300,6 +312,11 @@ class Tetrium
         Tetrium::ImGuiRenderContexts& ctx,
         const std::string& texture
     );
+    void unloadImGuiTexture(
+        Tetrium::ImGuiRenderContexts& ctx,
+        const std::string& texture
+    );
+
     void clearImGuiDrawData();
 
     /* ---------- Top-level data ---------- */
@@ -342,9 +359,6 @@ class Tetrium
     // and movement / camera inputs disables
     bool _uiMode = true;
 
-    // whether we want to draw imgui, set to false disables
-    // all imgui windows
-    bool _wantToDrawImGui = true;
     // engine level pause, toggle with P key
     bool _paused = false;
 
@@ -375,14 +389,6 @@ class Tetrium
                                       // obtained through a precise vulkan API call
         int timeOffset = 0;           // time offset added to the time that's used
                                       // to evaluate current frame, used for the old counter method
-        uint64_t mostRecentPresentFinish = 0;
-        uint32_t lastPresentedImageId = 0; // each image are tagged with an image id,
-                                           // image id corresponds to the tick #
-                                           // when the images are presented
-                                           // tick # and image id are bijective and they
-                                           // strictly increase over time
-        int vsyncFrameOffset = 0;
-        uint64_t numFramesPresented = 0; // total number of frames that have been presented so far
     } _softwareEvenOddCtx;
 
     struct
@@ -404,6 +410,7 @@ class Tetrium
     InputManager _inputManager;
     Profiler _profiler;
     TaskQueue _taskQueue;
+    SoundManager _soundManager;
     std::unique_ptr<std::vector<Profiler::Entry>> _lastProfilerData = _profiler.NewProfile();
 
     // ImGui widgets
@@ -415,6 +422,7 @@ class Tetrium
     friend class ImGuiWidgetTetraViewerDemo;
     friend class ImGuiWidgetTetraViewer;
     friend class ImGuiWidgetTemp;
+    friend class ImGuiWidgetBlobHunter;
 
     ImGuiWidgetDeviceInfo _widgetDeviceInfo;
     ImGuiWidgetPerfPlot _widgetPerfPlot;
@@ -426,8 +434,15 @@ class Tetrium
     ImGuiWidgetColorTile _widgetColorTile;
     ImGuiWidgetTemp _widgetTemp;
 
+    ImGuiWidgetBlobHunter _widgetBlobHunter;
+
+
     struct
     {
         [[deprecated]] TetraImageDisplaySystem imageDisplay;
     } _rgbyRenderers;
+
+    std::unordered_map<std::string, TetriumApp::App*> _appMap;
+
+    std::optional<TetriumApp::App*> _primaryApp = std::nullopt;
 };

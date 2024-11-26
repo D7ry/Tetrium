@@ -50,3 +50,14 @@ struct InitContext
      */
     std::array<VkDescriptorBufferInfo, NUM_FRAME_IN_FLIGHT> engineUBOStaticDescriptorBufferInfo;
 };
+
+enum class Sound
+{
+    kProgramStart,
+    kVineBoom,
+    kMusicGameMenu,
+    kMusicGamePlay,
+
+    kCorrectAnswer,
+    kWrongAnswer = kVineBoom,
+};

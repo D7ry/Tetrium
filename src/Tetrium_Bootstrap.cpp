@@ -17,7 +17,7 @@
 #include <vulkan/vulkan_core.h>
 
 // imgui
-#include "components/VulkanUtils.h" // FIXME: this shouldn't be here
+#include "lib/VulkanUtils.h"
 #include "imgui.h"
 
 // Molten VK Config
@@ -65,7 +65,7 @@ void Tetrium::createFunnyObjects()
 void Tetrium::keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
     Tetrium* pThis = reinterpret_cast<Tetrium*>(glfwGetWindowUserPointer(window));
-    if (key == GLFW_KEY_P && action == GLFW_PRESS) {
+    if (key == GLFW_KEY_SLASH && action == GLFW_PRESS) {
         _paused = !_paused;
     }
     _inputManager.OnKeyInput(window, key, scancode, action, mods);
@@ -123,7 +123,7 @@ void Tetrium::initDefaultStates()
     // by default, unlock cursor, disable imgui inputs, disable input handling
     _windowFocused = false;
     _inputManager.SetActive(_windowFocused);
-    _uiMode = false;
+    _uiMode = true;
 
     ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoMouse;
     ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoKeyboard;
@@ -210,6 +210,25 @@ void Tetrium::Init(const Tetrium::InitOptions& options)
     initDefaultStates();
 
     createFunnyObjects();
+
+    _soundManager.LoadAllSounds();
+    _soundManager.PlaySound(Sound::kProgramStart);
+
+    DEBUG("swapchain image format: {}", string_VkFormat(_swapChain.imageFormat));
+    VQDevice& device = *_device.get();
+    TetriumApp::InitContext appInitCtx{
+        .device = device,
+        .swapchain = {
+            .imageFormat = vk::Format(_swapChain.imageFormat),
+            .extent = _swapChain.extent,
+        },
+        .textureManager = &_textureManager,
+    };
+
+    // init apps
+    for (auto& [appName, app] : _appMap) {
+        app->Init(appInitCtx);
+    }
 }
 
 void Tetrium::framebufferResizeCallback(GLFWwindow* window, int width, int height)
@@ -268,8 +287,14 @@ void Tetrium::initVulkan()
         VK_ATTACHMENT_STORE_OP_STORE,
         true
     );
+    SCHEDULE_DELETE(
+        vkDestroyRenderPass(_device->logicalDevice, _renderContextRYGB.renderPass, nullptr);
+    )
     createVirtualFrameBuffer(
-        _renderContextRYGB.renderPass, _swapChain, _renderContextRYGB.virtualFrameBuffer
+        _renderContextRYGB.renderPass,
+        _swapChain,
+        _renderContextRYGB.virtualFrameBuffer,
+        _swapChain.numImages
     );
     SCHEDULE_DELETE(clearVirtualFrameBuffer(_renderContextRYGB.virtualFrameBuffer);)
 
@@ -279,7 +304,7 @@ void Tetrium::initVulkan()
         _device->logicalDevice,
         VK_IMAGE_LAYOUT_UNDEFINED,
         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, // ImGui pass runs after
-        //VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+        // VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
         _swapChain.imageFormat,
         VK_ATTACHMENT_LOAD_OP_CLEAR,
         VK_ATTACHMENT_STORE_OP_STORE,
@@ -297,6 +322,7 @@ void Tetrium::initVulkan()
             .dstAccessMask = VK_ACCESS_SHADER_READ_BIT
         }
     );
+    SCHEDULE_DELETE(vkDestroyRenderPass(_device->logicalDevice, _rocvTransformRenderPass, nullptr);)
 
     // create framebuffer for swapchain
     createSwapchainFrameBuffers(_swapChain, _rocvTransformRenderPass);
@@ -819,7 +845,8 @@ void Tetrium::createSynchronizationObjects(
         for (VkSemaphore* sema :
              {&primitive.semaImageAvailable,
               &primitive.semaRenderFinished,
-              &primitive.semaImageCopyFinished}) {
+              &primitive.semaImageCopyFinished,
+              &primitive.semaAppVulkanFinished}) {
             VK_CHECK_RESULT(vkCreateSemaphore(_device->logicalDevice, &semaphoreInfo, nullptr, sema)
             );
         }
@@ -848,6 +875,7 @@ void Tetrium::createSynchronizationObjects(
         for (size_t i = 0; i < NUM_FRAME_IN_FLIGHT; i++) {
             const SyncPrimitives& primitive = primitives[i];
             for (auto& sema : {// primitive.semaVsync,
+                               primitive.semaAppVulkanFinished,
                                primitive.semaImageCopyFinished,
                                primitive.semaRenderFinished,
                                primitive.semaImageAvailable
@@ -863,6 +891,11 @@ void Tetrium::createSynchronizationObjects(
 void Tetrium::Cleanup()
 {
     INFO("Cleaning up...");
+    TetriumApp::CleanupContext appCleanupCtx{.device = *_device.get()};
+    for (auto& [appName, app] : _appMap) {
+        app->Cleanup(appCleanupCtx);
+    }
+
     _deletionStack.flush();
     INFO("Resource cleaned up.");
 }
@@ -889,14 +922,14 @@ uint32_t findMemoryType(
 void Tetrium::createVirtualFrameBuffer(
     VkRenderPass renderPass,
     const SwapChainContext& swapChain,
-    VirtualFrameBuffer& vfb
+    VirtualFrameBuffer& vfb,
+    uint32_t numFrameBuffers
 )
 {
     DEBUG("Creating framebuffers..");
     ASSERT(renderPass != VK_NULL_HANDLE);
     ASSERT(swapChain.numImages != 0);
 
-    size_t numFrameBuffers = swapChain.numImages;
     ASSERT(numFrameBuffers != 0);
     vfb.frameBuffer.resize(numFrameBuffers);
     vfb.image.resize(numFrameBuffers);
@@ -1051,29 +1084,29 @@ void Tetrium::createDepthBuffer(SwapChainContext& ctx)
 // currently for perf reasons we're leaving it as is.
 void Tetrium::bindDefaultInputs()
 {
-    const int CAMERA_SPEED = 3;
-    _inputManager.RegisterCallback(GLFW_KEY_W, InputManager::KeyCallbackCondition::HOLD, [this]() {
-        _mainCamera.Move(_deltaTimer.GetDeltaTime() * CAMERA_SPEED, 0, 0);
-    });
-    _inputManager.RegisterCallback(GLFW_KEY_S, InputManager::KeyCallbackCondition::HOLD, [this]() {
-        _mainCamera.Move(-_deltaTimer.GetDeltaTime() * CAMERA_SPEED, 0, 0);
-    });
-    _inputManager.RegisterCallback(GLFW_KEY_A, InputManager::KeyCallbackCondition::HOLD, [this]() {
-        _mainCamera.Move(0, _deltaTimer.GetDeltaTime() * CAMERA_SPEED, 0);
-    });
-    _inputManager.RegisterCallback(GLFW_KEY_D, InputManager::KeyCallbackCondition::HOLD, [this]() {
-        _mainCamera.Move(0, -_deltaTimer.GetDeltaTime() * CAMERA_SPEED, 0);
-    });
-    _inputManager.RegisterCallback(
-        GLFW_KEY_LEFT_CONTROL,
-        InputManager::KeyCallbackCondition::HOLD,
-        [this]() { _mainCamera.Move(0, 0, -CAMERA_SPEED * _deltaTimer.GetDeltaTime()); }
-    );
-    _inputManager.RegisterCallback(
-        GLFW_KEY_SPACE,
-        InputManager::KeyCallbackCondition::HOLD,
-        [this]() { _mainCamera.Move(0, 0, CAMERA_SPEED * _deltaTimer.GetDeltaTime()); }
-    );
+    // const int CAMERA_SPEED = 3;
+    // _inputManager.RegisterCallback(GLFW_KEY_W, InputManager::KeyCallbackCondition::HOLD, [this]() {
+    //     _mainCamera.Move(_deltaTimer.GetDeltaTime() * CAMERA_SPEED, 0, 0);
+    // });
+    // _inputManager.RegisterCallback(GLFW_KEY_S, InputManager::KeyCallbackCondition::HOLD, [this]() {
+    //     _mainCamera.Move(-_deltaTimer.GetDeltaTime() * CAMERA_SPEED, 0, 0);
+    // });
+    // _inputManager.RegisterCallback(GLFW_KEY_A, InputManager::KeyCallbackCondition::HOLD, [this]() {
+    //     _mainCamera.Move(0, _deltaTimer.GetDeltaTime() * CAMERA_SPEED, 0);
+    // });
+    // _inputManager.RegisterCallback(GLFW_KEY_D, InputManager::KeyCallbackCondition::HOLD, [this]() {
+    //     _mainCamera.Move(0, -_deltaTimer.GetDeltaTime() * CAMERA_SPEED, 0);
+    // });
+    // _inputManager.RegisterCallback(
+    //     GLFW_KEY_LEFT_CONTROL,
+    //     InputManager::KeyCallbackCondition::HOLD,
+    //     [this]() { _mainCamera.Move(0, 0, -CAMERA_SPEED * _deltaTimer.GetDeltaTime()); }
+    // );
+    // _inputManager.RegisterCallback(
+    //     GLFW_KEY_SPACE,
+    //     InputManager::KeyCallbackCondition::HOLD,
+    //     [this]() { _mainCamera.Move(0, 0, CAMERA_SPEED * _deltaTimer.GetDeltaTime()); }
+    // );
     // ui mode toggle
     _inputManager.RegisterCallback(GLFW_KEY_U, InputManager::KeyCallbackCondition::PRESS, [this]() {
         _uiMode = !_uiMode;
@@ -1089,19 +1122,17 @@ void Tetrium::bindDefaultInputs()
         } else {
             io.ConfigFlags |= (ImGuiConfigFlags_NoMouse | ImGuiConfigFlags_NoKeyboard);
         }
-        // io.WantSetMousePos = _uiMode;
+        io.WantSetMousePos = _uiMode;
     });
-    _inputManager.RegisterCallback(
-        GLFW_KEY_ESCAPE, InputManager::KeyCallbackCondition::PRESS, [this]() {}
-    );
-    // flip imgui draw with "`" key
+    // close app with "`" key
     _inputManager.RegisterCallback(
         GLFW_KEY_GRAVE_ACCENT,
         InputManager::KeyCallbackCondition::PRESS,
         [this]() {
-            _wantToDrawImGui = !_wantToDrawImGui;
-            if (!_wantToDrawImGui) {
-                clearImGuiDrawData();
+            if (_primaryApp.has_value()) {
+                _primaryApp.value()->OnClose();
+                _primaryApp = std::nullopt;
+                _soundManager.DisableMusic();
             }
         }
     );
@@ -1191,4 +1222,13 @@ VkRenderPass Tetrium::createRenderPass(
     }
     INFO("render pass created");
     return renderPass;
+}
+
+void Tetrium::RegisterApp(TetriumApp::App* app, const std::string& name)
+{
+    INFO("Registering app [{}]...", name);
+    if (_appMap.find(name) != _appMap.end()) {
+        PANIC("App with name {} already exists!", name);
+    }
+    _appMap[name] = app;
 }

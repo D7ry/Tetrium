@@ -36,6 +36,7 @@ struct VQBuffer
     }
 };
 
+#define VQ_BUFFER_INDEX_TYPE VK_INDEX_TYPE_UINT32
 struct VQBufferIndex : VQBuffer
 {
     uint32_t numIndices; // how many indices are there?

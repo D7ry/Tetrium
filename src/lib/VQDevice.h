@@ -56,7 +56,7 @@ struct VQDevice
     /** @brief Graphics command buffer associated with this device.*/
     std::vector<VkCommandBuffer> graphicsCommandBuffers;
     /** @brief Graphics command buffer2 associated with this device.*/
-    std::vector<VkCommandBuffer> graphicsCommandBuffers2;
+    std::vector<VkCommandBuffer> appCommandBuffers;
 
     VkQueue graphicsQueue = VK_NULL_HANDLE;
 
@@ -65,6 +65,8 @@ struct VQDevice
     VkQueue computeQueue = VK_NULL_HANDLE;
 
     VkCommandPool graphicsCommandPool = VK_NULL_HANDLE;
+
+    VkFormat depthFormat = VK_FORMAT_UNDEFINED;
 
     /** @brief Contains queue family indices */
     QueueFamilyIndices queueFamilyIndices;

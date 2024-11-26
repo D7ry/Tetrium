@@ -10,3 +10,12 @@ for root, dirs, files in os.walk(shaders_path):
         if file.endswith(".vert") or file.endswith(".frag"):
             print("Compiling shader: " + file)
             subprocess.call(["glslc", os.path.join(root, file), "-o", os.path.join(root, file + ".spv")])
+
+# too lazy to rewrite logic, need my ug RA
+shaders_path = os.path.join(os.getcwd(), "assets/apps")
+print("Compiling all shaders in {}".format(shaders_path))
+for root, dirs, files in os.walk(shaders_path):
+    for file in files:
+        if file.endswith(".vert") or file.endswith(".frag"):
+            print("Compiling shader: " + file)
+            subprocess.call(["glslc", os.path.join(root, file), "-o", os.path.join(root, file + ".spv")])

@@ -1,6 +1,10 @@
 #include <iostream>
 
 #include "Tetrium.h"
+#include "TetriumColor/TetriumColor.h"
+
+#include "apps/AppScreeningTest.h"
+#include "apps/AppTetraHueSphere.h"
 
 void printGreetingBanner()
 {
@@ -10,7 +14,6 @@ void printGreetingBanner()
     std::cout << asciiLine << std::endl;
     std::cout << DEFAULTS::Engine::BANNER_TEXT << std::endl;
     std::cout << asciiLine << std::endl;
-
 }
 
 int main(int argc, char** argv)
@@ -19,13 +22,30 @@ int main(int argc, char** argv)
     INIT_LOGS();
     INFO("Logger initialized.");
     DEBUG("running in debug mode");
-    Tetrium::InitOptions options{
-        .tetraMode = Tetrium::TetraMode::kEvenOddSoftwareSync
+
+    std::vector<std::pair<TetriumApp::App*, const char*>> apps = {
+        {new TetriumApp::AppScreeningTest(), "Screening Test"},
+        {new TetriumApp::AppTetraHueSphere(), "Tetra Hue Sphere"},
     };
+
+    TetriumColor::Init();
+
+    Tetrium::InitOptions options{.tetraMode = Tetrium::TetraMode::kEvenOddSoftwareSync};
     Tetrium engine;
+
+    for (auto& [app, appName] : apps) {
+        engine.RegisterApp(app, appName);
+    }
+
     engine.Init(options);
     engine.Run();
     engine.Cleanup();
+
+    TetriumColor::Cleanup();
+
+    for (auto& [app, appName] : apps) {
+        delete app;
+    }
 
     return 0;
 }

@@ -2,7 +2,7 @@
 #include "ImGuiWidget.h"
 
 // image file browser + viewer for RGB/OCV images
-class ImGuiWidgetTetraViewer : public ImGuiWidgetMut
+class ImGuiWidgetTetraViewer : public ImGuiWidget
 {
   public:
     ImGuiWidgetTetraViewer();

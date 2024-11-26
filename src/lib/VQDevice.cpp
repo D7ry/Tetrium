@@ -5,6 +5,9 @@
 #include <set>
 #include <vulkan/vulkan_core.h>
 
+
+#include "VulkanUtils.h"
+
 void VQDevice::CreateLogicalDeviceAndQueue(const std::vector<const char*>& extensions) {
     if (!this->queueFamilyIndices.isComplete()) {
         FATAL("Queue family indices incomplete! Call InitQueueFamilyIndices().");
@@ -110,7 +113,7 @@ void VQDevice::CreateGraphicsCommandBuffer(uint32_t commandBufferCount) {
         FATAL("Graphics command buffers already initialized!");
     }
     this->graphicsCommandBuffers.resize(commandBufferCount);
-    this->graphicsCommandBuffers2.resize(commandBufferCount);
+    this->appCommandBuffers.resize(commandBufferCount);
 
     VkCommandBufferAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -122,7 +125,7 @@ void VQDevice::CreateGraphicsCommandBuffer(uint32_t commandBufferCount) {
         FATAL("Failed to allocate command buffers!");
     }
 
-    if (vkAllocateCommandBuffers(logicalDevice, &allocInfo, this->graphicsCommandBuffers2.data()) != VK_SUCCESS) {
+    if (vkAllocateCommandBuffers(logicalDevice, &allocInfo, this->appCommandBuffers.data()) != VK_SUCCESS) {
         FATAL("Failed to allocate command buffers!");
     }
 }
@@ -155,6 +158,8 @@ VQDevice::VQDevice(VkPhysicalDevice physicalDevice) {
             }
         }
     }
+
+    this->depthFormat = VulkanUtils::findDepthFormat(physicalDevice);
 }
 
 void VQDevice::CreateBufferInPlace(
@@ -211,7 +216,7 @@ void VQDevice::Cleanup() {
             logicalDevice, graphicsCommandPool, graphicsCommandBuffers.size(), graphicsCommandBuffers.data()
         );
         vkFreeCommandBuffers(
-            logicalDevice, graphicsCommandPool, graphicsCommandBuffers2.size(), graphicsCommandBuffers2.data()
+            logicalDevice, graphicsCommandPool, appCommandBuffers.size(), appCommandBuffers.data()
         );
     }
     if (graphicsCommandPool != VK_NULL_HANDLE) {

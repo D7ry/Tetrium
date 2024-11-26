@@ -3,7 +3,7 @@
 #include "ImGuiWidget.h"
 
 // current setup assumes single logical device
-void ImGuiWidgetDeviceInfo::Draw(const Tetrium* engine, ColorSpace colorSpace)
+void ImGuiWidgetDeviceInfo::Draw(Tetrium* engine, ColorSpace colorSpace)
 {
     const int INDENT = 20;
     { // GPU

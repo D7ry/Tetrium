@@ -27,21 +27,7 @@ void Tetrium::setupSoftwareEvenOddFrame()
     DEBUG("Setting up even-odd frame resources...");
     auto& ctx = _softwareEvenOddCtx;
     ctx.timeEngineStart = std::chrono::steady_clock::now();
-
-
-#if 0
-    // get refresh cycle
-    VkRefreshCycleDurationGOOGLE refreshCycleDuration;
-    ASSERT(_device->logicalDevice);
-    PFN_vkGetRefreshCycleDurationGOOGLE ptr = reinterpret_cast<PFN_vkGetRefreshCycleDurationGOOGLE>(
-        vkGetInstanceProcAddr(_instance, "vkGetRefreshCycleDurationGOOGLE")
-    );
-    ASSERT(ptr);
-    VK_CHECK_RESULT(ptr(_device->logicalDevice, _swapChain.chain, &refreshCycleDuration));
-    ctx.nanoSecondsPerFrame = refreshCycleDuration.refreshDuration;
-#else
     ctx.nanoSecondsPerFrame = 16666666; // default config
-#endif
     ASSERT(ctx.nanoSecondsPerFrame != 0);
 }
 
@@ -133,8 +119,7 @@ void Tetrium::checkHardwareEvenOddFrameSupport()
 // whether to use the new virtual frame counter
 // the old counter uses a nanosecond-precision timer,
 // the new counter takes the max of the image id so far presented.
-// TODO: profile precision of the new counter vs. old counter
-#define NEW_VIRTUAL_FRAMECOUNTER 1
+#define FAKE_SOFTWARE_FRAME_COUNTER 1
 
 uint64_t Tetrium::getSurfaceCounterValue()
 {
@@ -142,42 +127,9 @@ uint64_t Tetrium::getSurfaceCounterValue()
     switch (_tetraMode) {
     case TetraMode::kEvenOddSoftwareSync: {
         uint32_t imageCount;
-#if NEW_VIRTUAL_FRAMECOUNTER
-#if 0
-
-        PFN_vkGetPastPresentationTimingGOOGLE fnPtr = reinterpret_cast<PFN_vkGetPastPresentationTimingGOOGLE >(
-            vkGetInstanceProcAddr(_instance, "vkGetPastPresentationTimingGOOGLE")
-        );
-        fnPtr(
-            _device->logicalDevice, _swapChain.chain, &imageCount, nullptr
-        );
-        std::vector<VkPastPresentationTimingGOOGLE> images(imageCount);
-        fnPtr(
-            _device->logicalDevice, _swapChain.chain, &imageCount, images.data()
-        );
-        auto& ctx = _softwareEvenOddCtx;
-        for (int i = 0; i < imageCount; i++) {
-            auto& img = images.at(i);
-            if (img.presentID > ctx.lastPresentedImageId) {
-                ctx.numFramesPresented += 1;
-                ctx.lastPresentedImageId = img.presentID;
-            }
-            _softwareEvenOddCtx.mostRecentPresentFinish
-                = std::max(_softwareEvenOddCtx.mostRecentPresentFinish, img.actualPresentTime);
-            // INFO(
-            //     "i = {}; present id: {} : expected: {} actual: {}",
-            //     i,
-            //     img.presentID,
-            //     img.desiredPresentTime,
-            //     img.actualPresentTime
-            // );
-        }
-        surfaceCounter = ctx.numFramesPresented;
-#else  // !__APPLE__
-        //NEEDS_IMPLEMENTATION(); // only apple device supports software counter so far.
-        surfaceCounter = _numTicks; // use numTicks to emulate surface counter
-#endif // __APPLE__
-#else  // ! NEW_VIRTUAL_FRAMECOUNTER
+#if FAKE_SOFTWARE_FRAME_COUNTER
+        surfaceCounter = _numTicks;
+#else  // ! FAKE_SOFTWARE_FRAME_COUNTER
        // old method: count the time
        // return a software-based surface counter
         unsigned long long timeSinceStartNanoSeconds
@@ -187,7 +139,7 @@ uint64_t Tetrium::getSurfaceCounterValue()
                   .count()
               + _softwareEvenOddCtx.timeOffset;
         surfaceCounter = timeSinceStartNanoSeconds / _softwareEvenOddCtx.nanoSecondsPerFrame;
-#endif // NEW_VIRTUAL_FRAMECOUNTER
+#endif // ! FAKE_SOFTWARE_FRAME_COUNTER
     } break;
     case TetraMode::kEvenOddHardwareSync:
 #if WIN32
@@ -213,3 +165,11 @@ uint64_t Tetrium::getSurfaceCounterValue()
 }
 
 bool Tetrium::isEvenFrame() { return getSurfaceCounterValue() % 2 == 0; }
+
+ColorSpace Tetrium::getCurrentColorSpace() {
+    ColorSpace cs = isEvenFrame() ? ColorSpace::RGB : ColorSpace::OCV;
+    if (_flipEvenOdd) {
+        cs = cs == ColorSpace::RGB ? ColorSpace::OCV : ColorSpace::RGB;
+    }
+    return cs;
+}

@@ -11,7 +11,7 @@ ImU32 ConvertFloatToImU32(float* rgba)
 }
 } // namespace
 
-void ImGuiWidgetColorTile::Draw(const Tetrium* engine, ColorSpace colorSpace)
+void ImGuiWidgetColorTile::Draw(Tetrium* engine, ColorSpace colorSpace)
 {
     if (ImGui::Begin("Color Tile")) {
         // color picker widget

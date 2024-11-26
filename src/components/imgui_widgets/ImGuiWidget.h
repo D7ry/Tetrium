@@ -1,6 +1,7 @@
 #pragma once
 #include "imgui.h"
 #include "structs/ColorSpace.h"
+#include "structs/SharedEngineStructs.h"
 #include <map>
 
 class Tetrium;
@@ -10,28 +11,22 @@ class Tetrium;
 class ImGuiWidget
 {
   public:
+    virtual void Init(const InitContext* ctx) {};
     ImGuiWidget() {};
-    virtual void Draw(const Tetrium* engine, ColorSpace colorSpace) = 0;
-};
-
-class ImGuiWidgetMut
-{
-  public:
-    ImGuiWidgetMut() {};
     virtual void Draw(Tetrium* engine, ColorSpace colorSpace) = 0;
 };
 
 class ImGuiWidgetDeviceInfo : public ImGuiWidget
 {
   public:
-    virtual void Draw(const Tetrium* engine, ColorSpace colorSpace) override;
+    virtual void Draw(Tetrium* engine, ColorSpace colorSpace) override;
 };
 
 class ImGuiWidgetPerfPlot : public ImGuiWidget
 {
 
   public:
-    virtual void Draw(const Tetrium* engine, ColorSpace colorSpace) override;
+    virtual void Draw(Tetrium* engine, ColorSpace colorSpace) override;
 
   private:
     struct ScrollingBuffer
@@ -64,12 +59,11 @@ class ImGuiWidgetPerfPlot : public ImGuiWidget
 class ImGuiWidgetUBOViewer : public ImGuiWidget
 {
   public:
-    virtual void Draw(const Tetrium* engine, ColorSpace colorSpace) override;
+    virtual void Draw(Tetrium* engine, ColorSpace colorSpace) override;
 };
 
-
 // clear values
-class ImGuiWidgetGraphicsPipeline : public ImGuiWidgetMut
+class ImGuiWidgetGraphicsPipeline : public ImGuiWidget
 {
   public:
     virtual void Draw(Tetrium* engine, ColorSpace colorSpace) override;

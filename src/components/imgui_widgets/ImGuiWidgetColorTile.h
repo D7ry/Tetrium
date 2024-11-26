@@ -5,7 +5,7 @@
 class ImGuiWidgetColorTile : public ImGuiWidget
 {
   public:
-    virtual void Draw(const Tetrium* engine, ColorSpace colorSpace) override;
+    virtual void Draw(Tetrium* engine, ColorSpace colorSpace) override;
 
   private:
     

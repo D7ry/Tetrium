@@ -1,7 +1,7 @@
 #pragma once
 #include "ImGuiWidget.h"
 
-class ImGuiWidgetEvenOddCalibration : public ImGuiWidgetMut
+class ImGuiWidgetEvenOddCalibration : public ImGuiWidget
 {
   public:
     virtual void Draw(Tetrium* engine, ColorSpace colorSpace) override;

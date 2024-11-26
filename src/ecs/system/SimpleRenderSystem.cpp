@@ -1,5 +1,5 @@
 #include "components/ShaderUtils.h"
-#include "components/VulkanUtils.h"
+#include "lib/VulkanUtils.h"
 #include "lib/VQDevice.h"
 #include "lib/VQUtils.h"
 #include "structs/Vertex.h"
@@ -190,7 +190,7 @@ void SimpleRenderSystem::buildPipelineForContext(
 
     // set up vertex descriptions
     VkVertexInputBindingDescription bindingDescription = Vertex::GetBindingDescription();
-    auto attributeDescriptions = Vertex::GetAttributeDescriptions();
+    auto attributeDescriptions = Vertex::GetAttributeDescriptionsPtr();
     {
         vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 

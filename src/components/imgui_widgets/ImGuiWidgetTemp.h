@@ -4,7 +4,7 @@
 
 // temporary widget that contains all the dirty hacks
 
-class ImGuiWidgetTemp : public ImGuiWidgetMut
+class ImGuiWidgetTemp : public ImGuiWidget
 {
   public:
     virtual void Draw(Tetrium* engine, ColorSpace colorSpace) override;

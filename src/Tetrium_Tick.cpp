@@ -1,6 +1,4 @@
 // Tick-time function implementations
-#include "implot.h"
-#include "lib/Utils.h"
 
 #include "Tetrium.h"
 
@@ -49,6 +47,7 @@ void Tetrium::Tick()
         return;
     }
     _deltaTimer.Tick();
+    _soundManager.Tick();
     {
         {
             PROFILE_SCOPE(&_profiler, "Render Loop");
@@ -60,8 +59,6 @@ void Tetrium::Tick()
             TickContext tickData{&_mainCamera, deltaTime};
             tickData.profiler = &_profiler;
             flushEngineUBOStatic(_currentFrame);
-            drawImGui(RGB); // populate RGB context
-            drawImGui(OCV); // populate OCV context
             drawFrame(&tickData, _currentFrame);
             _currentFrame = (_currentFrame + 1) % NUM_FRAME_IN_FLIGHT;
         }
@@ -122,19 +119,36 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frameIdx)
         }
     }
 
+    ColorSpace colorSpace = getCurrentColorSpace();
+    bool isEven = isEvenFrame();
+
     std::array<VkSemaphore, 1> semaRenderFinished = {sync.semaRenderFinished};
+    std::array<VkSemaphore, 1> semaAppVulkanFinished = {sync.semaAppVulkanFinished};
     { // Render RGB, OCV channels onto both frame buffers
         PROFILE_SCOPE(&_profiler, "Record render commands");
+
+        vk::CommandBuffer CBApp(_device->appCommandBuffers[frameIdx]);
+        CBApp.reset();
+
+        CBApp.begin(vk::CommandBufferBeginInfo());
+        if (_primaryApp.has_value()) {
+            TetriumApp::TickContextVulkan tickCtx{
+                .currentFrameInFlight = frameIdx,
+                .colorSpace = colorSpace,
+                .commandBuffer = CBApp,
+            };
+            _primaryApp.value()->TickVulkan(tickCtx);
+        }
+        CBApp.end();
+
+        // TODO: should this be placed here?
+        drawImGui(colorSpace, frameIdx);
 
         vk::CommandBuffer CB1(_device->graphicsCommandBuffers[frameIdx]);
         //  Record a command buffer which draws the scene onto that image
         CB1.reset();
 
         { // begin command buffer
-            VkCommandBufferBeginInfo beginInfo{};
-            beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-            beginInfo.flags = 0;                  // Optional
-            beginInfo.pInheritanceInfo = nullptr; // Optional
             CB1.begin(vk::CommandBufferBeginInfo());
         }
 
@@ -148,16 +162,17 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frameIdx)
         { // main render pass
             vk::Extent2D extend = _swapChain.extent;
             vk::Rect2D renderArea(VkOffset2D{0, 0}, extend);
-            vk::RenderPassBeginInfo renderPassBeginInfo(
-                {}, {}, renderArea, _clearValues.size(), _clearValues.data(), nullptr
-            );
-
             VkViewport viewport{};
             VkRect2D scissor{};
             getFullScreenViewportAndScissor(_swapChain, viewport, scissor);
 
             vkCmdSetViewport(CB1, 0, 1, &viewport);
             vkCmdSetScissor(CB1, 0, 1, &scissor);
+#if 0 // legacy code, to be referenced when migrating to ROCV in app
+            vk::RenderPassBeginInfo renderPassBeginInfo(
+                {}, {}, renderArea, _clearValues.size(), _clearValues.data(), nullptr
+            );
+
             // 1. rasterize onto RYGB FB
             if (true) {
                 renderPassBeginInfo.renderPass = _renderContextRYGB.renderPass;
@@ -174,13 +189,6 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frameIdx)
             // at this point the RYGB FB contains RYGB channels, now we need to transform it into
             // even/odd frame representation based on the current frame's even-oddness.
 
-            // 2. get even-odd info
-            bool isEven = isEvenFrame();
-            bool renderRGB = isEven;
-            if (_flipEvenOdd) {
-                renderRGB = !renderRGB;
-            }
-
             // 3. depending on even-odd, transform RYGB into R000, or OCV0
             // by sampling from RYGB FB and rendering onto a full-screen quad on the FB
             transformToROCVframeBuffer(
@@ -188,35 +196,64 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frameIdx)
                 _swapChain,
                 frameIdx,
                 swapchainImageIndex,
-                renderRGB ? ColorSpace::RGB : ColorSpace::OCV,
+                colorSpace,
                 CB1,
                 (isEven && _evenOddRenderingSettings.blackOutEven)
                     || (!isEven && _evenOddRenderingSettings.blackOutOdd)
             );
+#endif
 
-            // paint ImGui -- both even and odd context should've been populated.
-            if (renderRGB) {
-                recordImGuiDrawCommandBuffer(_imguiCtx, RGB, CB1, extend, swapchainImageIndex);
-            } else {
-                recordImGuiDrawCommandBuffer(_imguiCtx, OCV, CB1, extend, swapchainImageIndex);
-            }
+            recordImGuiDrawCommandBuffer(_imguiCtx, CB1, extend, swapchainImageIndex);
         }
 
         CB1.end();
 
-        VkSubmitInfo submitInfo{.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO};
-        std::array<VkCommandBuffer, 1> submitCommandBuffers = {CB1};
-        submitInfo.commandBufferCount = static_cast<uint32_t>(submitCommandBuffers.size());
-        submitInfo.pCommandBuffers = submitCommandBuffers.data();
-        submitInfo.signalSemaphoreCount = semaRenderFinished.size();
-        submitInfo.pSignalSemaphores = semaRenderFinished.data();
-        submitInfo.waitSemaphoreCount = 1;
-        submitInfo.pWaitSemaphores = &sync.semaImageAvailable;
-        std::array<VkPipelineStageFlags, 1> semaImageAvailableStages
-            = {VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT};
-        submitInfo.pWaitDstStageMask = semaImageAvailableStages.data();
+        // submit app command buffer, that paints the apps,
+        // that may render onto textures sampled onto imguis
+        std::array<VkCommandBuffer, 1> appCommandBuffers = {CBApp};
+        VkSubmitInfo submitInfoApp{
+            .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+            .pNext = nullptr,
+            .waitSemaphoreCount = 0,
+            .pWaitSemaphores = nullptr,
+            .pWaitDstStageMask = 0,
+            .commandBufferCount = 1,
+            .pCommandBuffers = appCommandBuffers.data(),
+            .signalSemaphoreCount = 1,
+            .pSignalSemaphores = semaAppVulkanFinished.data()
+        };
 
-        if (vkQueueSubmit(_device->graphicsQueue, 1, &submitInfo, sync.fenceInFlight)
+        // submit engine rendering command buffer, that paints the imgui backend
+        VkSubmitInfo submitInfoEngineRendering{.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO};
+        std::array<VkCommandBuffer, 1> submitCommandBuffers = {CB1};
+
+        submitInfoEngineRendering.commandBufferCount
+            = static_cast<uint32_t>(submitCommandBuffers.size());
+        submitInfoEngineRendering.pCommandBuffers = submitCommandBuffers.data();
+        submitInfoEngineRendering.signalSemaphoreCount = semaRenderFinished.size();
+        submitInfoEngineRendering.pSignalSemaphores = semaRenderFinished.data();
+
+        // set up sync primitives
+        // want to wait for:
+        // 1. fb to be available to render onto
+        // 2. all apps to finish rendering, so we can safely paint imgui
+        std::array<VkSemaphore, 2> submitInfoEngineRenderingWaitSemaphores
+            = {sync.semaImageAvailable, sync.semaAppVulkanFinished};
+        submitInfoEngineRendering.waitSemaphoreCount
+            = submitInfoEngineRenderingWaitSemaphores.size();
+        submitInfoEngineRendering.pWaitSemaphores = submitInfoEngineRenderingWaitSemaphores.data();
+        std::array<VkPipelineStageFlags, 2> submitInfoEngineRenderingWaitStages
+            = {VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+        submitInfoEngineRendering.pWaitDstStageMask = submitInfoEngineRenderingWaitStages.data();
+
+        std::array<VkSubmitInfo, 2> submitInfos = {
+            submitInfoApp, // user-space app rendering
+            submitInfoEngineRendering // engine rendering, would wait for app rendering to finish
+        };
+
+        if (vkQueueSubmit(
+                _device->graphicsQueue, submitInfos.size(), submitInfos.data(), sync.fenceInFlight
+            )
             != VK_SUCCESS) {
             FATAL("Failed to submit draw command buffer!");
         }
@@ -239,30 +276,6 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frameIdx)
                                                           // presentation was successful
 
         uint64_t time = 0;
-#if VIRTUAL_VSYNC
-        if (_softwareEvenOddCtx.mostRecentPresentFinish) {
-            time = _softwareEvenOddCtx.mostRecentPresentFinish
-                   + _softwareEvenOddCtx.nanoSecondsPerFrame * _softwareEvenOddCtx.vsyncFrameOffset;
-        }
-#endif // VIRTUAL_VSYNC
-
-        // label each frame with the tick number
-        // this is useful for calculating the virtual frame counter,
-        // as we can take the max(frame.id) to get the number of presented frames.
-
-        // VkPresentTimeGOOGLE presentTime{(uint32_t)_numTicks, time};
-        //
-        // VkPresentTimesInfoGOOGLE presentTimeInfo{
-        //     .sType = VK_STRUCTURE_TYPE_PRESENT_TIMES_INFO_GOOGLE,
-        //     .pNext = VK_NULL_HANDLE,
-        //     .swapchainCount = 1,
-        //     .pTimes = &presentTime
-        // };
-        //
-        // if (_tetraMode == TetraMode::kEvenOddSoftwareSync) {
-        //     presentInfo.pNext = &presentTimeInfo;
-        // }
-        //
         result = vkQueuePresentKHR(_device->presentationQueue, &presentInfo);
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR
             || this->_framebufferResized) {

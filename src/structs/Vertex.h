@@ -3,6 +3,7 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/hash.hpp>
 #include <vulkan/vulkan_core.h>
+#include <vulkan/vulkan.hpp>
 
 struct VertexInstancedData
 {
@@ -27,7 +28,10 @@ struct Vertex
 
     static const std::array<VkVertexInputBindingDescription, 2>* GetBindingDescriptionsInstanced();
 
-    static const std::array<VkVertexInputAttributeDescription, 4>* GetAttributeDescriptions();
+    static const std::array<VkVertexInputAttributeDescription, 4>* GetAttributeDescriptionsPtr();
+
+    static const std::array<vk::VertexInputAttributeDescription, 4> GetAttributeDescriptions();
+
 
     static const std::array<VkVertexInputAttributeDescription, 9>*
     GetAttributeDescriptionsInstanced();

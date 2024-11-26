@@ -11,8 +11,8 @@ namespace Tetrium_ImGui
 {
 // context arrays that gets populated after Tetrium::initImGuiContext() is called
 // stores the same data as `Tetrium::_imguiCtx.ctxImGui` and `Tetrium::_imguiCtx.ctxImPlot`
-static ImGuiContext* ctxImGui[ColorSpace::ColorSpaceSize] = {};
-static ImPlotContext* ctxImPlot[ColorSpace::ColorSpaceSize] = {};
+[[deprecated]] static ImGuiContext* ctxImGui[ColorSpace::ColorSpaceSize] = {};
+[[deprecated]] static ImPlotContext* ctxImPlot[ColorSpace::ColorSpaceSize] = {};
 
 namespace GLFW
 {
@@ -28,7 +28,7 @@ struct
     GLFWmonitorfun Monitor = nullptr;
 } prevCallbacks;
 
-void ImGuiCustomWindowFocusCallback(GLFWwindow* window, int focused)
+[[deprecated]] void ImGuiCustomWindowFocusCallback(GLFWwindow* window, int focused)
 {
     for (int i = 0; i < ColorSpace::ColorSpaceSize; ++i) {
         ImGui::SetCurrentContext(ctxImGui[i]);
@@ -40,7 +40,7 @@ void ImGuiCustomWindowFocusCallback(GLFWwindow* window, int focused)
         prevCallbacks.WindowFocus(window, focused);
 }
 
-void ImGuiCustomCursorEnterCallback(GLFWwindow* window, int entered)
+[[deprecated]] void ImGuiCustomCursorEnterCallback(GLFWwindow* window, int entered)
 {
     for (int i = 0; i < ColorSpace::ColorSpaceSize; ++i) {
         ImGui::SetCurrentContext(ctxImGui[i]);
@@ -52,7 +52,7 @@ void ImGuiCustomCursorEnterCallback(GLFWwindow* window, int entered)
         prevCallbacks.CursorEnter(window, entered);
 }
 
-void ImGuiCustomCursorPosCallback(GLFWwindow* window, double xpos, double ypos)
+[[deprecated]] void ImGuiCustomCursorPosCallback(GLFWwindow* window, double xpos, double ypos)
 {
     for (int i = 0; i < ColorSpace::ColorSpaceSize; ++i) {
         ImGui::SetCurrentContext(ctxImGui[i]);
@@ -64,7 +64,12 @@ void ImGuiCustomCursorPosCallback(GLFWwindow* window, double xpos, double ypos)
         prevCallbacks.CursorPos(window, xpos, ypos);
 }
 
-void ImGuiCustomMouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
+[[deprecated]] void ImGuiCustomMouseButtonCallback(
+    GLFWwindow* window,
+    int button,
+    int action,
+    int mods
+)
 {
     for (int i = 0; i < ColorSpace::ColorSpaceSize; ++i) {
         ImGui::SetCurrentContext(ctxImGui[i]);
@@ -76,7 +81,7 @@ void ImGuiCustomMouseButtonCallback(GLFWwindow* window, int button, int action, 
         prevCallbacks.MouseButton(window, button, action, mods);
 }
 
-void ImGuiCustomScrollCallback(GLFWwindow* window, double xoffset, double yoffset)
+[[deprecated]] void ImGuiCustomScrollCallback(GLFWwindow* window, double xoffset, double yoffset)
 {
     for (int i = 0; i < ColorSpace::ColorSpaceSize; ++i) {
         ImGui::SetCurrentContext(ctxImGui[i]);
@@ -88,7 +93,13 @@ void ImGuiCustomScrollCallback(GLFWwindow* window, double xoffset, double yoffse
         prevCallbacks.Scroll(window, xoffset, yoffset);
 }
 
-void ImGuiCustomKeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
+[[deprecated]] void ImGuiCustomKeyCallback(
+    GLFWwindow* window,
+    int key,
+    int scancode,
+    int action,
+    int mods
+)
 {
     for (int i = 0; i < ColorSpace::ColorSpaceSize; ++i) {
         ImGui::SetCurrentContext(ctxImGui[i]);
@@ -100,7 +111,7 @@ void ImGuiCustomKeyCallback(GLFWwindow* window, int key, int scancode, int actio
         prevCallbacks.Key(window, key, scancode, action, mods);
 }
 
-void ImGuiCustomCharCallback(GLFWwindow* window, unsigned int c)
+[[deprecated]] void ImGuiCustomCharCallback(GLFWwindow* window, unsigned int c)
 {
     for (int i = 0; i < ColorSpace::ColorSpaceSize; ++i) {
         ImGui::SetCurrentContext(ctxImGui[i]);
@@ -112,7 +123,7 @@ void ImGuiCustomCharCallback(GLFWwindow* window, unsigned int c)
         prevCallbacks.Char(window, c);
 }
 
-void ImGuiCustomMonitorCallback(GLFWmonitor* monitor, int event)
+[[deprecated]] void ImGuiCustomMonitorCallback(GLFWmonitor* monitor, int event)
 {
     for (int i = 0; i < ColorSpace::ColorSpaceSize; ++i) {
         ImGui::SetCurrentContext(ctxImGui[i]);
@@ -129,7 +140,7 @@ void ImGuiCustomMonitorCallback(GLFWmonitor* monitor, int event)
 // Set up custom callback functions that invokes on both RGB
 // and OCV imgui contexts; Naively binding all callbacks through
 // GLFW doesn't work, as the callbacks do not handle context switching.
-void setupCustomCallbacks(GLFWwindow* window)
+[[deprecated]] void setupCustomCallbacks(GLFWwindow* window)
 {
     // Store previous callbacks and set new ones
     GLFW::prevCallbacks.WindowFocus
@@ -285,7 +296,7 @@ void Tetrium::reinitImGuiFrameBuffers(Tetrium::ImGuiRenderContexts& ctx)
 
 void Tetrium::destroyImGuiContext(Tetrium::ImGuiRenderContexts& ctx)
 {
-    // FIXME: current imgui impl does not support vulkan multi-context shutdown;
+    // NOTE: current imgui impl does not support vulkan multi-context shutdown;
     // not a big problem for now since we only shut down at very end, but
     // it leads to ugly validation errors
     ImGui_ImplVulkan_Shutdown();
@@ -305,8 +316,9 @@ void Tetrium::initImGuiRenderContext(Tetrium::ImGuiRenderContexts& ctx)
 {
     // create render pass
     VkImageLayout imguiInitialLayout, imguiFinalLayout;
-    imguiInitialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    //imguiFinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; // for RYGB conversion pass, if run imgui pass before
+    imguiInitialLayout = VK_IMAGE_LAYOUT_UNDEFINED; // for first pass
+    // imguiFinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; // for RYGB conversion pass, if
+    // run imgui pass before
     imguiFinalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR; // if painting to physical fb
 
     ctx.renderPass = createRenderPass(
@@ -314,7 +326,7 @@ void Tetrium::initImGuiRenderContext(Tetrium::ImGuiRenderContexts& ctx)
         imguiInitialLayout,
         imguiFinalLayout,
         _swapChain.imageFormat,
-        VK_ATTACHMENT_LOAD_OP_LOAD,
+        VK_ATTACHMENT_LOAD_OP_CLEAR,
         VK_ATTACHMENT_STORE_OP_STORE,
         false // imgui FB has no depth attachment
     );
@@ -347,63 +359,51 @@ void Tetrium::initImGuiRenderContext(Tetrium::ImGuiRenderContexts& ctx)
 
     IMGUI_CHECKVERSION();
 
-    // initialize imgui contexts for both
-    for (ColorSpace cs : {RGB, OCV}) {
-        ctx.ctxImGui[cs] = ImGui::CreateContext();
-        ctx.ctxImPlot[cs] = ImPlot::CreateContext();
-        ImGui::SetCurrentContext(ctx.ctxImGui[cs]);
-        ImPlot::SetCurrentContext(ctx.ctxImPlot[cs]);
+    ctx.backendImGuiContext = ImGui::CreateContext();
+    ctx.backendImPlotContext = ImPlot::CreateContext();
+    ImGui::SetCurrentContext(ctx.backendImGuiContext);
+    ImPlot::SetCurrentContext(ctx.backendImPlotContext);
 
-        ImGui_ImplGlfw_InitForVulkan(_window, false);
-        ImGui_ImplVulkan_Init(&initInfo);
+    bool installCallbacks = true;
+    ImGui_ImplGlfw_InitForVulkan(_window, installCallbacks);
+    ImGui_ImplVulkan_Init(&initInfo);
 
-        ImGuiIO& io = ImGui::GetIO();
-        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
-        io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
-        ImGui::StyleColorsDark();
+    ImGuiIO& io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
+    ImGui::StyleColorsDark();
 
-        Tetrium_ImGui::setupImGuiStyle();
-        Tetrium_ImGui::initFonts();
+    Tetrium_ImGui::setupImGuiStyle();
+    Tetrium_ImGui::initFonts();
 
-        // store the context pointers
-        Tetrium_ImGui::ctxImGui[cs] = ctx.ctxImGui[cs];
-        Tetrium_ImGui::ctxImPlot[cs] = ctx.ctxImPlot[cs];
-    }
-
-    Tetrium_ImGui::setupCustomCallbacks(_window);
     DEBUG("imgui context initialized");
 }
 
 void Tetrium::recordImGuiDrawCommandBuffer(
     Tetrium::ImGuiRenderContexts& ctx,
-    ColorSpace colorSpace,
     vk::CommandBuffer cb,
     vk::Extent2D extent,
     int swapChainImageIndex
 )
 {
-    // assuming drawImGui() has been invoked for both colorSpace
-    ImGui::SetCurrentContext(_imguiCtx.ctxImGui[colorSpace]);
-    ImPlot::SetCurrentContext(_imguiCtx.ctxImPlot[colorSpace]);
 
-    VkRenderPassBeginInfo renderPassInfo{};
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    renderPassInfo.renderPass = ctx.renderPass;
-    // renderPassInfo.framebuffer = ctx.frameBuffers[colorSpace][swapChainImageIndex];
-    renderPassInfo.framebuffer = ctx.frameBuffer[swapChainImageIndex];
-    renderPassInfo.renderArea.extent = extent;
-    renderPassInfo.renderArea.offset = {0, 0};
-    renderPassInfo.clearValueCount = 0;
-    renderPassInfo.pClearValues = nullptr;
+    vk::RenderPassBeginInfo renderPassInfo(
+        ctx.renderPass,
+        ctx.frameBuffer[swapChainImageIndex],
+        vk::Rect2D({0, 0}, extent),
+        _clearValues.size(),
+        _clearValues.data()
+    );
 
-    vkCmdBeginRenderPass(cb, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+    cb.beginRenderPass(renderPassInfo, vk::SubpassContents::eInline);
 
     ImDrawData* drawData = ImGui::GetDrawData();
     if (drawData == nullptr) {
         FATAL("Draw data is null!");
     }
     ImGui_ImplVulkan_RenderDrawData(drawData, cb);
-    vkCmdEndRenderPass(cb);
+
+    cb.endRenderPass();
 }
 
 const ImGuiTexture& Tetrium::getOrLoadImGuiTexture(
@@ -426,6 +426,15 @@ const ImGuiTexture& Tetrium::getOrLoadImGuiTexture(
     auto res = ctx.textures.insert({texture, tex});
     ASSERT(res.second);
     return res.first->second;
+}
+
+void Tetrium::unloadImGuiTexture(Tetrium::ImGuiRenderContexts& ctx, const std::string& texture)
+{
+
+    auto it = ctx.textures.find(texture);
+    ASSERT(it != ctx.textures.end());
+    ImGui_ImplVulkan_RemoveTexture(reinterpret_cast<VkDescriptorSet>(it->second.id));
+    _textureManager.UnLoadTexture(texture);
 }
 
 void Tetrium::clearImGuiDrawData()
