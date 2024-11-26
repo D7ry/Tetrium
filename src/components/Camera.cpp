@@ -102,3 +102,10 @@ void Camera::SetPosition(float x, float y, float z) {
     _position.z = z;
     updateViewMatrix();
 }
+
+void Camera::SetRotation(float yaw, float pitch, float roll) {
+    _rotation.y = yaw;
+    _rotation.x = pitch;
+    _rotation.z = roll;
+    updateViewMatrix();
+}

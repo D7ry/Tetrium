@@ -96,6 +96,14 @@ void AppTetraHueSphere::TickImGui(const TetriumApp::TickContextImGui& ctx)
             _rasterizationCtx.camera.SetPosition(0, 0, 0);
         }
 
+        glm::vec3 rot = _rasterizationCtx.camera.GetRotation();
+
+        ImGui::Text("Camera Rotation: (%.2f, %.2f, %.2f)", rot.x, rot.y, rot.z);
+        ImGui::SameLine();
+        if (ImGui::Button("Reset##Rotation")) {
+            _rasterizationCtx.camera.SetRotation(0, 0, 0);
+        }
+
         // ImGui::Text("Hue Sphere Transform");
         //
         // // slider for hue sphere transform
