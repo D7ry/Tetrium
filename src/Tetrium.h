@@ -39,7 +39,6 @@
 
 // Applications
 #include "apps/App.h"
-#include "apps/AppScreeningTest.h"
 
 class ImPlotContext;
 class TickContext;
@@ -137,6 +136,7 @@ class Tetrium
         VkSemaphore semaImageAvailable;
         VkSemaphore semaRenderFinished;
         VkSemaphore semaImageCopyFinished;
+        VkSemaphore semaAppVulkanFinished;
         VkSemaphore semaVsync;
         VkFence fenceInFlight;
         VkFence fenceRenderFinished;

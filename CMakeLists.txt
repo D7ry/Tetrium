@@ -106,6 +106,7 @@ add_executable(${PROJECT_NAME}
         src/ecs/system/TetraImageDisplaySystem.cpp
 
         src/apps/AppScreeningTest.cpp
+        src/apps/AppTetraHueSphere.cpp
 )
 
 target_sources(${PROJECT_NAME} 

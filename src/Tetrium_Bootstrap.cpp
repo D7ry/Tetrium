@@ -837,7 +837,9 @@ void Tetrium::createSynchronizationObjects(
         for (VkSemaphore* sema :
              {&primitive.semaImageAvailable,
               &primitive.semaRenderFinished,
-              &primitive.semaImageCopyFinished}) {
+              &primitive.semaImageCopyFinished,
+              &primitive.semaAppVulkanFinished
+              }) {
             VK_CHECK_RESULT(vkCreateSemaphore(_device->logicalDevice, &semaphoreInfo, nullptr, sema)
             );
         }
@@ -866,6 +868,7 @@ void Tetrium::createSynchronizationObjects(
         for (size_t i = 0; i < NUM_FRAME_IN_FLIGHT; i++) {
             const SyncPrimitives& primitive = primitives[i];
             for (auto& sema : {// primitive.semaVsync,
+                               primitive.semaAppVulkanFinished,
                                primitive.semaImageCopyFinished,
                                primitive.semaRenderFinished,
                                primitive.semaImageAvailable
@@ -1218,6 +1221,7 @@ VkRenderPass Tetrium::createRenderPass(
 
 void Tetrium::RegisterApp(TetriumApp::App* app, const std::string& name)
 {
+    INFO("Registering app [{}]...", name);
     if (_appMap.find(name) != _appMap.end()) {
         PANIC("App with name {} already exists!", name);
     }

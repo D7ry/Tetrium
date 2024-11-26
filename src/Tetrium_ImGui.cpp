@@ -381,7 +381,7 @@ void Tetrium::initImGuiRenderContext(Tetrium::ImGuiRenderContexts& ctx)
 
 void Tetrium::recordImGuiDrawCommandBuffer(
     Tetrium::ImGuiRenderContexts& ctx,
-    ColorSpace colorSpace,
+    ColorSpace colorSpace, // FIXME: remove this unused arg
     vk::CommandBuffer cb,
     vk::Extent2D extent,
     int swapChainImageIndex

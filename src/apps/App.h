@@ -41,12 +41,13 @@ struct TickContextOffScreen
 
 struct TickContextVulkan
 {
+    int currentFrameInFlight;
     ColorSpace colorSpace;
 
     vk::CommandBuffer commandBuffer;
     // semaphores to wait for before the engine performs vulkan ImGui rendering
     // TickVulkan() should push all semaphores that need to be waited on to this
-    std::vector<vk::Semaphore>& waitSemaphores;
+    // std::vector<vk::Semaphore>& waitSemaphores;
 };
 
 // ImGui-based application interface
