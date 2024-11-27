@@ -124,7 +124,7 @@ void Tetrium::Init(const Tetrium::InitOptions& options)
 #if __APPLE__
     MoltenVKConfig::Setup();
 #endif // __APPLE__
-    _window = initGLFW(options.tetraMode == TetraMode::kEvenOddSoftwareSync);
+    _window = initGLFW(false);
     glfwSetWindowUserPointer(_window, this);
     SCHEDULE_DELETE(glfwDestroyWindow(_window); glfwTerminate();)
 
