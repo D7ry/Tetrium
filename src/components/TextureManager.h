@@ -31,6 +31,9 @@ class TextureManager
     void GetDescriptorImageInfo(uint32_t handle, VkDescriptorImageInfo& imageInfo);
 
     uint32_t LoadTexture(const std::string& texturePath);
+    
+    uint32_t LoadCubemapTexture(const std::string& imagePath);
+    
     void UnLoadTexture(uint32_t handle);
     Texture GetTexture(uint32_t handle);
 
@@ -53,7 +56,9 @@ class TextureManager
         VkImage image,
         VkFormat format,
         VkImageLayout oldLayout,
-        VkImageLayout newLayout
+        VkImageLayout newLayout,
+        uint32_t baseArrayLayer = 0,
+        uint32_t layerCount = 1
     );
 
     // copy over content  in the staging buffer to the actual image

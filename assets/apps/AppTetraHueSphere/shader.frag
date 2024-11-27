@@ -13,11 +13,11 @@ layout (binding = 0) uniform UBO_T {
     int textureIndex;
 } ubo;
 
-layout(binding = 1) uniform sampler2D texSampler[4]; // [uglyRGB, uglyOCV, prettyRGB, prettyOCV]
+layout(binding = 1) uniform  samplerCube texSampler[4]; // [uglyRGB, uglyOCV, prettyRGB, prettyOCV]
 
 void main() {
-    vec4 texColor = vec4(fragNormal, 1.f);
+    // assume fargNormal is normalized
 
-    // vec4 texColor = texture(texSampler[ubo.textureIndex], fragTexCoord);
+    vec4 texColor = texture(texSampler[ubo.textureIndex], fragNormal);
     outColor = texColor;
 }

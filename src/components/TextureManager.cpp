@@ -6,6 +6,27 @@
 #include <stb_image.h>
 #include <vulkan/vulkan_core.h>
 
+namespace
+{
+uint32_t findMemoryType(
+    VkPhysicalDevice physicalDevice,
+    uint32_t typeFilter,
+    VkMemoryPropertyFlags properties
+)
+{
+    VkPhysicalDeviceMemoryProperties memProperties;
+    vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
+
+    for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
+        if ((typeFilter & (1 << i))
+            && (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+            return i;
+        }
+    }
+    PANIC("Failed to find suitable memory type!");
+}
+} // namespace
+
 // temporary LUT utilities
 // TODO: this slows down image loading and doens't work for raster, should implement a LUT
 // post-processing pass
@@ -86,6 +107,194 @@ void TextureManager::GetDescriptorImageInfo(uint32_t handle, VkDescriptorImageIn
     imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     imageInfo.imageView = texture.textureImageView;
     imageInfo.sampler = texture.textureSampler;
+}
+
+uint32_t TextureManager::LoadCubemapTexture(const std::string& imagePath)
+{
+    const auto imageFormat = VK_FORMAT_R8G8B8A8_SRGB;
+    // Load the single image
+    int width, height, channels;
+    stbi_uc* pixels = stbi_load(imagePath.c_str(), &width, &height, &channels, STBI_rgb_alpha);
+    if (!pixels) {
+        PANIC("Failed to load texture image: {}")
+    }
+
+    // Assuming the image is a vertical cross layout (3x4 grid)
+    int faceWidth = width / 4;
+    int faceHeight = height / 3;
+    VkDeviceSize faceSize = faceWidth * faceHeight * 4;
+
+    // Create staging buffer
+    VQBuffer stagingBuffer{};
+    _device->CreateBufferInPlace(
+        faceSize * 6,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        stagingBuffer
+    );
+
+    // Copy pixel data to staging buffer
+
+    // Extract faces from the vertical cross layout
+    auto copyFace = [&](int srcX, int srcY, int faceIndex) {
+        DEBUG("Copying face {} from ({}, {}) to {}", faceIndex, srcX, srcY, faceIndex);
+        for (int y = 0; y < faceHeight; ++y) {
+            for (int x = 0; x < faceWidth; ++x) {
+                int srcIndex = ((srcY * faceHeight + y) * width + (srcX * faceWidth + x)) * 4;
+                int dstOffset = (faceIndex * faceSize) + (y * faceWidth + x) * 4;
+                // DEBUG("Copying pixel at ({}, {}) to {}", x, y, dstOffset);
+                memcpy(
+                    static_cast<char*>(stagingBuffer.bufferAddress) + dstOffset,
+                    pixels + srcIndex,
+                    4
+                );
+            }
+        }
+    };
+
+    // Order: +X, -X, +Y, -Y, +Z, -Z
+    copyFace(2, 1, 0); // +X
+    copyFace(0, 1, 1); // -X
+    copyFace(1, 0, 2); // +Y
+    copyFace(1, 2, 3); // -Y
+    copyFace(1, 1, 4); // +Z
+    copyFace(3, 1, 5); // -Z
+
+    // Free the pixel data
+    stbi_image_free(pixels);
+
+    // Create cubemap image
+    VkImage cubemapImage;
+    VkDeviceMemory cubemapImageMemory;
+
+    VkImageCreateInfo imageCreateInfo = {};
+    imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+    imageCreateInfo.format = imageFormat;
+    imageCreateInfo.extent.width = faceWidth;
+    imageCreateInfo.extent.height = faceHeight;
+    imageCreateInfo.extent.depth = 1;
+    imageCreateInfo.mipLevels = 1;
+    imageCreateInfo.arrayLayers = 6;
+    imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+    imageCreateInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    imageCreateInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+    imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    vkCreateImage(_device->logicalDevice, &imageCreateInfo, nullptr, &cubemapImage);
+
+    VkMemoryAllocateInfo allocInfo = {};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    VkMemoryRequirements memRequirements;
+    vkGetImageMemoryRequirements(_device->logicalDevice, cubemapImage, &memRequirements);
+    allocInfo.allocationSize = memRequirements.size;
+    allocInfo.memoryTypeIndex = findMemoryType(
+        _device->physicalDevice, memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+    );
+    vkAllocateMemory(_device->logicalDevice, &allocInfo, nullptr, &cubemapImageMemory);
+    vkBindImageMemory(_device->logicalDevice, cubemapImage, cubemapImageMemory, 0);
+
+
+    // Transition image layout and copy data
+    for (int i = 0; i < 6; i++) {
+        transitionImageLayout(
+            cubemapImage,
+            imageFormat,
+            VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            i,
+            1
+        );
+    }
+
+    VkBufferImageCopy regions[6];
+    uint32_t uWidth = static_cast<uint32_t>(faceWidth);
+    uint32_t uHeight = static_cast<uint32_t>(faceHeight);
+    for (int i = 0; i < 6; ++i) {
+        regions[i].bufferOffset = faceSize * i;
+        regions[i].bufferRowLength = 0;
+        regions[i].bufferImageHeight = 0;
+        regions[i].imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        regions[i].imageSubresource.mipLevel = 0;
+        regions[i].imageSubresource.baseArrayLayer = i;
+        regions[i].imageSubresource.layerCount = 1;
+        regions[i].imageOffset = {0, 0, 0};
+        regions[i].imageExtent = {uWidth, uHeight, 1};
+    }
+
+    {
+        VulkanUtils::QuickCommandBuffer commandBuffer(_device);
+
+        vkCmdCopyBufferToImage(
+            commandBuffer.cmdBuffer,
+            stagingBuffer.buffer,
+            cubemapImage,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            6,
+            regions
+        );
+    }
+
+    for (int i = 0; i < 6; i++) {
+        transitionImageLayout(
+            cubemapImage,
+            imageFormat,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            i,
+            1
+        );
+    }
+
+    // Create image view
+    VkImageViewCreateInfo viewCreateInfo = {};
+    viewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    viewCreateInfo.image = cubemapImage;
+    viewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_CUBE;
+    viewCreateInfo.format = imageFormat;
+    viewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    viewCreateInfo.subresourceRange.baseMipLevel = 0;
+    viewCreateInfo.subresourceRange.levelCount = 1;
+    viewCreateInfo.subresourceRange.baseArrayLayer = 0;
+    viewCreateInfo.subresourceRange.layerCount = 6;
+
+    VkImageView cubemapImageView;
+    vkCreateImageView(_device->logicalDevice, &viewCreateInfo, nullptr, &cubemapImageView);
+
+    // Create sampler
+    VkSamplerCreateInfo samplerCreateInfo = {};
+    samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerCreateInfo.magFilter = VK_FILTER_LINEAR;
+    samplerCreateInfo.minFilter = VK_FILTER_LINEAR;
+    samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerCreateInfo.anisotropyEnable = VK_FALSE;
+    samplerCreateInfo.maxAnisotropy = 0;
+    // samplerCreateInfo.maxAnisotropy = 16;
+    samplerCreateInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    samplerCreateInfo.unnormalizedCoordinates = VK_FALSE;
+    samplerCreateInfo.compareEnable = VK_FALSE;
+    samplerCreateInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+    samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+
+    VkSampler cubemapSampler;
+    vkCreateSampler(_device->logicalDevice, &samplerCreateInfo, nullptr, &cubemapSampler);
+
+    // Store the cubemap texture
+    uint32_t handle = _nextHandle++;
+    _textures[handle] = __TextureInternal{
+        .textureImage = cubemapImage,
+        .textureImageView = cubemapImageView,
+        .textureImageMemory = cubemapImageMemory,
+        .textureSampler = cubemapSampler,
+        .width = faceWidth,
+        .height = faceHeight};
+
+    // Cleanup staging buffer
+    stagingBuffer.Cleanup();
+
+    return handle;
 }
 
 uint32_t TextureManager::LoadTexture(const std::string& texturePath)
@@ -211,7 +420,9 @@ void TextureManager::transitionImageLayout(
     VkImage image,
     VkFormat format,
     VkImageLayout oldLayout,
-    VkImageLayout newLayout
+    VkImageLayout newLayout,
+    uint32_t baseArrayLayer,
+    uint32_t layerCount
 )
 {
     VulkanUtils::QuickCommandBuffer commandBuffer(this->_device);
@@ -231,8 +442,8 @@ void TextureManager::transitionImageLayout(
     barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     barrier.subresourceRange.baseMipLevel = 0;
     barrier.subresourceRange.levelCount = 1;
-    barrier.subresourceRange.baseArrayLayer = 0;
-    barrier.subresourceRange.layerCount = 1;
+    barrier.subresourceRange.baseArrayLayer = baseArrayLayer;
+    barrier.subresourceRange.layerCount = layerCount;
 
     VkPipelineStageFlags sourceStage;
     VkPipelineStageFlags destinationStage;

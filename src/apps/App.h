@@ -23,8 +23,11 @@ struct InitContext
             LoadAndGetTextureDescriptorImageInfo;
 
         std::function<uint32_t(const std::string&)> LoadTexture;
+        std::function<uint32_t(const std::string&)> LoadCubemapTexture;
+
         std::function<vk::DescriptorImageInfo(uint32_t)> GetTextureDescriptorImageInfo;
         std::function<ImGuiTexture(uint32_t)> InitImGuiTexture;
+
     } api;
 };
 

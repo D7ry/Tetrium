@@ -219,6 +219,9 @@ void Tetrium::Init(const Tetrium::InitOptions& options)
             .LoadTexture = [this](const std::string& texture) {
                 return this->_textureManager.LoadTexture(texture);
             },
+            .LoadCubemapTexture = [this](const std::string& texture) {
+                return this->_textureManager.LoadCubemapTexture(texture);
+            },
             .GetTextureDescriptorImageInfo = [this](uint32_t handle) {
                 vk::DescriptorImageInfo info;
                 this->_textureManager.GetDescriptorImageInfo(handle, info);
