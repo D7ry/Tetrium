@@ -5,6 +5,7 @@
 
 #include "apps/AppScreeningTest.h"
 #include "apps/AppTetraHueSphere.h"
+#include "apps/AppImageViewer.h"
 
 void printGreetingBanner()
 {
@@ -26,6 +27,7 @@ int main(int argc, char** argv)
     std::vector<std::pair<TetriumApp::App*, const char*>> apps = {
         {new TetriumApp::AppScreeningTest(), "Screening Test"},
         {new TetriumApp::AppTetraHueSphere(), "Tetra Hue Sphere"},
+        {new TetriumApp::AppImageViewer(), "Image Viewer"},
     };
 
     TetriumColor::Init();

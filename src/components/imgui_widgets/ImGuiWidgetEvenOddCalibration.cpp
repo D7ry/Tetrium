@@ -62,126 +62,125 @@ void ImGuiWidgetEvenOddCalibration::drawColorQuadTest()
     ImGui::End();
 }
 
-void ImGuiWidgetEvenOddCalibration::drawCalibrationWindow(Tetrium* engine, ColorSpace colorSpace)
-{
-    ImGui::SetNextWindowPos(ImVec2(0, 0));
-
-    ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
-    // ImGui::SetNextWindowFocus();
-    //
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0, 0, 0, 255));
-
-    ImGui::Begin(
-        "Even Odd Test",
-        NULL,
-        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse
-            | ImGuiWindowFlags_NoResize
-    );
-
-    if (ImGui::Button("close")) {
-        _drawTestWindow = false;
-    }
-
-    if (colorSpace == ColorSpace::RGB) {
-        ImGui::Text("Color Space: RGB");
-    } else {
-        ImGui::Text("Color Space: OCV");
-    }
-
-    ImGui::Text("Num Dropped Frame: %u", engine->_evenOddDebugCtx.numDroppedFrames);
-    ImGui::SameLine();
-    if (ImGui::Button("Reset") && colorSpace == ColorSpace::RGB) {
-        engine->_evenOddDebugCtx.numDroppedFrames = 0;
-    }
-
-    { // draw RGB and OCV gradients
-        ImDrawList* dl = ImGui::GetWindowDrawList();
-
-        ImVec2 availableSize = ImGui::GetContentRegionAvail();
-        availableSize.x *= 0.5;
-
-        ImGuiTexture gradientTexture
-            = engine->getOrLoadImGuiTexture(engine->_imguiCtx, RGV_COLOR_GRADIENT_IMAGE_PATH);
-
-        // scale the texture
-        float scale = availableSize.x / (float)gradientTexture.width;
-
-        ImVec2 fitSize;
-        fitSize.x = (float)gradientTexture.width * scale;
-        fitSize.y = (float)gradientTexture.height * scale;
-
-        ImVec2 imageBegin = ImGui::GetCursorPos() + ImGui::GetWindowPos();
-
-        if (colorSpace == ColorSpace::OCV) {
-            imageBegin.x += fitSize.x; // RGB is drawn on the lhs
-        }
-
-        ImVec2 imageEnd(imageBegin.x + fitSize.x, imageBegin.y + fitSize.y);
-
-        dl->AddImage(gradientTexture.id, imageBegin, imageEnd);
-    }
-
-    ImGui::Checkbox("Flip RGB/OCV", &engine->_flipEvenOdd);
-    if (0 && engine->_tetraMode == Tetrium::TetraMode::kEvenOddSoftwareSync) {
-        ImGui::SliderInt(
-            "Software Sync Timing Offset (ns)",
-            &engine->_softwareEvenOddCtx.timeOffset,
-            0,
-            engine->_softwareEvenOddCtx.nanoSecondsPerFrame
-        );
-        ImGui::Text(
-            "Software Sync Frame Time (ns): %lu", engine->_softwareEvenOddCtx.nanoSecondsPerFrame
-        );
-        ImGui::SeparatorText("Auto Calibration");
-
-        if (!_calibrationInProgress) {
-            if (ImGui::Button("Calibrate") && colorSpace == ColorSpace::RGB) {
-                startAutoCalibration(engine);
-            }
-        } else {
-            if (ImGui::Button("Cancel")) {
-                _calibrationInProgress = false;
-            }
-            ImGui::SameLine();
-            ImGui::Text("Calibration in progress...");
-            ImGui::PushStyleColor(
-                ImGuiCol_PlotHistogram, ImVec4(0.3f, 0.7f, 0.3f, 1.0f)
-            ); // Green progress
-            ImGui::PushStyleColor(
-                ImGuiCol_FrameBg, ImVec4(0.1f, 0.1f, 0.1f, 1.0f)
-            ); // Dark background
-            ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 5.0f);
-            ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
-            ImGui::ProgressBar(_calibrationProgress, ImVec2{ImGui::GetWindowWidth() * 0.6f, 0});
-            ImGui::PopStyleVar(2);
-            ImGui::PopStyleColor(2);
-        }
-
-        // calibration results
-        if (_calibrationComplete) {
-            ImGui::PushStyleColor(
-                ImGuiCol_Text, ImVec4(0.0f, 1.0f, 0.0f, 1.0f)
-            ); // Bright green color
-            ImGui::Text("Calibration complete.");
-            ImGui::PopStyleColor();
-
-            ImGui::Text("Optimal offset: ");
-            ImGui::SameLine();
-            ImGui::TextColored(
-                ImVec4(0.0f, 1.0f, 0.5f, 1.0f), "%d ns", _optimalOffset.load()
-            ); // Light green color
-
-            ImGui::Text("Highest dropped frames at worst offset: ");
-            ImGui::SameLine();
-            ImGui::TextColored(
-                ImVec4(0.0f, 0.8f, 0.0f, 1.0f), "%d", _highestDroppedFrames.load()
-            ); // Slightly darker green
-        }
-    }
-
-    ImGui::PopStyleColor();
-    ImGui::End();
-}
+// void ImGuiWidgetEvenOddCalibration::drawCalibrationWindow(Tetrium* engine, ColorSpace colorSpace)
+// {
+//     ImGui::SetNextWindowPos(ImVec2(0, 0));
+//
+//     ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
+//     // ImGui::SetNextWindowFocus();
+//     //
+//     ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0, 0, 0, 255));
+//
+//     ImGui::Begin(
+//         "Even Odd Test",
+//         NULL,
+//         ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse
+//             | ImGuiWindowFlags_NoResize
+//     );
+//
+//     if (ImGui::Button("close")) {
+//         _drawTestWindow = false;
+//     }
+//
+//     if (colorSpace == ColorSpace::RGB) {
+//         ImGui::Text("Color Space: RGB");
+//     } else {
+//         ImGui::Text("Color Space: OCV");
+//     }
+//
+//     ImGui::Text("Num Dropped Frame: %u", engine->_evenOddDebugCtx.numDroppedFrames);
+//     ImGui::SameLine();
+//     if (ImGui::Button("Reset") && colorSpace == ColorSpace::RGB) {
+//         engine->_evenOddDebugCtx.numDroppedFrames = 0;
+//     }
+//
+//     { // draw RGB and OCV gradients
+//         ImDrawList* dl = ImGui::GetWindowDrawList();
+//
+//         ImVec2 availableSize = ImGui::GetContentRegionAvail();
+//         availableSize.x *= 0.5;
+//
+//         ImGuiTexture& gradientTexture = engine->_engineTextures[(int)Tetrium::EngineTexture::kCalibrationGraient].second;
+//
+//         // scale the texture
+//         float scale = availableSize.x / (float)gradientTexture.width;
+//
+//         ImVec2 fitSize;
+//         fitSize.x = (float)gradientTexture.width * scale;
+//         fitSize.y = (float)gradientTexture.height * scale;
+//
+//         ImVec2 imageBegin = ImGui::GetCursorPos() + ImGui::GetWindowPos();
+//
+//         if (colorSpace == ColorSpace::OCV) {
+//             imageBegin.x += fitSize.x; // RGB is drawn on the lhs
+//         }
+//
+//         ImVec2 imageEnd(imageBegin.x + fitSize.x, imageBegin.y + fitSize.y);
+//
+//         dl->AddImage(gradientTexture.id, imageBegin, imageEnd);
+//     }
+//
+//     ImGui::Checkbox("Flip RGB/OCV", &engine->_flipEvenOdd);
+//     if (0 && engine->_tetraMode == Tetrium::TetraMode::kEvenOddSoftwareSync) {
+//         ImGui::SliderInt(
+//             "Software Sync Timing Offset (ns)",
+//             &engine->_softwareEvenOddCtx.timeOffset,
+//             0,
+//             engine->_softwareEvenOddCtx.nanoSecondsPerFrame
+//         );
+//         ImGui::Text(
+//             "Software Sync Frame Time (ns): %lu", engine->_softwareEvenOddCtx.nanoSecondsPerFrame
+//         );
+//         ImGui::SeparatorText("Auto Calibration");
+//
+//         if (!_calibrationInProgress) {
+//             if (ImGui::Button("Calibrate") && colorSpace == ColorSpace::RGB) {
+//                 startAutoCalibration(engine);
+//             }
+//         } else {
+//             if (ImGui::Button("Cancel")) {
+//                 _calibrationInProgress = false;
+//             }
+//             ImGui::SameLine();
+//             ImGui::Text("Calibration in progress...");
+//             ImGui::PushStyleColor(
+//                 ImGuiCol_PlotHistogram, ImVec4(0.3f, 0.7f, 0.3f, 1.0f)
+//             ); // Green progress
+//             ImGui::PushStyleColor(
+//                 ImGuiCol_FrameBg, ImVec4(0.1f, 0.1f, 0.1f, 1.0f)
+//             ); // Dark background
+//             ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 5.0f);
+//             ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
+//             ImGui::ProgressBar(_calibrationProgress, ImVec2{ImGui::GetWindowWidth() * 0.6f, 0});
+//             ImGui::PopStyleVar(2);
+//             ImGui::PopStyleColor(2);
+//         }
+//
+//         // calibration results
+//         if (_calibrationComplete) {
+//             ImGui::PushStyleColor(
+//                 ImGuiCol_Text, ImVec4(0.0f, 1.0f, 0.0f, 1.0f)
+//             ); // Bright green color
+//             ImGui::Text("Calibration complete.");
+//             ImGui::PopStyleColor();
+//
+//             ImGui::Text("Optimal offset: ");
+//             ImGui::SameLine();
+//             ImGui::TextColored(
+//                 ImVec4(0.0f, 1.0f, 0.5f, 1.0f), "%d ns", _optimalOffset.load()
+//             ); // Light green color
+//
+//             ImGui::Text("Highest dropped frames at worst offset: ");
+//             ImGui::SameLine();
+//             ImGui::TextColored(
+//                 ImVec4(0.0f, 0.8f, 0.0f, 1.0f), "%d", _highestDroppedFrames.load()
+//             ); // Slightly darker green
+//         }
+//     }
+//
+//     ImGui::PopStyleColor();
+//     ImGui::End();
+// }
 
 void ImGuiWidgetEvenOddCalibration::Draw(Tetrium* engine, ColorSpace colorSpace)
 {
@@ -240,8 +239,7 @@ void ImGuiWidgetEvenOddCalibration::Draw(Tetrium* engine, ColorSpace colorSpace)
         ImVec2 availableSize = ImGui::GetContentRegionAvail();
         availableSize.x *= 0.5;
 
-        ImGuiTexture gradientTexture
-            = engine->getOrLoadImGuiTexture(engine->_imguiCtx, RGV_COLOR_GRADIENT_IMAGE_PATH);
+        ImGuiTexture& gradientTexture = engine->_engineTextures[(int)Tetrium::EngineTexture::kCalibrationGraient].second;
 
         // scale the texture
         float scale = availableSize.x / (float)gradientTexture.width;
@@ -273,9 +271,9 @@ void ImGuiWidgetEvenOddCalibration::Draw(Tetrium* engine, ColorSpace colorSpace)
     //     _drawQuadColorTest = true;
     // }
 
-    if (_drawTestWindow) {
-        drawCalibrationWindow(engine, colorSpace);
-    }
+    // if (_drawTestWindow) {
+    //     drawCalibrationWindow(engine, colorSpace);
+    // }
     // if (_drawQuadColorTest) {
     //     drawColorQuadTest();
     // }

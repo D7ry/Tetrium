@@ -57,12 +57,14 @@ void Tetrium::drawAppsImGui(ColorSpace colorSpace, int currentFrameInFlight)
             .currentFrameInFlight = currentFrameInFlight,
             .colorSpace = colorSpace,
             .apis = {
-                .GetImGuiTexture = [this](const std::string& texture) -> ImGuiTexture {
-                    return getOrLoadImGuiTexture(_imguiCtx, texture);
-                },
-                .UnloadImGuiTexture
-                = [this](const std::string& texture) { unloadImGuiTexture(_imguiCtx, texture); },
                 .PlaySound = [this](Sound sound) { _soundManager.PlaySound(sound); },
+                .LoadTexture = [this](const std::string& path) { return _textureManager.LoadTexture(path); },
+                .InitImGuiTexture = [this](uint32_t textureHandle) {
+                    _textureManager.LoadImGuiTexture(textureHandle);
+                    return _textureManager.GetImGuiTexture(textureHandle);
+                },
+                .GetImGuiTexture = [this](uint32_t textureHandle) { return _textureManager.GetImGuiTexture(textureHandle); },
+                .UnloadTexture = [this](uint32_t textureHandle) { _textureManager.UnLoadTexture(textureHandle); }
             },
             .controls = {.wantExit = false, .musicOverride = std::nullopt}
         };
@@ -158,12 +160,6 @@ void Tetrium::drawMainMenu(ColorSpace colorSpace)
                 ImGui::EndTabItem();
             }
 
-            if (ImGui::BeginTabItem("👓Tetra Viewer")) {
-                // _widgetTetraViewerDemo.Draw(this, colorSpace);
-                _widgetTetraViewer.Draw(this, colorSpace);
-                ImGui::EndTabItem();
-            }
-
             if (ImGui::BeginTabItem("Color Tile")) {
                 _widgetColorTile.Draw(this, colorSpace);
                 ImGui::EndTabItem();
@@ -219,9 +215,8 @@ void Tetrium::drawImGui(ColorSpace colorSpace, int currentFrameInFlight)
     if (!_windowFocused) {
         ImGuiU::DrawCenteredText("Press Tab to enable input", ImVec4(0, 0, 0, 0.8));
     } else if (_uiMode) { // window focused and in ui mode, draw cursor
-        ImGuiTexture cursorTexture
-            = getOrLoadImGuiTexture(_imguiCtx, "../assets/textures/engine/cursor.png");
-        Tetrium_GUI::drawCursor(cursorTexture);
+        ImGuiTexture imguiTexture = _engineTextures[(int)EngineTexture::kCursor].second;
+        Tetrium_GUI::drawCursor(imguiTexture);
     }
     Tetrium_GUI::drawFootNote();
 

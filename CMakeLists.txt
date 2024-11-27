@@ -72,8 +72,6 @@ endif()
 find_package(OpenAL REQUIRED)
 
 
-
-
 project(Tetrium)
 
 add_executable(${PROJECT_NAME}
@@ -101,8 +99,6 @@ add_executable(${PROJECT_NAME}
         src/components/imgui_widgets/ImGuiWidgetUBOViewer.cpp
         src/components/imgui_widgets/ImGuiWidgetEvenOddCalibration.cpp
         src/components/imgui_widgets/ImGuiWidgetGraphicsPipeline.cpp
-        src/components/imgui_widgets/ImGuiWidgetTetraViewerDemo.cpp
-        src/components/imgui_widgets/ImGuiWidgetTetraViewer.cpp
         src/components/imgui_widgets/ImGuiWidgetColorTile.cpp
         src/components/imgui_widgets/ImGuiWidgetBlobHunter.cpp
 
@@ -112,11 +108,13 @@ add_executable(${PROJECT_NAME}
         src/lib/VQUtils.cpp
         src/lib/ImGuiUtils.cpp
         src/structs/Vertex.cpp
-        src/ecs/system/SimpleRenderSystem.cpp
+        #src/ecs/system/SimpleRenderSystem.cpp
         src/ecs/system/TetraImageDisplaySystem.cpp
 
         src/apps/AppScreeningTest.cpp
         src/apps/AppTetraHueSphere.cpp
+        src/apps/AppImageViewer.cpp
+
 
         src/apps/app_components/TextureFrameBuffer.cpp
 )

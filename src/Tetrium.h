@@ -31,8 +31,6 @@
 #include "components/imgui_widgets/ImGuiWidgetColorTile.h"
 #include "components/imgui_widgets/ImGuiWidgetEvenOddCalibration.h"
 #include "components/imgui_widgets/ImGuiWidgetTemp.h"
-#include "components/imgui_widgets/ImGuiWidgetTetraViewer.h"
-#include "components/imgui_widgets/ImGuiWidgetTetraViewerDemo.h"
 #include "components/imgui_widgets/ImGuiWidgetBlobHunter.h"
 // ecs
 #include "ecs/system/TetraImageDisplaySystem.h"
@@ -52,6 +50,8 @@ class Tetrium
     static const std::vector<const char*> EVEN_ODD_HARDWARE_INSTANCE_EXTENSIONS;
     static const std::vector<const char*> EVEN_ODD_HARDWARE_DEVICE_EXTENSIONS;
     static const std::vector<const char*> EVEN_ODD_SOFTWARE_DEVICE_EXTENSIONS;
+
+    const char* COLOR_GRADIENT_IMAGE_PATH = "";
 
   public:
     // Display mode to present tetracolor outputs.
@@ -170,7 +170,6 @@ class Tetrium
     {
         VkRenderPass renderPass;
         VkDescriptorPool descriptorPool;
-        std::unordered_map<std::string, ImGuiTexture> textures;
         std::vector<VkFramebuffer> frameBuffer;
         ImGuiContext* backendImGuiContext;
         ImPlotContext* backendImPlotContext;
@@ -186,11 +185,12 @@ class Tetrium
     /* ---------- Initialization Subroutines ---------- */
     void initVulkan();
     void initDefaultStates();
+    void loadEngineTextures();
+    void cleanupEngineTextures();
     VkInstance createInstance();
     void createDevice();
     VkSurfaceKHR createGlfwWindowSurface(GLFWwindow* window);
     void createSynchronizationObjects(std::array<SyncPrimitives, NUM_FRAME_IN_FLIGHT>& primitives);
-    void createFunnyObjects();
     VkRenderPass createRenderPass(
         VkDevice logicalDevice,
         VkImageLayout initialLayout,
@@ -308,14 +308,6 @@ class Tetrium
         vk::Extent2D extent,
         int swapChainImageIndex
     );
-    const ImGuiTexture& getOrLoadImGuiTexture(
-        Tetrium::ImGuiRenderContexts& ctx,
-        const std::string& texture
-    );
-    void unloadImGuiTexture(
-        Tetrium::ImGuiRenderContexts& ctx,
-        const std::string& texture
-    );
 
     void clearImGuiDrawData();
 
@@ -419,8 +411,6 @@ class Tetrium
     friend class ImGuiWidgetUBOViewer;
     friend class ImGuiWidgetEvenOddCalibration;
     friend class ImGuiWidgetGraphicsPipeline;
-    friend class ImGuiWidgetTetraViewerDemo;
-    friend class ImGuiWidgetTetraViewer;
     friend class ImGuiWidgetTemp;
     friend class ImGuiWidgetBlobHunter;
 
@@ -429,8 +419,6 @@ class Tetrium
     ImGuiWidgetUBOViewer _widgetUBOViewer;
     ImGuiWidgetEvenOddCalibration _widgetEvenOdd;
     ImGuiWidgetGraphicsPipeline _widgetGraphicsPipeline;
-    ImGuiWidgetTetraViewerDemo _widgetTetraViewerDemo;
-    ImGuiWidgetTetraViewer _widgetTetraViewer;
     ImGuiWidgetColorTile _widgetColorTile;
     ImGuiWidgetTemp _widgetTemp;
 
@@ -445,4 +433,14 @@ class Tetrium
     std::unordered_map<std::string, TetriumApp::App*> _appMap;
 
     std::optional<TetriumApp::App*> _primaryApp = std::nullopt;
+
+    enum class EngineTexture
+    {
+        kCursor,
+        kCalibrationGraient,
+        kNumTextures
+    };
+
+    static const std::array<std::string, static_cast<int>(EngineTexture::kNumTextures)> ENGINE_TEXTURE_PATHS;
+    std::array<std::pair<uint32_t, ImGuiTexture>, static_cast<int>(EngineTexture::kNumTextures)> _engineTextures;
 };

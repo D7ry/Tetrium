@@ -101,6 +101,8 @@ class AppTetraHueSphere : public App
 
         float orthoWidth = 1.f;
         float perspectiveFOV = 90;
+
+        std::vector<uint32_t> loadedTextures;
     } _rasterizationCtx;
 
 };

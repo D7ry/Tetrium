@@ -1,6 +1,8 @@
+#include "backends/imgui_impl_vulkan.h"
+
 #include "TextureManager.h"
-#include "lib/VulkanUtils.h"
 #include "lib/VQBuffer.h"
+#include "lib/VulkanUtils.h"
 #include <stb_image.h>
 #include <vulkan/vulkan_core.h>
 
@@ -39,8 +41,7 @@ const LUTChannel LUT_CHANNELS_RGBA[4] = {
      248, 249, 249, 250, 251, 252, 253, 254, 255},
     GetIdLUTChannel(),
     GetIdLUTChannel(),
-    GetIdLUTChannel()
-};
+    GetIdLUTChannel()};
 
 // Perform LUT mapping on a stbi-loaded texture
 void LUTTexture(stbi_uc* pixels, int width, int height, int channels)
@@ -76,22 +77,18 @@ void TextureManager::Cleanup()
     _textures.clear();
 }
 
-void TextureManager::GetDescriptorImageInfo(
-    const std::string& texturePath,
-    VkDescriptorImageInfo& imageInfo
-)
+void TextureManager::GetDescriptorImageInfo(uint32_t handle, VkDescriptorImageInfo& imageInfo)
 {
-    DEBUG("texture path: {}", texturePath);
-    if (_textures.find(texturePath) == _textures.end()) {
-        LoadTexture(texturePath);
+    if (_textures.find(handle) == _textures.end()) {
+        FATAL("Texture not loaded: {}", handle);
     }
-    __TextureInternal& texture = _textures.at(texturePath);
+    __TextureInternal& texture = _textures.at(handle);
     imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     imageInfo.imageView = texture.textureImageView;
     imageInfo.sampler = texture.textureSampler;
 }
 
-void TextureManager::LoadTexture(const std::string& texturePath)
+uint32_t TextureManager::LoadTexture(const std::string& texturePath)
 {
     if (_device == VK_NULL_HANDLE) {
         FATAL("Texture manager hasn't been initialized!");
@@ -100,8 +97,7 @@ void TextureManager::LoadTexture(const std::string& texturePath)
     stbi_uc* pixels = stbi_load(texturePath.c_str(), &width, &height, &channels, STBI_rgb_alpha);
     LUT::LUTTexture(pixels, width, height, STBI_rgb_alpha);
 
-    VkDeviceSize vkTextureSize = width * height * 4; // each pixel takes up 4 bytes: 1
-                                                     // for R, G, B, A each.
+    VkDeviceSize vkTextureSize = width * height * 4;
 
     if (pixels == nullptr) {
         FATAL("Failed to load texture {}", texturePath);
@@ -113,12 +109,9 @@ void TextureManager::LoadTexture(const std::string& texturePath)
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
     );
 
-    // copy memory to staging buffer. we can directly copy because staging buffer is host visible
-    // and mapped.
     memcpy(stagingBuffer.bufferAddress, pixels, static_cast<size_t>(vkTextureSize));
     stbi_image_free(pixels);
 
-    // create image object
     VkImage textureImage = VK_NULL_HANDLE;
     VkImageView textureImageView = VK_NULL_HANDLE;
     VkDeviceMemory textureImageMemory = VK_NULL_HANDLE;
@@ -149,7 +142,6 @@ void TextureManager::LoadTexture(const std::string& texturePath)
         static_cast<uint32_t>(width),
         static_cast<uint32_t>(height)
     );
-    // transition again for shader read
     transitionImageLayout(
         textureImage,
         VK_FORMAT_R8G8B8A8_SRGB,
@@ -159,56 +151,57 @@ void TextureManager::LoadTexture(const std::string& texturePath)
 
     textureImageView = VulkanUtils::createImageView(textureImage, _device->logicalDevice);
 
-    // create sampler
-    {
-        VkSamplerCreateInfo samplerInfo{};
-        samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-        samplerInfo.magFilter = VK_FILTER_LINEAR;
-        samplerInfo.minFilter = VK_FILTER_LINEAR;
+    VkSamplerCreateInfo samplerInfo{};
+    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerInfo.magFilter = VK_FILTER_LINEAR;
+    samplerInfo.minFilter = VK_FILTER_LINEAR;
+    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.anisotropyEnable = VK_FALSE;
+    samplerInfo.maxAnisotropy = 1;
+    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    samplerInfo.unnormalizedCoordinates = VK_FALSE;
+    samplerInfo.compareEnable = VK_FALSE;
+    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    samplerInfo.mipLodBias = 0.0f;
+    samplerInfo.minLod = 0.0f;
+    samplerInfo.maxLod = 0.0f;
 
-        samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-
-        samplerInfo.anisotropyEnable = VK_FALSE;
-        samplerInfo.maxAnisotropy = 1; // TODO: implement customization of anisotrophic filtering.
-
-        samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-        samplerInfo.unnormalizedCoordinates = VK_FALSE;
-
-        samplerInfo.compareEnable = VK_FALSE;
-        samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-
-        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-        samplerInfo.mipLodBias = 0.0f;
-        samplerInfo.minLod = 0.0f;
-        samplerInfo.maxLod = 0.0f;
-
-        if (vkCreateSampler(_device->logicalDevice, &samplerInfo, nullptr, &textureSampler)
-            != VK_SUCCESS) {
-            FATAL("Failed to create texture sampler!");
-        }
+    if (vkCreateSampler(_device->logicalDevice, &samplerInfo, nullptr, &textureSampler)
+        != VK_SUCCESS) {
+        FATAL("Failed to create texture sampler!");
     }
 
-    _textures.emplace(std::make_pair(
-        texturePath,
+    uint32_t handle = _nextHandle++;
+    _textures.emplace(
+        handle,
         __TextureInternal{
-            textureImage, textureImageView, textureImageMemory, textureSampler, width, height
-        }
-    ));
+            textureImage, textureImageView, textureImageMemory, textureSampler, width, height}
+    );
 
-    stagingBuffer.Cleanup(); // clean up staging buffer
+    stagingBuffer.Cleanup();
+    DEBUG("Texture {} loaded: {}", texturePath, handle);
+    return handle;
 }
 
-void TextureManager::UnLoadTexture(const std::string& texturePath)
+void TextureManager::UnLoadTexture(uint32_t handle)
 {
-    auto elem = _textures.find(texturePath);
-    ASSERT(elem != _textures.end());
+    auto elem = _textures.find(handle);
+    if (elem == _textures.end()) {
+        PANIC("Attemping to delete non-existing texture handle with id {}", handle);
+    }
     __TextureInternal& texture = elem->second;
+    if (texture.imguiTextureId.has_value()) {
+        ImGui_ImplVulkan_RemoveTexture(static_cast<VkDescriptorSet>(texture.imguiTextureId.value())
+        );
+    }
     vkDestroyImageView(_device->logicalDevice, texture.textureImageView, nullptr);
     vkDestroyImage(_device->logicalDevice, texture.textureImage, nullptr);
     vkDestroySampler(_device->logicalDevice, texture.textureSampler, nullptr);
     vkFreeMemory(_device->logicalDevice, texture.textureImageMemory, nullptr);
+    _textures.erase(handle);
 }
 
 void TextureManager::transitionImageLayout(
@@ -249,8 +242,7 @@ void TextureManager::transitionImageLayout(
 
         sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
         destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-    } else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
-               && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) { // after texture transfer
+    } else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) { // after texture transfer
         barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
         barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
@@ -304,19 +296,45 @@ void TextureManager::copyBufferToImage(
 
 void TextureManager::Init(std::shared_ptr<VQDevice> device) { this->_device = device; }
 
-TextureManager::Texture TextureManager::GetTexture(const std::string& texturePath)
+TextureManager::Texture TextureManager::GetTexture(uint32_t handle)
 {
-    auto it = _textures.find(texturePath);
+    auto it = _textures.find(handle);
     if (it == _textures.end()) {
-        LoadTexture(texturePath);
-        it = _textures.find(texturePath);
-        ASSERT(it != _textures.end());
+        FATAL("Texture not loaded: {}", handle);
     }
     __TextureInternal& tex = it->second;
     return Texture{
         .sampler = tex.textureSampler,
         .imageView = tex.textureImageView,
         .width = tex.width,
-        .height = tex.height
-    };
+        .height = tex.height};
+}
+
+ImGuiTexture TextureManager::GetImGuiTexture(uint32_t handle)
+{
+    auto it = _textures.find(handle);
+    if (it == _textures.end()) {
+        FATAL("Texture not loaded: {}", handle);
+    }
+    __TextureInternal& tex = it->second;
+    if (!tex.imguiTextureId.has_value()) {
+        FATAL("Texture {} is not loaded as ImGui texture!", handle);
+    }
+    return ImGuiTexture{tex.imguiTextureId.value(), tex.width, tex.height};
+}
+
+void TextureManager::LoadImGuiTexture(uint32_t handle)
+{
+    auto it = _textures.find(handle);
+    if (it == _textures.end()) {
+        FATAL("Texture not loaded: {}", handle);
+    }
+    __TextureInternal& tex = it->second;
+    if (tex.imguiTextureId.has_value()) {
+        FATAL("Texture {} has its imgui texture loaded already!", handle);
+    }
+
+    tex.imguiTextureId = ImGui_ImplVulkan_AddTexture(
+        tex.textureSampler, tex.textureImageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+    );
 }

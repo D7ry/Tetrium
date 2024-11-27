@@ -37,31 +37,6 @@
 
 #define VIRTUAL_VSYNC 0
 
-// creates a cow for now
-void Tetrium::createFunnyObjects()
-{
-    // lil cow
-    // Entity* spot = new Entity("Spot");
-    //
-    // std::string textures[ColorSpaceSize]
-    //     = {(DIRECTORIES::ASSETS + "textures/spot.png"), (DIRECTORIES::ASSETS +
-    //     "textures/spot.png")
-    //     };
-
-    // auto meshInstance
-    //     = _renderer.MakeMeshInstanceComponent(DIRECTORIES::ASSETS + "models/spot.obj", textures);
-
-    // give the lil cow a mesh
-    // spot->AddComponent(meshInstance);
-    // give the lil cow a transform
-    // spot->AddComponent(new TransformComponent());
-    // _renderer.AddEntity(spot);
-    // spot->GetComponent<TransformComponent>()->rotation.x = 90;
-    // spot->GetComponent<TransformComponent>()->rotation.y = 90;
-    // spot->GetComponent<TransformComponent>()->position.z = 0.05;
-    // register lil cow
-}
-
 void Tetrium::keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
     Tetrium* pThis = reinterpret_cast<Tetrium*>(glfwGetWindowUserPointer(window));
@@ -106,6 +81,23 @@ void Tetrium::cursorPosCallback(GLFWwindow* window, double xpos, double ypos)
     }
     prevX = xpos;
     prevY = ypos;
+}
+
+void Tetrium::loadEngineTextures()
+{
+    for (int i = 0; i < static_cast<int>(EngineTexture::kNumTextures); i++) {
+        uint32_t handle = _textureManager.LoadTexture(ENGINE_TEXTURE_PATHS[i]);
+        _textureManager.LoadImGuiTexture(handle);
+        ImGuiTexture imguiTexture = _textureManager.GetImGuiTexture(handle);
+        _engineTextures[i] = {handle, imguiTexture};
+    }
+}
+
+void Tetrium::cleanupEngineTextures()
+{
+    for (int i = 0; i < static_cast<int>(EngineTexture::kNumTextures); i++) {
+        _textureManager.UnLoadTexture(_engineTextures[i].first);
+    }
 }
 
 void Tetrium::initDefaultStates()
@@ -209,10 +201,11 @@ void Tetrium::Init(const Tetrium::InitOptions& options)
 
     initDefaultStates();
 
-    createFunnyObjects();
-
     _soundManager.LoadAllSounds();
     _soundManager.PlaySound(Sound::kProgramStart);
+
+    loadEngineTextures();
+    SCHEDULE_DELETE(cleanupEngineTextures();)
 
     DEBUG("swapchain image format: {}", string_VkFormat(_swapChain.imageFormat));
     VQDevice& device = *_device.get();
@@ -224,9 +217,23 @@ void Tetrium::Init(const Tetrium::InitOptions& options)
         },
         .api = {
             .LoadAndGetTextureDescriptorImageInfo = [this](const std::string& texture) {
+                // FIXME: remove this
                 vk::DescriptorImageInfo info;
-                this->_textureManager.GetDescriptorImageInfo(texture, info);
+                uint32_t handle = this->_textureManager.LoadTexture(texture);
+                this->_textureManager.GetDescriptorImageInfo(handle, info);
                 return info;
+            },
+            .LoadTexture = [this](const std::string& texture) {
+                return this->_textureManager.LoadTexture(texture);
+            },
+            .GetTextureDescriptorImageInfo = [this](uint32_t handle) {
+                vk::DescriptorImageInfo info;
+                this->_textureManager.GetDescriptorImageInfo(handle, info);
+                return info;
+            },
+            .InitImGuiTexture = [this](uint32_t handle) {
+                this->_textureManager.LoadImGuiTexture(handle);
+                return this->_textureManager.GetImGuiTexture(handle);
             },
         },
     };
@@ -325,8 +332,7 @@ void Tetrium::initVulkan()
             .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
             .dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
             .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-            .dstAccessMask = VK_ACCESS_SHADER_READ_BIT
-        }
+            .dstAccessMask = VK_ACCESS_SHADER_READ_BIT}
     );
     SCHEDULE_DELETE(vkDestroyRenderPass(_device->logicalDevice, _rocvTransformRenderPass, nullptr);)
 
@@ -672,8 +678,7 @@ void Tetrium::createSwapChain(Tetrium::SwapChainContext& ctx, const VkSurfaceKHR
     VkSwapchainCounterCreateInfoEXT swapChainCounterCreateInfo{
         .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_COUNTER_CREATE_INFO_EXT,
         .pNext = NULL,
-        .surfaceCounters = VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_BIT_EXT
-    };
+        .surfaceCounters = VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_BIT_EXT};
 
     if (_tetraMode == TetraMode::kEvenOddHardwareSync) {
 #if __linux__
@@ -884,8 +889,7 @@ void Tetrium::createSynchronizationObjects(
                                primitive.semaAppVulkanFinished,
                                primitive.semaImageCopyFinished,
                                primitive.semaRenderFinished,
-                               primitive.semaImageAvailable
-                 }) {
+                               primitive.semaImageAvailable}) {
                 vkDestroySemaphore(this->_device->logicalDevice, sema, nullptr);
             }
             vkDestroyFence(this->_device->logicalDevice, primitive.fenceInFlight, nullptr);
@@ -897,7 +901,13 @@ void Tetrium::createSynchronizationObjects(
 void Tetrium::Cleanup()
 {
     INFO("Cleaning up...");
-    TetriumApp::CleanupContext appCleanupCtx{.device = *_device.get()};
+    TetriumApp::CleanupContext appCleanupCtx{
+        .device = *_device.get(),
+        .api = {
+            .UnloadTexture
+            = [this](uint32_t handle) { this->_textureManager.UnLoadTexture(handle); },
+        }};
+
     for (auto& [appName, app] : _appMap) {
         app->Cleanup(appCleanupCtx);
     }
@@ -1126,8 +1136,7 @@ void Tetrium::bindDefaultInputs()
             io.ConfigFlags &= ~ImGuiConfigFlags_NoKeyboard;
             io.MousePos = ImVec2{
                 static_cast<float>(_swapChain.extent.width) / 2,
-                static_cast<float>(_swapChain.extent.height) / 2
-            };
+                static_cast<float>(_swapChain.extent.height) / 2};
             io.WantSetMousePos = true;
         } else {
             io.ConfigFlags |= (ImGuiConfigFlags_NoMouse | ImGuiConfigFlags_NoKeyboard);

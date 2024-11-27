@@ -511,9 +511,10 @@ MeshComponent* SimpleRenderSystem::MakeMeshInstanceComponent(
         if (it == _textureDescriptorIndices.end()) {
             // load texture into textures[textureOffset]
             DEBUG("loading texture into {}", _textureDescriptorInfoIdx);
-            _textureManager->GetDescriptorImageInfo(
-                texturePath, _textureDescriptorInfo[_textureDescriptorInfoIdx]
-            );
+            NEEDS_IMPLEMENTATION();
+            // _textureManager->GetDescriptorImageInfo(
+            //     texturePath, _textureDescriptorInfo[_textureDescriptorInfoIdx]
+            // );
             textureOffset = _textureDescriptorInfoIdx;
             _textureDescriptorInfoIdx++;
             updateTextureDescriptorSet(

@@ -111,7 +111,7 @@ void TetriumApp::AppScreeningTest::drawIdle(const TetriumApp::TickContextImGui& 
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(10, 5));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(10, 10));
 
-    ImGuiTexture tex = ctx.apis.GetImGuiTexture("../assets/textures/BAIR_logo.png");
+    ImGuiTexture& tex = _textures.bairLogo;
     ImVec2 logoSize = ImVec2{(float)tex.width, (float)tex.height};
 
     ImVec2 elemPos((screenSize.x - logoSize.x) * 0.5f, (screenSize.y - logoSize.y) * 0.5f - 300);
@@ -144,7 +144,7 @@ void TetriumApp::AppScreeningTest::drawIdle(const TetriumApp::TickContextImGui& 
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
     }
     if (ImGui::Button("Play", buttonSize) && !isNameEmpty) {
-        newGame();
+        newGame(ctx);
     }
     if (isNameEmpty) {
         ImGui::PopStyleColor(3);
@@ -175,7 +175,7 @@ void AppScreeningTest::drawIshihara(
 )
 {
     ImGuiTexture tex
-        = ctx.apis.GetImGuiTexture(subject.prompt.currentIshiharaTexturePath[ctx.colorSpace]);
+        = subject.prompt.currentIshiharaPlateTexture[ctx.colorSpace]; // RGB is the default
 
     ImVec2 availSize = ImGui::GetContentRegionAvail();
     ImVec2 textureFullscreenSize = calculateFitSize(tex.width, tex.height, availSize);
@@ -196,7 +196,7 @@ void AppScreeningTest::drawTestForSubject(
     // handle state transition
     subject.currStateRemainderTime -= ImGui::GetIO().DeltaTime;
     if (subject.currStateRemainderTime <= 0) {
-        transitionSubjectState(subject);
+        transitionSubjectState(subject, ctx);
     }
     ASSERT(subject.currStateRemainderTime > 0);
 
@@ -291,7 +291,7 @@ void AppScreeningTest::drawAnswerPrompts(
 
     // Draw the four buttons
     for (int i = 0; i < 4; i++) {
-        ImGuiTexture tex = ctx.apis.GetImGuiTexture(subject.prompt.currentAnswerTexturePath[i]);
+        ImGuiTexture tex = subject.prompt.currentAnswerTexture[i];
 
         ImGui::SetCursorPos(ImVec2(positions[i].x - buttonSize / 2, positions[i].y - buttonSize / 2)
         );
@@ -308,7 +308,7 @@ void AppScreeningTest::drawAnswerPrompts(
                 DEBUG("Wrong answer!");
                 ctx.apis.PlaySound(Sound::kWrongAnswer);
             }
-            transitionSubjectState(subject);
+            transitionSubjectState(subject, ctx);
         }
 
         // Add button label
@@ -326,7 +326,10 @@ void AppScreeningTest::drawAnswerPrompts(
     ImGui::ProgressBar(progress, progressBarSize);
 }
 
-void AppScreeningTest::transitionSubjectState(SubjectContext& subject)
+void AppScreeningTest::transitionSubjectState(
+    SubjectContext& subject,
+    const TetriumApp::TickContextImGui& ctx
+)
 {
     switch (subject.state) {
     case SubjectState::kFixation:
@@ -348,12 +351,12 @@ void AppScreeningTest::transitionSubjectState(SubjectContext& subject)
         subject.currentAttempt += 1; // to next attempt
         subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.FIXATION;
         subject.state = SubjectState::kFixation;
-        populatePromptContext(subject);
+        populatePromptContext(subject, ctx);
         break;
     }
 }
 
-void AppScreeningTest::newGame()
+void AppScreeningTest::newGame(const TetriumApp::TickContextImGui& ctx)
 {
     if (_plateGenerator) {
         delete _plateGenerator;
@@ -371,7 +374,7 @@ void AppScreeningTest::newGame()
         .currentAttempt = 0,
         .numSuccessAttempts = 0,
     };
-    populatePromptContext(_subject);
+    populatePromptContext(_subject, ctx);
     _state = TestState::kScreening;
 }
 
@@ -432,7 +435,10 @@ std::pair<std::string, std::string> AppScreeningTest::generateIshiharaTestTextur
     return {rgbTexturePath, ocvTexturePath};
 }
 
-void AppScreeningTest::populatePromptContext(SubjectContext& subject)
+void AppScreeningTest::populatePromptContext(
+    SubjectContext& subject,
+    const TetriumApp::TickContextImGui& ctx
+)
 {
     // stall and generate ishihara textures
     std::array<int, 4> ishiharaPlateNumbers = PickRandomFourIshiharaPlates();
@@ -442,19 +448,51 @@ void AppScreeningTest::populatePromptContext(SubjectContext& subject)
     auto [rgbTexturePath, ocvTexturePath]
         = generateIshiharaTestTextures(_subject, answerPlateNumber);
 
-    _subject.prompt.currentIshiharaTexturePath[ColorSpace::RGB] = rgbTexturePath;
-    _subject.prompt.currentIshiharaTexturePath[ColorSpace::OCV] = ocvTexturePath;
+    // unload previous textures
+    if (_subject.prompt.currentIshiharaPlateTextureHandle[ColorSpace::RGB] != 0) {
+        ctx.apis.UnloadTexture(_subject.prompt.currentIshiharaPlateTextureHandle[ColorSpace::RGB]);
+    }
+    if (_subject.prompt.currentIshiharaPlateTextureHandle[ColorSpace::OCV] != 0) {
+        ctx.apis.UnloadTexture(_subject.prompt.currentIshiharaPlateTextureHandle[ColorSpace::OCV]);
+    }
+
+    _subject.prompt.currentIshiharaPlateTextureHandle[ColorSpace::RGB]
+        = ctx.apis.LoadTexture(rgbTexturePath);
+    _subject.prompt.currentIshiharaPlateTextureHandle[ColorSpace::OCV]
+        = ctx.apis.LoadTexture(ocvTexturePath);
+
+    _subject.prompt.currentIshiharaPlateTexture[ColorSpace::RGB] = ctx.apis.InitImGuiTexture(
+        _subject.prompt.currentIshiharaPlateTextureHandle[ColorSpace::RGB]
+    );
+    _subject.prompt.currentIshiharaPlateTexture[ColorSpace::OCV] = ctx.apis.InitImGuiTexture(
+        _subject.prompt.currentIshiharaPlateTextureHandle[ColorSpace::OCV]
+    );
 
     // populate answer textures -- they're pre-generated
-    _subject.prompt.currentAnswerTexturePath[0]
-        = GetIshiharaPlateAnswerTexturePath(ishiharaPlateNumbers[0]);
-    _subject.prompt.currentAnswerTexturePath[1]
-        = GetIshiharaPlateAnswerTexturePath(ishiharaPlateNumbers[1]);
-    _subject.prompt.currentAnswerTexturePath[2]
-        = GetIshiharaPlateAnswerTexturePath(ishiharaPlateNumbers[2]);
-    _subject.prompt.currentAnswerTexturePath[3]
-        = GetIshiharaPlateAnswerTexturePath(ishiharaPlateNumbers[3]);
-    _subject.prompt.correctAnswerTextureIndex = answerPlateIndex;
-    _subject.prompt.currentSelectedAnswer = -1;
+    for (int i = 0; i < 4; i++) {
+        _subject.prompt.currentAnswerTextureHandle[i]
+            = _answerPromptTextureHandles[ishiharaPlateNumbers[i]];
+        _subject.prompt.currentAnswerTexture[i]
+            = _answerPromptImGuiTextures[ishiharaPlateNumbers[i]];
+    }
 }
+
+void AppScreeningTest::Init(TetriumApp::InitContext& ctx)
+{
+    for (int ishiharaPlateNumber : ISHIHARA_PLATES_NUMBERS) {
+        std::string path = GetIshiharaPlateAnswerTexturePath(ishiharaPlateNumber);
+        uint32_t textureHandle = ctx.api.LoadTexture(path);
+        _answerPromptTextureHandles[ishiharaPlateNumber] = textureHandle;
+        _answerPromptImGuiTextures[ishiharaPlateNumber] = ctx.api.InitImGuiTexture(textureHandle);
+    }
+    // load bair logo
+    // FIXME: free the logo texture when cleaning up
+    _textures.bairLogo = ctx.api.InitImGuiTexture(ctx.api.LoadTexture("../assets/textures/BAIR_logo.png"));
+};
+
+void AppScreeningTest::Cleanup(TetriumApp::CleanupContext& ctx){
+    for (int ishiharaPlateNumber : ISHIHARA_PLATES_NUMBERS) {
+        ctx.api.UnloadTexture(_answerPromptTextureHandles[ishiharaPlateNumber]);
+    }
+};
 } // namespace TetriumApp

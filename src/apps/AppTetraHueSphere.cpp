@@ -476,21 +476,18 @@ void AppTetraHueSphere::initRasterization(TetriumApp::InitContext& initCtx)
                 nullptr
             );
 
+            uint32_t imageInfoUglyRGBHandle = initCtx.api.LoadTexture(HUE_SPHERE_UGLY_TEXTURE_PATH_RGB);
+            uint32_t imageInfoUglyOCVHandle = initCtx.api.LoadTexture(HUE_SPHERE_UGLY_TEXTURE_PATH_OCV);
+            uint32_t imageInfoPrettyRGBHandle = initCtx.api.LoadTexture(HUE_SPHERE_PRETTY_TEXTURE_PATH_RGB);
+            uint32_t imageInfoPrettyOCVHandle = initCtx.api.LoadTexture(HUE_SPHERE_PRETTY_TEXTURE_PATH_OCV);
+
             // sampler
-            vk::DescriptorImageInfo imageInfoUglyRGB
-                = initCtx.api.LoadAndGetTextureDescriptorImageInfo(HUE_SPHERE_UGLY_TEXTURE_PATH_RGB
-                );
-            vk::DescriptorImageInfo imageInfoUglyOCV
-                = initCtx.api.LoadAndGetTextureDescriptorImageInfo(HUE_SPHERE_UGLY_TEXTURE_PATH_OCV
-                );
-            vk::DescriptorImageInfo imageInfoPrettyRGB
-                = initCtx.api.LoadAndGetTextureDescriptorImageInfo(
-                    HUE_SPHERE_PRETTY_TEXTURE_PATH_RGB
-                );
-            vk::DescriptorImageInfo imageInfoPrettyOCV
-                = initCtx.api.LoadAndGetTextureDescriptorImageInfo(
-                    HUE_SPHERE_PRETTY_TEXTURE_PATH_OCV
-                );
+            vk::DescriptorImageInfo imageInfoUglyRGB = initCtx.api.GetTextureDescriptorImageInfo(imageInfoUglyRGBHandle);
+            vk::DescriptorImageInfo imageInfoUglyOCV = initCtx.api.GetTextureDescriptorImageInfo(imageInfoUglyOCVHandle);
+            vk::DescriptorImageInfo imageInfoPrettyRGB = initCtx.api.GetTextureDescriptorImageInfo(imageInfoPrettyRGBHandle);
+            vk::DescriptorImageInfo imageInfoPrettyOCV = initCtx.api.GetTextureDescriptorImageInfo(imageInfoPrettyOCVHandle);
+
+            _rasterizationCtx.loadedTextures.push_back(imageInfoUglyRGBHandle);
 
             std::array<vk::DescriptorImageInfo, SAMPLER_DESCRIPTOR_COUNT> imageInfos
                 = {imageInfoUglyRGB, imageInfoUglyOCV, imageInfoPrettyRGB, imageInfoPrettyOCV};
@@ -663,6 +660,10 @@ void AppTetraHueSphere::initRasterization(TetriumApp::InitContext& initCtx)
 
 void AppTetraHueSphere::cleanupRasterization(TetriumApp::CleanupContext& cleanupCtx)
 {
+    // clean up texture
+    for (auto handle : _rasterizationCtx.loadedTextures) {
+        cleanupCtx.api.UnloadTexture(handle);
+    }
     vk::Device device = cleanupCtx.device.logicalDevice;
 
     // Destroy pipeline

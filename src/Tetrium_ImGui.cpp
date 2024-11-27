@@ -406,37 +406,6 @@ void Tetrium::recordImGuiDrawCommandBuffer(
     cb.endRenderPass();
 }
 
-const ImGuiTexture& Tetrium::getOrLoadImGuiTexture(
-    Tetrium::ImGuiRenderContexts& ctx,
-    const std::string& texture
-)
-{
-    auto it = ctx.textures.find(texture);
-    if (it != ctx.textures.end()) {
-        return it->second;
-    }
-
-    TextureManager::Texture t = _textureManager.GetTexture(texture);
-    VkDescriptorSet descriptor = ImGui_ImplVulkan_AddTexture(
-        t.sampler, t.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-    );
-
-    ImGuiTexture tex{.id = descriptor, .width = t.width, .height = t.height};
-
-    auto res = ctx.textures.insert({texture, tex});
-    ASSERT(res.second);
-    return res.first->second;
-}
-
-void Tetrium::unloadImGuiTexture(Tetrium::ImGuiRenderContexts& ctx, const std::string& texture)
-{
-
-    auto it = ctx.textures.find(texture);
-    ASSERT(it != ctx.textures.end());
-    ImGui_ImplVulkan_RemoveTexture(reinterpret_cast<VkDescriptorSet>(it->second.id));
-    _textureManager.UnLoadTexture(texture);
-}
-
 void Tetrium::clearImGuiDrawData()
 {
     ImGui_ImplVulkan_NewFrame();

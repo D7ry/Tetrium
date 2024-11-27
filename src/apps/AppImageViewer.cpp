@@ -1,14 +1,12 @@
+#include "imgui.h"
 #include <filesystem>
 
-#include "Tetrium.h"
-
-#include "ImGuiWidgetTetraViewer.h"
-#include "imgui.h"
-
-const char* ImGuiWidgetTetraViewer::TETRA_IMAGE_FOLDER_PATH = "../assets/textures/tetra_images/";
+#include "AppImageViewer.h"
 
 namespace
 {
+const char* TETRA_IMAGE_FOLDER_PATH = "../assets/textures/tetra_images/";
+
 ImVec2 calculateFitSize(const ImGuiTexture& texture, const ImVec2& availableSize)
 {
     float aspectRatio = (float)texture.width / (float)texture.height;
@@ -26,16 +24,15 @@ ImVec2 calculateFitSize(const ImGuiTexture& texture, const ImVec2& availableSize
 }
 } // namespace
 
-ImGuiWidgetTetraViewer::ImGuiWidgetTetraViewer() { refreshTetraImagePicker(); }
-
-void ImGuiWidgetTetraViewer::drawTetraImage(
-    Tetrium* engine,
+namespace TetriumApp
+{
+void AppImageViewer::drawTetraImage(
+    const TickContextImGui& ctx,
     ColorSpace colorSpace,
     const TetraImageFile& image
 )
 {
-    std::string imagePath = TETRA_IMAGE_FOLDER_PATH + image.paths[colorSpace];
-    ImGuiTexture tex = engine->getOrLoadImGuiTexture(engine->_imguiCtx, imagePath);
+    ImGuiTexture tex = image.textures[colorSpace];
 
     ImVec2 size = {(float)tex.width * _zoom, (float)tex.height * _zoom};
 
@@ -46,26 +43,30 @@ void ImGuiWidgetTetraViewer::drawTetraImage(
     ImGui::Image(tex.id, size);
 }
 
-void ImGuiWidgetTetraViewer::Draw(Tetrium* engine, ColorSpace colorSpace)
+void AppImageViewer::TickImGui(const TetriumApp::TickContextImGui& ctx)
 {
+    ColorSpace colorSpace = ctx.colorSpace;
     pollControls();
     ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0, 0, 0, 1));
     ImGuiWindowFlags flags = 0;
-    if (_fullScreen) {
-        ImGui::SetNextWindowPos(ImVec2(0, 0));
-        ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
-        flags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse
-                | ImGuiWindowFlags_NoResize;
+    ImGui::SetNextWindowPos(ImVec2(0, 0));
+    ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
+    flags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse
+            | ImGuiWindowFlags_NoResize;
+
+    if (_wantReloadImages) {
+        refreshTetraImagePicker(ctx);
+        _wantReloadImages = false;
     }
 
     if (ImGui::Begin("Tetra Viewer", NULL, flags)) {
         if (!_noUI) {
             drawControlPrompts();
-            drawTetraImagePicker(colorSpace);
+            drawTetraImagePicker(ctx, colorSpace);
         }
 
         if (_currTetraImage != -1) {
-            drawTetraImage(engine, colorSpace, _tetraImages.at(_currTetraImage));
+            drawTetraImage(ctx, colorSpace, _tetraImages.at(_currTetraImage));
         }
     }
     ImGui::End();
@@ -73,9 +74,13 @@ void ImGuiWidgetTetraViewer::Draw(Tetrium* engine, ColorSpace colorSpace)
 }
 
 // reload all tetra images through IO
-void ImGuiWidgetTetraViewer::refreshTetraImagePicker()
+void AppImageViewer::refreshTetraImagePicker(const TickContextImGui& ctx)
 {
     _currTetraImage = -1;
+    for (TetraImageFile& image : _tetraImages) {
+        ctx.apis.UnloadTexture(image.textureHandles[ColorSpace::RGB]);
+        ctx.apis.UnloadTexture(image.textureHandles[ColorSpace::OCV]);
+    }
     _tetraImages.clear();
 
     std::unordered_set<std::string> images;
@@ -110,7 +115,15 @@ void ImGuiWidgetTetraViewer::refreshTetraImagePicker()
             if (!isRGB) { // fileName is actually ocv
                 rgbFileName.swap(ocvFileName);
             }
-            TetraImageFile image{.name = tetraImageName, .paths = {rgbFileName, ocvFileName}};
+            TetraImageFile image{.name = tetraImageName, .fileNames = {rgbFileName, ocvFileName}};
+            std::string rgbFilePath = TETRA_IMAGE_FOLDER_PATH + rgbFileName;
+            std::string ocvFilePath = TETRA_IMAGE_FOLDER_PATH + ocvFileName;
+            image.textureHandles[ColorSpace::RGB] = ctx.apis.LoadTexture(rgbFilePath);
+            image.textureHandles[ColorSpace::OCV] = ctx.apis.LoadTexture(ocvFilePath);
+            image.textures[ColorSpace::RGB]
+                = ctx.apis.InitImGuiTexture(image.textureHandles[ColorSpace::RGB]);
+            image.textures[ColorSpace::OCV]
+                = ctx.apis.InitImGuiTexture(image.textureHandles[ColorSpace::OCV]);
             _tetraImages.emplace_back(image);
         } else {
             images.insert(fileName);
@@ -118,14 +131,10 @@ void ImGuiWidgetTetraViewer::refreshTetraImagePicker()
     }
 }
 
-void ImGuiWidgetTetraViewer::drawTetraImagePicker(ColorSpace colorSpace)
+void AppImageViewer::drawTetraImagePicker(const TickContextImGui& ctx, ColorSpace colorSpace)
 {
-    if (_shouldRefreshFilePicker) {
-        refreshTetraImagePicker();
-        _shouldRefreshFilePicker = false;
-    }
     if (ImGui::Button("Load Images")) {
-        _shouldRefreshFilePicker = true;
+        _wantReloadImages = true;
     }
 
     ImGui::SameLine();
@@ -146,13 +155,13 @@ void ImGuiWidgetTetraViewer::drawTetraImagePicker(ColorSpace colorSpace)
     }
 }
 
-void ImGuiWidgetTetraViewer::drawControlPrompts()
+void AppImageViewer::drawControlPrompts()
 {
-    ImGui::Text("J/K : zoom in/out. H/L: cycle images. F: toggle full screen mode. B: toggle UI. "
+    ImGui::Text("J/K : zoom in/out. H/L: cycle images. B: toggle UI. "
                 "A: Toggle Adaptive Image Sizes");
 }
 
-void ImGuiWidgetTetraViewer::pollControls()
+void AppImageViewer::pollControls()
 {
 
     if (ImGui::IsKeyPressed(ImGuiKey_K)) {
@@ -160,9 +169,6 @@ void ImGuiWidgetTetraViewer::pollControls()
     }
     if (ImGui::IsKeyPressed(ImGuiKey_J)) {
         _zoom -= 0.1;
-    }
-    if (ImGui::IsKeyPressed(ImGuiKey_F)) {
-        _fullScreen = !_fullScreen;
     }
     if (ImGui::IsKeyPressed(ImGuiKey_B)) {
         _noUI = !_noUI;
@@ -185,3 +191,13 @@ void ImGuiWidgetTetraViewer::pollControls()
         }
     }
 }
+
+void AppImageViewer::Cleanup(TetriumApp::CleanupContext& ctx)
+{
+    for (TetraImageFile& image : _tetraImages) {
+        for (int i = 0; i < ColorSpaceSize; i++) {
+            ctx.api.UnloadTexture(image.textureHandles[i]);
+        }
+    }
+}
+} // namespace TetriumApp

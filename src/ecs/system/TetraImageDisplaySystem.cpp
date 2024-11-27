@@ -452,9 +452,10 @@ void TetraImageDisplaySystem::LoadTexture(const std::string& imagePath)
 {
     // load texture into textures[textureOffset]
     DEBUG("loading texture into {}", _textureDescriptorInfoIdx);
-    _textureManager->GetDescriptorImageInfo(
-        imagePath, _textureDescriptorInfo[_textureDescriptorInfoIdx]
-    );
+    NEEDS_IMPLEMENTATION();
+    // _textureManager->GetDescriptorImageInfo(
+    //     imagePath, _textureDescriptorInfo[_textureDescriptorInfoIdx]
+    // );
     _textureDescriptorIndices[imagePath] = _textureDescriptorInfoIdx;
     _textureDescriptorInfoIdx++;
     updateTextureDescriptorSet();

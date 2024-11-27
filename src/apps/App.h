@@ -10,19 +10,32 @@ namespace TetriumApp
 struct InitContext
 {
     VQDevice& device;
-    struct {
+
+    struct
+    {
         vk::Format imageFormat;
         vk::Extent2D extent;
     } swapchain;
 
-    struct {
-        std::function<vk::DescriptorImageInfo(const std::string&)> LoadAndGetTextureDescriptorImageInfo;
+    struct
+    {
+        std::function<vk::DescriptorImageInfo(const std::string&)>
+            LoadAndGetTextureDescriptorImageInfo;
+
+        std::function<uint32_t(const std::string&)> LoadTexture;
+        std::function<vk::DescriptorImageInfo(uint32_t)> GetTextureDescriptorImageInfo;
+        std::function<ImGuiTexture(uint32_t)> InitImGuiTexture;
     } api;
 };
 
 struct CleanupContext
 {
     VQDevice& device;
+
+    struct
+    {
+        std::function<void(uint32_t)> UnloadTexture;
+    } api;
 };
 
 struct TickContextImGui
@@ -32,9 +45,11 @@ struct TickContextImGui
 
     struct
     {
-        std::function<ImGuiTexture(const std::string&)> GetImGuiTexture;
-        std::function<void(const std::string&)> UnloadImGuiTexture;
         std::function<void(Sound)> PlaySound;
+        std::function<uint32_t(const std::string&)> LoadTexture;
+        std::function<ImGuiTexture(uint32_t)> InitImGuiTexture;
+        std::function<ImGuiTexture(uint32_t)> GetImGuiTexture;
+        std::function<void(uint32_t)> UnloadTexture;
     } apis;
 
     mutable struct
@@ -68,9 +83,10 @@ class App
     virtual void Cleanup(TetriumApp::CleanupContext& ctx) = 0;
 
     // Called when the app is opened i.e. becomes the primary app
-    virtual void OnOpen() {};
+    virtual void OnOpen(){};
     // Called when the app is closed i.e. no longer the primary app
-    virtual void OnClose() {};
+    virtual void OnClose(){};
+
     virtual ~App() {}
 
     // TickImGui() and TickVulkan() are only called if the app is active
