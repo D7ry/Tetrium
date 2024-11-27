@@ -73,14 +73,10 @@ void Tetrium::cursorPosCallback(GLFWwindow* window, double xpos, double ypos)
     }
     double deltaX = prevX - xpos;
     double deltaY = prevY - ypos;
-    // handle camera movement
-    deltaX *= 0.3;
-    deltaY *= 0.3; // make movement slower
-    if (_windowFocused && !_uiMode) {
-        _mainCamera.ModRotation(deltaX, deltaY, 0);
-    }
     prevX = xpos;
     prevY = ypos;
+
+    // the whole code will get DCE'd
 }
 
 void Tetrium::loadEngineTextures()
@@ -107,9 +103,6 @@ void Tetrium::initDefaultStates()
     // clear color
     _clearValues[0].color = {0.0f, 0.0f, 0.0f, 1.f};
     _clearValues[1].depthStencil = vk::ClearDepthStencilValue(1.f, 0.f);
-
-    // camera location
-    _mainCamera.SetPosition(-2, 0, 0);
 
     // input states
     // by default, unlock cursor, disable imgui inputs, disable input handling
@@ -1100,33 +1093,6 @@ void Tetrium::createDepthBuffer(SwapChainContext& ctx)
 // currently for perf reasons we're leaving it as is.
 void Tetrium::bindDefaultInputs()
 {
-    // const int CAMERA_SPEED = 3;
-    // _inputManager.RegisterCallback(GLFW_KEY_W, InputManager::KeyCallbackCondition::HOLD, [this]()
-    // {
-    //     _mainCamera.Move(_deltaTimer.GetDeltaTime() * CAMERA_SPEED, 0, 0);
-    // });
-    // _inputManager.RegisterCallback(GLFW_KEY_S, InputManager::KeyCallbackCondition::HOLD, [this]()
-    // {
-    //     _mainCamera.Move(-_deltaTimer.GetDeltaTime() * CAMERA_SPEED, 0, 0);
-    // });
-    // _inputManager.RegisterCallback(GLFW_KEY_A, InputManager::KeyCallbackCondition::HOLD, [this]()
-    // {
-    //     _mainCamera.Move(0, _deltaTimer.GetDeltaTime() * CAMERA_SPEED, 0);
-    // });
-    // _inputManager.RegisterCallback(GLFW_KEY_D, InputManager::KeyCallbackCondition::HOLD, [this]()
-    // {
-    //     _mainCamera.Move(0, -_deltaTimer.GetDeltaTime() * CAMERA_SPEED, 0);
-    // });
-    // _inputManager.RegisterCallback(
-    //     GLFW_KEY_LEFT_CONTROL,
-    //     InputManager::KeyCallbackCondition::HOLD,
-    //     [this]() { _mainCamera.Move(0, 0, -CAMERA_SPEED * _deltaTimer.GetDeltaTime()); }
-    // );
-    // _inputManager.RegisterCallback(
-    //     GLFW_KEY_SPACE,
-    //     InputManager::KeyCallbackCondition::HOLD,
-    //     [this]() { _mainCamera.Move(0, 0, CAMERA_SPEED * _deltaTimer.GetDeltaTime()); }
-    // );
     // ui mode toggle
     _inputManager.RegisterCallback(GLFW_KEY_U, InputManager::KeyCallbackCondition::PRESS, [this]() {
         _uiMode = !_uiMode;

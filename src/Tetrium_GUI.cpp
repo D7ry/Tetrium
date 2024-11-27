@@ -93,44 +93,6 @@ void Tetrium::drawMainMenu(ColorSpace colorSpace)
 
     if (ImGui::Begin(DEFAULTS::Engine::APPLICATION_NAME, NULL, fullScreenFlags)) {
         if (ImGui::BeginTabBar("Engine Tab")) {
-            /* if (ImGui::BeginTabItem((const char*)u8"🏠General")) {
-                ImGui::SeparatorText("📹Camera");
-                {
-                    ImGui::Text(
-                        "Position: (%f, %f, %f)",
-                        _mainCamera.GetPosition().x,
-                        _mainCamera.GetPosition().y,
-                        _mainCamera.GetPosition().z
-                    );
-                    ImGui::Text(
-                        "Yaw: %f Pitch: %f Roll: %f",
-                        _mainCamera.GetRotation().y,
-                        _mainCamera.GetRotation().x,
-                        _mainCamera.GetRotation().z
-                    );
-                    ImGui::SliderFloat("FOV", &_FOV, 30, 120, "%.f");
-                }
-                if (ImGui::Button("Reset")) {
-                    _mainCamera.SetPosition(0, 0, 0);
-                }
-                ImGui::SeparatorText("🐭Cursor Lock(tab)");
-                if (_windowFocused) {
-                    ImGui::Text("Cursor Lock: Active");
-                } else {
-                    ImGui::Text("Cursor Lock: Deactive");
-                }
-                if (_uiMode) {
-                    ImGui::Text("UI Mode: Active");
-                } else {
-                    ImGui::Text("UI Mode: Deactive");
-                }
-                ImGui::SeparatorText("🚗Engine UBO");
-                _widgetUBOViewer.Draw(this, colorSpace);
-                ImGui::SeparatorText("Graphics Pipeline");
-                _widgetGraphicsPipeline.Draw(this, colorSpace);
-                ImGui::EndTabItem();
-            } */
-
             if (ImGui::BeginTabItem("🎨Apps")) {
                 // show all apps
                 for (auto& [appName, app] : _appMap) {
@@ -164,16 +126,6 @@ void Tetrium::drawMainMenu(ColorSpace colorSpace)
                 _widgetColorTile.Draw(this, colorSpace);
                 ImGui::EndTabItem();
             }
-
-            // if (ImGui::BeginTabItem("🐍Blob Hunter")) {
-            //     _widgetBlobHunter.Draw(this, colorSpace);
-            //     ImGui::EndTabItem();
-            // }
-
-            // we don't use temp stuff lol
-            // if (ImGui::BeginTabItem("Temp Stuff")) {
-            //     _widgetTemp.Draw(this, colorSpace);
-            // }
 
             ImGui::EndTabBar(); // Engine Tab
         }

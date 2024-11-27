@@ -32,14 +32,11 @@
 #include "components/imgui_widgets/ImGuiWidgetEvenOddCalibration.h"
 #include "components/imgui_widgets/ImGuiWidgetTemp.h"
 #include "components/imgui_widgets/ImGuiWidgetBlobHunter.h"
-// ecs
-#include "ecs/system/TetraImageDisplaySystem.h"
 
 // Applications
 #include "apps/App.h"
 
 class ImPlotContext;
-class TickContext;
 
 class Tetrium
 {
@@ -260,11 +257,9 @@ class Tetrium
     void bindDefaultInputs();
 
     /* ---------- Render-Time Functions ---------- */
-    void drawFrame(TickContext* tickData, uint8_t frame);
+    void drawFrame(uint8_t frame);
     void drawMainMenu(ColorSpace colorSpace);
     void drawImGui(ColorSpace colorSpace, int currentFrameInFlight);
-    void flushEngineUBOStatic(uint8_t frame);
-    void getMainProjectionMatrix(glm::mat4& projectionMatrix);
 
     void drawAppsImGui(ColorSpace colorSpace, int currentFrameInFlight);
 
@@ -360,8 +355,6 @@ class Tetrium
 
     float _FOV = 90;
     double _timeSinceStartSeconds; // seconds in time since engine start, regardless of pause
-    unsigned long int
-        _timeSinceStartNanoSeconds;  // nanoseconds in time since engine start, regardless of pause
     unsigned long int _numTicks = 0; // how many ticks has happened so far
 
     // even-odd frame
@@ -398,7 +391,6 @@ class Tetrium
     DeletionStack _deletionStack;
     TextureManager _textureManager;
     DeltaTimer _deltaTimer;
-    Camera _mainCamera; // FIXME: this should be a component
     InputManager _inputManager;
     Profiler _profiler;
     TaskQueue _taskQueue;
@@ -424,11 +416,6 @@ class Tetrium
 
     ImGuiWidgetBlobHunter _widgetBlobHunter;
 
-
-    struct
-    {
-        [[deprecated]] TetraImageDisplaySystem imageDisplay;
-    } _rgbyRenderers;
 
     std::unordered_map<std::string, TetriumApp::App*> _appMap;
 

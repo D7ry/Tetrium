@@ -14,32 +14,6 @@ void Tetrium::Run()
     DEBUG("Ending run loop...");
 }
 
-void Tetrium::getMainProjectionMatrix(glm::mat4& projectionMatrix)
-{
-    auto& extent = _swapChain.extent;
-    projectionMatrix = glm::perspective(
-        glm::radians(_FOV),
-        extent.width / static_cast<float>(extent.height),
-        DEFAULTS::ZNEAR,
-        DEFAULTS::ZFAR
-    );
-    projectionMatrix[1][1] *= -1; // invert for vulkan coord system
-}
-
-void Tetrium::flushEngineUBOStatic(uint8_t frame)
-{
-    PROFILE_SCOPE(&_profiler, "flushEngineUBOStatic");
-    VQBuffer& buf = _engineUBOStatic[frame];
-    EngineUBOStatic ubo{
-        _mainCamera.GetViewMatrix() // view
-        // proj
-    };
-    getMainProjectionMatrix(ubo.proj);
-    ubo.timeSinceStartSeconds = _timeSinceStartSeconds;
-    ubo.sinWave = (sin(_timeSinceStartSeconds) + 1) / 2.f; // offset to [0, 1]
-    memcpy(buf.bufferAddress, &ubo, sizeof(ubo));
-}
-
 void Tetrium::Tick()
 {
     if (_paused) {
@@ -54,12 +28,8 @@ void Tetrium::Tick()
             // CPU-exclusive workloads
             double deltaTime = _deltaTimer.GetDeltaTime();
             _timeSinceStartSeconds += deltaTime;
-            _timeSinceStartNanoSeconds += _deltaTimer.GetDeltaTimeNanoSeconds();
             _inputManager.Tick(deltaTime);
-            TickContext tickData{&_mainCamera, deltaTime};
-            tickData.profiler = &_profiler;
-            flushEngineUBOStatic(_currentFrame);
-            drawFrame(&tickData, _currentFrame);
+            drawFrame(_currentFrame);
             _currentFrame = (_currentFrame + 1) % NUM_FRAME_IN_FLIGHT;
         }
         {
@@ -88,7 +58,7 @@ void Tetrium::getFullScreenViewportAndScissor(
     scissor.extent = extend;
 }
 
-void Tetrium::drawFrame(TickContext* ctx, uint8_t frameIdx)
+void Tetrium::drawFrame(uint8_t frameIdx)
 {
     SyncPrimitives& sync = _syncProjector[frameIdx];
     VkResult result;
@@ -151,13 +121,6 @@ void Tetrium::drawFrame(TickContext* ctx, uint8_t frameIdx)
         { // begin command buffer
             CB1.begin(vk::CommandBufferBeginInfo());
         }
-
-        // update graphics rendering context
-        ctx->graphics.currentFrameInFlight = frameIdx;
-        ctx->graphics.currentSwapchainImageIndex = swapchainImageIndex;
-        ctx->graphics.CB = CB1;
-        ctx->graphics.currentFBextend = _swapChain.extent;
-        getMainProjectionMatrix(ctx->graphics.mainProjectionMatrix);
 
         { // main render pass
             vk::Extent2D extend = _swapChain.extent;
