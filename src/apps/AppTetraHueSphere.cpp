@@ -288,7 +288,7 @@ void AppTetraHueSphere::cleanupRenderContext(
     TetriumApp::CleanupContext& cleanupCtx
 )
 {
-    ctx.fb.Cleanup(cleanupCtx.device.logicalDevice);
+    ctx.fb.Cleanup();
 }
 
 void AppTetraHueSphere::initRenderContext(RenderContext& ctx, TetriumApp::InitContext& initCtx)

@@ -157,59 +157,60 @@ void loadModel(
     vertices.clear();
     indices.clear();
 
+    // Load the OBJ file
     if (!tinyobj::LoadObj(
             &attrib, &shapes, &materials, &warn, &err, meshFilePath
         )) {
         throw std::runtime_error(warn + err);
     }
 
-    // deduplication
-    std::unordered_map<Vertex, uint32_t> uniqueVertices{
-    }; // unique vertex -> index
+    // Deduplication map for unique vertices
+    std::unordered_map<Vertex, uint32_t> uniqueVertices; // unique vertex -> index
 
+    // Iterate through the shapes and process the mesh data
     for (const auto& shape : shapes) {
         for (const auto& index : shape.mesh.indices) {
-            Vertex vertex{glm::vec3{
-                attrib.vertices[3 * index.vertex_index + 0],
-                attrib.vertices[3 * index.vertex_index + 1],
-                attrib.vertices[3 * index.vertex_index + 2]
-            }};
+            // Construct the vertex
+            Vertex vertex{
+                glm::vec3{
+                    attrib.vertices[3 * index.vertex_index + 0],
+                    attrib.vertices[3 * index.vertex_index + 1],
+                    attrib.vertices[3 * index.vertex_index + 2]
+                }
+            };
 
-            vertex.texCoord
-                = {attrib.texcoords[2 * index.texcoord_index + 0],
-                   1.0f - attrib.texcoords[2 * index.texcoord_index + 1]};
+            // Load texture coordinates (if available)
+            if (index.texcoord_index >= 0) {
+                vertex.texCoord = {
+                    attrib.texcoords[2 * index.texcoord_index + 0],
+                    1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
+                };
+            }
 
-            vertex.color = {1.0f, 1.0f, 1.0f};
+            // If normals are available, load them
+            if (index.normal_index >= 0) {
+                vertex.normal = glm::vec3{
+                    attrib.normals[3 * index.normal_index + 0],
+                    attrib.normals[3 * index.normal_index + 1],
+                    attrib.normals[3 * index.normal_index + 2]
+                };
+            } else {
+                // If no normal is provided, set the default normal
+                vertex.normal = glm::vec3(0.0f, 0.0f, 0.0f); // Optional: You could set this to a default value
+            }
 
+            // Deduplicate vertices and add them to the list
             if (uniqueVertices.find(vertex) == uniqueVertices.end()) {
                 uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
                 vertices.push_back(vertex);
             }
 
+            // Add index to the indices list
             indices.push_back(uniqueVertices[vertex]);
         }
     }
 
-    // calculate vertex normals
-    for (int i = 0; i < indices.size();
-         i += 3) { // note that we traverse indices here instead of vertices;
-                   // each iteration is a triangle
-        Vertex& v0 = vertices[indices[i + 0]];
-        Vertex& v1 = vertices[indices[i + 1]];
-        Vertex& v2 = vertices[indices[i + 2]];
-
-        glm::vec3 edge1 = v1.pos - v0.pos;
-        glm::vec3 edge2 = v2.pos - v0.pos;
-        glm::vec3 normal = glm::normalize(glm::cross(edge1, edge2));
-
-        v0.normal += normal;
-        v1.normal += normal;
-        v2.normal += normal;
-    }
-
-    for (Vertex& v : vertices) {
-        v.normal = glm::normalize(v.normal);
-    }
+    // Normals are now taken from the OBJ file, no need to calculate them manually
 }
 } // namespace CoreUtils
 
