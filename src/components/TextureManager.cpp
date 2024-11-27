@@ -90,6 +90,9 @@ void TextureManager::GetDescriptorImageInfo(uint32_t handle, VkDescriptorImageIn
 
 uint32_t TextureManager::LoadTexture(const std::string& texturePath)
 {
+    if (texturePath.empty()) {
+        FATAL("Empty texture path!");
+    }
     if (_device == VK_NULL_HANDLE) {
         FATAL("Texture manager hasn't been initialized!");
     }

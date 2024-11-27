@@ -93,12 +93,12 @@ add_executable(${PROJECT_NAME}
         src/components/Camera.cpp
         src/components/TextureManager.cpp
         src/components/InputManager.cpp
-        src/components/imgui_widgets/ImGuiWidgetTemp.cpp
+        # src/components/imgui_widgets/ImGuiWidgetTemp.cpp
         src/components/imgui_widgets/ImGuiWidgetPerfPlot.cpp
         src/components/imgui_widgets/ImGuiWidgetDeviceInfo.cpp
-        src/components/imgui_widgets/ImGuiWidgetUBOViewer.cpp
+        # src/components/imgui_widgets/ImGuiWidgetUBOViewer.cpp
         src/components/imgui_widgets/ImGuiWidgetEvenOddCalibration.cpp
-        src/components/imgui_widgets/ImGuiWidgetGraphicsPipeline.cpp
+        # src/components/imgui_widgets/ImGuiWidgetGraphicsPipeline.cpp
         src/components/imgui_widgets/ImGuiWidgetColorTile.cpp
         src/components/imgui_widgets/ImGuiWidgetBlobHunter.cpp
 

@@ -280,7 +280,7 @@ void initFonts()
 
 } // namespace Tetrium_ImGui
 
-void Tetrium::reinitImGuiFrameBuffers(Tetrium::ImGuiRenderContexts& ctx)
+void Tetrium::reinitImGuiFrameBuffers(Tetrium::ImGuiRenderContext& ctx)
 {
     Tetrium_ImGui::InitializeFrameBuffer(
         _device->Get(),
@@ -294,7 +294,7 @@ void Tetrium::reinitImGuiFrameBuffers(Tetrium::ImGuiRenderContexts& ctx)
     );
 }
 
-void Tetrium::destroyImGuiContext(Tetrium::ImGuiRenderContexts& ctx)
+void Tetrium::destroyImGuiContext(Tetrium::ImGuiRenderContext& ctx)
 {
     // NOTE: current imgui impl does not support vulkan multi-context shutdown;
     // not a big problem for now since we only shut down at very end, but
@@ -312,7 +312,7 @@ void Tetrium::destroyImGuiContext(Tetrium::ImGuiRenderContexts& ctx)
     vkDestroyDescriptorPool(_device->logicalDevice, ctx.descriptorPool, nullptr);
 }
 
-void Tetrium::initImGuiRenderContext(Tetrium::ImGuiRenderContexts& ctx)
+void Tetrium::initImGuiRenderContext(Tetrium::ImGuiRenderContext& ctx)
 {
     // create render pass
     VkImageLayout imguiInitialLayout, imguiFinalLayout;
@@ -380,7 +380,7 @@ void Tetrium::initImGuiRenderContext(Tetrium::ImGuiRenderContexts& ctx)
 }
 
 void Tetrium::recordImGuiDrawCommandBuffer(
-    Tetrium::ImGuiRenderContexts& ctx,
+    Tetrium::ImGuiRenderContext& ctx,
     vk::CommandBuffer cb,
     vk::Extent2D extent,
     int swapChainImageIndex
