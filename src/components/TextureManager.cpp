@@ -137,7 +137,7 @@ uint32_t TextureManager::LoadCubemapTexture(const std::string& imagePath)
 
     // Extract faces from the vertical cross layout
     auto copyFace = [&](int srcX, int srcY, int faceIndex) {
-        DEBUG("Copying face {} from ({}, {}) to {}", faceIndex, srcX, srcY, faceIndex);
+        // DEBUG("Copying face {} from ({}, {}) to {}", faceIndex, srcX, srcY, faceIndex);
         for (int y = 0; y < faceHeight; ++y) {
             for (int x = 0; x < faceWidth; ++x) {
                 int srcIndex = ((srcY * faceHeight + y) * width + (srcX * faceWidth + x)) * 4;
