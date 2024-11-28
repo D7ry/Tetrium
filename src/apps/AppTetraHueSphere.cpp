@@ -28,8 +28,11 @@ const char* FRAGMENT_SHADER_PATH = "../assets/apps/AppTetraHueSphere/shader.frag
 // const char* HUE_SPHERE_MODEL_PATH = "../assets/apps/AppTetraHueSphere/ugly_sphere.obj";
 
 const char* HUE_SPHERE_UGLY_MODEL_PATH = "../assets/apps/AppTetraHueSphere/fibonacci_sampled.obj";
-const char* HUE_SPHERE_UGLY_TEXTURE_PATH_RGB = "../assets/apps/AppTetraHueSphere/cubemaps/test_RGB_cube_map.png";
-const char* HUE_SPHERE_UGLY_TEXTURE_PATH_OCV = "../assets/apps/AppTetraHueSphere/cubemaps/test_OCV_cube_map.png";
+// const char* HUE_SPHERE_UGLY_TEXTURE_PATH_RGB = "../assets/apps/AppTetraHueSphere/cubemaps/cubemap_RGB.png";
+// const char* HUE_SPHERE_UGLY_TEXTURE_PATH_OCV = "../assets/apps/AppTetraHueSphere/cubemaps/cubemap_OCV.png";
+
+const char* HUE_SPHERE_UGLY_TEXTURE_PATH_RGB = "../assets/apps/AppTetraHueSphere/cubemaps/test_RGB.png";
+const char* HUE_SPHERE_UGLY_TEXTURE_PATH_OCV = "../assets/apps/AppTetraHueSphere/cubemaps/test_OCV.png";
 
 const char* HUE_SPHERE_PRETTY_MODEL_PATH = "../assets/apps/AppTetraHueSphere/pretty_sphere.obj";
 const char* HUE_SPHERE_PRETTY_TEXTURE_PATH_RGB = HUE_SPHERE_UGLY_TEXTURE_PATH_RGB;
@@ -164,7 +167,9 @@ void AppTetraHueSphere::TickImGui(const TetriumApp::TickContextImGui& ctx)
 
     // rotate hue sphere
 
-    _rasterizationCtx.hueSpheretransform.rotation.z
+    // TODO: this is a temp hack to work around non-commutative rotation
+    // use quaternions instead in the future for transform
+    _rasterizationCtx.hueSpheretransform.rotation.y
         += io.DeltaTime * _rasterizationCtx.sphereRotationSpeed * 50.f;
 }
 
@@ -655,6 +660,8 @@ void AppTetraHueSphere::initRasterization(TetriumApp::InitContext& initCtx)
             _rasterizationCtx.prettySphereMesh.indexBuffer
         );
     }
+
+    _rasterizationCtx.hueSpheretransform.rotation = glm::vec3(90,0, 0);
 }
 
 void AppTetraHueSphere::cleanupRasterization(TetriumApp::CleanupContext& cleanupCtx)
