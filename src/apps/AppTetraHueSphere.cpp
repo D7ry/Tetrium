@@ -28,11 +28,11 @@ const char* FRAGMENT_SHADER_PATH = "../assets/apps/AppTetraHueSphere/shader.frag
 // const char* HUE_SPHERE_MODEL_PATH = "../assets/apps/AppTetraHueSphere/ugly_sphere.obj";
 
 const char* HUE_SPHERE_UGLY_MODEL_PATH = "../assets/apps/AppTetraHueSphere/fibonacci_sampled.obj";
-// const char* HUE_SPHERE_UGLY_TEXTURE_PATH_RGB = "../assets/apps/AppTetraHueSphere/cubemaps/cubemap_RGB.png";
-// const char* HUE_SPHERE_UGLY_TEXTURE_PATH_OCV = "../assets/apps/AppTetraHueSphere/cubemaps/cubemap_OCV.png";
+const char* HUE_SPHERE_UGLY_TEXTURE_PATH_RGB = "../assets/apps/AppTetraHueSphere/cubemaps/cubemap_RGB.png";
+const char* HUE_SPHERE_UGLY_TEXTURE_PATH_OCV = "../assets/apps/AppTetraHueSphere/cubemaps/cubemap_OCV.png";
 
-const char* HUE_SPHERE_UGLY_TEXTURE_PATH_RGB = "../assets/apps/AppTetraHueSphere/cubemaps/test_RGB.png";
-const char* HUE_SPHERE_UGLY_TEXTURE_PATH_OCV = "../assets/apps/AppTetraHueSphere/cubemaps/test_OCV.png";
+// const char* HUE_SPHERE_UGLY_TEXTURE_PATH_RGB = "../assets/apps/AppTetraHueSphere/cubemaps/test_RGB.png";
+// const char* HUE_SPHERE_UGLY_TEXTURE_PATH_OCV = "../assets/apps/AppTetraHueSphere/cubemaps/test_OCV.png";
 
 const char* HUE_SPHERE_PRETTY_MODEL_PATH = "../assets/apps/AppTetraHueSphere/pretty_sphere.obj";
 const char* HUE_SPHERE_PRETTY_TEXTURE_PATH_RGB = HUE_SPHERE_UGLY_TEXTURE_PATH_RGB;

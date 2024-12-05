@@ -159,6 +159,12 @@ class Tetrium
         ImPlotContext* backendImPlotContext;
     };
 
+    enum class ROCVPresentMode{
+        kNormal,
+        kRGBOnly,
+        kOCVOnly
+    }
+
     /* ---------- Windowing ---------- */;
     std::pair<GLFWmonitor*, GLFWvidmode> cliMonitorModeSelection();
     GLFWwindow* initGLFW(bool promptUserForFullScreenWindow);
@@ -287,7 +293,8 @@ class Tetrium
         Tetrium::ImGuiRenderContext& ctx,
         vk::CommandBuffer cb,
         vk::Extent2D extent,
-        int swapChainImageIndex
+        int swapChainImageIndex,
+        ColorSpace colorSpace
     );
 
     void clearImGuiDrawData();
@@ -400,4 +407,6 @@ class Tetrium
     std::optional<TetriumApp::App*> _primaryApp = std::nullopt;
 
     std::array<std::pair<uint32_t, ImGuiTexture>, static_cast<int>(EngineTexture::kNumTextures)> _engineTextures;
+
+    ROCVPresentMode _rocvPresentMode = ROCVPresentMode::kNormal;
 };

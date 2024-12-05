@@ -166,7 +166,7 @@ void Tetrium::drawFrame(uint8_t frameIdx)
             );
 #endif
 
-            recordImGuiDrawCommandBuffer(_imguiCtx, CB1, extend, swapchainImageIndex);
+            recordImGuiDrawCommandBuffer(_imguiCtx, CB1, extend, swapchainImageIndex, colorSpace);
         }
 
         CB1.end();

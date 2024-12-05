@@ -383,7 +383,8 @@ void Tetrium::recordImGuiDrawCommandBuffer(
     Tetrium::ImGuiRenderContext& ctx,
     vk::CommandBuffer cb,
     vk::Extent2D extent,
-    int swapChainImageIndex
+    int swapChainImageIndex,
+    ColorSpace colorSpace
 )
 {
 
@@ -401,7 +402,26 @@ void Tetrium::recordImGuiDrawCommandBuffer(
     if (drawData == nullptr) {
         FATAL("Draw data is null!");
     }
-    ImGui_ImplVulkan_RenderDrawData(drawData, cb);
+
+    bool shouldPaintImGUI = true;
+    switch (_rocvPresentMode) {
+    case ROCVPresentMode::kNormal:
+        break;
+    case ROCVPresentMode::kRGBOnly:
+        if (colorSpace == ColorSpace::OCV) {
+            shouldPaintImGUI = false;
+        }
+        break;
+    case ROCVPresentMode::kOCVOnly:
+        if (colorSpace == ColorSpace::RGB) {
+            shouldPaintImGUI = false;
+        }
+        break;
+    }
+
+    if (shouldPaintImGUI) {
+        ImGui_ImplVulkan_RenderDrawData(drawData, cb);
+    }
 
     cb.endRenderPass();
 }

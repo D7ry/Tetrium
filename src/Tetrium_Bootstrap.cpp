@@ -1124,6 +1124,13 @@ void Tetrium::bindDefaultInputs()
             }
         }
     );
+
+    // "." key to toggle only even / only odd / both
+    _inputManager.RegisterCallback(
+        GLFW_KEY_PERIOD,
+        InputManager::KeyCallbackCondition::PRESS,
+        [this]() { _rocvPresentMode = (ROCVPresentMode)(((int)_rocvPresentMode + 1) % 3); }
+    );
 }
 
 // https://www.saschawillems.de/blog/2018/07/19/vulkan-input-attachments-and-sub-passes/
