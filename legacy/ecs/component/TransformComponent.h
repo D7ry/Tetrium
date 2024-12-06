@@ -1,3 +1,4 @@
+#if 0
 #pragma once
 #include "ecs/component/Component.h"
 
@@ -35,3 +36,4 @@ struct TransformComponent : public IComponent
         return model;
     }
 };
+#endif

@@ -1,45 +1,117 @@
+#if 0
 #include "components/ShaderUtils.h"
+#include "lib/VulkanUtils.h"
 #include "lib/VQDevice.h"
+#include "lib/VQUtils.h"
+#include "structs/Vertex.h"
 
+#include "components/Camera.h"
 #include "components/TextureManager.h"
 
-#include "TetraImageDisplaySystem.h"
+#include "SimpleRenderSystem.h"
+#include "ecs/component/TransformComponent.h"
 
-void TetraImageDisplaySystem::Init(const InitContext* ctx)
+void SimpleRenderSystem::Init(const InitContext* ctx)
 {
     _device = ctx->device;
     _textureManager = ctx->textureManager;
+    _dynamicUBOAlignmentSize = _device->GetDynamicUBOAlignedSize(sizeof(UBODynamic));
 
-    // FIXME: add cleanup functions
-    for (VQBuffer& systemUBO : _renderCtx._systemUBOStatic) {
-        _device->CreateBufferInPlace(
-            sizeof(SystemUBOStatic),
-            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-            systemUBO
-        );
-    }
-    createGraphicsPipeline(ctx->rygbRenderPass, ctx);
+    NEEDS_IMPLEMENTATION() // TODO: figure out new pipeline creation
+    //createGraphicsPipeline(ctx->renderPasses, ctx);
 }
 
-void TetraImageDisplaySystem::Cleanup()
+void SimpleRenderSystem::Cleanup()
 {
     DEBUG("Cleaning up phong rendering system");
 
-    // clean up pipeline
-    vkDestroyPipeline(_device->logicalDevice, _renderCtx._pipeline, nullptr);
-    vkDestroyPipelineLayout(_device->logicalDevice, _renderCtx._pipelineLayout, nullptr);
+    // clean up meshes
+    for (auto& mesh : this->_meshes) {
+        // free up buffers
+        mesh.second.indexBuffer.Cleanup();
+        mesh.second.vertexBuffer.Cleanup();
+    }
+
+    for (auto& ctx : {&(_renderSystemContexts[RGB]), &(_renderSystemContexts[OCV])}) {
+        // clean up static UBO & dynamic UBO
+        for (int i = 0; i < ctx->_UBO.size(); i++) {
+            ctx->_UBO[i].dynamicUBO.Cleanup();
+        }
+        // clean up pipeline
+        vkDestroyPipeline(_device->logicalDevice, ctx->_pipeline, nullptr);
+        vkDestroyPipelineLayout(_device->logicalDevice, ctx->_pipelineLayout, nullptr);
+    }
 
     // clean up descriptors
     vkDestroyDescriptorSetLayout(_device->logicalDevice, _descriptorSetLayout, nullptr);
     // descriptor sets automatically cleaned up
     vkDestroyDescriptorPool(_device->logicalDevice, _descriptorPool, nullptr);
 
-    DEBUG("TetraImageDisplaySystem cleaned up");
+    DEBUG("SimpleRenderSystem cleaned up");
     // note: texture is handled by TextureManager so no need to clean that up
 }
 
-void TetraImageDisplaySystem::buildPipelineForContext(
+void SimpleRenderSystem::Tick(const TickContext* tickCtx, ColorSpace cs)
+{
+    const RenderSystemContext& renderCtx = _renderSystemContexts[cs];
+
+    VkCommandBuffer CB = tickCtx->graphics.CB;
+    int frameIdx = tickCtx->graphics.currentFrameInFlight;
+
+    vkCmdBindPipeline(CB, VK_PIPELINE_BIND_POINT_GRAPHICS, renderCtx._pipeline);
+
+    for (Entity* entity : this->_entities) {
+        MeshComponent* meshInstance = entity->GetComponent<MeshComponent>();
+        TransformComponent* transform = entity->GetComponent<TransformComponent>();
+        ASSERT(meshInstance != nullptr)
+        ASSERT(transform != nullptr)
+        // actual render logic
+
+        uint32_t dynamicUBOOffset = meshInstance->dynamicUBOId * _dynamicUBOAlignmentSize;
+        { // bind descriptor set to the correct dynamic ubo
+            vkCmdBindDescriptorSets(
+                CB,
+                VK_PIPELINE_BIND_POINT_GRAPHICS,
+                renderCtx._pipelineLayout,
+                0,
+                1,
+                &renderCtx._descriptorSets[frameIdx],
+                1,
+                &dynamicUBOOffset
+            );
+        }
+
+        { // update dynamic UBO
+            // TODO: may be a little expensive to do; given dynamic ubo only
+            // needs to be updated when relevant data structures of the instance
+            // changes
+            // memcpy here will stall the program
+            UBODynamic* pUBOdynamic = reinterpret_cast<UBODynamic*>(
+                reinterpret_cast<uintptr_t>(renderCtx._UBO[frameIdx].dynamicUBO.bufferAddress)
+                + dynamicUBOOffset
+            );
+            transform->GetModelMatrix(pUBOdynamic->model);
+            // TODO: the below shouldn't be necessary after first update, verify this.
+            pUBOdynamic->isRGB = cs == ColorSpace::RGB;
+            pUBOdynamic->textureOffsetRGB = meshInstance->textureOffsetRGB;
+            pUBOdynamic->textureOffsetOCV = meshInstance->textureOffsetOCV;
+        }
+
+        { // bind vertex & index buffer
+            VkDeviceSize offsets[] = {0};
+            VkBuffer vertexBuffers[] = {meshInstance->mesh->vertexBuffer.buffer};
+            VkBuffer indexBufffer = meshInstance->mesh->indexBuffer.buffer;
+            vkCmdBindVertexBuffers(CB, 0, 1, vertexBuffers, offsets);
+            vkCmdBindIndexBuffer(CB, indexBufffer, 0, VK_INDEX_TYPE_UINT32);
+        }
+
+        { // issue draw call
+            vkCmdDrawIndexed(CB, meshInstance->mesh->indexBuffer.numIndices, 1, 0, 0, 0);
+        }
+    }
+}
+
+void SimpleRenderSystem::buildPipelineForContext(
     const VkRenderPass pass,
     RenderSystemContext& ctx,
     const std::array<VkDescriptorBufferInfo, NUM_FRAME_IN_FLIGHT>& engineUboInfo
@@ -66,17 +138,16 @@ void TetraImageDisplaySystem::buildPipelineForContext(
         }
     }
 
-    std::array<VkDescriptorBufferInfo, NUM_FRAME_IN_FLIGHT> systemUboInfo;
-    for (int i = 0; i < ctx._systemUBOStatic.size(); i++) {
-        systemUboInfo[i].range = sizeof(SystemUBOStatic);
-        systemUboInfo[i].buffer = ctx._systemUBOStatic[i].buffer;
-        systemUboInfo[i].offset = 0;
-    }
+    // allocate for dynamic ubo, and write to descriptors
+    resizeDynamicUbo(ctx, 10);
+    _numDynamicUBO = 10;
     // update descriptor sets
-    // note here we only update descriptor sets for static ubo
+    // note here we only update descripto sets for static ubo
+    // dynamic ubo is updated through `resizeDynamicUbo`
     // texture array is updated through `updateTextureDescriptorSet`
     for (size_t i = 0; i < NUM_FRAME_IN_FLIGHT; i++) {
-        std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
+
+        std::array<VkWriteDescriptorSet, 1> descriptorWrites{};
         descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         descriptorWrites[0].dstSet = ctx._descriptorSets[i];
         descriptorWrites[0].dstBinding = (int)BindingLocation::UBO_STATIC_ENGINE;
@@ -84,14 +155,6 @@ void TetraImageDisplaySystem::buildPipelineForContext(
         descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         descriptorWrites[0].descriptorCount = 1;
         descriptorWrites[0].pBufferInfo = &engineUboInfo.at(i);
-
-        descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[1].dstSet = ctx._descriptorSets[i];
-        descriptorWrites[1].dstBinding = (int)BindingLocation::UBO_STATIC_SYSTEM;
-        descriptorWrites[1].dstArrayElement = 0;
-        descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        descriptorWrites[1].descriptorCount = 1;
-        descriptorWrites[1].pBufferInfo = &systemUboInfo.at(i);
 
         vkUpdateDescriptorSets(
             _device->logicalDevice, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr
@@ -101,10 +164,10 @@ void TetraImageDisplaySystem::buildPipelineForContext(
     /////  ---------- shader ---------- /////
 
     VkShaderModule vertShaderModule = ShaderCreation::createShaderModule(
-        _device->logicalDevice, "../shaders/tetra_image.vert.spv"
+        _device->logicalDevice, "../shaders/phong/phong_tetra.vert.spv"
     );
     VkShaderModule fragShaderModule = ShaderCreation::createShaderModule(
-        _device->logicalDevice, "../shaders/tetra_image.frag.spv"
+        _device->logicalDevice, "../shaders/phong/phong_tetra.frag.spv"
     );
 
     VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
@@ -123,14 +186,20 @@ void TetraImageDisplaySystem::buildPipelineForContext(
     VkPipelineShaderStageCreateInfo shaderStages[]
         = {vertShaderStageInfo, fragShaderStageInfo}; // put the 2 stages together.
 
-    VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
-    { // set up vertex input info
-        // we don't input vertex buffer so no need for descriptions
+    VkPipelineVertexInputStateCreateInfo vertexInputInfo
+        = {}; // describes the format of the vertex data.
+
+    // set up vertex descriptions
+    VkVertexInputBindingDescription bindingDescription = Vertex::GetBindingDescription();
+    auto attributeDescriptions = Vertex::GetAttributeDescriptionsPtr();
+    {
         vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-        vertexInputInfo.vertexBindingDescriptionCount = 0;
-        vertexInputInfo.pVertexBindingDescriptions = nullptr;
-        vertexInputInfo.vertexAttributeDescriptionCount = 0;
-        vertexInputInfo.pVertexAttributeDescriptions = 0;
+
+        vertexInputInfo.vertexBindingDescriptionCount = 1;
+        vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
+        vertexInputInfo.vertexAttributeDescriptionCount
+            = static_cast<uint32_t>(attributeDescriptions->size());
+        vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions->data();
     }
 
     // Input assembly
@@ -310,29 +379,29 @@ void TetraImageDisplaySystem::buildPipelineForContext(
     vkDestroyShaderModule(_device->logicalDevice, vertShaderModule, nullptr);
 }
 
-void TetraImageDisplaySystem::createGraphicsPipeline(
-    const VkRenderPass renderPass,
+void SimpleRenderSystem::createGraphicsPipeline(
+    const VkRenderPass renderPasses[ColorSpaceSize],
     const InitContext* initData
 )
 {
     /////  ---------- descriptor ---------- /////
-    VkDescriptorSetLayoutBinding engineUBOStaticBinding{};
-    VkDescriptorSetLayoutBinding systemUBOStaticBinding{};
+    VkDescriptorSetLayoutBinding uboStaticBinding{};
+    VkDescriptorSetLayoutBinding uboDynamicBinding{};
     VkDescriptorSetLayoutBinding samplerLayoutBinding{};
-    { // engine UBO static -- vertex
-        engineUBOStaticBinding.binding = (int)BindingLocation::UBO_STATIC_ENGINE;
-        engineUBOStaticBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        engineUBOStaticBinding.descriptorCount = 1; // number of values in the array
-        engineUBOStaticBinding.stageFlags
-            = VK_SHADER_STAGE_VERTEX_BIT;                    // only used in vertex shader
-        engineUBOStaticBinding.pImmutableSamplers = nullptr; // Optional
+    { // UBO static -- vertex
+        uboStaticBinding.binding = (int)BindingLocation::UBO_STATIC_ENGINE;
+        uboStaticBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        uboStaticBinding.descriptorCount = 1;                     // number of values in the array
+        uboStaticBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT; // only used in vertex shader
+        uboStaticBinding.pImmutableSamplers = nullptr;            // Optional
     }
-    { // system UBO static -- fragment
-        systemUBOStaticBinding.binding = (int)BindingLocation::UBO_STATIC_SYSTEM;
-        systemUBOStaticBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        systemUBOStaticBinding.descriptorCount = 1; // number of values in the array
-        systemUBOStaticBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-        systemUBOStaticBinding.pImmutableSamplers = nullptr;
+    { // UBO dynamic -- vertex
+        uboDynamicBinding.binding = (int)BindingLocation::UBO_DYNAMIC;
+        uboDynamicBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+        uboDynamicBinding.descriptorCount = 1; // number of values in the array
+
+        uboDynamicBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+        uboDynamicBinding.pImmutableSamplers = nullptr;            // Optional
     }
     { // combined image sampler array -- fragment
         samplerLayoutBinding.binding = (int)BindingLocation::TEXTURE_SAMPLER;
@@ -345,7 +414,7 @@ void TetraImageDisplaySystem::createGraphicsPipeline(
         samplerLayoutBinding.pImmutableSamplers = nullptr;
     }
     std::array<VkDescriptorSetLayoutBinding, 3> bindings
-        = {engineUBOStaticBinding, systemUBOStaticBinding, samplerLayoutBinding};
+        = {uboStaticBinding, uboDynamicBinding, samplerLayoutBinding};
     { // _descriptorSetLayout
         VkDescriptorSetLayoutCreateInfo layoutInfo{};
         layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -383,80 +452,154 @@ void TetraImageDisplaySystem::createGraphicsPipeline(
         }
     }
 
-    buildPipelineForContext(renderPass, _renderCtx, initData->engineUBOStaticDescriptorBufferInfo);
+    buildPipelineForContext(
+        renderPasses[RGB], _renderSystemContexts[RGB], initData->engineUBOStaticDescriptorBufferInfo
+    );
+    buildPipelineForContext(
+        renderPasses[OCV], _renderSystemContexts[OCV], initData->engineUBOStaticDescriptorBufferInfo
+    );
 }
 
-void TetraImageDisplaySystem::updateTextureDescriptorSet()
+MeshComponent* SimpleRenderSystem::MakeMeshInstanceComponent(
+    const std::string& meshPath,
+    std::string texturePaths[ColorSpaceSize]
+)
 {
-    DEBUG("updating texture descirptor set");
-    for (size_t i = 0; i < NUM_FRAME_IN_FLIGHT; i++) {
+    Mesh* mesh = nullptr;
+    size_t dynamicUBOId = 0;
+    int textureOffset = 0;
+
+    { // load or create new mesh
+        auto it = _meshes.find(meshPath);
+        if (it == _meshes.end()) { // construct phong mesh
+            Mesh newMesh;
+            VQDevice& device = *_device;
+            VQUtils::meshToBuffer(
+                meshPath.c_str(), device, newMesh.vertexBuffer, newMesh.indexBuffer
+            );
+            auto result = _meshes.insert({meshPath, newMesh});
+            ASSERT(result.second)
+            mesh = &(result.first->second);
+        } else {
+            mesh = &it->second;
+        }
+    }
+
+    // reserve a dynamic UBO for this instance
+    // note each instance has to have a dynamic ubo, for storing instance data
+    // such as texture index and model mat
+    {
+        // have an available index that's been released, simply use that index.
+        if (!_freeDynamicUBOIdx.empty()) {
+            dynamicUBOId = _freeDynamicUBOIdx.back();
+            _freeDynamicUBOIdx.pop_back();
+        } else { // use a new index
+            dynamicUBOId = _currDynamicUBO;
+            _currDynamicUBO++;
+            if (_currDynamicUBO >= _numDynamicUBO) {
+                _numDynamicUBO *= 1.5;
+                resizeDynamicUbo(_renderSystemContexts[RGB], _numDynamicUBO); // grow dynamic UBO
+                resizeDynamicUbo(_renderSystemContexts[OCV], _numDynamicUBO); // grow dynamic UBO
+            }
+        }
+    }
+
+    int textureOffsets[ColorSpaceSize];
+
+    for (ColorSpace cs : {RGB, OCV}) { // load or create new texture
+        std::string& texturePath = texturePaths[cs];
+        auto it = _textureDescriptorIndices.find(texturePath);
+        if (it == _textureDescriptorIndices.end()) {
+            // load texture into textures[textureOffset]
+            DEBUG("loading texture into {}", _textureDescriptorInfoIdx);
+            NEEDS_IMPLEMENTATION();
+            // _textureManager->GetDescriptorImageInfo(
+            //     texturePath, _textureDescriptorInfo[_textureDescriptorInfoIdx]
+            // );
+            textureOffset = _textureDescriptorInfoIdx;
+            _textureDescriptorInfoIdx++;
+            updateTextureDescriptorSet(
+            ); // TODO: updateTextureDescriptorSet() may be called at end of for loop
+        } else {
+            textureOffset = it->second;
+        }
+        textureOffsets[cs] = textureOffset;
+    }
+
+    // return new component
+    MeshComponent* ret = new MeshComponent();
+    ret->mesh = mesh;
+    ret->dynamicUBOId = dynamicUBOId;
+    ret->textureOffsetRGB = textureOffsets[RGB];
+    ret->textureOffsetOCV = textureOffsets[OCV];
+    return ret;
+}
+
+void SimpleRenderSystem::DestroyMeshComponent(MeshComponent*& component)
+{
+    _freeDynamicUBOIdx.push_back(component->dynamicUBOId); // relinquish dynamic ubo
+    delete component;
+    component = nullptr;
+}
+
+// reallocate dynamic UBO array, updating the descriptors as well
+// note that contents from the old UBO array aren't copied over
+// TODO: implement copying over from the old array?
+void SimpleRenderSystem::resizeDynamicUbo(RenderSystemContext& ctx, size_t dynamicUboCount)
+{
+    for (int i = 0; i < NUM_FRAME_IN_FLIGHT; i++) {
+        // reallocate dyamic ubo
+        ctx._UBO[i].dynamicUBO.Cleanup();
+        this->_device->CreateBufferInPlace(
+            _dynamicUBOAlignmentSize * dynamicUboCount,
+            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            ctx._UBO[i].dynamicUBO
+        );
+        // point descriptor to newly allocated buffer
+        VkDescriptorBufferInfo descriptorBufferInfo_dynamic{};
+        descriptorBufferInfo_dynamic.buffer = ctx._UBO[i].dynamicUBO.buffer;
+        descriptorBufferInfo_dynamic.offset = 0;
+        descriptorBufferInfo_dynamic.range = _dynamicUBOAlignmentSize;
+
         std::array<VkWriteDescriptorSet, 1> descriptorWrites{};
         descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[0].dstSet = _renderCtx._descriptorSets[i];
-        descriptorWrites[0].dstBinding = (int)BindingLocation::TEXTURE_SAMPLER;
+        descriptorWrites[0].dstSet = ctx._descriptorSets[i];
+        descriptorWrites[0].dstBinding = (int)BindingLocation::UBO_DYNAMIC;
         descriptorWrites[0].dstArrayElement = 0;
-        descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        descriptorWrites[0].descriptorCount
-            = _textureDescriptorInfoIdx; // descriptors are 0-indexed, +1 for
-                                         // the # of valid samplers
-        descriptorWrites[0].pImageInfo = _textureDescriptorInfo.data();
-
-        DEBUG("descriptor count: {}", descriptorWrites[0].descriptorCount);
+        descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+        descriptorWrites[0].descriptorCount = 1;
+        descriptorWrites[0].pBufferInfo = &descriptorBufferInfo_dynamic;
 
         vkUpdateDescriptorSets(
             _device->logicalDevice, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr
         );
     }
-};
+}
 
-void TetraImageDisplaySystem::Tick(const TickContext* tickCtx, const std::string& texturePath)
+void SimpleRenderSystem::updateTextureDescriptorSet()
 {
-    const RenderSystemContext& renderCtx = _renderCtx;
+    DEBUG("updating texture descirptor set");
+    for (const RenderSystemContext& ctx :
+         {_renderSystemContexts[RGB], _renderSystemContexts[OCV]}) {
+        for (size_t i = 0; i < NUM_FRAME_IN_FLIGHT; i++) {
+            std::array<VkWriteDescriptorSet, 1> descriptorWrites{};
+            descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrites[0].dstSet = ctx._descriptorSets[i];
+            descriptorWrites[0].dstBinding = (int)BindingLocation::TEXTURE_SAMPLER;
+            descriptorWrites[0].dstArrayElement = 0;
+            descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            descriptorWrites[0].descriptorCount
+                = _textureDescriptorInfoIdx; // descriptors are 0-indexed, +1 for
+                                             // the # of valid samplers
+            descriptorWrites[0].pImageInfo = _textureDescriptorInfo.data();
 
-    VkCommandBuffer CB = tickCtx->graphics.CB;
-    int frameIdx = tickCtx->graphics.currentFrameInFlight;
+            DEBUG("descriptor cont: {}", descriptorWrites[0].descriptorCount);
 
-    int textureOffset = 0;
-    auto it = _textureDescriptorIndices.find(texturePath);
-    if (it == _textureDescriptorIndices.end()) {
-        FATAL("Cannot find texture for {}", texturePath);
-    } else {
-        textureOffset = it->second;
+            vkUpdateDescriptorSets(
+                _device->logicalDevice, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr
+            );
+        }
     }
-
-    // update system UBO to point the correct texture descriptor index
-    flushSystemUBO(frameIdx, textureOffset);
-
-    vkCmdBindPipeline(CB, VK_PIPELINE_BIND_POINT_GRAPHICS, renderCtx._pipeline);
-    vkCmdBindDescriptorSets(
-        CB,
-        VK_PIPELINE_BIND_POINT_GRAPHICS,
-        renderCtx._pipelineLayout,
-        0,
-        1,
-        &renderCtx._descriptorSets[frameIdx],
-        0,
-        nullptr
-    );
-    vkCmdDraw(CB, 3, 1, 0, 0);
-}
-
-void TetraImageDisplaySystem::flushSystemUBO(uint32_t frame, int textureIndex)
-{
-    VQBuffer& buf = _renderCtx._systemUBOStatic[frame];
-    SystemUBOStatic ubo{.textureIndex = textureIndex};
-    memcpy(buf.bufferAddress, &ubo, sizeof(ubo));
-}
-
-void TetraImageDisplaySystem::LoadTexture(const std::string& imagePath)
-{
-    // load texture into textures[textureOffset]
-    DEBUG("loading texture into {}", _textureDescriptorInfoIdx);
-    NEEDS_IMPLEMENTATION();
-    // _textureManager->GetDescriptorImageInfo(
-    //     imagePath, _textureDescriptorInfo[_textureDescriptorInfoIdx]
-    // );
-    _textureDescriptorIndices[imagePath] = _textureDescriptorInfoIdx;
-    _textureDescriptorInfoIdx++;
-    updateTextureDescriptorSet();
-}
+};
+#endif

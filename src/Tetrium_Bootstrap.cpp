@@ -28,9 +28,6 @@
 #include "MoltenVKConfig.h"
 #endif // __APPLE__
 
-// ecs
-#include "ecs/component/TransformComponent.h"
-
 #include "Tetrium.h"
 
 #if __linux__

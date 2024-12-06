@@ -4,9 +4,10 @@
 #include "lib/VQDeviceImage.h"
 
 #include "components/Camera.h" // FIXME: fix dependency hell
-#include "ecs/component/TransformComponent.h" // FIXME: fix dependency hell
+
 
 #include "app_components/TextureFrameBuffer.h"
+#include "app_components/Transform.h"
 
 namespace TetriumApp
 {
@@ -91,7 +92,7 @@ class AppTetraHueSphere : public App
         Mesh uglySphereMesh;
 
         Camera camera;
-        TransformComponent hueSpheretransform = TransformComponent::Identity();
+        Transform hueSpheretransform = Transform::Identity();
 
         float sphereRotationSpeed = 1.f;
 

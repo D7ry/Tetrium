@@ -1,3 +1,4 @@
+#if 0
 #pragma once
 #include "structs/SharedEngineStructs.h"
 
@@ -27,3 +28,4 @@ class ISystem
   protected:
     std::vector<Entity*> _entities;
 };
+#endif

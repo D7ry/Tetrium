@@ -1,3 +1,4 @@
+#if 0
 #pragma once
 #include <typeindex>
 
@@ -45,3 +46,4 @@ class Entity
     std::unordered_map<std::type_index, IComponent*> _components;
     std::string _name;
 };
+#endif

@@ -1,3 +1,4 @@
+#if 0
 #pragma once
 
 // base component class
@@ -10,3 +11,4 @@ class IComponent
 
     Entity* parent;
 };
+#endif

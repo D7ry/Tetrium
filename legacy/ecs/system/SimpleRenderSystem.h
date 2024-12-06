@@ -1,3 +1,4 @@
+#if 0
 #pragma once
 #include <map>
 #include <unordered_set>
@@ -131,3 +132,4 @@ class SimpleRenderSystem : public ISystem
         TEXTURE_SAMPLER = 2
     };
 };
+#endif
