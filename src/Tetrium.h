@@ -250,7 +250,7 @@ class Tetrium
     void bindDefaultInputs();
 
     /* ---------- Render-Time Functions ---------- */
-    void drawFrame(uint8_t frame);
+    void drawFrame(ColorSpace colorSpace, uint8_t frameIdx);
     void drawMainMenu(ColorSpace colorSpace);
     void drawImGui(ColorSpace colorSpace, int currentFrameInFlight);
 

@@ -20,6 +20,9 @@
 #include "imgui.h"
 #include "lib/VulkanUtils.h"
 
+// Tetrium-color
+#include "TetriumColor/TetriumColor.h"
+
 // Molten VK Config
 #if __APPLE__
 #include "MoltenVKConfig.h"
@@ -116,6 +119,8 @@ void Tetrium::initDefaultStates()
 
 void Tetrium::Init(const Tetrium::InitOptions& options)
 {
+    TetriumColor::Init();
+    SCHEDULE_DELETE(TetriumColor::Cleanup();)
     // populate static config fields
     _tetraMode = options.tetraMode;
     if (_tetraMode == TetraMode::kDualProjector) {
