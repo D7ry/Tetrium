@@ -63,7 +63,6 @@ void Tetrium::drawAppsImGui(ColorSpace colorSpace, int currentFrameInFlight)
                     _textureManager.LoadImGuiTexture(textureHandle);
                     return _textureManager.GetImGuiTexture(textureHandle);
                 },
-                .GetImGuiTexture = [this](uint32_t textureHandle) { return _textureManager.GetImGuiTexture(textureHandle); },
                 .UnloadTexture = [this](uint32_t textureHandle) { _textureManager.UnLoadTexture(textureHandle); }
             },
             .controls = {.wantExit = false, .musicOverride = std::nullopt}

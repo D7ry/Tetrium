@@ -51,7 +51,6 @@ struct TickContextImGui
         std::function<void(Sound)> PlaySound;
         std::function<uint32_t(const std::string&)> LoadTexture;
         std::function<ImGuiTexture(uint32_t)> InitImGuiTexture;
-        std::function<ImGuiTexture(uint32_t)> GetImGuiTexture;
         std::function<void(uint32_t)> UnloadTexture;
     } apis;
 
@@ -71,11 +70,7 @@ struct TickContextVulkan
 {
     int currentFrameInFlight;
     ColorSpace colorSpace;
-
     vk::CommandBuffer commandBuffer;
-    // semaphores to wait for before the engine performs vulkan ImGui rendering
-    // TickVulkan() should push all semaphores that need to be waited on to this
-    // std::vector<vk::Semaphore>& waitSemaphores;
 };
 
 // ImGui-based application interface
