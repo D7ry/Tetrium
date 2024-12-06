@@ -95,10 +95,14 @@ class AppTetraHueSphere : public App
 
         float sphereRotationSpeed = 1.f;
 
-        float fov = 90;
 
         RenderMeshType renderMeshType = RenderMeshType::PrettySphere;
         ProjectionType projectionType = ProjectionType::Perspective;
+
+        float orthoWidth = 1.f;
+        float perspectiveFOV = 90;
+
+        std::vector<uint32_t> loadedTextures;
     } _rasterizationCtx;
 
 };

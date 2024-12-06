@@ -55,15 +55,21 @@ if (APPLE)
     set(OPENAL_ROOT_DIR "/opt/homebrew/opt/openal-soft")
     set(OPENAL_INCLUDE_DIR "${OPENAL_ROOT_DIR}/include")
     set(OPENAL_LIBRARY "${OPENAL_ROOT_DIR}/lib/libopenal.dylib")
+    find_package(SndFile REQUIRED)
 else() #linux
     set(FREETYPE_INCLUDE_DIRS "/usr/include/freetype2")
     set(FREETYPE_LIBRARIES "/usr/lib/x86_64-linux-gnu/libfreetype.so")
+    # NOTE: openal is a bit cursed, need to debug package pathing
+    set(OPENAL_LIBRARY "/usr/lib/x86_64-linux-gnu/libopenal.so")
+    set(OPENAL_INCLUDE_DIR "/usr/include/")
+    #FIXME: sndfile is also cursed
+    set(SNDFILE_LIBRARY "/usr/lib/x86_64-linux-gnu/libsndfile.so")
+    set(SNDFILE_INCLUDE_DIR "/usr/include/")
 endif()
 endif()
 
 # openal and sndfile for sound playing
 find_package(OpenAL REQUIRED)
-find_package(SndFile REQUIRED)
 
 
 project(Tetrium)
@@ -87,14 +93,12 @@ add_executable(${PROJECT_NAME}
         src/components/Camera.cpp
         src/components/TextureManager.cpp
         src/components/InputManager.cpp
-        src/components/imgui_widgets/ImGuiWidgetTemp.cpp
+        # src/components/imgui_widgets/ImGuiWidgetTemp.cpp
         src/components/imgui_widgets/ImGuiWidgetPerfPlot.cpp
         src/components/imgui_widgets/ImGuiWidgetDeviceInfo.cpp
-        src/components/imgui_widgets/ImGuiWidgetUBOViewer.cpp
+        # src/components/imgui_widgets/ImGuiWidgetUBOViewer.cpp
         src/components/imgui_widgets/ImGuiWidgetEvenOddCalibration.cpp
-        src/components/imgui_widgets/ImGuiWidgetGraphicsPipeline.cpp
-        src/components/imgui_widgets/ImGuiWidgetTetraViewerDemo.cpp
-        src/components/imgui_widgets/ImGuiWidgetTetraViewer.cpp
+        # src/components/imgui_widgets/ImGuiWidgetGraphicsPipeline.cpp
         src/components/imgui_widgets/ImGuiWidgetColorTile.cpp
         src/components/imgui_widgets/ImGuiWidgetBlobHunter.cpp
 
@@ -104,11 +108,13 @@ add_executable(${PROJECT_NAME}
         src/lib/VQUtils.cpp
         src/lib/ImGuiUtils.cpp
         src/structs/Vertex.cpp
-        src/ecs/system/SimpleRenderSystem.cpp
-        src/ecs/system/TetraImageDisplaySystem.cpp
+        #src/ecs/system/SimpleRenderSystem.cpp
+        # src/ecs/system/TetraImageDisplaySystem.cpp
 
         src/apps/AppScreeningTest.cpp
         src/apps/AppTetraHueSphere.cpp
+        src/apps/AppImageViewer.cpp
+
 
         src/apps/app_components/TextureFrameBuffer.cpp
 )

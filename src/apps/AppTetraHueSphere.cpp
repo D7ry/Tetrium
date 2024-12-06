@@ -5,8 +5,6 @@
 #include "structs/Vertex.h"
 
 #include "components/ShaderUtils.h"
-#include "components/TextureManager.h" // FIXME: fix dependency hell
-#include "lib/VulkanUtils.h"
 
 #include "AppTetraHueSphere.h"
 
@@ -23,24 +21,28 @@ unsigned int FB_HEIGHT = 1024;
 
 static const VkFormat FB_IMAGE_FORMAT = VK_FORMAT_R8G8B8A8_SRGB;
 
+// TODO: get rid of this
 const char* VERTEX_SHADER_PATH = "../assets/apps/AppTetraHueSphere/shader.vert.spv";
 const char* FRAGMENT_SHADER_PATH = "../assets/apps/AppTetraHueSphere/shader.frag.spv";
 
 // const char* HUE_SPHERE_MODEL_PATH = "../assets/apps/AppTetraHueSphere/ugly_sphere.obj";
 
 const char* HUE_SPHERE_UGLY_MODEL_PATH = "../assets/apps/AppTetraHueSphere/fibonacci_sampled.obj";
-const char* HUE_SPHERE_UGLY_TEXTURE_PATH_RGB = "../assets/apps/AppTetraHueSphere/RGB.png";
-const char* HUE_SPHERE_UGLY_TEXTURE_PATH_OCV = "../assets/apps/AppTetraHueSphere/OCV.png";
+const char* HUE_SPHERE_UGLY_TEXTURE_PATH_RGB = "../assets/apps/AppTetraHueSphere/cubemaps/cubemap_RGB.png";
+const char* HUE_SPHERE_UGLY_TEXTURE_PATH_OCV = "../assets/apps/AppTetraHueSphere/cubemaps/cubemap_OCV.png";
 
-const char* HUE_SPHERE_PRETTY_MODEL_PATH = "../assets/apps/AppTetraHueSphere/cubemap_sampled.obj";
-const char* HUE_SPHERE_PRETTY_TEXTURE_PATH_RGB
-    = "../assets/apps/AppTetraHueSphere/cube_map_RGB.png";
-const char* HUE_SPHERE_PRETTY_TEXTURE_PATH_OCV
-    = "../assets/apps/AppTetraHueSphere/cube_map_OCV.png";
+// const char* HUE_SPHERE_UGLY_TEXTURE_PATH_RGB = "../assets/apps/AppTetraHueSphere/cubemaps/test_RGB.png";
+// const char* HUE_SPHERE_UGLY_TEXTURE_PATH_OCV = "../assets/apps/AppTetraHueSphere/cubemaps/test_OCV.png";
+
+const char* HUE_SPHERE_PRETTY_MODEL_PATH = "../assets/apps/AppTetraHueSphere/pretty_sphere.obj";
+const char* HUE_SPHERE_PRETTY_TEXTURE_PATH_RGB = HUE_SPHERE_UGLY_TEXTURE_PATH_RGB;
+const char* HUE_SPHERE_PRETTY_TEXTURE_PATH_OCV = HUE_SPHERE_UGLY_TEXTURE_PATH_OCV;
+
 } // namespace
 
 void AppTetraHueSphere::TickImGui(const TetriumApp::TickContextImGui& ctx)
 {
+    ctx.controls.musicOverride = Sound::kMusicInterstellar;
     ImGuiIO& io = ImGui::GetIO();
     ImGui::SetNextWindowPos(ImVec2(0, 0));
     ImGui::SetNextWindowSize(io.DisplaySize);
@@ -54,6 +56,7 @@ void AppTetraHueSphere::TickImGui(const TetriumApp::TickContextImGui& ctx)
         )) {
 
         ImGui::Columns(2, "TetraHueSphereColumns", true);
+        ImGui::SeparatorText("Mesh Settings");
         // radio button for mesh type
         ImGui::Text("Mesh Type");
         ImGui::RadioButton(
@@ -66,7 +69,11 @@ void AppTetraHueSphere::TickImGui(const TetriumApp::TickContextImGui& ctx)
             (int)RenderMeshType::PrettySphere
         );
 
-        ImGui::SliderFloat("Sphere Rotation Speed", &_rasterizationCtx.sphereRotationSpeed, 0.f, 5.f);
+        ImGui::SliderFloat(
+            "Sphere Rotation Speed", &_rasterizationCtx.sphereRotationSpeed, 0.f, 5.f
+        );
+
+        ImGui::SeparatorText("Projection Settings");
 
         ImGui::Text("Projection Type");
         ImGui::RadioButton(
@@ -79,16 +86,27 @@ void AppTetraHueSphere::TickImGui(const TetriumApp::TickContextImGui& ctx)
             "Perspective", (int*)&_rasterizationCtx.projectionType, (int)ProjectionType::Perspective
         );
 
+        ImGui::SliderFloat("Orthographic Width", &_rasterizationCtx.orthoWidth, 0.1f, 10.f);
+        ImGui::SliderFloat("Perspective FOV", &_rasterizationCtx.perspectiveFOV, 1.f, 130.f);
+
         RenderContext& renderCtx = _renderContexts[ctx.currentFrameInFlight];
-        // color & depth stencil clear value sliders
-        ImGui::ColorEdit4("Clear Color", (float*)&_clearValues[0].color);
-        ImGui::SliderFloat("Clear Depth", &_clearValues[1].depthStencil.depth, 0.f, 1.f);
 
         // camera control;
         glm::vec3 pos = _rasterizationCtx.camera.GetPosition();
 
         ImGui::Text("Camera Position: (%.2f, %.2f, %.2f)", pos.x, pos.y, pos.z);
-        ImGui::SliderFloat("Camera FOV", &_rasterizationCtx.fov, 1.f, 130.f);
+        ImGui::SameLine();
+        if (ImGui::Button("Reset")) {
+            _rasterizationCtx.camera.SetPosition(0, 0, 0);
+        }
+
+        glm::vec3 rot = _rasterizationCtx.camera.GetRotation();
+
+        ImGui::Text("Camera Rotation: (%.2f, %.2f, %.2f)", rot.x, rot.y, rot.z);
+        ImGui::SameLine();
+        if (ImGui::Button("Reset##Rotation")) {
+            _rasterizationCtx.camera.SetRotation(0, 0, 0);
+        }
 
         // ImGui::Text("Hue Sphere Transform");
         //
@@ -103,6 +121,11 @@ void AppTetraHueSphere::TickImGui(const TetriumApp::TickContextImGui& ctx)
         // if (ImGui::SliderFloat("Hue Sphere Z", &hueSpherePos.z, -10.f, 10.f)) {
         //     _rasterizationCtx.hueSpheretransform.position = hueSpherePos;
         // }
+        
+        ImGui::SeparatorText("Rendering");
+        // color & depth stencil clear value sliders
+        ImGui::ColorEdit4("Clear Color", (float*)&_clearValues[0].color);
+        ImGui::SliderFloat("Clear Depth", &_clearValues[1].depthStencil.depth, 0.f, 1.f);
 
         ImGui::NextColumn();
         // okay to sample image here -- imgui raster pass stalls until the rendering to
@@ -144,7 +167,9 @@ void AppTetraHueSphere::TickImGui(const TetriumApp::TickContextImGui& ctx)
 
     // rotate hue sphere
 
-    _rasterizationCtx.hueSpheretransform.rotation.z
+    // TODO: this is a temp hack to work around non-commutative rotation
+    // use quaternions instead in the future for transform
+    _rasterizationCtx.hueSpheretransform.rotation.y
         += io.DeltaTime * _rasterizationCtx.sphereRotationSpeed * 50.f;
 }
 
@@ -160,16 +185,25 @@ void AppTetraHueSphere::TickVulkan(TetriumApp::TickContextVulkan& ctx)
 
         vk::Extent2D extent = vk::Extent2D(FB_WIDTH, FB_HEIGHT);
 
-        glm::mat4 projectionMatrix
-            = _rasterizationCtx.projectionType == ProjectionType::Perspective
-                  ? glm::perspective(
-                        glm::radians(_rasterizationCtx.fov),
-                        extent.width / static_cast<float>(extent.height),
-                        DEFAULTS::ZNEAR,
-                        DEFAULTS::ZFAR
-                    )
+        float aspectRatio = static_cast<float>(extent.width) / static_cast<float>(extent.height);
+        float orthoWidth = _rasterizationCtx.orthoWidth;
+        float orthoHeight = orthoWidth / aspectRatio; // Calculate height based on aspect ratio
 
-                  : glm::ortho(-1.f, 1.f, -1.f, 1.f, DEFAULTS::ZNEAR, DEFAULTS::ZFAR);
+        glm::mat4 projectionMatrix = _rasterizationCtx.projectionType == ProjectionType::Perspective
+                                         ? glm::perspective(
+                                               glm::radians(_rasterizationCtx.perspectiveFOV),
+                                               aspectRatio,
+                                               DEFAULTS::ZNEAR,
+                                               DEFAULTS::ZFAR
+                                           )
+                                         : glm::ortho(
+                                               -orthoWidth / 2.0f,  // left
+                                               orthoWidth / 2.0f,   // right
+                                               -orthoHeight / 2.0f, // bottom
+                                               orthoHeight / 2.0f,  // top
+                                               DEFAULTS::ZNEAR,     // near
+                                               DEFAULTS::ZFAR       // far
+                                           );
 
         projectionMatrix[1][1] *= -1; // invert for vulkan coord system
         pUBO->proj = projectionMatrix;
@@ -245,10 +279,12 @@ void AppTetraHueSphere::Init(TetriumApp::InitContext& ctx)
         initRenderContext(_renderContexts[i], ctx);
     }
 
-    _clearValues[0].color = {0.0f, 0.0f, 0.0f, 1.f};
+    _clearValues[0].color = {0.0f, 0.0f, 0.0f, 0.f};
     _clearValues[1].depthStencil = vk::ClearDepthStencilValue(1.f, 0.f);
 
     initRasterization(ctx);
+
+    _rasterizationCtx.camera.SetPosition(-0.75, 0, 0);
 };
 
 void AppTetraHueSphere::cleanupRenderContext(
@@ -256,7 +292,7 @@ void AppTetraHueSphere::cleanupRenderContext(
     TetriumApp::CleanupContext& cleanupCtx
 )
 {
-    ctx.fb.Cleanup(cleanupCtx.device.logicalDevice);
+    ctx.fb.Cleanup();
 }
 
 void AppTetraHueSphere::initRenderContext(RenderContext& ctx, TetriumApp::InitContext& initCtx)
@@ -444,24 +480,18 @@ void AppTetraHueSphere::initRasterization(TetriumApp::InitContext& initCtx)
                 nullptr
             );
 
-            // sampler
-            VkDescriptorImageInfo imageInfoUglyRGB;
-            VkDescriptorImageInfo imageInfoUglyOCV;
-            vk::DescriptorImageInfo imageInfoPrettyRGB;
-            vk::DescriptorImageInfo imageInfoPrettyOCV;
-            initCtx.textureManager->GetDescriptorImageInfo(
-                HUE_SPHERE_UGLY_TEXTURE_PATH_RGB, imageInfoUglyRGB
-            );
-            initCtx.textureManager->GetDescriptorImageInfo(
-                HUE_SPHERE_UGLY_TEXTURE_PATH_OCV, imageInfoUglyOCV
-            );
+            uint32_t imageInfoUglyRGBHandle = initCtx.api.LoadCubemapTexture(HUE_SPHERE_UGLY_TEXTURE_PATH_RGB);
+            uint32_t imageInfoUglyOCVHandle = initCtx.api.LoadCubemapTexture(HUE_SPHERE_UGLY_TEXTURE_PATH_OCV);
+            uint32_t imageInfoPrettyRGBHandle = initCtx.api.LoadCubemapTexture(HUE_SPHERE_PRETTY_TEXTURE_PATH_RGB);
+            uint32_t imageInfoPrettyOCVHandle = initCtx.api.LoadCubemapTexture(HUE_SPHERE_PRETTY_TEXTURE_PATH_OCV);
 
-            initCtx.textureManager->GetDescriptorImageInfo(
-                HUE_SPHERE_PRETTY_TEXTURE_PATH_RGB, imageInfoPrettyRGB
-            );
-            initCtx.textureManager->GetDescriptorImageInfo(
-                HUE_SPHERE_PRETTY_TEXTURE_PATH_OCV, imageInfoPrettyOCV
-            );
+            // sampler
+            vk::DescriptorImageInfo imageInfoUglyRGB = initCtx.api.GetTextureDescriptorImageInfo(imageInfoUglyRGBHandle);
+            vk::DescriptorImageInfo imageInfoUglyOCV = initCtx.api.GetTextureDescriptorImageInfo(imageInfoUglyOCVHandle);
+            vk::DescriptorImageInfo imageInfoPrettyRGB = initCtx.api.GetTextureDescriptorImageInfo(imageInfoPrettyRGBHandle);
+            vk::DescriptorImageInfo imageInfoPrettyOCV = initCtx.api.GetTextureDescriptorImageInfo(imageInfoPrettyOCVHandle);
+
+            _rasterizationCtx.loadedTextures.push_back(imageInfoUglyRGBHandle);
 
             std::array<vk::DescriptorImageInfo, SAMPLER_DESCRIPTOR_COUNT> imageInfos
                 = {imageInfoUglyRGB, imageInfoUglyOCV, imageInfoPrettyRGB, imageInfoPrettyOCV};
@@ -630,10 +660,16 @@ void AppTetraHueSphere::initRasterization(TetriumApp::InitContext& initCtx)
             _rasterizationCtx.prettySphereMesh.indexBuffer
         );
     }
+
+    _rasterizationCtx.hueSpheretransform.rotation = glm::vec3(90,0, 0);
 }
 
 void AppTetraHueSphere::cleanupRasterization(TetriumApp::CleanupContext& cleanupCtx)
 {
+    // clean up texture
+    for (auto handle : _rasterizationCtx.loadedTextures) {
+        cleanupCtx.api.UnloadTexture(handle);
+    }
     vk::Device device = cleanupCtx.device.logicalDevice;
 
     // Destroy pipeline

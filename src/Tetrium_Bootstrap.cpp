@@ -17,8 +17,11 @@
 #include <vulkan/vulkan_core.h>
 
 // imgui
-#include "lib/VulkanUtils.h"
 #include "imgui.h"
+#include "lib/VulkanUtils.h"
+
+// Tetrium-color
+#include "TetriumColor/TetriumColor.h"
 
 // Molten VK Config
 #if __APPLE__
@@ -36,31 +39,6 @@
 #define SCHEDULE_DELETE(...) this->_deletionStack.push([this]() { __VA_ARGS__ });
 
 #define VIRTUAL_VSYNC 0
-
-// creates a cow for now
-void Tetrium::createFunnyObjects()
-{
-    // lil cow
-    // Entity* spot = new Entity("Spot");
-    //
-    // std::string textures[ColorSpaceSize]
-    //     = {(DIRECTORIES::ASSETS + "textures/spot.png"), (DIRECTORIES::ASSETS +
-    //     "textures/spot.png")
-    //     };
-
-    // auto meshInstance
-    //     = _renderer.MakeMeshInstanceComponent(DIRECTORIES::ASSETS + "models/spot.obj", textures);
-
-    // give the lil cow a mesh
-    // spot->AddComponent(meshInstance);
-    // give the lil cow a transform
-    // spot->AddComponent(new TransformComponent());
-    // _renderer.AddEntity(spot);
-    // spot->GetComponent<TransformComponent>()->rotation.x = 90;
-    // spot->GetComponent<TransformComponent>()->rotation.y = 90;
-    // spot->GetComponent<TransformComponent>()->position.z = 0.05;
-    // register lil cow
-}
 
 void Tetrium::keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
@@ -98,14 +76,27 @@ void Tetrium::cursorPosCallback(GLFWwindow* window, double xpos, double ypos)
     }
     double deltaX = prevX - xpos;
     double deltaY = prevY - ypos;
-    // handle camera movement
-    deltaX *= 0.3;
-    deltaY *= 0.3; // make movement slower
-    if (_windowFocused && !_uiMode) {
-        _mainCamera.ModRotation(deltaX, deltaY, 0);
-    }
     prevX = xpos;
     prevY = ypos;
+
+    // the whole code will get DCE'd
+}
+
+void Tetrium::loadEngineTextures()
+{
+    for (int i = 0; i < static_cast<int>(EngineTexture::kNumTextures); i++) {
+        uint32_t handle = _textureManager.LoadTexture(ENGINE_TEXTURE_PATHS[i]);
+        _textureManager.LoadImGuiTexture(handle);
+        ImGuiTexture imguiTexture = _textureManager.GetImGuiTexture(handle);
+        _engineTextures[i] = {handle, imguiTexture};
+    }
+}
+
+void Tetrium::cleanupEngineTextures()
+{
+    for (int i = 0; i < static_cast<int>(EngineTexture::kNumTextures); i++) {
+        _textureManager.UnLoadTexture(_engineTextures[i].first);
+    }
 }
 
 void Tetrium::initDefaultStates()
@@ -116,21 +107,20 @@ void Tetrium::initDefaultStates()
     _clearValues[0].color = {0.0f, 0.0f, 0.0f, 1.f};
     _clearValues[1].depthStencil = vk::ClearDepthStencilValue(1.f, 0.f);
 
-    // camera location
-    _mainCamera.SetPosition(-2, 0, 0);
-
     // input states
     // by default, unlock cursor, disable imgui inputs, disable input handling
     _windowFocused = false;
     _inputManager.SetActive(_windowFocused);
     _uiMode = true;
 
-    ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoMouse;
-    ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoKeyboard;
+    // ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoMouse;
+    // ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoKeyboard;
 };
 
 void Tetrium::Init(const Tetrium::InitOptions& options)
 {
+    TetriumColor::Init();
+    SCHEDULE_DELETE(TetriumColor::Cleanup();)
     // populate static config fields
     _tetraMode = options.tetraMode;
     if (_tetraMode == TetraMode::kDualProjector) {
@@ -139,7 +129,7 @@ void Tetrium::Init(const Tetrium::InitOptions& options)
 #if __APPLE__
     MoltenVKConfig::Setup();
 #endif // __APPLE__
-    _window = initGLFW(options.tetraMode == TetraMode::kEvenOddSoftwareSync);
+    _window = initGLFW(false);
     glfwSetWindowUserPointer(_window, this);
     SCHEDULE_DELETE(glfwDestroyWindow(_window); glfwTerminate();)
 
@@ -209,10 +199,11 @@ void Tetrium::Init(const Tetrium::InitOptions& options)
 
     initDefaultStates();
 
-    createFunnyObjects();
-
     _soundManager.LoadAllSounds();
     _soundManager.PlaySound(Sound::kProgramStart);
+
+    loadEngineTextures();
+    SCHEDULE_DELETE(cleanupEngineTextures();)
 
     DEBUG("swapchain image format: {}", string_VkFormat(_swapChain.imageFormat));
     VQDevice& device = *_device.get();
@@ -222,7 +213,30 @@ void Tetrium::Init(const Tetrium::InitOptions& options)
             .imageFormat = vk::Format(_swapChain.imageFormat),
             .extent = _swapChain.extent,
         },
-        .textureManager = &_textureManager,
+        .api = {
+            .LoadAndGetTextureDescriptorImageInfo = [this](const std::string& texture) {
+                // FIXME: remove this
+                vk::DescriptorImageInfo info;
+                uint32_t handle = this->_textureManager.LoadTexture(texture);
+                this->_textureManager.GetDescriptorImageInfo(handle, info);
+                return info;
+            },
+            .LoadTexture = [this](const std::string& texture) {
+                return this->_textureManager.LoadTexture(texture);
+            },
+            .LoadCubemapTexture = [this](const std::string& texture) {
+                return this->_textureManager.LoadCubemapTexture(texture);
+            },
+            .GetTextureDescriptorImageInfo = [this](uint32_t handle) {
+                vk::DescriptorImageInfo info;
+                this->_textureManager.GetDescriptorImageInfo(handle, info);
+                return info;
+            },
+            .InitImGuiTexture = [this](uint32_t handle) {
+                this->_textureManager.LoadImGuiTexture(handle);
+                return this->_textureManager.GetImGuiTexture(handle);
+            },
+        },
     };
 
     // init apps
@@ -319,8 +333,7 @@ void Tetrium::initVulkan()
             .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
             .dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
             .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-            .dstAccessMask = VK_ACCESS_SHADER_READ_BIT
-        }
+            .dstAccessMask = VK_ACCESS_SHADER_READ_BIT}
     );
     SCHEDULE_DELETE(vkDestroyRenderPass(_device->logicalDevice, _rocvTransformRenderPass, nullptr);)
 
@@ -666,8 +679,7 @@ void Tetrium::createSwapChain(Tetrium::SwapChainContext& ctx, const VkSurfaceKHR
     VkSwapchainCounterCreateInfoEXT swapChainCounterCreateInfo{
         .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_COUNTER_CREATE_INFO_EXT,
         .pNext = NULL,
-        .surfaceCounters = VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_BIT_EXT
-    };
+        .surfaceCounters = VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_BIT_EXT};
 
     if (_tetraMode == TetraMode::kEvenOddHardwareSync) {
 #if __linux__
@@ -878,8 +890,7 @@ void Tetrium::createSynchronizationObjects(
                                primitive.semaAppVulkanFinished,
                                primitive.semaImageCopyFinished,
                                primitive.semaRenderFinished,
-                               primitive.semaImageAvailable
-                 }) {
+                               primitive.semaImageAvailable}) {
                 vkDestroySemaphore(this->_device->logicalDevice, sema, nullptr);
             }
             vkDestroyFence(this->_device->logicalDevice, primitive.fenceInFlight, nullptr);
@@ -891,7 +902,13 @@ void Tetrium::createSynchronizationObjects(
 void Tetrium::Cleanup()
 {
     INFO("Cleaning up...");
-    TetriumApp::CleanupContext appCleanupCtx{.device = *_device.get()};
+    TetriumApp::CleanupContext appCleanupCtx{
+        .device = *_device.get(),
+        .api = {
+            .UnloadTexture
+            = [this](uint32_t handle) { this->_textureManager.UnLoadTexture(handle); },
+        }};
+
     for (auto& [appName, app] : _appMap) {
         app->Cleanup(appCleanupCtx);
     }
@@ -1084,29 +1101,6 @@ void Tetrium::createDepthBuffer(SwapChainContext& ctx)
 // currently for perf reasons we're leaving it as is.
 void Tetrium::bindDefaultInputs()
 {
-    // const int CAMERA_SPEED = 3;
-    // _inputManager.RegisterCallback(GLFW_KEY_W, InputManager::KeyCallbackCondition::HOLD, [this]() {
-    //     _mainCamera.Move(_deltaTimer.GetDeltaTime() * CAMERA_SPEED, 0, 0);
-    // });
-    // _inputManager.RegisterCallback(GLFW_KEY_S, InputManager::KeyCallbackCondition::HOLD, [this]() {
-    //     _mainCamera.Move(-_deltaTimer.GetDeltaTime() * CAMERA_SPEED, 0, 0);
-    // });
-    // _inputManager.RegisterCallback(GLFW_KEY_A, InputManager::KeyCallbackCondition::HOLD, [this]() {
-    //     _mainCamera.Move(0, _deltaTimer.GetDeltaTime() * CAMERA_SPEED, 0);
-    // });
-    // _inputManager.RegisterCallback(GLFW_KEY_D, InputManager::KeyCallbackCondition::HOLD, [this]() {
-    //     _mainCamera.Move(0, -_deltaTimer.GetDeltaTime() * CAMERA_SPEED, 0);
-    // });
-    // _inputManager.RegisterCallback(
-    //     GLFW_KEY_LEFT_CONTROL,
-    //     InputManager::KeyCallbackCondition::HOLD,
-    //     [this]() { _mainCamera.Move(0, 0, -CAMERA_SPEED * _deltaTimer.GetDeltaTime()); }
-    // );
-    // _inputManager.RegisterCallback(
-    //     GLFW_KEY_SPACE,
-    //     InputManager::KeyCallbackCondition::HOLD,
-    //     [this]() { _mainCamera.Move(0, 0, CAMERA_SPEED * _deltaTimer.GetDeltaTime()); }
-    // );
     // ui mode toggle
     _inputManager.RegisterCallback(GLFW_KEY_U, InputManager::KeyCallbackCondition::PRESS, [this]() {
         _uiMode = !_uiMode;
@@ -1116,8 +1110,7 @@ void Tetrium::bindDefaultInputs()
             io.ConfigFlags &= ~ImGuiConfigFlags_NoKeyboard;
             io.MousePos = ImVec2{
                 static_cast<float>(_swapChain.extent.width) / 2,
-                static_cast<float>(_swapChain.extent.height) / 2
-            };
+                static_cast<float>(_swapChain.extent.height) / 2};
             io.WantSetMousePos = true;
         } else {
             io.ConfigFlags |= (ImGuiConfigFlags_NoMouse | ImGuiConfigFlags_NoKeyboard);
@@ -1135,6 +1128,13 @@ void Tetrium::bindDefaultInputs()
                 _soundManager.DisableMusic();
             }
         }
+    );
+
+    // "." key to toggle only even / only odd / both
+    _inputManager.RegisterCallback(
+        GLFW_KEY_PERIOD,
+        InputManager::KeyCallbackCondition::PRESS,
+        [this]() { _rocvPresentMode = (ROCVPresentMode)(((int)_rocvPresentMode + 1) % 3); }
     );
 }
 

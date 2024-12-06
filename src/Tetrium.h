@@ -31,17 +31,12 @@
 #include "components/imgui_widgets/ImGuiWidgetColorTile.h"
 #include "components/imgui_widgets/ImGuiWidgetEvenOddCalibration.h"
 #include "components/imgui_widgets/ImGuiWidgetTemp.h"
-#include "components/imgui_widgets/ImGuiWidgetTetraViewer.h"
-#include "components/imgui_widgets/ImGuiWidgetTetraViewerDemo.h"
 #include "components/imgui_widgets/ImGuiWidgetBlobHunter.h"
-// ecs
-#include "ecs/system/TetraImageDisplaySystem.h"
 
 // Applications
 #include "apps/App.h"
 
 class ImPlotContext;
-class TickContext;
 
 class Tetrium
 {
@@ -52,6 +47,15 @@ class Tetrium
     static const std::vector<const char*> EVEN_ODD_HARDWARE_INSTANCE_EXTENSIONS;
     static const std::vector<const char*> EVEN_ODD_HARDWARE_DEVICE_EXTENSIONS;
     static const std::vector<const char*> EVEN_ODD_SOFTWARE_DEVICE_EXTENSIONS;
+
+    enum class EngineTexture
+    {
+        kCursor,
+        kCalibrationGraient,
+        kNumTextures
+    };
+
+    static const std::array<std::string, static_cast<int>(EngineTexture::kNumTextures)> ENGINE_TEXTURE_PATHS;
 
   public:
     // Display mode to present tetracolor outputs.
@@ -85,20 +89,6 @@ class Tetrium
     void Cleanup();
 
     void RegisterApp(TetriumApp::App* app, const std::string& appName);
-
-    struct AnimationKeyFrame
-    {
-        glm::vec3 position = glm::vec3(0.f);
-        glm::vec3 rotation = glm::vec3(0.f); // yaw pitch roll
-        glm::vec3 scale = glm::vec3(1.f);    // x y z
-    };
-
-    void RegisterAnimatedObject(
-        const std::string& meshPath,
-        const std::string& texturePath,
-        std::unique_ptr<std::vector<AnimationKeyFrame>> keyframes,
-        float timeSecondsPerFrame // how long does each frame take before moving on to the next?
-    );
 
   private:
     /* ---------- Packed Structs ---------- */
@@ -142,12 +132,6 @@ class Tetrium
         VkFence fenceRenderFinished;
     };
 
-    // render context for the dual-pass, virtual frame buffer rendering architecture.
-    // RGB and OCV channel each have their own render context,
-    // they are rendered in parallel for each tick.
-    //
-    // By the end of rendering, only one channel's render results from the "virtual frame buffer"
-    // gets copied to the actual frame buffer, stored in `SwapChainContext::frameBuffer`
     struct VirtualFrameBuffer
     {
         std::vector<VkFramebuffer> frameBuffer;
@@ -166,15 +150,20 @@ class Tetrium
 
     // Context for imgui rendering
     // imgui stays as a struct due to its backend's coupling with Vulkan backend.
-    struct ImGuiRenderContexts
+    struct ImGuiRenderContext
     {
         VkRenderPass renderPass;
         VkDescriptorPool descriptorPool;
-        std::unordered_map<std::string, ImGuiTexture> textures;
         std::vector<VkFramebuffer> frameBuffer;
         ImGuiContext* backendImGuiContext;
         ImPlotContext* backendImPlotContext;
     };
+
+    enum class ROCVPresentMode{
+        kNormal,
+        kRGBOnly,
+        kOCVOnly
+    }
 
     /* ---------- Windowing ---------- */;
     std::pair<GLFWmonitor*, GLFWvidmode> cliMonitorModeSelection();
@@ -186,11 +175,12 @@ class Tetrium
     /* ---------- Initialization Subroutines ---------- */
     void initVulkan();
     void initDefaultStates();
+    void loadEngineTextures();
+    void cleanupEngineTextures();
     VkInstance createInstance();
     void createDevice();
     VkSurfaceKHR createGlfwWindowSurface(GLFWwindow* window);
     void createSynchronizationObjects(std::array<SyncPrimitives, NUM_FRAME_IN_FLIGHT>& primitives);
-    void createFunnyObjects();
     VkRenderPass createRenderPass(
         VkDevice logicalDevice,
         VkImageLayout initialLayout,
@@ -260,11 +250,9 @@ class Tetrium
     void bindDefaultInputs();
 
     /* ---------- Render-Time Functions ---------- */
-    void drawFrame(TickContext* tickData, uint8_t frame);
+    void drawFrame(ColorSpace colorSpace, uint8_t frameIdx);
     void drawMainMenu(ColorSpace colorSpace);
     void drawImGui(ColorSpace colorSpace, int currentFrameInFlight);
-    void flushEngineUBOStatic(uint8_t frame);
-    void getMainProjectionMatrix(glm::mat4& projectionMatrix);
 
     void drawAppsImGui(ColorSpace colorSpace, int currentFrameInFlight);
 
@@ -276,7 +264,6 @@ class Tetrium
 
     void initRYGB2ROCVTransform(InitContext* ctx);
     void cleanupRYGB2ROCVTransform();
-
     void transformToROCVframeBuffer(
         VirtualFrameBuffer& rgybFrameBuffer,
         SwapChainContext& rocvSwapChain,
@@ -299,22 +286,15 @@ class Tetrium
     ColorSpace getCurrentColorSpace();
 
     /* ---------- ImGui ---------- */
-    void initImGuiRenderContext(Tetrium::ImGuiRenderContexts& ctx);
-    void destroyImGuiContext(Tetrium::ImGuiRenderContexts& ctx);
-    void reinitImGuiFrameBuffers(Tetrium::ImGuiRenderContexts& ctx);
+    void initImGuiRenderContext(Tetrium::ImGuiRenderContext& ctx);
+    void destroyImGuiContext(Tetrium::ImGuiRenderContext& ctx);
+    void reinitImGuiFrameBuffers(Tetrium::ImGuiRenderContext& ctx);
     void recordImGuiDrawCommandBuffer(
-        Tetrium::ImGuiRenderContexts& ctx,
+        Tetrium::ImGuiRenderContext& ctx,
         vk::CommandBuffer cb,
         vk::Extent2D extent,
-        int swapChainImageIndex
-    );
-    const ImGuiTexture& getOrLoadImGuiTexture(
-        Tetrium::ImGuiRenderContexts& ctx,
-        const std::string& texture
-    );
-    void unloadImGuiTexture(
-        Tetrium::ImGuiRenderContexts& ctx,
-        const std::string& texture
+        int swapChainImageIndex,
+        ColorSpace colorSpace
     );
 
     void clearImGuiDrawData();
@@ -325,7 +305,7 @@ class Tetrium
     std::shared_ptr<VQDevice> _device;
 
     SwapChainContext _swapChain;
-    ImGuiRenderContexts _imguiCtx;
+    ImGuiRenderContext _imguiCtx;
 
     /* ---------- Prensentation ---------- */
     GLFWwindow* _window;
@@ -368,8 +348,6 @@ class Tetrium
 
     float _FOV = 90;
     double _timeSinceStartSeconds; // seconds in time since engine start, regardless of pause
-    unsigned long int
-        _timeSinceStartNanoSeconds;  // nanoseconds in time since engine start, regardless of pause
     unsigned long int _numTicks = 0; // how many ticks has happened so far
 
     // even-odd frame
@@ -406,7 +384,6 @@ class Tetrium
     DeletionStack _deletionStack;
     TextureManager _textureManager;
     DeltaTimer _deltaTimer;
-    Camera _mainCamera;
     InputManager _inputManager;
     Profiler _profiler;
     TaskQueue _taskQueue;
@@ -416,33 +393,20 @@ class Tetrium
     // ImGui widgets
     friend class ImGuiWidgetDeviceInfo;
     friend class ImGuiWidgetPerfPlot;
-    friend class ImGuiWidgetUBOViewer;
     friend class ImGuiWidgetEvenOddCalibration;
-    friend class ImGuiWidgetGraphicsPipeline;
-    friend class ImGuiWidgetTetraViewerDemo;
-    friend class ImGuiWidgetTetraViewer;
-    friend class ImGuiWidgetTemp;
     friend class ImGuiWidgetBlobHunter;
 
     ImGuiWidgetDeviceInfo _widgetDeviceInfo;
     ImGuiWidgetPerfPlot _widgetPerfPlot;
-    ImGuiWidgetUBOViewer _widgetUBOViewer;
     ImGuiWidgetEvenOddCalibration _widgetEvenOdd;
-    ImGuiWidgetGraphicsPipeline _widgetGraphicsPipeline;
-    ImGuiWidgetTetraViewerDemo _widgetTetraViewerDemo;
-    ImGuiWidgetTetraViewer _widgetTetraViewer;
     ImGuiWidgetColorTile _widgetColorTile;
-    ImGuiWidgetTemp _widgetTemp;
 
     ImGuiWidgetBlobHunter _widgetBlobHunter;
 
-
-    struct
-    {
-        [[deprecated]] TetraImageDisplaySystem imageDisplay;
-    } _rgbyRenderers;
-
     std::unordered_map<std::string, TetriumApp::App*> _appMap;
-
     std::optional<TetriumApp::App*> _primaryApp = std::nullopt;
+
+    std::array<std::pair<uint32_t, ImGuiTexture>, static_cast<int>(EngineTexture::kNumTextures)> _engineTextures;
+
+    ROCVPresentMode _rocvPresentMode = ROCVPresentMode::kNormal;
 };

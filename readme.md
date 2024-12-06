@@ -8,60 +8,23 @@ ___  ___ ___  __
 Vulkan-based tetrachromacy display engine.
 ## Engine Architecture
 
-### Frontend
+### Developing Applications
 
-Frontend is still under construction! Currently all renders are hard-coded in backend.
+Refer to [App.h](src/apps/App.h) for details and documentations on developing self-contained 
+applications that writes to both RGB and OCV color spaces.
 
 ### Backend
 
 Engine backend consists of core logic on vulkan rendering, presentation, and even-odd
 frame synchronization. 
 
-#### "Deferred" Presentation
-
-The engine holds two off-screen frame buffers, each responsible for one color space(RGB/OCV)
-
-Each tick, the engine simultaneously renders to the two buffers with RGB and OCV logic.
-
-Once the rendering is done, depending on the presentation mode:
-
-- `TetraMode::kDualProjector`: both buffers are committed to either RGB or OCV projector.
-- `TetraMode::kEvenOddSoftwareSync` or `TetraMode::kEvenOddHardwareSync`: the engine determines the
-  count of the vertical blanking period, either through hardware APIs or a virtual software frame
-  counter; the engine then commits one frame buffer while discarding the other.
-
 #### Even-Odd Frame Synchronization
 
 To determine even/odd-ness of the frame to present, the engine relies on the total number of
-vertical blanking periods % 2. This information is obtained using [vkGetSwapchainCounterEXT](https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetSwapchainCounterEXT.html), when the engine runs under `kEvenOddSoftwareSync`. 
-For `kEvenOddSoftwareSync`, [vkGetPastPresentationTimingGOOGLE](https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetPastPresentationTimingGOOGLE.html) is used to provide a rought estimation.
+vertical blanking periods % 2. This information is obtained using [vkGetSwapchainCounterEXT](https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetSwapchainCounterEXT.html), when the engine runs under `kEvenOddHardwareSync`. 
 
-### ImGui
-
-Given most of tetrachromacy test are performed under 2D space, the engine provides an interface 
-with [DearImGui](https://github.com/ocornut/imgui) that allows for easy integration and development
-of 2D RGV&OCV apps.
-
-In engine backend `Tetrium::drawImGui(ColorSpace)` function calls into various ImGui render widgets.
-Internally, `drawImGui` operates on both RGB and OCV color space, one can differentiate them using
-the `colorSpace` argument and develop various widgets. As an example:
-
-```cpp
-enum ColorSpace {
-    RGB,
-    OCV
-};
-drawImGui(ColorSpace colorSpace) {
-    switch colorSpace {
-        case RGB:
-            ImGui::Image(ishiHaraImgRGB);
-            break;
-        case OCV:
-            ImGui::Image(ishiHaraImgOCV);
-            break;
-    }
-}
-```
+`kEvenOddSoftwareSync` mode provides an inaccurate simulation for frame synchronization, useful for
+developing on devices without discrete GPU.
 
 
 ## Requirements

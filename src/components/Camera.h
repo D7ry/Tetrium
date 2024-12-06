@@ -23,6 +23,7 @@ class Camera
     inline const glm::vec3& GetRotation() { return _rotation; };
 
     void SetPosition(float x, float y, float z);
+    void SetRotation(float yaw, float pitch, float roll);
 
   private:
     glm::vec3 _position;   // world position of the camera

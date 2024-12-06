@@ -20,14 +20,14 @@ struct GraphicsContext
 
 class Profiler;
 
-struct TickContext
-{
-    const Camera* mainCamera;
-    // std::vector<VkFramebuffer>* swapChainFB;
-    double deltaTime;
-    GraphicsContext graphics;
-    Profiler* profiler;
-};
+// struct TickContext
+// {
+//     const Camera* mainCamera;
+//     // std::vector<VkFramebuffer>* swapChainFB;
+//     double deltaTime;
+//     GraphicsContext graphics;
+//     Profiler* profiler;
+// };
 
 class VQDevice;
 class TextureManager;
@@ -57,6 +57,8 @@ enum class Sound
     kVineBoom,
     kMusicGameMenu,
     kMusicGamePlay,
+
+    kMusicInterstellar,
 
     kCorrectAnswer,
     kWrongAnswer = kVineBoom,

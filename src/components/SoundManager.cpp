@@ -60,9 +60,11 @@ ALvoid* SoundManager::loadSoundFile(
 )
 {
     SF_INFO sfInfo;
+    DEBUG("Loading sound {}", filename);
     SNDFILE* sndFile = sf_open(filename, SFM_READ, &sfInfo);
     if (!sndFile) {
-        PANIC("Failed to open sound file {}", filename);
+        const char* error = sf_strerror(NULL);
+        PANIC("Failed to open sound file {}; error: {}", filename, error);
     }
 
     *size = static_cast<ALsizei>(sfInfo.frames * sfInfo.channels * sizeof(short));

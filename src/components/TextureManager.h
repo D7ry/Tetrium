@@ -1,5 +1,6 @@
 #pragma once
 #include "lib/VQDevice.h"
+#include "structs/ImGuiTexture.h"
 #include <vulkan/vulkan_core.h>
 
 class VQDevice;
@@ -27,12 +28,17 @@ class TextureManager
     // suggested to call before cleaning up swapchain.
     void Cleanup();
 
-    void GetDescriptorImageInfo(const std::string& texturePath, VkDescriptorImageInfo& imageInfo);
+    void GetDescriptorImageInfo(uint32_t handle, VkDescriptorImageInfo& imageInfo);
 
-    void LoadTexture(const std::string& texturePath);
-    void UnLoadTexture(const std::string& texturePath);
+    uint32_t LoadTexture(const std::string& texturePath);
+    
+    uint32_t LoadCubemapTexture(const std::string& imagePath);
+    
+    void UnLoadTexture(uint32_t handle);
+    Texture GetTexture(uint32_t handle);
 
-    Texture GetTexture(const std::string& texturePath);
+    void LoadImGuiTexture(uint32_t handle);
+    ImGuiTexture GetImGuiTexture(uint32_t handle);
 
   private:
     struct __TextureInternal
@@ -43,18 +49,22 @@ class TextureManager
         VkSampler textureSampler;          // sampler for shaders
         int width;
         int height;
+        std::optional<void*> imguiTextureId = std::nullopt;
     };
 
     void transitionImageLayout(
         VkImage image,
         VkFormat format,
         VkImageLayout oldLayout,
-        VkImageLayout newLayout
+        VkImageLayout newLayout,
+        uint32_t baseArrayLayer = 0,
+        uint32_t layerCount = 1
     );
 
     // copy over content  in the staging buffer to the actual image
     void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
 
-    std::unordered_map<std::string, __TextureInternal> _textures; // image path -> texture obj
+    uint32_t _nextHandle = 1;
+    std::unordered_map<uint32_t, __TextureInternal> _textures; // handle -> texture obj
     std::shared_ptr<VQDevice> _device;
 };

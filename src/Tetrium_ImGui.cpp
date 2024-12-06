@@ -11,151 +11,151 @@ namespace Tetrium_ImGui
 {
 // context arrays that gets populated after Tetrium::initImGuiContext() is called
 // stores the same data as `Tetrium::_imguiCtx.ctxImGui` and `Tetrium::_imguiCtx.ctxImPlot`
-[[deprecated]] static ImGuiContext* ctxImGui[ColorSpace::ColorSpaceSize] = {};
-[[deprecated]] static ImPlotContext* ctxImPlot[ColorSpace::ColorSpaceSize] = {};
+// [[deprecated]] static ImGuiContext* ctxImGui[ColorSpace::ColorSpaceSize] = {};
+// [[deprecated]] static ImPlotContext* ctxImPlot[ColorSpace::ColorSpaceSize] = {};
 
-namespace GLFW
-{
-struct
-{
-    GLFWwindowfocusfun WindowFocus = nullptr;
-    GLFWcursorenterfun CursorEnter = nullptr;
-    GLFWcursorposfun CursorPos = nullptr;
-    GLFWmousebuttonfun MouseButton = nullptr;
-    GLFWscrollfun Scroll = nullptr;
-    GLFWkeyfun Key = nullptr;
-    GLFWcharfun Char = nullptr;
-    GLFWmonitorfun Monitor = nullptr;
-} prevCallbacks;
-
-[[deprecated]] void ImGuiCustomWindowFocusCallback(GLFWwindow* window, int focused)
-{
-    for (int i = 0; i < ColorSpace::ColorSpaceSize; ++i) {
-        ImGui::SetCurrentContext(ctxImGui[i]);
-        ImPlot::SetCurrentContext(ctxImPlot[i]);
-        ImGui_ImplGlfw_WindowFocusCallback(window, focused);
-    }
-
-    if (prevCallbacks.WindowFocus)
-        prevCallbacks.WindowFocus(window, focused);
-}
-
-[[deprecated]] void ImGuiCustomCursorEnterCallback(GLFWwindow* window, int entered)
-{
-    for (int i = 0; i < ColorSpace::ColorSpaceSize; ++i) {
-        ImGui::SetCurrentContext(ctxImGui[i]);
-        ImPlot::SetCurrentContext(ctxImPlot[i]);
-        ImGui_ImplGlfw_CursorEnterCallback(window, entered);
-    }
-
-    if (prevCallbacks.CursorEnter)
-        prevCallbacks.CursorEnter(window, entered);
-}
-
-[[deprecated]] void ImGuiCustomCursorPosCallback(GLFWwindow* window, double xpos, double ypos)
-{
-    for (int i = 0; i < ColorSpace::ColorSpaceSize; ++i) {
-        ImGui::SetCurrentContext(ctxImGui[i]);
-        ImPlot::SetCurrentContext(ctxImPlot[i]);
-        ImGui_ImplGlfw_CursorPosCallback(window, xpos, ypos);
-    }
-
-    if (prevCallbacks.CursorPos)
-        prevCallbacks.CursorPos(window, xpos, ypos);
-}
-
-[[deprecated]] void ImGuiCustomMouseButtonCallback(
-    GLFWwindow* window,
-    int button,
-    int action,
-    int mods
-)
-{
-    for (int i = 0; i < ColorSpace::ColorSpaceSize; ++i) {
-        ImGui::SetCurrentContext(ctxImGui[i]);
-        ImPlot::SetCurrentContext(ctxImPlot[i]);
-        ImGui_ImplGlfw_MouseButtonCallback(window, button, action, mods);
-    }
-
-    if (prevCallbacks.MouseButton)
-        prevCallbacks.MouseButton(window, button, action, mods);
-}
-
-[[deprecated]] void ImGuiCustomScrollCallback(GLFWwindow* window, double xoffset, double yoffset)
-{
-    for (int i = 0; i < ColorSpace::ColorSpaceSize; ++i) {
-        ImGui::SetCurrentContext(ctxImGui[i]);
-        ImPlot::SetCurrentContext(ctxImPlot[i]);
-        ImGui_ImplGlfw_ScrollCallback(window, xoffset, yoffset);
-    }
-
-    if (prevCallbacks.Scroll)
-        prevCallbacks.Scroll(window, xoffset, yoffset);
-}
-
-[[deprecated]] void ImGuiCustomKeyCallback(
-    GLFWwindow* window,
-    int key,
-    int scancode,
-    int action,
-    int mods
-)
-{
-    for (int i = 0; i < ColorSpace::ColorSpaceSize; ++i) {
-        ImGui::SetCurrentContext(ctxImGui[i]);
-        ImPlot::SetCurrentContext(ctxImPlot[i]);
-        ImGui_ImplGlfw_KeyCallback(window, key, scancode, action, mods);
-    }
-
-    if (prevCallbacks.Key)
-        prevCallbacks.Key(window, key, scancode, action, mods);
-}
-
-[[deprecated]] void ImGuiCustomCharCallback(GLFWwindow* window, unsigned int c)
-{
-    for (int i = 0; i < ColorSpace::ColorSpaceSize; ++i) {
-        ImGui::SetCurrentContext(ctxImGui[i]);
-        ImPlot::SetCurrentContext(ctxImPlot[i]);
-        ImGui_ImplGlfw_CharCallback(window, c);
-    }
-
-    if (prevCallbacks.Char)
-        prevCallbacks.Char(window, c);
-}
-
-[[deprecated]] void ImGuiCustomMonitorCallback(GLFWmonitor* monitor, int event)
-{
-    for (int i = 0; i < ColorSpace::ColorSpaceSize; ++i) {
-        ImGui::SetCurrentContext(ctxImGui[i]);
-        ImPlot::SetCurrentContext(ctxImPlot[i]);
-        ImGui_ImplGlfw_MonitorCallback(monitor, event);
-    }
-
-    if (prevCallbacks.Monitor)
-        prevCallbacks.Monitor(monitor, event);
-}
-
-} // namespace GLFW
+// namespace GLFW
+// {
+// struct
+// {
+//     GLFWwindowfocusfun WindowFocus = nullptr;
+//     GLFWcursorenterfun CursorEnter = nullptr;
+//     GLFWcursorposfun CursorPos = nullptr;
+//     GLFWmousebuttonfun MouseButton = nullptr;
+//     GLFWscrollfun Scroll = nullptr;
+//     GLFWkeyfun Key = nullptr;
+//     GLFWcharfun Char = nullptr;
+//     GLFWmonitorfun Monitor = nullptr;
+// } prevCallbacks;
+//
+// [[deprecated]] void ImGuiCustomWindowFocusCallback(GLFWwindow* window, int focused)
+// {
+//     for (int i = 0; i < ColorSpace::ColorSpaceSize; ++i) {
+//         ImGui::SetCurrentContext(ctxImGui[i]);
+//         ImPlot::SetCurrentContext(ctxImPlot[i]);
+//         ImGui_ImplGlfw_WindowFocusCallback(window, focused);
+//     }
+//
+//     if (prevCallbacks.WindowFocus)
+//         prevCallbacks.WindowFocus(window, focused);
+// }
+//
+// [[deprecated]] void ImGuiCustomCursorEnterCallback(GLFWwindow* window, int entered)
+// {
+//     for (int i = 0; i < ColorSpace::ColorSpaceSize; ++i) {
+//         ImGui::SetCurrentContext(ctxImGui[i]);
+//         ImPlot::SetCurrentContext(ctxImPlot[i]);
+//         ImGui_ImplGlfw_CursorEnterCallback(window, entered);
+//     }
+//
+//     if (prevCallbacks.CursorEnter)
+//         prevCallbacks.CursorEnter(window, entered);
+// }
+//
+// [[deprecated]] void ImGuiCustomCursorPosCallback(GLFWwindow* window, double xpos, double ypos)
+// {
+//     for (int i = 0; i < ColorSpace::ColorSpaceSize; ++i) {
+//         ImGui::SetCurrentContext(ctxImGui[i]);
+//         ImPlot::SetCurrentContext(ctxImPlot[i]);
+//         ImGui_ImplGlfw_CursorPosCallback(window, xpos, ypos);
+//     }
+//
+//     if (prevCallbacks.CursorPos)
+//         prevCallbacks.CursorPos(window, xpos, ypos);
+// }
+//
+// [[deprecated]] void ImGuiCustomMouseButtonCallback(
+//     GLFWwindow* window,
+//     int button,
+//     int action,
+//     int mods
+// )
+// {
+//     for (int i = 0; i < ColorSpace::ColorSpaceSize; ++i) {
+//         ImGui::SetCurrentContext(ctxImGui[i]);
+//         ImPlot::SetCurrentContext(ctxImPlot[i]);
+//         ImGui_ImplGlfw_MouseButtonCallback(window, button, action, mods);
+//     }
+//
+//     if (prevCallbacks.MouseButton)
+//         prevCallbacks.MouseButton(window, button, action, mods);
+// }
+//
+// [[deprecated]] void ImGuiCustomScrollCallback(GLFWwindow* window, double xoffset, double yoffset)
+// {
+//     for (int i = 0; i < ColorSpace::ColorSpaceSize; ++i) {
+//         ImGui::SetCurrentContext(ctxImGui[i]);
+//         ImPlot::SetCurrentContext(ctxImPlot[i]);
+//         ImGui_ImplGlfw_ScrollCallback(window, xoffset, yoffset);
+//     }
+//
+//     if (prevCallbacks.Scroll)
+//         prevCallbacks.Scroll(window, xoffset, yoffset);
+// }
+//
+// [[deprecated]] void ImGuiCustomKeyCallback(
+//     GLFWwindow* window,
+//     int key,
+//     int scancode,
+//     int action,
+//     int mods
+// )
+// {
+//     for (int i = 0; i < ColorSpace::ColorSpaceSize; ++i) {
+//         ImGui::SetCurrentContext(ctxImGui[i]);
+//         ImPlot::SetCurrentContext(ctxImPlot[i]);
+//         ImGui_ImplGlfw_KeyCallback(window, key, scancode, action, mods);
+//     }
+//
+//     if (prevCallbacks.Key)
+//         prevCallbacks.Key(window, key, scancode, action, mods);
+// }
+//
+// [[deprecated]] void ImGuiCustomCharCallback(GLFWwindow* window, unsigned int c)
+// {
+//     for (int i = 0; i < ColorSpace::ColorSpaceSize; ++i) {
+//         ImGui::SetCurrentContext(ctxImGui[i]);
+//         ImPlot::SetCurrentContext(ctxImPlot[i]);
+//         ImGui_ImplGlfw_CharCallback(window, c);
+//     }
+//
+//     if (prevCallbacks.Char)
+//         prevCallbacks.Char(window, c);
+// }
+//
+// [[deprecated]] void ImGuiCustomMonitorCallback(GLFWmonitor* monitor, int event)
+// {
+//     for (int i = 0; i < ColorSpace::ColorSpaceSize; ++i) {
+//         ImGui::SetCurrentContext(ctxImGui[i]);
+//         ImPlot::SetCurrentContext(ctxImPlot[i]);
+//         ImGui_ImplGlfw_MonitorCallback(monitor, event);
+//     }
+//
+//     if (prevCallbacks.Monitor)
+//         prevCallbacks.Monitor(monitor, event);
+// }
+//
+// } // namespace GLFW
 
 // Set up custom callback functions that invokes on both RGB
 // and OCV imgui contexts; Naively binding all callbacks through
 // GLFW doesn't work, as the callbacks do not handle context switching.
-[[deprecated]] void setupCustomCallbacks(GLFWwindow* window)
-{
-    // Store previous callbacks and set new ones
-    GLFW::prevCallbacks.WindowFocus
-        = glfwSetWindowFocusCallback(window, GLFW::ImGuiCustomWindowFocusCallback);
-    GLFW::prevCallbacks.CursorEnter
-        = glfwSetCursorEnterCallback(window, GLFW::ImGuiCustomCursorEnterCallback);
-    GLFW::prevCallbacks.CursorPos
-        = glfwSetCursorPosCallback(window, GLFW::ImGuiCustomCursorPosCallback);
-    GLFW::prevCallbacks.MouseButton
-        = glfwSetMouseButtonCallback(window, GLFW::ImGuiCustomMouseButtonCallback);
-    GLFW::prevCallbacks.Scroll = glfwSetScrollCallback(window, GLFW::ImGuiCustomScrollCallback);
-    GLFW::prevCallbacks.Key = glfwSetKeyCallback(window, GLFW::ImGuiCustomKeyCallback);
-    GLFW::prevCallbacks.Char = glfwSetCharCallback(window, GLFW::ImGuiCustomCharCallback);
-    GLFW::prevCallbacks.Monitor = glfwSetMonitorCallback(GLFW::ImGuiCustomMonitorCallback);
-}
+// [[deprecated]] void setupCustomCallbacks(GLFWwindow* window)
+// {
+//     // Store previous callbacks and set new ones
+//     GLFW::prevCallbacks.WindowFocus
+//         = glfwSetWindowFocusCallback(window, GLFW::ImGuiCustomWindowFocusCallback);
+//     GLFW::prevCallbacks.CursorEnter
+//         = glfwSetCursorEnterCallback(window, GLFW::ImGuiCustomCursorEnterCallback);
+//     GLFW::prevCallbacks.CursorPos
+//         = glfwSetCursorPosCallback(window, GLFW::ImGuiCustomCursorPosCallback);
+//     GLFW::prevCallbacks.MouseButton
+//         = glfwSetMouseButtonCallback(window, GLFW::ImGuiCustomMouseButtonCallback);
+//     GLFW::prevCallbacks.Scroll = glfwSetScrollCallback(window, GLFW::ImGuiCustomScrollCallback);
+//     GLFW::prevCallbacks.Key = glfwSetKeyCallback(window, GLFW::ImGuiCustomKeyCallback);
+//     GLFW::prevCallbacks.Char = glfwSetCharCallback(window, GLFW::ImGuiCustomCharCallback);
+//     GLFW::prevCallbacks.Monitor = glfwSetMonitorCallback(GLFW::ImGuiCustomMonitorCallback);
+// }
 
 void InitializeFrameBuffer(
     VkDevice device,
@@ -280,7 +280,7 @@ void initFonts()
 
 } // namespace Tetrium_ImGui
 
-void Tetrium::reinitImGuiFrameBuffers(Tetrium::ImGuiRenderContexts& ctx)
+void Tetrium::reinitImGuiFrameBuffers(Tetrium::ImGuiRenderContext& ctx)
 {
     Tetrium_ImGui::InitializeFrameBuffer(
         _device->Get(),
@@ -294,7 +294,7 @@ void Tetrium::reinitImGuiFrameBuffers(Tetrium::ImGuiRenderContexts& ctx)
     );
 }
 
-void Tetrium::destroyImGuiContext(Tetrium::ImGuiRenderContexts& ctx)
+void Tetrium::destroyImGuiContext(Tetrium::ImGuiRenderContext& ctx)
 {
     // NOTE: current imgui impl does not support vulkan multi-context shutdown;
     // not a big problem for now since we only shut down at very end, but
@@ -312,7 +312,7 @@ void Tetrium::destroyImGuiContext(Tetrium::ImGuiRenderContexts& ctx)
     vkDestroyDescriptorPool(_device->logicalDevice, ctx.descriptorPool, nullptr);
 }
 
-void Tetrium::initImGuiRenderContext(Tetrium::ImGuiRenderContexts& ctx)
+void Tetrium::initImGuiRenderContext(Tetrium::ImGuiRenderContext& ctx)
 {
     // create render pass
     VkImageLayout imguiInitialLayout, imguiFinalLayout;
@@ -380,10 +380,11 @@ void Tetrium::initImGuiRenderContext(Tetrium::ImGuiRenderContexts& ctx)
 }
 
 void Tetrium::recordImGuiDrawCommandBuffer(
-    Tetrium::ImGuiRenderContexts& ctx,
+    Tetrium::ImGuiRenderContext& ctx,
     vk::CommandBuffer cb,
     vk::Extent2D extent,
-    int swapChainImageIndex
+    int swapChainImageIndex,
+    ColorSpace colorSpace
 )
 {
 
@@ -401,40 +402,28 @@ void Tetrium::recordImGuiDrawCommandBuffer(
     if (drawData == nullptr) {
         FATAL("Draw data is null!");
     }
-    ImGui_ImplVulkan_RenderDrawData(drawData, cb);
 
-    cb.endRenderPass();
-}
-
-const ImGuiTexture& Tetrium::getOrLoadImGuiTexture(
-    Tetrium::ImGuiRenderContexts& ctx,
-    const std::string& texture
-)
-{
-    auto it = ctx.textures.find(texture);
-    if (it != ctx.textures.end()) {
-        return it->second;
+    bool shouldPaintImGUI = true;
+    switch (_rocvPresentMode) {
+    case ROCVPresentMode::kNormal:
+        break;
+    case ROCVPresentMode::kRGBOnly:
+        if (colorSpace == ColorSpace::OCV) {
+            shouldPaintImGUI = false;
+        }
+        break;
+    case ROCVPresentMode::kOCVOnly:
+        if (colorSpace == ColorSpace::RGB) {
+            shouldPaintImGUI = false;
+        }
+        break;
     }
 
-    TextureManager::Texture t = _textureManager.GetTexture(texture);
-    VkDescriptorSet descriptor = ImGui_ImplVulkan_AddTexture(
-        t.sampler, t.imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-    );
+    if (shouldPaintImGUI) {
+        ImGui_ImplVulkan_RenderDrawData(drawData, cb);
+    }
 
-    ImGuiTexture tex{.id = descriptor, .width = t.width, .height = t.height};
-
-    auto res = ctx.textures.insert({texture, tex});
-    ASSERT(res.second);
-    return res.first->second;
-}
-
-void Tetrium::unloadImGuiTexture(Tetrium::ImGuiRenderContexts& ctx, const std::string& texture)
-{
-
-    auto it = ctx.textures.find(texture);
-    ASSERT(it != ctx.textures.end());
-    ImGui_ImplVulkan_RemoveTexture(reinterpret_cast<VkDescriptorSet>(it->second.id));
-    _textureManager.UnLoadTexture(texture);
+    cb.endRenderPass();
 }
 
 void Tetrium::clearImGuiDrawData()

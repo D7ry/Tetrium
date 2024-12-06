@@ -9,8 +9,8 @@ namespace TetriumApp
 class AppScreeningTest : public App
 {
   public:
-    virtual void Init(TetriumApp::InitContext& ctx) override {};
-    virtual void Cleanup(TetriumApp::CleanupContext& ctx) override {};
+    virtual void Init(TetriumApp::InitContext& ctx) override;
+    virtual void Cleanup(TetriumApp::CleanupContext& ctx) override;
 
     virtual void TickImGui(const TetriumApp::TickContextImGui& ctx) override;
 
@@ -53,8 +53,10 @@ class AppScreeningTest : public App
 
     struct SubjectPromptContext
     {
-        std::string currentIshiharaTexturePath[ColorSpace::ColorSpaceSize];
-        std::string currentAnswerTexturePath[4];
+        uint32_t currentIshiharaPlateTextureHandle[ColorSpace::ColorSpaceSize] = {};
+        ImGuiTexture currentIshiharaPlateTexture[ColorSpace::ColorSpaceSize];
+        uint32_t currentAnswerTextureHandle[4];
+        ImGuiTexture currentAnswerTexture[4];
         int correctAnswerTextureIndex;
         int currentSelectedAnswer = -1;
     };
@@ -75,6 +77,12 @@ class AppScreeningTest : public App
     SubjectContext _subject;
 
   private:
+    struct
+    {
+        ImGuiTexture bairLogo;
+
+    } _textures;
+
     // draw subroutines
     void drawIdle(const TetriumApp::TickContextImGui& ctx);
 
@@ -93,9 +101,9 @@ class AppScreeningTest : public App
     ImGuiTexture GetAnswerPromptTextureDigit(uint32_t digit);
 
     // game logic
-    void newGame();
+    void newGame(const TetriumApp::TickContextImGui& ctx);
 
-    void transitionSubjectState(SubjectContext& subject);
+    void transitionSubjectState(SubjectContext& subject, const TetriumApp::TickContextImGui& ctx);
 
     void endGame(SubjectContext& subject);
 
@@ -111,6 +119,9 @@ class AppScreeningTest : public App
 
     TetriumColor::PseudoIsochromaticPlateGenerator* _plateGenerator = nullptr;
 
-    void populatePromptContext(SubjectContext& subject);
+    void populatePromptContext(SubjectContext& subject, const TetriumApp::TickContextImGui& ctx);
+
+    std::unordered_map<int, uint32_t> _answerPromptTextureHandles = {};
+    std::unordered_map<int, ImGuiTexture> _answerPromptImGuiTextures = {};
 };
 } // namespace TetriumApp

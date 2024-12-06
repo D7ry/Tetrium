@@ -12,6 +12,12 @@ void TextureFrameBuffer::Init(
     VkFormat depthFormat
 )
 {
+    _device = device;
+    _physicalDevice = physicalDevice;
+    _renderPass = renderPass;
+    _imageFormat = imageFormat;
+    _depthFormat = depthFormat;
+
     // Create color image & image view
     VulkanUtils::createImage(
         width,
@@ -80,14 +86,20 @@ void TextureFrameBuffer::Init(
     );
 }
 
-void TextureFrameBuffer::Cleanup(vk::Device device)
+void TextureFrameBuffer::Cleanup()
 {
-    device.destroyFramebuffer(_frameBuffer);
-    device.destroySampler(_sampler);
-    device.destroyImageView(_deviceImage.view);
-    device.destroyImage(_deviceImage.image);
-    device.freeMemory(_deviceImage.memory);
-    device.destroyImageView(_depthImage.view);
-    device.destroyImage(_depthImage.image);
-    device.freeMemory(_depthImage.memory);
+    _device.destroyFramebuffer(_frameBuffer);
+    _device.destroySampler(_sampler);
+    _device.destroyImageView(_deviceImage.view);
+    _device.destroyImage(_deviceImage.image);
+    _device.freeMemory(_deviceImage.memory);
+    _device.destroyImageView(_depthImage.view);
+    _device.destroyImage(_depthImage.image);
+    _device.freeMemory(_depthImage.memory);
+}
+
+void TextureFrameBuffer::Resize(uint32_t width, uint32_t height)
+{
+    Cleanup();
+    Init(_device, _physicalDevice, _renderPass, width, height, _imageFormat, _depthFormat);
 }
