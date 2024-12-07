@@ -33,7 +33,7 @@ int main(int argc, char** argv)
     };
 
 
-    Tetrium::InitOptions options{.tetraMode = Tetrium::TetraMode::kEvenOddSoftwareSync};
+    Tetrium::InitOptions options{.tetraMode = Tetrium::TetraMode::kEvenOddHardwareSync};
     Tetrium engine;
 
     for (auto& [app, appName] : apps) {

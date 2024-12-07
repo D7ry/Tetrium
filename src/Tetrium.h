@@ -375,11 +375,6 @@ class Tetrium
         bool currShouldBeEven = true;
     } _evenOddDebugCtx;
 
-    struct {
-        bool blackOutEven = false;
-        bool blackOutOdd = false;
-    } _evenOddRenderingSettings;
-
     /* ---------- Engine Components ---------- */
     DeletionStack _deletionStack;
     TextureManager _textureManager;

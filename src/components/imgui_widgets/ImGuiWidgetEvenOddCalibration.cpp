@@ -100,7 +100,8 @@ void ImGuiWidgetEvenOddCalibration::drawColorQuadTest()
 //         ImVec2 availableSize = ImGui::GetContentRegionAvail();
 //         availableSize.x *= 0.5;
 //
-//         ImGuiTexture& gradientTexture = engine->_engineTextures[(int)Tetrium::EngineTexture::kCalibrationGraient].second;
+//         ImGuiTexture& gradientTexture =
+//         engine->_engineTextures[(int)Tetrium::EngineTexture::kCalibrationGraient].second;
 //
 //         // scale the texture
 //         float scale = availableSize.x / (float)gradientTexture.width;
@@ -222,15 +223,22 @@ void ImGuiWidgetEvenOddCalibration::Draw(Tetrium* engine, ColorSpace colorSpace)
         engine->_flipEvenOdd = true;
     }
 
-    bool blackOutEven = engine->_evenOddRenderingSettings.blackOutEven;
-    bool blackOutOdd = engine->_evenOddRenderingSettings.blackOutOdd;
+    {
+        bool showAllChannels = engine->_rocvPresentMode == Tetrium::ROCVPresentMode::kNormal;
+        bool rgbOnly = engine->_rocvPresentMode == Tetrium::ROCVPresentMode::kRGBOnly;
+        bool ocvOnly = engine->_rocvPresentMode == Tetrium::ROCVPresentMode::kOCVOnly;
 
-    if (ImGui::Checkbox("Black Out Even Frames", &blackOutEven)) {
-        engine->_evenOddRenderingSettings.blackOutEven = blackOutEven;
-    }
-
-    if (ImGui::Checkbox("Black Out Odd Frames", &blackOutOdd)) {
-        engine->_evenOddRenderingSettings.blackOutOdd = blackOutOdd;
+        if (ImGui::RadioButton("Show All Channels", showAllChannels)) {
+            engine->_rocvPresentMode = Tetrium::ROCVPresentMode::kNormal;
+        }
+        ImGui::SameLine();
+        if (ImGui::RadioButton("Show RGB Only", rgbOnly)) {
+            engine->_rocvPresentMode = Tetrium::ROCVPresentMode::kRGBOnly;
+        }
+        ImGui::SameLine();
+        if (ImGui::RadioButton("Show OCV Only", ocvOnly)) {
+            engine->_rocvPresentMode = Tetrium::ROCVPresentMode::kOCVOnly;
+        }
     }
 
     { // draw RGB and OCV gradients
@@ -239,7 +247,8 @@ void ImGuiWidgetEvenOddCalibration::Draw(Tetrium* engine, ColorSpace colorSpace)
         ImVec2 availableSize = ImGui::GetContentRegionAvail();
         availableSize.x *= 0.5;
 
-        ImGuiTexture& gradientTexture = engine->_engineTextures[(int)Tetrium::EngineTexture::kCalibrationGraient].second;
+        ImGuiTexture& gradientTexture
+            = engine->_engineTextures[(int)Tetrium::EngineTexture::kCalibrationGraient].second;
 
         // scale the texture
         float scale = availableSize.x / (float)gradientTexture.width;

@@ -92,6 +92,11 @@ void Tetrium::drawMainMenu(ColorSpace colorSpace)
 
     if (ImGui::Begin(DEFAULTS::Engine::APPLICATION_NAME, NULL, fullScreenFlags)) {
         if (ImGui::BeginTabBar("Engine Tab")) {
+            if (ImGui::BeginTabItem("🛸Even-Odd")) {
+                _widgetEvenOdd.Draw(this, colorSpace);
+                ImGui::EndTabItem();
+            }
+
             if (ImGui::BeginTabItem("🎨Apps")) {
                 // show all apps
                 for (auto& [appName, app] : _appMap) {
@@ -116,10 +121,6 @@ void Tetrium::drawMainMenu(ColorSpace colorSpace)
                 ImGui::EndTabItem();
             }
 
-            if (ImGui::BeginTabItem("🛸Even-Odd")) {
-                _widgetEvenOdd.Draw(this, colorSpace);
-                ImGui::EndTabItem();
-            }
 
             if (ImGui::BeginTabItem("Color Tile")) {
                 _widgetColorTile.Draw(this, colorSpace);

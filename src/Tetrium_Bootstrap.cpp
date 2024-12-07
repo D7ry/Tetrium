@@ -1133,6 +1133,13 @@ void Tetrium::bindDefaultInputs()
         InputManager::KeyCallbackCondition::PRESS,
         [this]() { _rocvPresentMode = (ROCVPresentMode)(((int)_rocvPresentMode + 1) % 3); }
     );
+
+    // ";" key to toggle rgb/ocv to even/odd mapping
+    _inputManager.RegisterCallback(
+        GLFW_KEY_SEMICOLON,
+        InputManager::KeyCallbackCondition::PRESS,
+        [this]() { _flipEvenOdd = !_flipEvenOdd; }
+    );
 }
 
 // https://www.saschawillems.de/blog/2018/07/19/vulkan-input-attachments-and-sub-passes/
