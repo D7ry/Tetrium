@@ -129,6 +129,15 @@ void AppImageViewer::refreshTetraImagePicker(const TickContextImGui& ctx)
             images.insert(fileName);
         }
     }
+
+    // sort all tetra images by rgb file name
+    std::sort(
+        _tetraImages.begin(),
+        _tetraImages.end(),
+        [](const TetraImageFile& a, const TetraImageFile& b) {
+            return a.fileNames[ColorSpace::RGB] < b.fileNames[ColorSpace::RGB];
+        }
+    );
 }
 
 void AppImageViewer::drawTetraImagePicker(const TickContextImGui& ctx, ColorSpace colorSpace)
