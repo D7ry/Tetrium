@@ -36,6 +36,7 @@ developing on devices without discrete GPU.
 - `make` or `ninja`
 - openAL
 - libsndfile
+- openSSL
 
 ### Hardware Even-odd frame sync
 
