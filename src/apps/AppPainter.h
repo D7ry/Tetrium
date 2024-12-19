@@ -1,5 +1,7 @@
 #pragma once
 
+#include "lib/DeletionStack.h"
+
 #include "App.h"
 #include "app_components/TextureFrameBuffer.h"
 
@@ -94,31 +96,45 @@ class AppPainter : public App
     // space transformation.
 
     // CPU-accessible buffer to store paint space data
-    struct {
-        vk::Buffer buffer = VK_NULL_HANDLE;
-        vk::DeviceMemory memory = VK_NULL_HANDLE;
-    } _paintSpaceBuffer;
-
+    VQBuffer _paintSpaceBuffer;
     void initPaintSpaceBuffer(TetriumApp::InitContext& ctx);
     void cleanupPaintSpaceBuffer(TetriumApp::CleanupContext& ctx);
 
-    struct PaintSpaceFrameBuffer
+    // GPU-accessible texture to sample from in paint space.
+    struct PaintSpaceTexture
     {
         vk::Image image = VK_NULL_HANDLE;
+        vk::ImageView imageView = VK_NULL_HANDLE;
         vk::DeviceMemory memory = VK_NULL_HANDLE;
         bool needsUpdate = true; // whether the frame buffer needs to be staged, set to `true` when
                                  // `_paintSpaceBuffer` is updated
     };
-    // GPU-accessible frame buffers for paint space
-    std::array<PaintSpaceFrameBuffer, NUM_FRAME_IN_FLIGHT> _fbPaintSpace;
-    void initPaintSpaceFrameBuffer(TetriumApp::InitContext& ctx);
-    void cleanupPaintSpaceFrameBuffer(TetriumApp::CleanupContext& ctx);
 
-    // ---------- View space(RGB+OCV) frame buffers ---------- 
+    std::array<PaintSpaceTexture, NUM_FRAME_IN_FLIGHT> _paintSpaceTexture;
+    void initPaintSpaceTexture(TetriumApp::InitContext& ctx);
+    void cleanupPaintSpaceTexture(TetriumApp::CleanupContext& ctx);
+
+    // ---------- View space(RGB+OCV) frame buffers ----------
 
     // Frame buffers are updated by applying the transformation matrices to the RYGB canvas,
     // after which they are sampled by ImGui backend as a texture for rendering.
-    std::array<TextureFrameBuffer, NUM_FRAME_IN_FLIGHT> _fbViewSpace;
+    std::array<TextureFrameBuffer, NUM_FRAME_IN_FLIGHT> _viewSpaceFrameBuffer;
+    void initViewSpaceFrameBuffer(TetriumApp::InitContext& ctx);
+    void cleanupViewSpaceFrameBuffer(TetriumApp::CleanupContext& ctx);
+
+    // ---------- Paint to view space transformation context ----------
+
+    enum class BindingLocation : uint32_t
+    {
+        ubo = 0,
+        sampler = 1
+    };
+
+    struct UBO
+    {
+        // either RYGB -> RGB or RYGB -> OCV
+        glm::mat4x3 transformMatrix;
+    };
 
     // Render pass that samples from the paint space fb
     // and transforms the colors to RGB and OCV color spaces.
@@ -131,6 +147,16 @@ class AppPainter : public App
     struct
     {
         vk::RenderPass renderPass = VK_NULL_HANDLE;
+
+        vk::PipelineLayout pipelineLayout = VK_NULL_HANDLE;
+        vk::Pipeline pipeline = VK_NULL_HANDLE;
+
+        vk::DescriptorPool descriptorPool = VK_NULL_HANDLE;
+        vk::DescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
+        std::array<VkDescriptorSet, NUM_FRAME_IN_FLIGHT> descriptorSets = {};
+
+        std::array<VQBuffer, NUM_FRAME_IN_FLIGHT> ubo = {};
+        std::array<vk::Sampler, NUM_FRAME_IN_FLIGHT> samplers = {};
     } _paintToViewSpaceContext;
 
     void initPaintToViewSpaceContext(TetriumApp::InitContext& ctx);
