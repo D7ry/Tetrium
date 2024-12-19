@@ -20,9 +20,9 @@ class AppPainter : public App
     // transformation matrices from RYGB to RGB and OCV color spaces
     // the project renders in RGB and OCV color space.
     // TODO: use actual matrices
-    glm::mat4 _tranformMatrixFromRygb[ColorSpace::ColorSpaceSize] = {
-        glm::mat4(1.f), // RYGB -> RGB
-        glm::mat4(1.f), // RYGB -> OCV
+    std::array<glm::mat4x3, ColorSpace::ColorSpaceSize> _tranformMatrixFromRygb = {
+        glm::mat4x3(1.f), // RYGB -> RGB
+        glm::mat4x3(1.f)  // RYGB -> OCV
     };
 
     // Color picker widget that visualizes RYGB color space through slice of
@@ -82,21 +82,32 @@ class AppPainter : public App
 
     bool _wantDrawColorPicker = false;
 
-    // Paint space(RYGB) frame buffer.
-    // We paint onto this texture RYGB values into RGBA channels, repurposing the alpha channel.
+    // ---------- Paint space(RYGB) buffers ----------
+    //
+    // We paint onto buffer RYGB values into RGBA channels, repurposing the alpha channel.
     // so a single pixel is laid out as:
-    // | R | Y | G | B | -> | R | G | B | A |
+    // | R | Y | G | B | <-- pixel data
+    // | R | G | B | A | <-- actual buffer memory
     // the framebuffer is in `VK_FORMAT_R32G32B32A32_SFLOAT` format,
     // as colors in RYGB space may be negative.
+    // we write to a CPU-accessible staging buffer; the buffer is flushed to GPU buffer for color
+    // space transformation.
+
+    // CPU-accessible buffer to store paint space data
+    VQBuffer _paintSpaceBuffer; 
+
     struct PaintSpaceFrameBuffer
     {
+        bool needsUpdate = true; // whether the frame buffer needs to be staged, set to `true` when
+                                 // `_paintSpaceBuffer` is updated
     };
-
-    PaintSpaceFrameBuffer _fbPaintSpace;
+    // GPU-accessible frame buffers for paint space
+    std::array<PaintSpaceFrameBuffer, NUM_FRAME_IN_FLIGHT> _fbPaintSpace;
     void initPaintSpaceFrameBuffer(TetriumApp::InitContext& ctx);
     void cleanupPaintSpaceFrameBuffer(TetriumApp::CleanupContext& ctx);
 
-    // View space(RGB+OCV) frame buffers.
+    // ---------- View space(RGB+OCV) frame buffers ---------- 
+
     // Frame buffers are updated by applying the transformation matrices to the RYGB canvas,
     // after which they are sampled by ImGui backend as a texture for rendering.
     std::array<TextureFrameBuffer, NUM_FRAME_IN_FLIGHT> _fbViewSpace;
@@ -107,9 +118,14 @@ class AppPainter : public App
     //
     // The shader
     // 1. samples from the paint space frame buffer as a texture
-    // 2. applies either RGB or OCV transformation matrices
-    vk::RenderPass _renderPassPaintToViewSpace = VK_NULL_HANDLE;
-    void initRenderPassPaintToViewSpace(TetriumApp::InitContext& ctx);
-    void cleanupRenderPassPaintToViewSpace(TetriumApp::CleanupContext& ctx);
+    // 2. applies 4x4 transformation matrix
+    // depending on the color space,
+    struct
+    {
+        vk::RenderPass renderPass = VK_NULL_HANDLE;
+    } _paintToViewSpaceContext;
+
+    void initPaintToViewSpaceContext(TetriumApp::InitContext& ctx);
+    void cleanupPaintToViewSpaceContext(TetriumApp::CleanupContext& ctx);
 };
 } // namespace TetriumApp
