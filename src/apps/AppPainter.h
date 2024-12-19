@@ -94,10 +94,18 @@ class AppPainter : public App
     // space transformation.
 
     // CPU-accessible buffer to store paint space data
-    VQBuffer _paintSpaceBuffer; 
+    struct {
+        vk::Buffer buffer = VK_NULL_HANDLE;
+        vk::DeviceMemory memory = VK_NULL_HANDLE;
+    } _paintSpaceBuffer;
+
+    void initPaintSpaceBuffer(TetriumApp::InitContext& ctx);
+    void cleanupPaintSpaceBuffer(TetriumApp::CleanupContext& ctx);
 
     struct PaintSpaceFrameBuffer
     {
+        vk::Image image = VK_NULL_HANDLE;
+        vk::DeviceMemory memory = VK_NULL_HANDLE;
         bool needsUpdate = true; // whether the frame buffer needs to be staged, set to `true` when
                                  // `_paintSpaceBuffer` is updated
     };
