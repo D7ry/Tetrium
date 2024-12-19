@@ -63,8 +63,9 @@ class AppPainter : public App
     };
 
   public:
-    AppPainter();
-    ~AppPainter();
+    AppPainter() {}
+
+    ~AppPainter() {}
 
     virtual void Init(TetriumApp::InitContext& ctx) override;
 
@@ -75,13 +76,11 @@ class AppPainter : public App
     virtual void TickVulkan(TetriumApp::TickContextVulkan& ctx) override;
 
   private:
-    void Draw(const TetriumApp::TickContextImGui& ctx);
-
-    void DrawColorPickerWidget(const TetriumApp::TickContextImGui& ctx);
-
     // TODO::
     // - implement serialization and deserialization of RYGB files
     ColorPicker _colorPicker;
+
+    bool _wantDrawColorPicker = false;
 
     // Paint space(RYGB) frame buffer.
     // We paint onto this texture RYGB values into RGBA channels, repurposing the alpha channel.
@@ -89,7 +88,13 @@ class AppPainter : public App
     // | R | Y | G | B | -> | R | G | B | A |
     // the framebuffer is in `VK_FORMAT_R32G32B32A32_SFLOAT` format,
     // as colors in RYGB space may be negative.
-    TextureFrameBuffer _fbPaintSpace;
+    struct PaintSpaceFrameBuffer {
+
+    };
+
+    PaintSpaceFrameBuffer _fbPaintSpace;
+    void initPaintSpaceFrameBuffer(TetriumApp::InitContext& ctx);
+    void cleanupPaintSpaceFrameBuffer(TetriumApp::CleanupContext& ctx);
 
     // View space(RGB+OCV) frame buffers.
     // Frame buffers are updated by applying the transformation matrices to the RYGB canvas,
