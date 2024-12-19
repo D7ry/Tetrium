@@ -88,8 +88,8 @@ class AppPainter : public App
     // | R | Y | G | B | -> | R | G | B | A |
     // the framebuffer is in `VK_FORMAT_R32G32B32A32_SFLOAT` format,
     // as colors in RYGB space may be negative.
-    struct PaintSpaceFrameBuffer {
-
+    struct PaintSpaceFrameBuffer
+    {
     };
 
     PaintSpaceFrameBuffer _fbPaintSpace;
@@ -100,5 +100,16 @@ class AppPainter : public App
     // Frame buffers are updated by applying the transformation matrices to the RYGB canvas,
     // after which they are sampled by ImGui backend as a texture for rendering.
     std::array<TextureFrameBuffer, NUM_FRAME_IN_FLIGHT> _fbViewSpace;
+
+    // Render pass that samples from the paint space fb
+    // and transforms the colors to RGB and OCV color spaces.
+    // the pass relies on a shader that renders onto a full-screen quad.
+    //
+    // The shader
+    // 1. samples from the paint space frame buffer as a texture
+    // 2. applies either RGB or OCV transformation matrices
+    vk::RenderPass _renderPassPaintToViewSpace = VK_NULL_HANDLE;
+    void initRenderPassPaintToViewSpace(TetriumApp::InitContext& ctx);
+    void cleanupRenderPassPaintToViewSpace(TetriumApp::CleanupContext& ctx);
 };
 } // namespace TetriumApp
