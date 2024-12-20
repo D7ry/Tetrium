@@ -119,7 +119,6 @@ void AppPainter::cleanupViewSpaceFrameBuffer(TetriumApp::CleanupContext& ctx)
     }
 }
 
-// TODO: impl
 void AppPainter::initPaintToViewSpaceContext(TetriumApp::InitContext& ctx)
 {
     vk::Device device = ctx.device.logicalDevice;
@@ -294,8 +293,8 @@ void AppPainter::initPaintToViewSpaceContext(TetriumApp::InitContext& ctx)
     /* create pipeline */
     {
         // TODO: write shaders
-        const char* VERTEX_SHADER_PATH = "assets/apps/AppPainter/paint_to_view_space.vert.spv";
-        const char* FRAGMENT_SHADER_PATH = "assets/apps/AppPainter/paint_to_view_space.vert.spv";
+        const char* VERTEX_SHADER_PATH = "assets/apps/AppPainter/shaders/paint_to_view_space.vert.spv";
+        const char* FRAGMENT_SHADER_PATH = "assets/apps/AppPainter/shaders/paint_to_view_space.vert.spv";
 
         // shader modules
         vk::ShaderModule vertShaderModule
@@ -435,10 +434,23 @@ void AppPainter::initPaintToViewSpaceContext(TetriumApp::InitContext& ctx)
     }
 }
 
-// TODO: impl
 void AppPainter::cleanupPaintToViewSpaceContext(TetriumApp::CleanupContext& ctx)
 {
-    vkDestroyRenderPass(ctx.device.logicalDevice, _paintToViewSpaceContext.renderPass, nullptr);
+    vk::Device device = ctx.device.logicalDevice;
+
+    for (VQBuffer& ubo : _paintToViewSpaceContext.ubo) {
+        ubo.Cleanup();
+    }
+
+    for (vk::Sampler& sampler : _paintToViewSpaceContext.samplers) {
+        device.destroySampler(sampler);
+    }
+
+    device.destroyDescriptorSetLayout(_paintToViewSpaceContext.descriptorSetLayout);
+    device.destroyDescriptorPool(_paintToViewSpaceContext.descriptorPool);
+    device.destroyRenderPass(_paintToViewSpaceContext.renderPass);
+    device.destroyPipeline(_paintToViewSpaceContext.pipeline);
+    device.destroyPipelineLayout(_paintToViewSpaceContext.pipelineLayout);
 }
 
 void AppPainter::Init(TetriumApp::InitContext& ctx)
@@ -466,9 +478,75 @@ void AppPainter::Cleanup(TetriumApp::CleanupContext& ctx)
 // TODO: impl
 void AppPainter::TickVulkan(TetriumApp::TickContextVulkan& ctx)
 {
-    // update paint space framebuffers if needed
+    PaintSpaceTexture& canvas = _paintSpaceTexture[ctx.currentFrameInFlight];
+    vk::CommandBuffer& cb = ctx.commandBuffer;
 
-    // Transform paint space to view space using the transform pass
+    // update paint space texture if needed
+    if (canvas.needsUpdate) {
+        vk::BufferImageCopy copyRegion(
+            0,
+            0,
+            0,
+            vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, 0, 1),
+            vk::Offset3D(0, 0, 0),
+            vk::Extent3D(HardCodedValues::CANVAS_WIDTH, HardCodedValues::CANVAS_HEIGHT, 1)
+        );
+        cb.copyBufferToImage(
+            _paintSpaceBuffer.buffer, // src
+            canvas.image,             // dst
+            vk::ImageLayout::eGeneral,
+            1,
+            &copyRegion
+        );
+
+        // pipeline blocks until pain space texture is updated.
+        cb.pipelineBarrier(
+            vk::PipelineStageFlagBits::eTransfer,
+            vk::PipelineStageFlagBits::eFragmentShader,
+            vk::DependencyFlags(),
+            0,
+            nullptr,
+            0,
+            nullptr,
+            0,
+            nullptr
+        );
+        //canvas.needsUpdate = false;
+        // TODO
+
+        // flush UBO
+        UBO* pUBO = 
+            reinterpret_cast<UBO*>(_paintToViewSpaceContext.ubo[ctx.currentFrameInFlight].bufferAddress);
+
+        pUBO->transformMatrix = _tranformMatrixFromRygb[ctx.colorSpace];
+    }
+
+    // Transform paint space to view space
+    vk::Extent2D extend(HardCodedValues::CANVAS_WIDTH, HardCodedValues::CANVAS_HEIGHT);
+    vk::Rect2D renderArea(VkOffset2D{0, 0}, extend);
+    vk::RenderPassBeginInfo renderPassBeginInfo(
+        _paintToViewSpaceContext.renderPass,
+        _viewSpaceFrameBuffer[ctx.currentFrameInFlight].GetFrameBuffer(),
+        renderArea,
+        _clearValues.size(),
+        _clearValues.data()
+    );
+
+    cb.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
+    cb.bindPipeline(vk::PipelineBindPoint::eGraphics, _paintToViewSpaceContext.pipeline);
+    cb.bindDescriptorSets(
+        vk::PipelineBindPoint::eGraphics,
+        _paintToViewSpaceContext.pipelineLayout,
+        0,
+        1,
+        &_paintToViewSpaceContext.descriptorSets[ctx.currentFrameInFlight],
+        0,
+        nullptr,
+        vk::getDispatchLoaderStatic()
+    );
+    // draw a full-screen quad
+    cb.draw(3, 1, 0, 0);
+    cb.endRenderPass();
 }
 
 // TODO: impl

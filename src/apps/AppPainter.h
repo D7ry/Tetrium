@@ -153,7 +153,7 @@ class AppPainter : public App
 
         vk::DescriptorPool descriptorPool = VK_NULL_HANDLE;
         vk::DescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
-        std::array<VkDescriptorSet, NUM_FRAME_IN_FLIGHT> descriptorSets = {};
+        std::array<vk::DescriptorSet, NUM_FRAME_IN_FLIGHT> descriptorSets = {};
 
         std::array<VQBuffer, NUM_FRAME_IN_FLIGHT> ubo = {};
         std::array<vk::Sampler, NUM_FRAME_IN_FLIGHT> samplers = {};
@@ -161,5 +161,7 @@ class AppPainter : public App
 
     void initPaintToViewSpaceContext(TetriumApp::InitContext& ctx);
     void cleanupPaintToViewSpaceContext(TetriumApp::CleanupContext& ctx);
+
+    std::array<vk::ClearValue, 2> _clearValues; // [color, depthStencil]
 };
 } // namespace TetriumApp
