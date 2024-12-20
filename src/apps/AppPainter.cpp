@@ -14,11 +14,15 @@ void AppPainter::initPaintSpaceBuffer(TetriumApp::InitContext& ctx)
 {
     VkDeviceSize bufferSize
         = _canvasWidth * _canvasHeight * PAINT_SPACE_PIXEL_SIZE;
+    DEBUG("Paint space buffer size: {}", bufferSize);
     _paintSpaceBuffer = ctx.device.CreateBuffer(
         bufferSize,
         VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
     );
+
+    // fill buffer with zeros
+    memset(_paintSpaceBuffer.bufferAddress, 0, bufferSize);
 }
 
 void AppPainter::cleanupPaintSpaceBuffer(TetriumApp::CleanupContext& ctx)
@@ -523,7 +527,7 @@ void AppPainter::TickVulkan(TetriumApp::TickContextVulkan& ctx)
             &copyRegion
         );
 
-        // pipeline blocks until pain space texture is updated.
+        // pipeline blocks until paint space texture is updated.
         cb.pipelineBarrier(
             vk::PipelineStageFlagBits::eTransfer,
             vk::PipelineStageFlagBits::eFragmentShader,

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "imgui.h"
+
 #include "lib/DeletionStack.h"
 
 #include "App.h"
@@ -16,12 +18,14 @@ namespace TetriumApp
 //
 // references:
 // https://github.com/OpenGL-Graphics/imgui-paint
+// TODO::
+// - implement serialization and deserialization of RYGB files
+// - (low priority) implement canvas resizing
 class AppPainter : public App
 {
   private:
     // transformation matrices from RYGB to RGB and OCV color spaces
     // the project renders in RGB and OCV color space.
-    // TODO: use actual matrices
     std::array<glm::mat4x3, ColorSpace::ColorSpaceSize> _tranformMatrixFromRygb
         = {// RYGB -> RGB
            glm::mat4x3{
@@ -87,8 +91,6 @@ class AppPainter : public App
     virtual void TickVulkan(TetriumApp::TickContextVulkan& ctx) override;
 
   private:
-    // TODO::
-    // - implement serialization and deserialization of RYGB files
     ColorPicker _colorPicker;
 
     bool _wantDrawColorPicker = false;
@@ -176,5 +178,9 @@ class AppPainter : public App
     uint32_t _canvasWidth = 1024;
     uint32_t _canvasHeight = 1024;
     const int PAINT_SPACE_PIXEL_SIZE = 4 * sizeof(float); // R32G32B32A32_SFLOAT
+
+
+    // ---------- ImGui Runtime Logic ----------
+    void canvasInteract(const ImVec2& canvasMousePos);
 };
 } // namespace TetriumApp

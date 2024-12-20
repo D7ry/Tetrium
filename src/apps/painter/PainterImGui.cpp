@@ -4,6 +4,30 @@
 
 namespace TetriumApp
 {
+
+void AppPainter::canvasInteract(const ImVec2& canvasMousePos) {
+    uint32_t x = static_cast<uint32_t>(canvasMousePos.x);
+    uint32_t y = static_cast<uint32_t>(canvasMousePos.y);
+    if (x >= _canvasWidth || y >= _canvasHeight) {
+        return;
+    }
+
+    // TODO: complete canvas interact logic
+    DEBUG("Canvas interact at ({}, {})", x, y);
+
+    const float RYGB_COLOR[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+
+    uint32_t index = y * _canvasWidth + x;
+    char* pBuffer = reinterpret_cast<char*>(_paintSpaceBuffer.bufferAddress); // use char for byte arithmetic
+
+    float* pPixel = reinterpret_cast<float*>(pBuffer + index * PAINT_SPACE_PIXEL_SIZE);
+    memcpy(pPixel, RYGB_COLOR, PAINT_SPACE_PIXEL_SIZE);
+
+    for (PaintSpaceTexture& texture: _paintSpaceTexture) {
+        texture.needsUpdate = true;
+    }
+}
+
 // TODO: impl
 void AppPainter::TickImGui(const TetriumApp::TickContextImGui& ctx)
 {
@@ -23,19 +47,23 @@ void AppPainter::TickImGui(const TetriumApp::TickContextImGui& ctx)
         }
     }
 
-    // Pool inputs
-    {
-        // draw onto the paint space canvas, flagging paint space fbs for update
-        // TODO: impl
-
-    }
-
     // Draw canvas
     {
-        // TODO: handle canvas resizing here, do we want to stall the thread?
         const TextureFrameBuffer& fb = _viewSpaceFrameBuffer[ctx.currentFrameInFlight];
         ImVec2 canvasSize = ImVec2(_canvasWidth, _canvasHeight);
         ImGui::Image(fb.GetImGuiTextureId(), canvasSize);
+
+        if (ImGui::IsKeyDown(ImGuiKey_MouseLeft)) {
+            // check if mouse is within canvas
+            ImVec2 mousePos = ImGui::GetMousePos();
+            ImVec2 canvasPos = ImGui::GetItemRectMin();
+            if (mousePos.x >= canvasPos.x && mousePos.x < canvasPos.x + canvasSize.x
+                && mousePos.y >= canvasPos.y && mousePos.y < canvasPos.y + canvasSize.y) {
+                // paint
+                ImVec2 canvasMousePos = ImVec2(mousePos.x - canvasPos.x, mousePos.y - canvasPos.y);
+                canvasInteract(canvasMousePos);
+            }
+        }
     }
 
     // Draw widgets
