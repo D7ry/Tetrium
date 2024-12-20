@@ -163,5 +163,9 @@ class AppPainter : public App
     void cleanupPaintToViewSpaceContext(TetriumApp::CleanupContext& ctx);
 
     std::array<vk::ClearValue, 2> _clearValues; // [color, depthStencil]
+
+    uint32_t _canvasWidth = 1024;
+    uint32_t _canvasHeight = 1024;
+    const int PAINT_SPACE_PIXEL_SIZE = 4 * sizeof(float); // R32G32B32A32_SFLOAT
 };
 } // namespace TetriumApp

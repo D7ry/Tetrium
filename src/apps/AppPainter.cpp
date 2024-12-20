@@ -5,14 +5,6 @@
 
 #include "AppPainter.h"
 
-// FIXME: they shouldn't be here
-namespace HardCodedValues
-{
-uint32_t CANVAS_WIDTH = 1024;
-uint32_t CANVAS_HEIGHT = 1024;
-int PAINT_SPACE_PIXEL_SIZE = 4 * sizeof(float); // R32G32B32A32_SFLOAT
-};                                              // namespace HardCodedValues
-
 namespace TetriumApp
 {
 
@@ -20,8 +12,8 @@ namespace TetriumApp
 
 void AppPainter::initPaintSpaceBuffer(TetriumApp::InitContext& ctx)
 {
-    VkDeviceSize bufferSize = HardCodedValues::CANVAS_WIDTH * HardCodedValues::CANVAS_HEIGHT
-                              * HardCodedValues::PAINT_SPACE_PIXEL_SIZE;
+    VkDeviceSize bufferSize
+        = _canvasWidth * _canvasHeight * PAINT_SPACE_PIXEL_SIZE;
     _paintSpaceBuffer = ctx.device.CreateBuffer(
         bufferSize,
         VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -56,8 +48,8 @@ void AppPainter::initPaintSpaceTexture(TetriumApp::InitContext& ctx)
         VkImageView imageView{};
 
         VulkanUtils::createImage(
-            HardCodedValues::CANVAS_WIDTH,
-            HardCodedValues::CANVAS_HEIGHT,
+            _canvasWidth,
+            _canvasHeight,
             IMAGE_FORMAT,
             VK_IMAGE_TILING_OPTIMAL,
             VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
@@ -129,8 +121,8 @@ void AppPainter::initViewSpaceFrameBuffer(TetriumApp::InitContext& ctx)
             ctx.device.logicalDevice,
             ctx.device.physicalDevice,
             _paintToViewSpaceContext.renderPass,
-            HardCodedValues::CANVAS_WIDTH,
-            HardCodedValues::CANVAS_HEIGHT,
+            _canvasWidth,
+            _canvasHeight,
             VK_FORMAT_R8G8B8A8_SRGB, // RGB / OCV color space
             ctx.device.depthFormat,
             true
@@ -299,7 +291,7 @@ void AppPainter::initPaintToViewSpaceContext(TetriumApp::InitContext& ctx)
                    vk::AttachmentLoadOp::eDontCare,
                    vk::AttachmentStoreOp::eDontCare,
                    vk::ImageLayout::eUndefined,
-                   vk::ImageLayout::eShaderReadOnlyOptimal// write to imgui texture
+                   vk::ImageLayout::eShaderReadOnlyOptimal // write to imgui texture
                ),
                // depth attachment
                vk::AttachmentDescription(
@@ -320,7 +312,6 @@ void AppPainter::initPaintToViewSpaceContext(TetriumApp::InitContext& ctx)
 
     /* create pipeline */
     {
-        // TODO: write shaders
         const char* VERTEX_SHADER_PATH
             = "../assets/apps/AppPainter/shaders/paint_to_view_space.vert.spv";
         const char* FRAGMENT_SHADER_PATH
@@ -360,13 +351,13 @@ void AppPainter::initPaintToViewSpaceContext(TetriumApp::InitContext& ctx)
         );
 
         vk::Viewport viewport(
-            0.f, 0.f, HardCodedValues::CANVAS_WIDTH, HardCodedValues::CANVAS_HEIGHT, 0.f, 1.f
+            0.f, 0.f, _canvasWidth, _canvasHeight, 0.f, 1.f
         );
         vk::Rect2D scissor(
             {0, 0},
             {
-                HardCodedValues::CANVAS_WIDTH,
-                HardCodedValues::CANVAS_HEIGHT,
+                _canvasWidth,
+                _canvasHeight,
             }
         );
         vk::PipelineViewportStateCreateInfo viewportState({}, 1, &viewport, 1, &scissor);
@@ -490,10 +481,9 @@ void AppPainter::Init(TetriumApp::InitContext& ctx)
     initPaintToViewSpaceContext(ctx);
     initViewSpaceFrameBuffer(ctx);
 
-    _clearValues = {
-        vk::ClearColorValue(std::array<float, 4>{0.0f, 0.0f, 0.0f, 1.0f}),
-        vk::ClearDepthStencilValue(1.0f, 0)
-    };
+    _clearValues
+        = {vk::ClearColorValue(std::array<float, 4>{0.0f, 0.0f, 0.0f, 1.0f}),
+           vk::ClearDepthStencilValue(1.0f, 0)};
 
     _colorPicker.Init();
 }
@@ -523,7 +513,7 @@ void AppPainter::TickVulkan(TetriumApp::TickContextVulkan& ctx)
             0,
             vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, 0, 1),
             vk::Offset3D(0, 0, 0),
-            vk::Extent3D(HardCodedValues::CANVAS_WIDTH, HardCodedValues::CANVAS_HEIGHT, 1)
+            vk::Extent3D(_canvasWidth, _canvasHeight, 1)
         );
         cb.copyBufferToImage(
             _paintSpaceBuffer.buffer, // src
@@ -556,7 +546,7 @@ void AppPainter::TickVulkan(TetriumApp::TickContextVulkan& ctx)
     pUBO->transformMatrix = _tranformMatrixFromRygb[ctx.colorSpace];
 
     // Transform paint space to view space
-    vk::Extent2D extend(HardCodedValues::CANVAS_WIDTH, HardCodedValues::CANVAS_HEIGHT);
+    vk::Extent2D extend(_canvasWidth, _canvasHeight);
     vk::Rect2D renderArea(VkOffset2D{0, 0}, extend);
     vk::RenderPassBeginInfo renderPassBeginInfo(
         _paintToViewSpaceContext.renderPass,
@@ -583,55 +573,6 @@ void AppPainter::TickVulkan(TetriumApp::TickContextVulkan& ctx)
     // draw a full-screen quad
     cb.draw(3, 1, 0, 0);
     cb.endRenderPass();
-}
-
-// TODO: impl
-void AppPainter::TickImGui(const TetriumApp::TickContextImGui& ctx)
-{
-    ImGuiIO& io = ImGui::GetIO();
-    ImGui::SetNextWindowPos(ImVec2(0, 0));
-    ImGui::SetNextWindowSize(io.DisplaySize);
-    if (ImGui::Begin(
-            "Painter",
-            NULL,
-            ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove
-                | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus
-                | ImGuiWindowFlags_NoScrollWithMouse
-        )) {
-        // Draw color picker widget
-        if (ImGui::Button("Color Picker")) {
-            _wantDrawColorPicker = true;
-        }
-    }
-
-    // Pool inputs
-    {
-        // draw onto the paint space canvas, flagging paint space fbs for update
-        // TODO: impl
-
-    }
-
-    // Draw canvas
-    {
-        // TODO: handle canvas resizing here
-        const TextureFrameBuffer& fb = _viewSpaceFrameBuffer[ctx.currentFrameInFlight];
-        ImGui::Image(
-            fb.GetImGuiTextureId(),
-            ImVec2(HardCodedValues::CANVAS_WIDTH, HardCodedValues::CANVAS_HEIGHT)
-        );
-    }
-
-    // Draw widgets
-    {
-        // TODO: impl
-    }
-
-    // Draw color picker widget
-    if (_wantDrawColorPicker) {
-        _colorPicker.Draw(ctx);
-    }
-
-    ImGui::End(); // Painter
 }
 
 /* ---------- Color Picker Implementation ---------- */

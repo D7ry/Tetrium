@@ -116,6 +116,7 @@ add_executable(${PROJECT_NAME}
         src/apps/AppTetraHueSphere.cpp
         src/apps/AppImageViewer.cpp
         src/apps/AppPainter.cpp
+        src/apps/painter/PainterImGui.cpp
 
         src/apps/app_components/TextureFrameBuffer.cpp
 )
