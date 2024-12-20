@@ -5,8 +5,9 @@
 namespace TetriumApp
 {
 
-void AppPainter::fillPixel(uint32_t x, uint32_t y, const std::array<float, 4>& color) 
+void AppPainter::fillPixel(uint32_t x, uint32_t y, const std::array<float, 4>& color)
 {
+    ASSERT(x < _canvasWidth && y < _canvasHeight);
     uint32_t index = y * _canvasWidth + x;
     char* pBuffer
         = reinterpret_cast<char*>(_paintSpaceBuffer.bufferAddress); // use char for byte arithmetic
@@ -26,9 +27,33 @@ void AppPainter::canvasInteract(const ImVec2& canvasMousePos)
     // TODO: complete canvas interact logic
     DEBUG("Canvas interact at ({}, {})", x, y);
 
-    fillPixel(x, y, _colorPicker.GetSelectedColorRYGBData());
+    auto color = _colorPicker.GetSelectedColorRYGBData();
 
-    _paintingState.isPainting = true;
+    uint32_t prevX = x;
+    uint32_t prevY = y;
+    if (_paintingState.prevCanvasMousePos.has_value()) {
+        ImVec2 prevCanvasMousePos = _paintingState.prevCanvasMousePos.value();
+        prevX = static_cast<uint32_t>(prevCanvasMousePos.x);
+        prevY = static_cast<uint32_t>(prevCanvasMousePos.y);
+        DEBUG("Prev canvas interact at ({}, {})", prevX, prevY);
+    }
+    // fill pixels between prev and current mouse pos
+    // Bresenham's line algorithm https://en.wikipedia.org/wiki/Bresenham%27s_line_algorithm
+    int dx = abs(static_cast<int>(x) - static_cast<int>(prevX));
+    int dy = abs(static_cast<int>(y) - static_cast<int>(prevY));
+    int sx = prevX < x ? 1 : -1;
+    int sy = prevY < y ? 1 : -1;
+    int err = (dx > dy ? dx : -dy) / 2;
+    int e2;
+
+    while (true) {
+        fillPixel(prevX, prevY, color);
+        if (prevX == x && prevY == y) break;
+        e2 = err;
+        if (e2 > -dx) { err -= dy; prevX += sx; }
+        if (e2 < dy) { err += dx; prevY += sy; }
+    }
+
     // flag textures for update
     for (PaintSpaceTexture& texture : _paintSpaceTexture) {
         texture.needsUpdate = true;
@@ -55,23 +80,25 @@ void AppPainter::TickImGui(const TetriumApp::TickContextImGui& ctx)
     }
 
     // Draw canvas
+    //
+    ImVec2 canvasSize = ImVec2(_canvasWidth, _canvasHeight);
     {
         const TextureFrameBuffer& fb = _viewSpaceFrameBuffer[ctx.currentFrameInFlight];
-        ImVec2 canvasSize = ImVec2(_canvasWidth, _canvasHeight);
         ImGui::Image(fb.GetImGuiTextureId(), canvasSize);
-
-        if (ImGui::IsKeyDown(ImGuiKey_MouseLeft)) {
-            // check if mouse is within canvas
-            ImVec2 mousePos = ImGui::GetMousePos();
-            ImVec2 canvasPos = ImGui::GetItemRectMin();
-            if (mousePos.x >= canvasPos.x && mousePos.x < canvasPos.x + canvasSize.x
-                && mousePos.y >= canvasPos.y && mousePos.y < canvasPos.y + canvasSize.y) {
-                // paint
-                ImVec2 canvasMousePos = ImVec2(mousePos.x - canvasPos.x, mousePos.y - canvasPos.y);
+    }
+    ImVec2 canvasPos = ImGui::GetItemRectMin();
+    {
+        // check if mouse is within canvas
+        ImVec2 mousePos = ImGui::GetMousePos();
+        if (mousePos.x >= canvasPos.x && mousePos.x < canvasPos.x + canvasSize.x
+            && mousePos.y >= canvasPos.y && mousePos.y < canvasPos.y + canvasSize.y) {
+            ImVec2 canvasMousePos = ImVec2(mousePos.x - canvasPos.x, mousePos.y - canvasPos.y);
+            if (ImGui::IsKeyDown(ImGuiKey_MouseLeft)) {
                 canvasInteract(canvasMousePos);
             }
+            _paintingState.prevCanvasMousePos = canvasMousePos;
         } else {
-            _paintingState.isPainting = false;
+            _paintingState.prevCanvasMousePos = std::nullopt;
         }
     }
 

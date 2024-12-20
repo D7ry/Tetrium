@@ -184,7 +184,7 @@ class AppPainter : public App
     // ---------- ImGui Runtime Logic ----------
 
     struct {
-        bool isPainting = false;
+        std::optional<ImVec2> prevCanvasMousePos;
     } _paintingState;
 
     void canvasInteract(const ImVec2& canvasMousePos);
