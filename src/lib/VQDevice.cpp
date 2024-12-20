@@ -298,5 +298,5 @@ void VQDevice::EndSingleTimeCommands(vk::CommandBuffer commandBuffer)
     vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
     vkQueueWaitIdle(graphicsQueue);
 
-    vkFreeCommandBuffers(logicalDevice,graphicsCommandPool, 1, &cb);
+    vkFreeCommandBuffers(logicalDevice, graphicsCommandPool, 1, &cb);
 }
