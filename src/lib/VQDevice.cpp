@@ -272,3 +272,17 @@ VQDevice::SwapChainSupport VQDevice::GetSwapChainSupportForSurface(const VkSurfa
 
     return details;
 }
+
+vk::CommandBuffer VQDevice::BeginSingleTimeCommands()
+{
+    vk::Device device = this->Get();
+    vk::CommandBufferAllocateInfo allocInfo(
+        graphicsCommandPool, vk::CommandBufferLevel::ePrimary, 1
+    );
+
+    vk::CommandBuffer cb = device.allocateCommandBuffers(allocInfo)[0];
+    cb.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
+    return cb;
+}
+
+void VQDevice::EndSingleTimeCommands(vk::CommandBuffer commandBuffer) { commandBuffer.end(); }
