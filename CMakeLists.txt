@@ -112,6 +112,7 @@ add_executable(${PROJECT_NAME}
         # src/ecs/system/TetraImageDisplaySystem.cpp
 
         # Apps
+        # Apps
         src/apps/AppScreeningTest.cpp
         src/apps/AppTetraHueSphere.cpp
         src/apps/AppImageViewer.cpp

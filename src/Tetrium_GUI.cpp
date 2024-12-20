@@ -33,7 +33,7 @@ void drawFootNote()
     ImVec2 windowSize = io.DisplaySize;
     ImDrawList* drawList = ImGui::GetForegroundDrawList();
 
-    const char* footnoteText = (const char*)u8"🧩 Tetrium 0.5a";
+    const char* footnoteText = (const char*)u8"🧩 Tetrium 0.7a";
     ImVec2 textSize = ImGui::CalcTextSize(footnoteText);
     ImVec2 padding(10.0f, 5.0f);
     ImVec2 pos(
