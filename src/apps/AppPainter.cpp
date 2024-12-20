@@ -68,6 +68,31 @@ void AppPainter::initPaintSpaceTexture(TetriumApp::InitContext& ctx)
             ctx.device.logicalDevice
         );
 
+        // transition image layout from undefined to general
+        {
+            vk::CommandBuffer cb = ctx.device.BeginSingleTimeCommands();
+            vk::ImageMemoryBarrier barrier(
+                vk::AccessFlags(),
+                vk::AccessFlags(),
+                vk::ImageLayout::eUndefined,
+                vk::ImageLayout::eGeneral,
+                VK_QUEUE_FAMILY_IGNORED,
+                VK_QUEUE_FAMILY_IGNORED,
+                image,
+                vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1)
+            );
+
+            cb.pipelineBarrier(
+                vk::PipelineStageFlagBits::eTopOfPipe,
+                vk::PipelineStageFlagBits::eTransfer,
+                vk::DependencyFlags(),
+                nullptr,
+                nullptr,
+                barrier
+            );
+            ctx.device.EndSingleTimeCommands(cb);
+        }
+
         imageViewCreateInfo.image = image;
 
         VK_CHECK_RESULT(
@@ -153,6 +178,10 @@ void AppPainter::initPaintToViewSpaceContext(TetriumApp::InitContext& ctx)
         vk::DescriptorPoolSize poolSizes[]
             = {{vk::DescriptorType::eUniformBuffer, NUM_FRAME_IN_FLIGHT},
                {vk::DescriptorType::eCombinedImageSampler, NUM_FRAME_IN_FLIGHT}};
+
+        vk::DescriptorPoolCreateInfo poolCreateInfo({}, NUM_FRAME_IN_FLIGHT * 2, 2, poolSizes);
+
+        _paintToViewSpaceContext.descriptorPool = device.createDescriptorPool(poolCreateInfo);
     }
 
     /* create descriptor set layout */
@@ -167,11 +196,11 @@ void AppPainter::initPaintToViewSpaceContext(TetriumApp::InitContext& ctx)
                    nullptr
 
                ),
-               // paint spage texture sampler
+               // paint space texture sampler
                vk::DescriptorSetLayoutBinding(
                    (uint32_t)BindingLocation::sampler,
                    vk::DescriptorType::eCombinedImageSampler,
-                   _paintToViewSpaceContext.samplers.size(),
+                   1,
                    vk::ShaderStageFlagBits::eFragment,
                    nullptr
                )};
@@ -193,7 +222,7 @@ void AppPainter::initPaintToViewSpaceContext(TetriumApp::InitContext& ctx)
         vk::DescriptorSetAllocateInfo descriptorSetAllocateInfo(
             _paintToViewSpaceContext.descriptorPool,
             NUM_FRAME_IN_FLIGHT,
-            &_paintToViewSpaceContext.descriptorSetLayout
+            layouts.data()
         );
         std::vector<vk::DescriptorSet> res
             = device.allocateDescriptorSets(descriptorSetAllocateInfo);
@@ -233,7 +262,7 @@ void AppPainter::initPaintToViewSpaceContext(TetriumApp::InitContext& ctx)
                      descriptorSet,
                      (uint32_t)BindingLocation::sampler,
                      0,
-                     _paintToViewSpaceContext.samplers.size(),
+                     1,
                      vk::DescriptorType::eCombinedImageSampler,
                      &imageInfo,
                      nullptr,
@@ -293,8 +322,10 @@ void AppPainter::initPaintToViewSpaceContext(TetriumApp::InitContext& ctx)
     /* create pipeline */
     {
         // TODO: write shaders
-        const char* VERTEX_SHADER_PATH = "assets/apps/AppPainter/shaders/paint_to_view_space.vert.spv";
-        const char* FRAGMENT_SHADER_PATH = "assets/apps/AppPainter/shaders/paint_to_view_space.vert.spv";
+        const char* VERTEX_SHADER_PATH
+            = "assets/apps/AppPainter/shaders/paint_to_view_space.vert.spv";
+        const char* FRAGMENT_SHADER_PATH
+            = "assets/apps/AppPainter/shaders/paint_to_view_space.vert.spv";
 
         // shader modules
         vk::ShaderModule vertShaderModule
@@ -511,12 +542,13 @@ void AppPainter::TickVulkan(TetriumApp::TickContextVulkan& ctx)
             0,
             nullptr
         );
-        //canvas.needsUpdate = false;
-        // TODO
+        // canvas.needsUpdate = false;
+        //  TODO
 
         // flush UBO
-        UBO* pUBO = 
-            reinterpret_cast<UBO*>(_paintToViewSpaceContext.ubo[ctx.currentFrameInFlight].bufferAddress);
+        UBO* pUBO = reinterpret_cast<UBO*>(
+            _paintToViewSpaceContext.ubo[ctx.currentFrameInFlight].bufferAddress
+        );
 
         pUBO->transformMatrix = _tranformMatrixFromRygb[ctx.colorSpace];
     }
