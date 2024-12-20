@@ -25,18 +25,16 @@ class AppPainter : public App
     std::array<glm::mat4x3, ColorSpace::ColorSpaceSize> _tranformMatrixFromRygb
         = {// RYGB -> RGB
            glm::mat4x3{
-               {1.f, 0.f, 0.f}, // R
-               {0.f, 1.f, 0.f}, // G
-               {0.f, 0.f, 1.f}, // B
-               {0.f, 0.f, 0.f}  // A
-           },
+               {0.00227389, 0.02027033, 0.84088907},
+               {0.09871685, 0.82513837, 0.08254044},
+               {-0.0825074, 0.09203826, -0.01052114},
+               {0.98151666, -0.02124976, -0.0095099}},
            // RYGB -> OCV
            glm::mat4x3{
-               {1.f, 0.f, 0.f}, // R
-               {0.f, 1.f, 0.f}, // G
-               {0.f, 0.f, 1.f}, // B
-               {0.f, 0.f, 0.f}  // A
-           }};
+               {-0.03549117, 0., 0.},
+               {-0.30406722, 0., 0.},
+               {0.95542715, 0., 0.},
+               {0.06836908, 0., 0.}}};
 
     // Color picker widget that visualizes RYGB color space through slice of
     // tetrachromatic hue sphere.
