@@ -183,9 +183,35 @@ class AppPainter : public App
 
     // ---------- ImGui Runtime Logic ----------
 
-    struct {
+    enum class BrushStrokeType
+    {
+        Circle,
+        Square,
+        Diamond,
+        SoftCircle
+        // ...more if needed...
+    };
+
+    struct BrushStrokeArgs
+    {
+        uint32_t x;
+        uint32_t y;
+        std::array<float, 4> color;
+        uint32_t brushSize;
+        uint32_t canvasWidth;
+        uint32_t canvasHeight;
+        std::function<void(uint32_t, uint32_t, const std::array<float,4>&)> fillPixel;
+        std::function<std::array<float,4>(uint32_t, uint32_t)> getPixel;
+    };
+
+    static const std::unordered_map<BrushStrokeType, std::function<void(const BrushStrokeArgs&)>>
+        brushStrokeMap;
+
+    struct
+    {
         std::optional<ImVec2> prevCanvasMousePos;
         uint32_t brushSize = 5;
+        BrushStrokeType brushType = BrushStrokeType::Circle;
     } _paintingState;
 
     void clearCanvas();
@@ -196,5 +222,6 @@ class AppPainter : public App
     void canvasInteract(const ImVec2& canvasMousePos);
     void brush(uint32_t xBegin, uint32_t yBegin, uint32_t xEnd, uint32_t yEnd);
     void fillPixel(uint32_t x, uint32_t y, const std::array<float, 4>& color);
+    std::array<float, 4> getPixel(uint32_t x, uint32_t y) const;
 };
 } // namespace TetriumApp

@@ -118,6 +118,7 @@ add_executable(${PROJECT_NAME}
         src/apps/AppPainter.cpp
         src/apps/painter/PainterImGui.cpp
         src/apps/painter/PainterColorPicker.cpp
+        src/apps/painter/PainterPaint.cpp
 
         src/apps/app_components/TextureFrameBuffer.cpp
 )
