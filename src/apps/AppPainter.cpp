@@ -220,9 +220,7 @@ void AppPainter::initPaintToViewSpaceContext(TetriumApp::InitContext& ctx)
             NUM_FRAME_IN_FLIGHT, _paintToViewSpaceContext.descriptorSetLayout
         );
         vk::DescriptorSetAllocateInfo descriptorSetAllocateInfo(
-            _paintToViewSpaceContext.descriptorPool,
-            NUM_FRAME_IN_FLIGHT,
-            layouts.data()
+            _paintToViewSpaceContext.descriptorPool, NUM_FRAME_IN_FLIGHT, layouts.data()
         );
         std::vector<vk::DescriptorSet> res
             = device.allocateDescriptorSets(descriptorSetAllocateInfo);
@@ -244,7 +242,7 @@ void AppPainter::initPaintToViewSpaceContext(TetriumApp::InitContext& ctx)
             vk::DescriptorImageInfo imageInfo(
                 _paintToViewSpaceContext.samplers[i],
                 _paintSpaceTexture[0].imageView,
-                vk::ImageLayout::eShaderReadOnlyOptimal
+                vk::ImageLayout::eGeneral
             );
 
             device.updateDescriptorSets(
@@ -300,7 +298,7 @@ void AppPainter::initPaintToViewSpaceContext(TetriumApp::InitContext& ctx)
                    vk::AttachmentLoadOp::eDontCare,
                    vk::AttachmentStoreOp::eDontCare,
                    vk::ImageLayout::eUndefined,
-                   vk::ImageLayout::eShaderReadOnlyOptimal // write to imgui texture
+                   vk::ImageLayout::eShaderReadOnlyOptimal// write to imgui texture
                ),
                // depth attachment
                vk::AttachmentDescription(
@@ -323,9 +321,9 @@ void AppPainter::initPaintToViewSpaceContext(TetriumApp::InitContext& ctx)
     {
         // TODO: write shaders
         const char* VERTEX_SHADER_PATH
-            = "assets/apps/AppPainter/shaders/paint_to_view_space.vert.spv";
+            = "../assets/apps/AppPainter/shaders/paint_to_view_space.vert.spv";
         const char* FRAGMENT_SHADER_PATH
-            = "assets/apps/AppPainter/shaders/paint_to_view_space.vert.spv";
+            = "../assets/apps/AppPainter/shaders/paint_to_view_space.frag.spv";
 
         // shader modules
         vk::ShaderModule vertShaderModule
@@ -565,6 +563,8 @@ void AppPainter::TickVulkan(TetriumApp::TickContextVulkan& ctx)
     );
 
     cb.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
+    cb.setViewport(0, vk::Viewport(0.f, 0.f, extend.width, extend.height, 0.f, 1.f));
+    cb.setScissor(0, vk::Rect2D({0, 0}, extend));
     cb.bindPipeline(vk::PipelineBindPoint::eGraphics, _paintToViewSpaceContext.pipeline);
     cb.bindDescriptorSets(
         vk::PipelineBindPoint::eGraphics,
