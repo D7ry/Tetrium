@@ -183,13 +183,13 @@ class AppPainter : public App
 
     // ---------- ImGui Runtime Logic ----------
 
-    enum class BrushStrokeType
+    enum class BrushStrokeType : uint32_t
     {
-        Circle,
+        Circle = 0,
         Square,
         Diamond,
-        SoftCircle
-        // ...more if needed...
+        SoftCircle,
+        BrushStrokeCount
     };
 
     struct BrushStrokeArgs
@@ -204,8 +204,9 @@ class AppPainter : public App
         std::function<std::array<float,4>(uint32_t, uint32_t)> getPixel;
     };
 
-    static const std::unordered_map<BrushStrokeType, std::function<void(const BrushStrokeArgs&)>>
-        brushStrokeMap;
+    static const std::array<std::function<void(const BrushStrokeArgs&)>,
+                       static_cast<size_t>(BrushStrokeType::BrushStrokeCount)>
+        brushStrokeArray;
 
     struct
     {

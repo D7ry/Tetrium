@@ -7,92 +7,93 @@
 namespace TetriumApp
 {
 
-const std::unordered_map<AppPainter::BrushStrokeType, std::function<void(const AppPainter::BrushStrokeArgs&)>>
-    AppPainter::brushStrokeMap{
-        {BrushStrokeType::Circle,
-         [](const BrushStrokeArgs& args) {
-             float radius = static_cast<float>(args.brushSize) / 2.0f;
-             for (int dxOffset = -static_cast<int>(radius); dxOffset <= static_cast<int>(radius);
-                  ++dxOffset) {
-                 for (int dyOffset = -static_cast<int>(radius);
-                      dyOffset <= static_cast<int>(radius);
-                      ++dyOffset) {
-                     if ((dxOffset * dxOffset + dyOffset * dyOffset) <= radius * radius) {
-                         int xToPaint = args.x + dxOffset;
-                         int yToPaint = args.y + dyOffset;
-                         if (xToPaint >= 0 && xToPaint < static_cast<int>(args.canvasWidth)
-                             && yToPaint >= 0 && yToPaint < static_cast<int>(args.canvasHeight)) {
-                             args.fillPixel(xToPaint, yToPaint, args.color);
-                         }
-                     }
-                 }
-             }
-         }},
-        {BrushStrokeType::Square,
-         [](const BrushStrokeArgs& args) {
-             for (int dxOffset = -static_cast<int>(args.brushSize);
-                  dxOffset <= static_cast<int>(args.brushSize);
-                  ++dxOffset) {
-                 for (int dyOffset = -static_cast<int>(args.brushSize);
-                      dyOffset <= static_cast<int>(args.brushSize);
-                      ++dyOffset) {
-                     int xToPaint = args.x + dxOffset;
-                     int yToPaint = args.y + dyOffset;
-                     if (xToPaint >= 0 && xToPaint < static_cast<int>(args.canvasWidth)
-                         && yToPaint >= 0 && yToPaint < static_cast<int>(args.canvasHeight)) {
-                         args.fillPixel(xToPaint, yToPaint, args.color);
-                     }
-                 }
-             }
-         }},
-        {BrushStrokeType::Diamond,
-         [](const BrushStrokeArgs& args) {
-             for (int i = -static_cast<int>(args.brushSize); i <= static_cast<int>(args.brushSize);
-                  ++i) {
-                 int span = static_cast<int>(args.brushSize) - abs(i);
-                 for (int j = -span; j <= span; ++j) {
-                     int xToPaint = args.x + j;
-                     int yToPaint = args.y + i;
-                     if (xToPaint >= 0 && xToPaint < static_cast<int>(args.canvasWidth)
-                         && yToPaint >= 0 && yToPaint < static_cast<int>(args.canvasHeight)) {
-                         args.fillPixel(xToPaint, yToPaint, args.color);
-                     }
-                 }
-             }
-         }},
-        {BrushStrokeType::SoftCircle,
-         [](const BrushStrokeArgs& args) {
-             float alpha = 0.3f; // example alpha
-             float radius = static_cast<float>(args.brushSize) / 2.0f;
-             for (int dxOffset = -static_cast<int>(radius); dxOffset <= static_cast<int>(radius);
-                  ++dxOffset) {
-                 for (int dyOffset = -static_cast<int>(radius); dyOffset <= static_cast<int>(radius);
-                      ++dyOffset) {
-                     if ((dxOffset * dxOffset + dyOffset * dyOffset) <= radius * radius) {
-                         int xToPaint = args.x + dxOffset;
-                         int yToPaint = args.y + dyOffset;
-                         if (xToPaint >= 0 && xToPaint < static_cast<int>(args.canvasWidth)
-                             && yToPaint >= 0 && yToPaint < static_cast<int>(args.canvasHeight)) {
-                             auto oldColor = args.fillPixel ? std::array<float,4>{}
-                                                         : std::array<float,4>{}; 
-                             // We'll retrieve the existing color from getPixel
-                             oldColor = args.getPixel(xToPaint, yToPaint);
+const std::array<std::function<void(const AppPainter::BrushStrokeArgs&)>,
+                 static_cast<size_t>(AppPainter::BrushStrokeType::BrushStrokeCount)>
+    AppPainter::brushStrokeArray = {
+    // Circle
+    [](const BrushStrokeArgs& args) {
+        float radius = static_cast<float>(args.brushSize) / 2.0f;
+        for (int dxOffset = -static_cast<int>(radius); dxOffset <= static_cast<int>(radius);
+             ++dxOffset) {
+            for (int dyOffset = -static_cast<int>(radius);
+                 dyOffset <= static_cast<int>(radius);
+                 ++dyOffset) {
+                if ((dxOffset * dxOffset + dyOffset * dyOffset) <= radius * radius) {
+                    int xToPaint = args.x + dxOffset;
+                    int yToPaint = args.y + dyOffset;
+                    if (xToPaint >= 0 && xToPaint < static_cast<int>(args.canvasWidth)
+                        && yToPaint >= 0 && yToPaint < static_cast<int>(args.canvasHeight)) {
+                        args.fillPixel(xToPaint, yToPaint, args.color);
+                    }
+                }
+            }
+        }
+    },
+    // Square
+    [](const BrushStrokeArgs& args) {
+        for (int dxOffset = -static_cast<int>(args.brushSize);
+             dxOffset <= static_cast<int>(args.brushSize);
+             ++dxOffset) {
+            for (int dyOffset = -static_cast<int>(args.brushSize);
+                 dyOffset <= static_cast<int>(args.brushSize);
+                 ++dyOffset) {
+                int xToPaint = args.x + dxOffset;
+                int yToPaint = args.y + dyOffset;
+                if (xToPaint >= 0 && xToPaint < static_cast<int>(args.canvasWidth)
+                    && yToPaint >= 0 && yToPaint < static_cast<int>(args.canvasHeight)) {
+                    args.fillPixel(xToPaint, yToPaint, args.color);
+                }
+            }
+        }
+    },
+    // Diamond
+    [](const BrushStrokeArgs& args) {
+        for (int i = -static_cast<int>(args.brushSize); i <= static_cast<int>(args.brushSize);
+             ++i) {
+            int span = static_cast<int>(args.brushSize) - abs(i);
+            for (int j = -span; j <= span; ++j) {
+                int xToPaint = args.x + j;
+                int yToPaint = args.y + i;
+                if (xToPaint >= 0 && xToPaint < static_cast<int>(args.canvasWidth)
+                    && yToPaint >= 0 && yToPaint < static_cast<int>(args.canvasHeight)) {
+                    args.fillPixel(xToPaint, yToPaint, args.color);
+                }
+            }
+        }
+    },
+    // SoftCircle
+    [](const BrushStrokeArgs& args) {
+        float alpha = 0.3f; // example alpha
+        float radius = static_cast<float>(args.brushSize) / 2.0f;
+        for (int dxOffset = -static_cast<int>(radius); dxOffset <= static_cast<int>(radius);
+             ++dxOffset) {
+            for (int dyOffset = -static_cast<int>(radius); dyOffset <= static_cast<int>(radius);
+                 ++dyOffset) {
+                if ((dxOffset * dxOffset + dyOffset * dyOffset) <= radius * radius) {
+                    int xToPaint = args.x + dxOffset;
+                    int yToPaint = args.y + dyOffset;
+                    if (xToPaint >= 0 && xToPaint < static_cast<int>(args.canvasWidth)
+                        && yToPaint >= 0 && yToPaint < static_cast<int>(args.canvasHeight)) {
+                        auto oldColor = args.fillPixel ? std::array<float,4>{}
+                                                    : std::array<float,4>{}; 
+                        // We'll retrieve the existing color from getPixel
+                        oldColor = args.getPixel(xToPaint, yToPaint);
 
-                             // Blend: old*(1-alpha) + new*(alpha)
-                             std::array<float,4> blended = {
-                                 oldColor[0]*(1.f-alpha) + args.color[0]*alpha,
-                                 oldColor[1]*(1.f-alpha) + args.color[1]*alpha,
-                                 oldColor[2]*(1.f-alpha) + args.color[2]*alpha,
-                                 // store alpha in 4th channel if needed
-                                 oldColor[3]*(1.f-alpha) + args.color[3]*alpha
-                             };
-                             args.fillPixel(xToPaint, yToPaint, blended);
-                         }
-                     }
-                 }
-             }
-         }},
-    };
+                        // Blend: old*(1-alpha) + new*(alpha)
+                        std::array<float,4> blended = {
+                            oldColor[0]*(1.f-alpha) + args.color[0]*alpha,
+                            oldColor[1]*(1.f-alpha) + args.color[1]*alpha,
+                            oldColor[2]*(1.f-alpha) + args.color[2]*alpha,
+                            // store alpha in 4th channel if needed
+                            oldColor[3]*(1.f-alpha) + args.color[3]*alpha
+                        };
+                        args.fillPixel(xToPaint, yToPaint, blended);
+                    }
+                }
+            }
+        }
+    }
+};
 
 void AppPainter::clearCanvas()
 {
@@ -151,22 +152,20 @@ void AppPainter::brush(uint32_t xBegin, uint32_t yBegin, uint32_t xEnd, uint32_t
     while (true) {
         DEBUG("Painting at ({}, {})", xBegin, yBegin);
 
-        auto it = brushStrokeMap.find(_paintingState.brushType);
-        if (it != brushStrokeMap.end()) {
-            BrushStrokeArgs args{
-                xBegin, yBegin,
-                _colorPicker.GetSelectedColorRYGBData(),
-                _paintingState.brushSize,
-                _canvasWidth, _canvasHeight,
-                [this](uint32_t x, uint32_t y, const std::array<float,4>& c) {
-                    fillPixel(x, y, c);
-                },
-                [this](uint32_t x, uint32_t y) {
-                    return getPixel(x, y);
-                }
-            };
-            it->second(args);
-        }
+        BrushStrokeArgs args{
+            xBegin, yBegin,
+            _colorPicker.GetSelectedColorRYGBData(),
+            _paintingState.brushSize,
+            _canvasWidth, _canvasHeight,
+            [this](uint32_t x, uint32_t y, const std::array<float,4>& c) {
+                fillPixel(x, y, c);
+            },
+            [this](uint32_t x, uint32_t y) {
+                return getPixel(x, y);
+            }
+        };
+        auto idx = static_cast<size_t>(_paintingState.brushType);
+        brushStrokeArray[idx](args);
 
         if (xBegin == xEnd && yBegin == yEnd)
             break;
