@@ -4,6 +4,16 @@
 
 namespace TetriumApp
 {
+void AppPainter::clearCanvas()
+{
+    const std::array<float, 4> clearColor = {0.0f, 0.0f, 0.0f, 0.0f};
+    for (uint32_t y = 0; y < _canvasHeight; ++y) {
+        for (uint32_t x = 0; x < _canvasWidth; ++x) {
+            fillPixel(x, y, clearColor);
+        }
+    }
+    flagTexturesForUpdate();
+}
 
 void AppPainter::fillPixel(uint32_t x, uint32_t y, const std::array<float, 4>& color)
 {
@@ -74,6 +84,14 @@ void AppPainter::brush(uint32_t xBegin, uint32_t yBegin, uint32_t xEnd, uint32_t
             yBegin += sy;
         }
     }
+    flagTexturesForUpdate();
+}
+
+void AppPainter::flagTexturesForUpdate()
+{
+    for (PaintSpaceTexture& texture : _paintSpaceTexture) {
+        texture.needsUpdate = true;
+    }
 }
 
 void AppPainter::canvasInteract(const ImVec2& canvasMousePos)
@@ -84,14 +102,7 @@ void AppPainter::canvasInteract(const ImVec2& canvasMousePos)
         return;
     }
 
-    // TODO: complete canvas interact logic
-    DEBUG("Canvas interact at ({}, {})", x, y);
     brush(_paintingState.prevCanvasMousePos->x, _paintingState.prevCanvasMousePos->y, x, y);
-
-    // flag textures for update
-    for (PaintSpaceTexture& texture : _paintSpaceTexture) {
-        texture.needsUpdate = true;
-    }
 }
 
 // TODO: impl
@@ -110,6 +121,10 @@ void AppPainter::TickImGui(const TetriumApp::TickContextImGui& ctx)
         // Draw color picker widget
         if (ImGui::Button("Color Picker")) {
             _wantDrawColorPicker = true;
+        }
+
+        if (ImGui::Button("Clear Canvas")) {
+            clearCanvas();
         }
 
         int brushSize = _paintingState.brushSize;

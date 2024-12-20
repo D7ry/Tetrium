@@ -188,6 +188,11 @@ class AppPainter : public App
         uint32_t brushSize = 5;
     } _paintingState;
 
+    void clearCanvas();
+
+    void flagTexturesForUpdate();
+
+    // Drawing and brushstrokes
     void canvasInteract(const ImVec2& canvasMousePos);
     void brush(uint32_t xBegin, uint32_t yBegin, uint32_t xEnd, uint32_t yEnd);
     void fillPixel(uint32_t x, uint32_t y, const std::array<float, 4>& color);
