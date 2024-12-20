@@ -22,10 +22,21 @@ class AppPainter : public App
     // transformation matrices from RYGB to RGB and OCV color spaces
     // the project renders in RGB and OCV color space.
     // TODO: use actual matrices
-    std::array<glm::mat4x3, ColorSpace::ColorSpaceSize> _tranformMatrixFromRygb = {
-        glm::mat4x3(1.f), // RYGB -> RGB
-        glm::mat4x3(1.f)  // RYGB -> OCV
-    };
+    std::array<glm::mat4x3, ColorSpace::ColorSpaceSize> _tranformMatrixFromRygb
+        = {// RYGB -> RGB
+           glm::mat4x3{
+               {1.f, 0.f, 0.f}, // R
+               {0.f, 1.f, 0.f}, // G
+               {0.f, 0.f, 1.f}, // B
+               {0.f, 0.f, 0.f}  // A
+           },
+           // RYGB -> OCV
+           glm::mat4x3{
+               {1.f, 0.f, 0.f}, // R
+               {0.f, 1.f, 0.f}, // G
+               {0.f, 0.f, 1.f}, // B
+               {0.f, 0.f, 0.f}  // A
+           }};
 
     // Color picker widget that visualizes RYGB color space through slice of
     // tetrachromatic hue sphere.
