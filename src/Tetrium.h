@@ -14,13 +14,14 @@
 #include "lib/VQBuffer.h"
 #include "lib/VQDevice.h"
 
+#include "lib/DeletionStack.h"
+
 // structs
 #include "structs/ImGuiTexture.h"
 #include "structs/SharedEngineStructs.h"
 
 // Engine Components
 #include "components/Camera.h"
-#include "components/DeletionStack.h"
 #include "components/DeltaTimer.h"
 #include "components/InputManager.h"
 #include "components/Profiler.h"

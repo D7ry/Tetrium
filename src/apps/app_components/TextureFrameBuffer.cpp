@@ -9,7 +9,8 @@ void TextureFrameBuffer::Init(
     uint32_t width,
     uint32_t height,
     VkFormat imageFormat,
-    VkFormat depthFormat
+    VkFormat depthFormat,
+    bool createImguiTexture
 )
 {
     _device = device;
@@ -80,14 +81,19 @@ void TextureFrameBuffer::Init(
 
     _sampler = device.createSampler(samplerInfo);
 
-    // Create ImGui texture
-    _imguiTextureId = ImGui_ImplVulkan_AddTexture(
-        _sampler, _deviceImage.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-    );
+    if (createImguiTexture) {
+        // Create ImGui texture
+        _imguiTextureId = ImGui_ImplVulkan_AddTexture(
+            _sampler, _deviceImage.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+        );
+    }
 }
 
 void TextureFrameBuffer::Cleanup()
 {
+    if (_imguiTextureId) {
+        ImGui_ImplVulkan_RemoveTexture(reinterpret_cast<VkDescriptorSet>(_imguiTextureId));
+    }
     _device.destroyFramebuffer(_frameBuffer);
     _device.destroySampler(_sampler);
     _device.destroyImageView(_deviceImage.view);

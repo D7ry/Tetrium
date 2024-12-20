@@ -111,10 +111,13 @@ add_executable(${PROJECT_NAME}
         #src/ecs/system/SimpleRenderSystem.cpp
         # src/ecs/system/TetraImageDisplaySystem.cpp
 
+        # Apps
         src/apps/AppScreeningTest.cpp
         src/apps/AppTetraHueSphere.cpp
         src/apps/AppImageViewer.cpp
-
+        src/apps/AppPainter.cpp
+        src/apps/painter/PainterImGui.cpp
+        src/apps/painter/PainterColorPicker.cpp
 
         src/apps/app_components/TextureFrameBuffer.cpp
 )

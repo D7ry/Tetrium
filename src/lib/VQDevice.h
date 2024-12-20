@@ -132,5 +132,8 @@ struct VQDevice
         VQBuffer& buffer
     );
 
+    vk::CommandBuffer BeginSingleTimeCommands();
+    void EndSingleTimeCommands(vk::CommandBuffer commandBuffer);
+
     void Cleanup();
 };

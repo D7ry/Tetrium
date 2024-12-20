@@ -5,6 +5,7 @@
 #include "apps/AppScreeningTest.h"
 #include "apps/AppTetraHueSphere.h"
 #include "apps/AppImageViewer.h"
+#include "apps/AppPainter.h"
 
 void printGreetingBanner()
 {
@@ -30,10 +31,11 @@ int main(int argc, char** argv)
         {new TetriumApp::AppScreeningTest(), "Screening Test"},
         {new TetriumApp::AppTetraHueSphere(), "Tetra Hue Sphere"},
         {new TetriumApp::AppImageViewer(), "Image Viewer"},
+        {new TetriumApp::AppPainter(), "Painter"},
     };
 
 
-    Tetrium::InitOptions options{.tetraMode = Tetrium::TetraMode::kEvenOddHardwareSync};
+    Tetrium::InitOptions options{.tetraMode = Tetrium::TetraMode::kEvenOddSoftwareSync};
     Tetrium engine;
 
     for (auto& [app, appName] : apps) {
