@@ -224,5 +224,9 @@ class AppPainter : public App
     void brush(uint32_t xBegin, uint32_t yBegin, uint32_t xEnd, uint32_t yEnd);
     void fillPixel(uint32_t x, uint32_t y, const std::array<float, 4>& color);
     std::array<float, 4> getPixel(uint32_t x, uint32_t y) const;
+
+    // ---------- Serialization ----------
+    void saveCanvasToFile(const std::string& filename);
+    void loadCanvasFromFile(const std::string& filename);
 };
 } // namespace TetriumApp
