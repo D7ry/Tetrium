@@ -510,7 +510,6 @@ void AppPainter::Cleanup(TetriumApp::CleanupContext& ctx)
 
 /* ---------- Tick ---------- */
 
-// TODO: impl
 void AppPainter::TickVulkan(TetriumApp::TickContextVulkan& ctx)
 {
     PaintSpaceTexture& canvas = _paintSpaceTexture[ctx.currentFrameInFlight];
@@ -546,16 +545,15 @@ void AppPainter::TickVulkan(TetriumApp::TickContextVulkan& ctx)
             0,
             nullptr
         );
-        // canvas.needsUpdate = false;
-        //  TODO
-
-        // flush UBO
-        UBO* pUBO = reinterpret_cast<UBO*>(
-            _paintToViewSpaceContext.ubo[ctx.currentFrameInFlight].bufferAddress
-        );
-
-        pUBO->transformMatrix = _tranformMatrixFromRygb[ctx.colorSpace];
+        canvas.needsUpdate = false;
     }
+
+    // flush UBO
+    UBO* pUBO = reinterpret_cast<UBO*>(
+        _paintToViewSpaceContext.ubo[ctx.currentFrameInFlight].bufferAddress
+    );
+
+    pUBO->transformMatrix = _tranformMatrixFromRygb[ctx.colorSpace];
 
     // Transform paint space to view space
     vk::Extent2D extend(HardCodedValues::CANVAS_WIDTH, HardCodedValues::CANVAS_HEIGHT);
