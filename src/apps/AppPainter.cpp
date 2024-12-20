@@ -114,6 +114,7 @@ void AppPainter::cleanupPaintSpaceTexture(TetriumApp::CleanupContext& ctx)
     vk::Device device = ctx.device.logicalDevice;
     for (PaintSpaceTexture& fb : _paintSpaceTexture) {
         device.destroyImage(fb.image);
+        device.destroyImageView(fb.imageView);
         device.freeMemory(fb.memory);
     }
 }
@@ -488,6 +489,11 @@ void AppPainter::Init(TetriumApp::InitContext& ctx)
     initPaintSpaceTexture(ctx);
     initPaintToViewSpaceContext(ctx);
     initViewSpaceFrameBuffer(ctx);
+
+    _clearValues = {
+        vk::ClearColorValue(std::array<float, 4>{0.0f, 0.0f, 0.0f, 1.0f}),
+        vk::ClearDepthStencilValue(1.0f, 0)
+    };
 
     _colorPicker.Init();
 }
