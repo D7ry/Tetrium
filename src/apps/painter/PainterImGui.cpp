@@ -38,6 +38,13 @@ void AppPainter::TickImGui(const TetriumApp::TickContextImGui& ctx)
             clearCanvas();
         }
 
+        if (ImGui::Button("save")) {
+            saveCanvasToFile("canvas.tiff");
+        }
+        if (ImGui::Button("load")) {
+            loadCanvasFromFile("canvas.tiff");
+        }
+
         int brushSize = _paintingState.brushSize;
         if (ImGui::SliderInt("Brush Size", &brushSize, 1, 100)) {
             _paintingState.brushSize = brushSize;
@@ -73,10 +80,6 @@ void AppPainter::TickImGui(const TetriumApp::TickContextImGui& ctx)
             }
         }
 
-        // Draw widgets
-        {
-            // TODO: impl
-        }
 
         // Draw color picker widget
         if (_wantDrawColorPicker) {

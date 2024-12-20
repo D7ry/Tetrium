@@ -226,6 +226,8 @@ class AppPainter : public App
     std::array<float, 4> getPixel(uint32_t x, uint32_t y) const;
 
     // ---------- Serialization ----------
+    // We serialize and de-serialize the canvas using the TIFF format,
+    // the format supports 32-bit floating point values for up to 4 channels.
     void saveCanvasToFile(const std::string& filename);
     void loadCanvasFromFile(const std::string& filename);
 };
