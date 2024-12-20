@@ -5,7 +5,18 @@
 namespace TetriumApp
 {
 
-void AppPainter::canvasInteract(const ImVec2& canvasMousePos) {
+void AppPainter::fillPixel(uint32_t x, uint32_t y, const std::array<float, 4>& color) 
+{
+    uint32_t index = y * _canvasWidth + x;
+    char* pBuffer
+        = reinterpret_cast<char*>(_paintSpaceBuffer.bufferAddress); // use char for byte arithmetic
+
+    float* pPixel = reinterpret_cast<float*>(pBuffer + index * PAINT_SPACE_PIXEL_SIZE);
+    memcpy(pPixel, color.data(), PAINT_SPACE_PIXEL_SIZE);
+}
+
+void AppPainter::canvasInteract(const ImVec2& canvasMousePos)
+{
     uint32_t x = static_cast<uint32_t>(canvasMousePos.x);
     uint32_t y = static_cast<uint32_t>(canvasMousePos.y);
     if (x >= _canvasWidth || y >= _canvasHeight) {
@@ -15,15 +26,11 @@ void AppPainter::canvasInteract(const ImVec2& canvasMousePos) {
     // TODO: complete canvas interact logic
     DEBUG("Canvas interact at ({}, {})", x, y);
 
-    const float RYGB_COLOR[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+    fillPixel(x, y, _colorPicker.GetSelectedColorRYGBData());
 
-    uint32_t index = y * _canvasWidth + x;
-    char* pBuffer = reinterpret_cast<char*>(_paintSpaceBuffer.bufferAddress); // use char for byte arithmetic
-
-    float* pPixel = reinterpret_cast<float*>(pBuffer + index * PAINT_SPACE_PIXEL_SIZE);
-    memcpy(pPixel, RYGB_COLOR, PAINT_SPACE_PIXEL_SIZE);
-
-    for (PaintSpaceTexture& texture: _paintSpaceTexture) {
+    _paintingState.isPainting = true;
+    // flag textures for update
+    for (PaintSpaceTexture& texture : _paintSpaceTexture) {
         texture.needsUpdate = true;
     }
 }
@@ -63,6 +70,8 @@ void AppPainter::TickImGui(const TetriumApp::TickContextImGui& ctx)
                 ImVec2 canvasMousePos = ImVec2(mousePos.x - canvasPos.x, mousePos.y - canvasPos.y);
                 canvasInteract(canvasMousePos);
             }
+        } else {
+            _paintingState.isPainting = false;
         }
     }
 
@@ -73,7 +82,7 @@ void AppPainter::TickImGui(const TetriumApp::TickContextImGui& ctx)
 
     // Draw color picker widget
     if (_wantDrawColorPicker) {
-        _colorPicker.Draw(ctx);
+        _colorPicker.TickImGui(ctx);
     }
 
     ImGui::End(); // Painter

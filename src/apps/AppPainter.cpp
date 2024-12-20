@@ -579,26 +579,4 @@ void AppPainter::TickVulkan(TetriumApp::TickContextVulkan& ctx)
     cb.endRenderPass();
 }
 
-/* ---------- Color Picker Implementation ---------- */
-// TODO: impl
-void AppPainter::ColorPicker::Init()
-{
-    // Load cubemap texture
-}
-
-// TODO: impl
-void AppPainter::ColorPicker::Cleanup()
-{
-    // Cleanup cubemap texture
-}
-
-void AppPainter::ColorPicker::Draw(const TetriumApp::TickContextImGui& ctx)
-{
-    // a floating window
-    if (ImGui::Begin("Color Picker")) {
-        ImGui::Text("RYGB Color Picker");
-    }
-    ImGui::End(); // Color Picker
-}
-
 } // namespace TetriumApp

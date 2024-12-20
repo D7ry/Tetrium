@@ -52,10 +52,12 @@ class AppPainter : public App
         void Cleanup();
 
         // Draw the color picker widget
-        void Draw(const TetriumApp::TickContextImGui& ctx);
+        void TickImGui(const TetriumApp::TickContextImGui& ctx);
 
         // Get the selected color in RYGB color space
-        glm::vec4 GetSelectedColorRYGB() const;
+        inline glm::vec4 GetSelectedColorRYGB() const;
+
+        std::array<float, 4> GetSelectedColorRYGBData() const;
 
       private:
         // update the selected color based on cubemap texture coordinate,
@@ -179,8 +181,13 @@ class AppPainter : public App
     uint32_t _canvasHeight = 1024;
     const int PAINT_SPACE_PIXEL_SIZE = 4 * sizeof(float); // R32G32B32A32_SFLOAT
 
-
     // ---------- ImGui Runtime Logic ----------
+
+    struct {
+        bool isPainting = false;
+    } _paintingState;
+
     void canvasInteract(const ImVec2& canvasMousePos);
+    void fillPixel(uint32_t x, uint32_t y, const std::array<float, 4>& color);
 };
 } // namespace TetriumApp
