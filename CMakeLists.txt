@@ -57,19 +57,17 @@ if (APPLE)
     set(OPENAL_LIBRARY "${OPENAL_ROOT_DIR}/lib/libopenal.dylib")
     find_package(SndFile REQUIRED)
 else() #linux
-    set(FREETYPE_INCLUDE_DIRS "/usr/include/freetype2")
-    set(FREETYPE_LIBRARIES "/usr/lib/x86_64-linux-gnu/libfreetype.so")
+    # set(FREETYPE_INCLUDE_DIRS "/usr/include/freetype2")
+    # set(FREETYPE_LIBRARIES "/usr/lib/x86_64-linux-gnu/libfreetype.so")
     # NOTE: openal is a bit cursed, need to debug package pathing
-    set(OPENAL_LIBRARY "/usr/lib/x86_64-linux-gnu/libopenal.so")
-    set(OPENAL_INCLUDE_DIR "/usr/include/")
+    #set(OPENAL_LIBRARY "/usr/lib/x86_64-linux-gnu/libopenal.so")
+    #set(OPENAL_INCLUDE_DIR "/usr/include/")
     #FIXME: sndfile is also cursed
-    set(SNDFILE_LIBRARY "/usr/lib/x86_64-linux-gnu/libsndfile.so")
-    set(SNDFILE_INCLUDE_DIR "/usr/include/")
+    # set(SNDFILE_LIBRARY "/usr/lib/x86_64-linux-gnu/libsndfile.so")
+    #set(SNDFILE_INCLUDE_DIR "/usr/include/")
 endif()
 endif()
 
-# openal and sndfile for sound playing
-find_package(OpenAL REQUIRED)
 
 
 project(Tetrium)
@@ -127,20 +125,6 @@ target_sources(${PROJECT_NAME}
     PRIVATE ${STB_IMG_SRC}
 )
 
-target_include_directories(${PROJECT_NAME}
-    PRIVATE ${TETRIUMCOLOR_INCLUDE}
-    PRIVATE ${STB_INCLUDE}
-    PRIVATE ${IMGUI_INCLUDE}
-    PRIVATE ${IMPLOT_INCLUDE}
-    PRIVATE ${SPDLOG_INCLUDE}
-    PRIVATE ${GLFW_INCLUDE}
-    PRIVATE ${GLM_INCLUDE}
-    PRIVATE ${TINY_OBJ_LOADER_INCLUDE}
-    PRIVATE ${FREETYPE_INCLUDE_DIRS}
-    PRIVATE ${OPENAL_INCLUDE_DIR}
-    PRIVATE ${SNDFILE_INCLUDE_DIR}
-    PRIVATE src
-)
 
 
 target_precompile_headers(${PROJECT_NAME} PUBLIC src/PCH.h)
@@ -155,16 +139,29 @@ if (UNIX)
             ${MOLTENVK_LIB_PATH}
         )
         target_compile_definitions(${PROJECT_NAME} PRIVATE VK_USE_PLATFORM_MACOS_MVK)
+
+	# openal and sndfile for sound playing
+	find_package(OpenAL REQUIRED)
     else()
 # linux
     find_package(Vulkan REQUIRED)
     find_package(X11 REQUIRED)
     find_package(PkgConfig REQUIRED)
+    find_package(OpenAL REQUIRED)
+    #find_package(SndFile REQUIRED)
+    #find_package(FreeType REQUIRED)
     pkg_check_modules(DRM REQUIRED libdrm)
+    pkg_check_modules(SNDFILE REQUIRED sndfile)
+    find_package(Freetype REQUIRED)
+    include_directories(${FREETYPE_INCLUDE_DIRS})
+    target_link_libraries(${PROJECT_NAME} ${FREETYPE_LIBRARIES})
+    include_directories(${SNDFILE_INCLUDE_DIRS})
+    link_directories(${SNDFILE_LIBRARY_DIRS})
     include_directories(${DRM_INCLUDE_DIRS})
     target_link_libraries(${PROJECT_NAME} Vulkan::Vulkan
         ${X11_LIBRARIES}
         ${DRM_LIBRARIES}
+	${SNDFILE_LIBRARIES}
         Xrandr
     )
 endif() # LINUX
@@ -181,6 +178,21 @@ if (WIN32)
         add_compile_options(/W4 /wd4100 /wd4201)
     endif()
 endif() # WIN32
+
+target_include_directories(${PROJECT_NAME}
+    PRIVATE ${TETRIUMCOLOR_INCLUDE}
+    PRIVATE ${STB_INCLUDE}
+    PRIVATE ${IMGUI_INCLUDE}
+    PRIVATE ${IMPLOT_INCLUDE}
+    PRIVATE ${SPDLOG_INCLUDE}
+    PRIVATE ${GLFW_INCLUDE}
+    PRIVATE ${GLM_INCLUDE}
+    PRIVATE ${TINY_OBJ_LOADER_INCLUDE}
+    #PRIVATE ${FREETYPE_INCLUDE_DIRS}
+    PRIVATE ${OPENAL_INCLUDE_DIR}
+    PRIVATE ${SNDFILE_INCLUDE_DIR}
+    PRIVATE src
+)
 
 target_link_libraries(${PROJECT_NAME} 
     spdlog::spdlog 
