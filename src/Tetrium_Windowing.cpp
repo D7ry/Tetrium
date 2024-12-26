@@ -187,7 +187,7 @@ void Tetrium::initExclusiveDisplay(Tetrium::DisplayContext& ctx)
     selectDisplayXlib(ctx);
 #elif __APPLE__
     NEEDS_IMPLEMENTATION();
-#elif WIN32
+#elif defined(WIN32)
     NEEDS_IMPLEMENTATION();
 #else
     NEEDS_IMPLEMENTATION();

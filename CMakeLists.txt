@@ -63,7 +63,6 @@ if (APPLE)
     set(OPENAL_INCLUDE_DIR "${OPENAL_ROOT_DIR}/include")
     set(OPENAL_LIBRARY "${OPENAL_ROOT_DIR}/lib/libopenal.dylib")
     find_package(SndFile REQUIRED)
-	find_package(OpenAL REQUIRED)
 endif()
 
 find_package(Freetype REQUIRED)
@@ -119,6 +118,7 @@ target_sources(${PROJECT_NAME}
     PRIVATE ${STB_IMG_SRC}
 )
 
+find_package(OpenAL REQUIRED)
 
 
 # vulkan
@@ -136,7 +136,6 @@ if (UNIX)
     find_package(Vulkan REQUIRED)
     find_package(X11 REQUIRED)
     find_package(PkgConfig REQUIRED)
-    find_package(OpenAL REQUIRED)
     pkg_check_modules(DRM REQUIRED libdrm)
     pkg_check_modules(SNDFILE REQUIRED sndfile)
     include_directories(${SNDFILE_INCLUDE_DIRS})

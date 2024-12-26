@@ -35,7 +35,7 @@ void Tetrium::checkSoftwareEvenOddFrameSupport() {}
 
 void Tetrium::setupHardwareEvenOddFrame()
 {
-#if WIN32
+#if defined(WIN32)
     NEEDS_IMPLEMENTATION();
 #endif
 #if __APPLE__
