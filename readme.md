@@ -37,6 +37,7 @@ developing on devices without discrete GPU.
 - openAL
 - libsndfile
 - openSSL
+- libtiff-dev
 
 ### Hardware Even-odd frame sync
 
@@ -62,6 +63,7 @@ install `X11` and `Xrandr` for direct display access, for hardware even-odd fram
 install freetype
 
 `sudo apt-get install libfreetype6-dev`
+`sudo apt-get install libtiff-dev`
 
 
 ### Windows

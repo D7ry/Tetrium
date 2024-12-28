@@ -183,9 +183,36 @@ class AppPainter : public App
 
     // ---------- ImGui Runtime Logic ----------
 
-    struct {
+    enum class BrushStrokeType : uint32_t
+    {
+        Circle = 0,
+        Square,
+        Diamond,
+        SoftCircle,
+        BrushStrokeCount
+    };
+
+    struct BrushStrokeArgs
+    {
+        uint32_t x;
+        uint32_t y;
+        std::array<float, 4> color;
+        uint32_t brushSize;
+        uint32_t canvasWidth;
+        uint32_t canvasHeight;
+        std::function<void(uint32_t, uint32_t, const std::array<float,4>&)> fillPixel;
+        std::function<std::array<float,4>(uint32_t, uint32_t)> getPixel;
+    };
+
+    static const std::array<std::function<void(const BrushStrokeArgs&)>,
+                       static_cast<size_t>(BrushStrokeType::BrushStrokeCount)>
+        brushStrokeArray;
+
+    struct
+    {
         std::optional<ImVec2> prevCanvasMousePos;
         uint32_t brushSize = 5;
+        BrushStrokeType brushType = BrushStrokeType::Circle;
     } _paintingState;
 
     void clearCanvas();
@@ -196,5 +223,12 @@ class AppPainter : public App
     void canvasInteract(const ImVec2& canvasMousePos);
     void brush(uint32_t xBegin, uint32_t yBegin, uint32_t xEnd, uint32_t yEnd);
     void fillPixel(uint32_t x, uint32_t y, const std::array<float, 4>& color);
+    std::array<float, 4> getPixel(uint32_t x, uint32_t y) const;
+
+    // ---------- Serialization ----------
+    // We serialize and de-serialize the canvas using the TIFF format,
+    // the format supports 32-bit floating point values for up to 4 channels.
+    void saveCanvasToFile(const std::string& filename);
+    void loadCanvasFromFile(const std::string& filename);
 };
 } // namespace TetriumApp

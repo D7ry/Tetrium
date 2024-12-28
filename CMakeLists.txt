@@ -103,12 +103,15 @@ add_executable(${PROJECT_NAME}
         src/structs/Vertex.cpp
 
         # Apps
+        # Apps
         src/apps/AppScreeningTest.cpp
         src/apps/AppTetraHueSphere.cpp
         src/apps/AppImageViewer.cpp
         src/apps/AppPainter.cpp
         src/apps/painter/PainterImGui.cpp
         src/apps/painter/PainterColorPicker.cpp
+        src/apps/painter/PainterPaint.cpp
+        src/apps/painter/PainterSerialize.cpp
 
         src/apps/app_components/TextureFrameBuffer.cpp
 )
@@ -149,6 +152,9 @@ if (UNIX)
     )
 endif() # LINUX
 endif() # APPLE
+
+find_package(TIFF REQUIRED)
+
 if (WIN32)
     set(VULKAN_SDK_PATH "C:/VulkanSDK/1.3.290.0")
     set(Vulkan_LIBRARY "${VULKAN_SDK_PATH}/Lib/vulkan-1.lib")
@@ -184,6 +190,7 @@ target_link_libraries(${PROJECT_NAME}
     ${FREETYPE_LIBRARIES}
     ${OPENAL_LIBRARY}
     ${SNDFILE_LIBRARY}
+    ${TIFF_LIBRARIES}
 )
 
 target_precompile_headers(${PROJECT_NAME} PUBLIC src/PCH.h)
