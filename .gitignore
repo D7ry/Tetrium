@@ -2,3 +2,5 @@ build/
 release/
 .cache/
 .DS_Store
+.vs/
+vcpkg_installed/

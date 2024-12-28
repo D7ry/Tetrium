@@ -679,14 +679,13 @@ void Tetrium::createSwapChain(Tetrium::SwapChainContext& ctx, const VkSurfaceKHR
         .surfaceCounters = VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_BIT_EXT};
 
     if (_tetraMode == TetraMode::kEvenOddHardwareSync) {
-#if __linux__
+#if __linux__ || defined(WIN32)
         DEBUG("swapchain created with counter support!");
         swapChainCounterCreateInfo.pNext = createInfo.pNext;
         createInfo.pNext = &swapChainCounterCreateInfo;
-#endif // __linux__
-#if WIN32
-        NEEDS_IMPLEMENTATION();
-#endif // WIN32
+#else
+       NEEDS_IMPLEMENTATION();
+#endif // __linux__ || defined(WIN32)
     }
 
     VkSwapchainKHR swapChain = VK_NULL_HANDLE;

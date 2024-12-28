@@ -1,0 +1,9 @@
+{
+  "name": "tetrium",
+  "version": "0.0.7",
+  "dependencies": [
+    "openal-soft",
+    "freetype",
+    "libsndfile"
+  ]
+}

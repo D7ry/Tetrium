@@ -3,11 +3,18 @@ cmake_minimum_required(VERSION 3.22)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 20)
 
+project(Tetrium)
+
+# ---------- Configure Apple Settings ---------- #
 if (APPLE)
     set(VULKAN_LIB_PATH $ENV{HOME}/lib/VulkanSDK/1.3.290.1/macOS/lib/libvulkan.1.3.290.dylib)
     set(MOLTENVK_LIB_PATH $ENV{HOME}/lib/VulkanSDK/1.3.290.1/macOS/lib/libMoltenVK.dylib)
+    MESSAGE(Building in Apple machine.)
+    MESSAGE(Vulkan Libary Path: "${VULKAN_LIB_PATH}")
+    MESSAGE(MoltenVK Libary Path: "${MOLTENVK_LIB_PATH}")
 endif()
  
+# ---------- Deps in extern/ ---------- #
 # imgui
 set(IMPLOT_INCLUDE extern/implot)
 set(IMGUI_INCLUDE extern/imgui)
@@ -46,8 +53,8 @@ set(TINY_OBJ_LOADER_INCLUDE extern/tinyobjloader)
 # tetriumColor
 add_subdirectory(extern/TetriumColor)
 
+# ---------- Linked Libraries ---------- #
 # freetype
-if (UNIX)
 if (APPLE)
     set(FREETYPE_INCLUDE_DIRS "/opt/homebrew/include/freetype2")
     set(FREETYPE_LIBRARIES "/opt/homebrew/lib/libfreetype.dylib")
@@ -56,23 +63,9 @@ if (APPLE)
     set(OPENAL_INCLUDE_DIR "${OPENAL_ROOT_DIR}/include")
     set(OPENAL_LIBRARY "${OPENAL_ROOT_DIR}/lib/libopenal.dylib")
     find_package(SndFile REQUIRED)
-else() #linux
-    set(FREETYPE_INCLUDE_DIRS "/usr/include/freetype2")
-    set(FREETYPE_LIBRARIES "/usr/lib/x86_64-linux-gnu/libfreetype.so")
-    # NOTE: openal is a bit cursed, need to debug package pathing
-    set(OPENAL_LIBRARY "/usr/lib/x86_64-linux-gnu/libopenal.so")
-    set(OPENAL_INCLUDE_DIR "/usr/include/")
-    #FIXME: sndfile is also cursed
-    set(SNDFILE_LIBRARY "/usr/lib/x86_64-linux-gnu/libsndfile.so")
-    set(SNDFILE_INCLUDE_DIR "/usr/include/")
-endif()
 endif()
 
-# openal and sndfile for sound playing
-find_package(OpenAL REQUIRED)
-
-
-project(Tetrium)
+find_package(Freetype REQUIRED)
 
 add_executable(${PROJECT_NAME}
         src/lib/Utils.cpp
@@ -108,8 +101,6 @@ add_executable(${PROJECT_NAME}
         src/lib/VQUtils.cpp
         src/lib/ImGuiUtils.cpp
         src/structs/Vertex.cpp
-        #src/ecs/system/SimpleRenderSystem.cpp
-        # src/ecs/system/TetraImageDisplaySystem.cpp
 
         # Apps
         src/apps/AppScreeningTest.cpp
@@ -127,23 +118,8 @@ target_sources(${PROJECT_NAME}
     PRIVATE ${STB_IMG_SRC}
 )
 
-target_include_directories(${PROJECT_NAME}
-    PRIVATE ${TETRIUMCOLOR_INCLUDE}
-    PRIVATE ${STB_INCLUDE}
-    PRIVATE ${IMGUI_INCLUDE}
-    PRIVATE ${IMPLOT_INCLUDE}
-    PRIVATE ${SPDLOG_INCLUDE}
-    PRIVATE ${GLFW_INCLUDE}
-    PRIVATE ${GLM_INCLUDE}
-    PRIVATE ${TINY_OBJ_LOADER_INCLUDE}
-    PRIVATE ${FREETYPE_INCLUDE_DIRS}
-    PRIVATE ${OPENAL_INCLUDE_DIR}
-    PRIVATE ${SNDFILE_INCLUDE_DIR}
-    PRIVATE src
-)
+find_package(OpenAL REQUIRED)
 
-
-target_precompile_headers(${PROJECT_NAME} PUBLIC src/PCH.h)
 
 # vulkan
 if (UNIX)
@@ -161,10 +137,14 @@ if (UNIX)
     find_package(X11 REQUIRED)
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(DRM REQUIRED libdrm)
+    pkg_check_modules(SNDFILE REQUIRED sndfile)
+    include_directories(${SNDFILE_INCLUDE_DIRS})
+    link_directories(${SNDFILE_LIBRARY_DIRS})
     include_directories(${DRM_INCLUDE_DIRS})
     target_link_libraries(${PROJECT_NAME} Vulkan::Vulkan
         ${X11_LIBRARIES}
         ${DRM_LIBRARIES}
+        ${SNDFILE_LIBRARIES}
         Xrandr
     )
 endif() # LINUX
@@ -182,6 +162,21 @@ if (WIN32)
     endif()
 endif() # WIN32
 
+target_include_directories(${PROJECT_NAME}
+    PRIVATE ${TETRIUMCOLOR_INCLUDE}
+    PRIVATE ${STB_INCLUDE}
+    PRIVATE ${IMGUI_INCLUDE}
+    PRIVATE ${IMPLOT_INCLUDE}
+    PRIVATE ${SPDLOG_INCLUDE}
+    PRIVATE ${GLFW_INCLUDE}
+    PRIVATE ${GLM_INCLUDE}
+    PRIVATE ${TINY_OBJ_LOADER_INCLUDE}
+    PRIVATE ${FREETYPE_INCLUDE_DIRS}
+    PRIVATE ${OPENAL_INCLUDE_DIR}
+    PRIVATE ${SNDFILE_INCLUDE_DIR}
+    PRIVATE src
+)
+
 target_link_libraries(${PROJECT_NAME} 
     spdlog::spdlog 
     glfw
@@ -190,6 +185,8 @@ target_link_libraries(${PROJECT_NAME}
     ${OPENAL_LIBRARY}
     ${SNDFILE_LIBRARY}
 )
+
+target_precompile_headers(${PROJECT_NAME} PUBLIC src/PCH.h)
 
 # debug flag for unix
 if(CMAKE_BUILD_TYPE MATCHES Release)
