@@ -5,70 +5,44 @@ ___  ___ ___  __
 
 ```
 
-Vulkan-based tetrachromacy display engine.
-## Engine Architecture
+Display engine targeting color experiences beyond regular human perception.
 
-### Developing Applications
+## Developing
 
 Refer to [App.h](src/apps/App.h) for details and documentations on developing self-contained 
 applications that writes to both RGB and OCV color spaces.
 
-### Backend
-
-Engine backend consists of core logic on vulkan rendering, presentation, and even-odd
-frame synchronization. 
-
-#### Even-Odd Frame Synchronization
-
-To determine even/odd-ness of the frame to present, the engine relies on the total number of
-vertical blanking periods % 2. This information is obtained using [vkGetSwapchainCounterEXT](https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetSwapchainCounterEXT.html), when the engine runs under `kEvenOddHardwareSync`. 
-
-`kEvenOddSoftwareSync` mode provides an inaccurate simulation for frame synchronization, useful for
-developing on devices without discrete GPU.
-
-
-## Requirements
-
-### All Systems
-
-- `CMake`
-- [Vulkan SDK](https://vulkan.lunarg.com/)
-- `make` or `ninja`
-- openAL
-- libsndfile
-- openSSL
-- libtiff-dev
-
-### Hardware Even-odd frame sync
-
-- NVIDIA GPU supporting `VK_EXT_display_surface_counter`
-
 ## Build
 
-### Apple
+```bash
+mkdir build && cd build
+cmake ../ && make
+```
 
-set `VULKAN_LIB_PATH` and `MOLTENVK_LIB_PATH` in `CMakeLists.txt` to your own path after installing Vulkan SDK
-
-#### FreeType
-
-`brew install freetype`
-
-validate that `/opt/homebrew/include/freetype2` and `/opt/homebrew/lib/libfreetype.dylib`
-contains freetype library and include files.
-
-### Linux
-
-install `X11` and `Xrandr` for direct display access, for hardware even-odd frame sync
-
-install freetype
-
-`sudo apt-get install libfreetype6-dev`
-`sudo apt-get install libtiff-dev`
+### Dependencies
 
 
-### Windows
+The following libraries are required at link time:
+- vulkan SDK
+- python3.11
+- tiff
+- freetype
+- drm
+- openal
+- sndfile
 
-tbd...
+### Building Hardware Even-Odd Sync
+
+Tetrium can be built on all platforms for development and testing.
+However, to use hardware frame counter for even-odd presentation, the following must be present:
+1. Vulkan instance extension `VK_EXT_display_surface_counter`, for counting the actual vblank #.
+2. Vulkan instance extension `VK_KHR_display` and `VK_EXT_direct_mode_display`, for establishing direct
+connection between GPU and the display that allows for querying the API in (1).
+
+Hardware-sync build is only available for linux, since neither windows nor MoltenVK support `VK_EXT_display_surface_counter`.  
+In addition, only X11 protocol is supported.
+
+NVIDIA RTX 30/40 series laptop GPU running in discrete graphics mode on Ubuntu 22.04(X11) and Fedora 41(X11) have been tested to be able to provide stable hardware frame counter.
 
 ## Run
 
@@ -78,5 +52,7 @@ field to set display mode.
 ## References
 
 [Theory of Human Tetrachromatic Color Experience and Printing](https://dl.acm.org/doi/10.1145/3658232)
+
+[TetriumColor](https://github.com/imjal/TetriumColor)
 
 [TetraPolyscope](https://github.com/i-geng/polyscope)
