@@ -67,7 +67,7 @@ endif()
 
 find_package(Freetype REQUIRED)
 
-add_executable(${PROJECT_NAME}
+set(SOURCES
         src/lib/Utils.cpp
         src/main.cpp
         src/Tetrium_Bootstrap.cpp
@@ -112,6 +112,9 @@ add_executable(${PROJECT_NAME}
 
         src/apps/app_components/TextureFrameBuffer.cpp
 )
+
+
+add_executable(${PROJECT_NAME} ${SOURCES})
 
 target_sources(${PROJECT_NAME} 
     PRIVATE ${IMGUI_SRC}

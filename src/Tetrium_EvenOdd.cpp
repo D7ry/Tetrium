@@ -142,7 +142,7 @@ uint64_t Tetrium::getSurfaceCounterValue()
 #endif // ! FAKE_SOFTWARE_FRAME_COUNTER
     } break;
     case TetraMode::kEvenOddHardwareSync:
-#if WIN32
+#if defined(WIN32)
         NEEDS_IMPLEMENTATION();
 #endif // WIN32
 #if __APPLE__
