@@ -62,7 +62,6 @@ if (APPLE)
     set(OPENAL_ROOT_DIR "/opt/homebrew/opt/openal-soft")
     set(OPENAL_INCLUDE_DIR "${OPENAL_ROOT_DIR}/include")
     set(OPENAL_LIBRARY "${OPENAL_ROOT_DIR}/lib/libopenal.dylib")
-    find_package(SndFile REQUIRED)
 endif()
 
 
@@ -146,13 +145,10 @@ if (UNIX)
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(DRM REQUIRED libdrm)
     pkg_check_modules(SNDFILE REQUIRED sndfile)
-    include_directories(${SNDFILE_INCLUDE_DIRS})
-    link_directories(${SNDFILE_LIBRARY_DIRS})
     include_directories(${DRM_INCLUDE_DIRS})
     target_link_libraries(${PROJECT_NAME} Vulkan::Vulkan
         ${X11_LIBRARIES}
         ${DRM_LIBRARIES}
-        ${SNDFILE_LIBRARIES}
         Xrandr
     )
 endif() # LINUX
