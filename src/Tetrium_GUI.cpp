@@ -27,13 +27,12 @@ void drawCursor(const ImGuiTexture& cursorTexture)
     );
 }
 
-void drawFootNote()
+void drawFootNote(const char* footnoteText)
 {
     ImGuiIO& io = ImGui::GetIO();
     ImVec2 windowSize = io.DisplaySize;
     ImDrawList* drawList = ImGui::GetForegroundDrawList();
 
-    const char* footnoteText = (const char*)u8"🧩 Tetrium 0.7a";
     ImVec2 textSize = ImGui::CalcTextSize(footnoteText);
     ImVec2 padding(10.0f, 5.0f);
     ImVec2 pos(
@@ -170,7 +169,20 @@ void Tetrium::drawImGui(ColorSpace colorSpace, int currentFrameInFlight)
         ImGuiTexture imguiTexture = _engineTextures[(int)EngineTexture::kCursor].second;
         Tetrium_GUI::drawCursor(imguiTexture);
     }
-    Tetrium_GUI::drawFootNote();
+
+    std::string footnoteText = (const char*)u8"🧩 Tetrium 0.7a";
+    switch (_rocvPresentMode) {
+        case ROCVPresentMode::kNormal:
+            footnoteText += " | Normal Mode";
+            break;
+        case ROCVPresentMode::kRGBOnly:
+            footnoteText += " | RGB Only Mode";
+            break;
+        case ROCVPresentMode::kOCVOnly:
+            footnoteText += " | OCV Only Mode";
+            break;
+    }
+    Tetrium_GUI::drawFootNote(footnoteText.c_str());
 
     if (_primaryApp.has_value()) {
         drawAppsImGui(colorSpace, currentFrameInFlight);
