@@ -65,7 +65,10 @@ if (APPLE)
     find_package(SndFile REQUIRED)
 endif()
 
+
+find_package(OpenAL CONFIG REQUIRED)
 find_package(Freetype REQUIRED)
+find_package(SndFile CONFIG REQUIRED)
 
 set(SOURCES
         src/lib/Utils.cpp
@@ -124,7 +127,6 @@ target_sources(${PROJECT_NAME}
     PRIVATE ${STB_IMG_SRC}
 )
 
-find_package(OpenAL REQUIRED)
 
 
 # vulkan
