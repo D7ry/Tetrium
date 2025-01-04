@@ -64,7 +64,7 @@ HRESULT DXGISwapChain::Create(int count, DXGI_FORMAT format)
         DXGI_USAGE_RENDER_TARGET_OUTPUT,
         count, // image count
         DXGI_SCALING_NONE,
-        DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL,
+            DXGI_SWAP_EFFECT_FLIP_DISCARD,
         DXGI_ALPHA_MODE_IGNORE,
         0};
 	
@@ -77,7 +77,7 @@ HRESULT DXGISwapChain::Create(int count, DXGI_FORMAT format)
     ASSERT(m_pDevice);
     IDXGISwapChain1* swapchain1 = nullptr;
     hr = pFactory->CreateSwapChainForHwnd(
-        m_commandQueue, m_hWnd, &swapchainDesc, &fullscreenDesc, nullptr, &swapchain1
+        m_commandQueue, m_hWnd, &swapchainDesc, nullptr, nullptr, &swapchain1
     );
 	
 	ASSERT(swapchain1);
@@ -87,14 +87,13 @@ HRESULT DXGISwapChain::Create(int count, DXGI_FORMAT format)
         PANIC("Failed to create swapchain");
     }
 
-	pFactory->MakeWindowAssociation(m_hWnd, 0);
+	DX_CHECK(pFactory->MakeWindowAssociation(m_hWnd, 0));
 	
     return S_OK;
 }
 
 void DXGISwapChain::Present() { 
-    m_pSwapChain->Present(1, 0);
-}
+    DX_CHECK(m_pSwapChain->Present(1, 0)); }
 
 unsigned int DXGISwapChain::GetVBlankCount()
 {

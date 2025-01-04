@@ -154,8 +154,13 @@ void Tetrium::drawImGui(ColorSpace colorSpace, int currentFrameInFlight)
     bool imguiDisplaySizeOverride = _tetraMode == TetraMode::kEvenOddHardwareSync;
     if (imguiDisplaySizeOverride) {
         ImVec2 projectorDisplaySize{
+#if defined(WIN32)
+            static_cast<float>(_swapChain.extent.width),
+            static_cast<float>(_swapChain.extent.height)
+#else
             static_cast<float>(_mainProjectorDisplay.extent.width),
             static_cast<float>(_mainProjectorDisplay.extent.height)
+#endif
         };
         ImGuiIO& io = ImGui::GetIO();
         io.DisplaySize = projectorDisplaySize;

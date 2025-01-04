@@ -36,7 +36,7 @@ void Tetrium::checkSoftwareEvenOddFrameSupport() {}
 void Tetrium::setupHardwareEvenOddFrame()
 {
 #if defined(WIN32)
-    NEEDS_IMPLEMENTATION();
+    // TODO: move some stuff to here
 #endif
 #if __APPLE__
     NEEDS_IMPLEMENTATION();
@@ -114,7 +114,7 @@ void Tetrium::checkHardwareEvenOddFrameSupport()
 #endif
 
 #if defined(WIN32)
-    NEEDS_IMPLEMENTATION();
+    // TODO: implement
 #endif // WIN32
 
     DEBUG("Even-odd frame support check passed!");
@@ -147,7 +147,7 @@ uint64_t Tetrium::getSurfaceCounterValue()
     } break;
     case TetraMode::kEvenOddHardwareSync:
 #if defined(WIN32)
-        NEEDS_IMPLEMENTATION();
+        surfaceCounter = _swapChain.chainDXGI->GetVBlankCount();
 #endif // WIN32
 #if __APPLE__
         NEEDS_IMPLEMENTATION();

@@ -105,7 +105,7 @@ void Tetrium::initDefaultStates()
     // configure states
 
     // clear color
-    _clearValues[0].color = {0.0f, 0.0f, 0.0f, 1.f};
+    _clearValues[0].color = {0.0f, 0.0f, 0.f, 1.f};
     _clearValues[1].depthStencil = vk::ClearDepthStencilValue(1.f, 0.f);
 
     // input states
@@ -723,8 +723,8 @@ void Tetrium::createSwapChain(Tetrium::SwapChainContext& ctx, const VkSurfaceKHR
     //github.com/krOoze/Hello_Triangle/blob/e8e66c060757c2d5ae0d5e544060332f9ccf3556/src/WSI/DxgiWsi.h#L464
 #if defined(WIN32)
     ASSERT(surface == VK_NULL_HANDLE); // don't need surface for dxgi
-    VkFormat format = VK_FORMAT_B8G8R8A8_UNORM;
-    DXGI_FORMAT dxgiFormat = DXGI_FORMAT_B8G8R8A8_UNORM;
+    VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
+    DXGI_FORMAT dxgiFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
     uint32_t imageCount = 3; // hardcoded here, all modern GPUs should have 2+ backbuffers
 
     ctx.chainDXGI = new DXGISwapChain(_dxgiDisplay);
@@ -765,9 +765,9 @@ void Tetrium::createSwapChain(Tetrium::SwapChainContext& ctx, const VkSurfaceKHR
         if (dxImageDesc.MipLevels != 1) {
             PANIC("Weird DXGI image mip level count");
         }
-        if (dxImageDesc.Format != DXGI_FORMAT_B8G8R8A8_UNORM) {
-            PANIC("Weird DXGI image format");
-        }
+        //if (dxImageDesc.Format != DXGI_FORMAT_B8G8R8A8_UNORM) {
+        //    PANIC("Weird DXGI image format");
+        //}
         if (dxImageDesc.SampleDesc.Count != 1) {
             PANIC("Weird DXGI image sample count");
         }
@@ -799,7 +799,7 @@ void Tetrium::createSwapChain(Tetrium::SwapChainContext& ctx, const VkSurfaceKHR
         std::wstring sharedHandleName
             = std::wstring(L"Local\\SomeBullshitNameIDontNeedAnyway") + std::to_wstring(i);
         DX_CHECK(ctx.chainDXGI->m_pDevice->CreateSharedHandle(
-            dxImage, NULL, GENERIC_ALL, sharedHandleName.data(), &ctx.sharedImageHandles[i]
+            dxImage, NULL, GENERIC_ALL, NULL, &ctx.sharedImageHandles[i]
         ));
 
         VkMemoryWin32HandlePropertiesKHR w32MemProps{
@@ -867,27 +867,6 @@ void Tetrium::createSwapChain(Tetrium::SwapChainContext& ctx, const VkSurfaceKHR
             vkBindImageMemory(_device->logicalDevice, ctx.image[i], ctx.sharedImageMemories[i], 0)
         );
     }
-
-
-    
-    //// Game loop
-    //MSG msg = {0};
-    //while (WM_QUIT != msg.message) {
-    //    if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
-    //        TranslateMessage(&msg);
-    //        DispatchMessage(&msg);
-    //    }
-
-    //    // Clear the back buffer (replace with your rendering logic)
-    //    // swapChain.m_pDeviceContext->ClearRenderTargetView(nullptr, D3DXCOLOR(0.0f, 0.2f,
-    //    // 0.4f, 1.0f));
-
-    //    // Present the back buffer
-    //    ctx.chainDXGI->Present();
-    //    ctx.chainDXGI->GetVBlankCount();
-    //}
-
-    //exit(0);
 
 #endif // WIN32
 	

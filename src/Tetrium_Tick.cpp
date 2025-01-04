@@ -4,10 +4,40 @@
 
 void Tetrium::Run()
 {
+
+    // Game loop
+
+    MSG msg = {0};
+    while (WM_QUIT != msg.message) {
+        if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
+
+        // Present the back buffer
+        //_swapChain.chainDXGI->Present();
+        //_swapChain.chainDXGI->GetVBlankCount();
+
+        glfwPollEvents();
+        Tick();
+    }
+
+    exit(0);
+	
     DEBUG("Starting run loop...");
     ASSERT(_window);
     glfwShowWindow(_window);
     while (!glfwWindowShouldClose(_window)) {
+#if defined(WIN32)
+        MSG msg = {0};
+        if (WM_QUIT == msg.message) {
+            break;
+        }
+        if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
+#endif // WIN32
         glfwPollEvents();
         Tick();
     }
@@ -66,7 +96,7 @@ void Tetrium::drawFrame(ColorSpace colorSpace, uint8_t frameIdx)
     VkResult result;
     uint32_t swapchainImageIndex;
 
-    { // wait for previous render
+    { // wait for previous render -- note the fence is for render, not presentation.
         PROFILE_SCOPE(&_profiler, "vkWaitForFences: fenceInFlight");
         VK_CHECK_RESULT(
             vkWaitForFences(_device->logicalDevice, 1, &sync.fenceInFlight, VK_TRUE, UINT64_MAX)
@@ -74,7 +104,12 @@ void Tetrium::drawFrame(ColorSpace colorSpace, uint8_t frameIdx)
         VK_CHECK_RESULT(vkResetFences(this->_device->logicalDevice, 1, &sync.fenceInFlight));
     }
 
+
     { // Asynchronously acquire an image from the swap chain,
+#if defined(WIN32)
+        swapchainImageIndex = _swapChain.chainDXGI->m_pSwapChain->GetCurrentBackBufferIndex();
+        DEBUG("Drawing to {}", swapchainImageIndex);
+#else
         result = vkAcquireNextImageKHR(
             this->_device->logicalDevice,
             _swapChain.chain,
@@ -89,6 +124,7 @@ void Tetrium::drawFrame(ColorSpace colorSpace, uint8_t frameIdx)
             const char* res = string_VkResult(result);
             PANIC("Failed to acquire swap chain image: {}", res);
         }
+#endif
     }
 
     vk::CommandBuffer appCB(_device->appCommandBuffers[frameIdx]);
@@ -136,9 +172,13 @@ void Tetrium::drawFrame(ColorSpace colorSpace, uint8_t frameIdx)
         std::array<vk::CommandBuffer, 1> appCBs = {appCB};
         std::array<vk::CommandBuffer, 1> engineCBs = {engineCB};
 
-        std::array<vk::Semaphore, 2> engineWaits = {
+        //std::array<vk::Semaphore, 2> engineWaits = {
+        //    sync.semaAppVulkanFinished, // app rendering finished
+        //    sync.semaImageAvailable,    // screen fb availability
+        //};
+        // FIXME: add back image available wait, or do we need it?
+        std::array<vk::Semaphore, 1> engineWaits = {
             sync.semaAppVulkanFinished, // app rendering finished
-            sync.semaImageAvailable,    // screen fb availability
         };
         std::array<vk::PipelineStageFlags, 2> engineWaitStages = {
             vk::PipelineStageFlagBits::eTopOfPipe, // conservatively wait for all app rendering to
@@ -147,7 +187,8 @@ void Tetrium::drawFrame(ColorSpace colorSpace, uint8_t frameIdx)
         };
 
         std::array<vk::Semaphore, 1> appSignals = {sync.semaAppVulkanFinished};
-        std::array<vk::Semaphore, 1> engineSignals = {sync.semaRenderFinished};
+        //std::array<vk::Semaphore, 1> engineSignals = {sync.semaRenderFinished};
+        std::array<vk::Semaphore, 0> engineSignals = {}; // FIXME: should wait for render finish
 
         std::array<vk::SubmitInfo, 2> submitInfos = {
             vk::SubmitInfo(
@@ -173,6 +214,10 @@ void Tetrium::drawFrame(ColorSpace colorSpace, uint8_t frameIdx)
 
     { // Presented the swapchain, which at this point contains a rendered RGB/OCV image
         PROFILE_SCOPE(&_profiler, "Queue Present");
+#if defined(WIN32)
+        _swapChain.chainDXGI->Present();
+
+#else
         //  Present the swap chain image
         VkPresentInfoKHR presentInfo{};
         presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -198,5 +243,7 @@ void Tetrium::drawFrame(ColorSpace colorSpace, uint8_t frameIdx)
             recreateVirtualFrameBuffers();
             this->_framebufferResized = false;
         }
+#endif
+
     }
 }
