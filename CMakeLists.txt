@@ -105,7 +105,6 @@ set(SOURCES
         src/structs/Vertex.cpp
 
         # Apps
-        # Apps
         src/apps/AppScreeningTest.cpp
         src/apps/AppTetraHueSphere.cpp
         src/apps/AppImageViewer.cpp
@@ -118,6 +117,10 @@ set(SOURCES
         src/apps/app_components/TextureFrameBuffer.cpp
 )
 
+if (WIN32)
+    list(APPEND SOURCES src/lib/dxgi/DXGISwapchain.cpp)
+endif()
+
 
 add_executable(${PROJECT_NAME} ${SOURCES})
 
@@ -125,8 +128,6 @@ target_sources(${PROJECT_NAME}
     PRIVATE ${IMGUI_SRC}
     PRIVATE ${STB_IMG_SRC}
 )
-
-
 
 # vulkan
 if (UNIX)
@@ -167,6 +168,10 @@ if (WIN32)
     if(MSVC)
         add_compile_options(/W4 /wd4100 /wd4201)
     endif()
+
+    # DirectX
+    find_package(dxsdk-d3dx CONFIG REQUIRED)
+    target_link_libraries(${PROJECT_NAME} Microsoft::D3DX9 Microsoft::D3DX10 Microsoft::D3DX11)
 endif() # WIN32
 
 target_include_directories(${PROJECT_NAME}

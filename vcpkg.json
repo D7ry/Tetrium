@@ -5,6 +5,7 @@
     "openal-soft",
     "freetype",
     "libsndfile",
-    "tiff"
+    "tiff",
+    "dxsdk-d3dx"
   ]
 }
