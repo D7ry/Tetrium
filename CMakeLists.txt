@@ -119,6 +119,7 @@ set(SOURCES
 
 if (WIN32)
     list(APPEND SOURCES src/lib/dxgi/DXGISwapchain.cpp)
+    list(APPEND SOURCES src/lib/dxgi/DXGIContext.cpp)
 endif()
 
 

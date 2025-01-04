@@ -3,7 +3,9 @@
 
 
 #include "DXGISwapchain.h"
-#pragma comment(lib, "d3d11.lib")
+#include <wrl/client.h>
+using namespace Microsoft::WRL;
+#pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi")
 
 // https://github.com/krOoze/Hello_Triangle/blob/dxgi_interop/src/WSI/DxgiWsi.h#L634
@@ -41,29 +43,46 @@ HRESULT DXGISwapChain::Create()
 {
     HRESULT hr = S_OK;
 
-    // Create a factory
-    IDXGIFactory* pFactory = DXGIContext::factory4;
+    IDXGIFactory7* pFactory = DXGIContext::factory7;
     if (FAILED(hr)) {
         PANIC("Failed to create DXGI factory");
     }
-
-    // Define swap chain description
-    DXGI_SWAP_CHAIN_DESC sd;
-    ZeroMemory(&sd, sizeof(sd));
-    sd.BufferCount = 1;
-    sd.BufferDesc.Width = m_width;
-    sd.BufferDesc.Height = m_height;
-    sd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-    sd.BufferDesc.RefreshRate = m_refreshRate;
-    sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-    sd.OutputWindow = m_hWnd;
-    sd.SampleDesc.Count = 1;
-    sd.SampleDesc.Quality = 0;
-    sd.Windowed = false; // always full-screen
-
+    const D3D12_COMMAND_QUEUE_DESC dxQDesc
+        = {D3D12_COMMAND_LIST_TYPE_DIRECT,
+           D3D12_COMMAND_QUEUE_PRIORITY_NORMAL,
+           D3D12_COMMAND_QUEUE_FLAG_NONE,
+          };
+	
+	m_pDevice->CreateCommandQueue(&dxQDesc, IID_PPV_ARGS(&m_commandQueue));
+	
+    const DXGI_SWAP_CHAIN_DESC1 swapchainDesc{
+        m_width,
+        m_height,
+        DXGI_FORMAT_B8G8R8A8_UNORM,
+        FALSE,  // Stereo
+        {1, 0}, // Samples
+        DXGI_USAGE_RENDER_TARGET_OUTPUT,
+        2, // image count
+        DXGI_SCALING_NONE,
+        DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL,
+        DXGI_ALPHA_MODE_IGNORE,
+        0};
+	
+    const DXGI_SWAP_CHAIN_FULLSCREEN_DESC fullscreenDesc{
+        m_refreshRate,
+        DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED,
+        DXGI_MODE_SCALING_UNSPECIFIED,
+        false,
+    };
     ASSERT(m_pDevice);
-    // Create device and swap chain
-    hr = pFactory->CreateSwapChain(m_pDevice, &sd, &m_pSwapChain);
+    IDXGISwapChain1* swapchain1 = nullptr;
+    hr = pFactory->CreateSwapChainForHwnd(
+        m_commandQueue, m_hWnd, &swapchainDesc, &fullscreenDesc, nullptr, &swapchain1
+    );
+	
+	ASSERT(swapchain1);
+	
+	m_pSwapChain = reinterpret_cast<IDXGISwapChain4*>(swapchain1);
     if (FAILED(hr)) {
         PANIC("Failed to create swapchain");
     }
@@ -91,12 +110,12 @@ unsigned int DXGISwapChain::GetVBlankCount()
 
 
 
-DXGISwapchainCreateContext PickFullscreenDXGIWindow()
+static DXGISwapchainCreateContext PickFullscreenDXGIWindow()
 {
     DXGISwapchainCreateContext ret{};
     std::vector<IDXGIAdapter*> adapters;
 
-    IDXGIFactory1* pFactory = DXGIContext::factory4;
+    IDXGIFactory1* pFactory = DXGIContext::factory7;
 
     UINT adapterIndex = 0;
     IDXGIAdapter* pAdapter = nullptr;
@@ -228,17 +247,8 @@ DXGISwapchainCreateContext PickFullscreenDXGIWindow()
         PANIC("Failed to create window");
     }
 
-    auto res = D3D11CreateDevice(
-        pAdapter,
-        D3D_DRIVER_TYPE_UNKNOWN,
-        0,
-        D3D11_CREATE_DEVICE_BGRA_SUPPORT,
-        0,
-        0,
-        D3D11_SDK_VERSION,
-        &ret.device,
-        nullptr,
-        &ret.deviceContext
+    auto res = D3D12CreateDevice(
+        pAdapter, D3D_FEATURE_LEVEL_11_1, IID_PPV_ARGS(&ret.device)
     );
 
 	if (res != 0) {
@@ -252,7 +262,6 @@ DXGISwapchainCreateContext PickFullscreenDXGIWindow()
     for (auto* adapter : adapters) {
         adapter->Release();
     }
-    pFactory->Release();
 	
     return ret;
 }

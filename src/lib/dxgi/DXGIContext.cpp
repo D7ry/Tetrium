@@ -4,13 +4,13 @@ namespace DXGIContext
 {
 void Init() { 
 	INFO("Initializing DXGI context");
-    ASSERT(SUCCEEDED(CreateDXGIFactory2(0, IID_PPV_ARGS(&factory4))))
+    ASSERT(SUCCEEDED(CreateDXGIFactory2(0, IID_PPV_ARGS(&factory7))))
 
 
 }
     
 
-    void Destroy() { factory4->Release();
+    void Destroy() { factory7->Release();
     }
 }
 
