@@ -115,6 +115,8 @@ class Tetrium
         VkSurfaceKHR surface;
 #if defined(WIN32)
         DXGISwapChain* chainDXGI = nullptr;
+        std::vector<HANDLE> sharedImageHandles;
+        std::vector<VkDeviceMemory> sharedImageMemories;
 #endif
     };
 

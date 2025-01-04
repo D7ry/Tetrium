@@ -722,32 +722,172 @@ void Tetrium::createSwapChain(Tetrium::SwapChainContext& ctx, const VkSurfaceKHR
     // create DXGI swapchain instead of vulkan swapchain
     //github.com/krOoze/Hello_Triangle/blob/e8e66c060757c2d5ae0d5e544060332f9ccf3556/src/WSI/DxgiWsi.h#L464
 #if defined(WIN32)
+    ASSERT(surface == VK_NULL_HANDLE); // don't need surface for dxgi
     VkFormat format = VK_FORMAT_B8G8R8A8_UNORM;
     DXGI_FORMAT dxgiFormat = DXGI_FORMAT_B8G8R8A8_UNORM;
     uint32_t imageCount = 3; // hardcoded here, all modern GPUs should have 2+ backbuffers
 
-	ctx.chainDXGI = new DXGISwapChain(_dxgiDisplay);
+    ctx.chainDXGI = new DXGISwapChain(_dxgiDisplay);
     ctx.chainDXGI->Create(imageCount, dxgiFormat);
 
-    
-    // Game loop
-    MSG msg = {0};
-    while (WM_QUIT != msg.message) {
-        if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
-        }
+    ctx.surface = VK_NULL_HANDLE;
+    ctx.extent = {ctx.chainDXGI->m_width, ctx.chainDXGI->m_height};
 
-        // Clear the back buffer (replace with your rendering logic)
-        // swapChain.m_pDeviceContext->ClearRenderTargetView(nullptr, D3DXCOLOR(0.0f, 0.2f,
-        // 0.4f, 1.0f));
+    ctx.image.resize(imageCount);
+    ctx.imageView.resize(imageCount);
+    ctx.frameBuffer.resize(imageCount);
+    ctx.sharedImageHandles.resize(imageCount);
+    ctx.sharedImageMemories.resize(imageCount);
+    ctx.imageFormat = format;
+    ctx.numImages = imageCount;
 
-        // Present the back buffer
-        ctx.chainDXGI->Present();
-        ctx.chainDXGI->GetVBlankCount();
+    // get swapchain images -- the other two resource are created in createImageViews and
+    // createFrameBuffer
+    std::vector<ID3D12Resource*> dxImages;
+    dxImages.resize(imageCount);
+    for (int i = 0; i < imageCount; i++) {
+        ASSERT(SUCCEEDED(ctx.chainDXGI->m_pSwapChain->GetBuffer(i, IID_PPV_ARGS(&dxImages[i]))))
     }
 
-    exit(0);
+    for (size_t i = 0; i < dxImages.size(); ++i) {
+        const auto& dxImage = dxImages[i];
+        const auto dxImageDesc = dxImage->GetDesc();
+        D3D12_HEAP_PROPERTIES dxImageHeap;
+        D3D12_HEAP_FLAGS dxImageHeapFlags;
+        DX_CHECK(dxImage->GetHeapProperties(&dxImageHeap, &dxImageHeapFlags));
+
+        if (dxImageDesc.Dimension != D3D12_RESOURCE_DIMENSION_TEXTURE2D) {
+            PANIC("Weird DXGI image dimensionality");
+        }
+        if (dxImageDesc.DepthOrArraySize != 1) {
+            PANIC("Weird DXGI image array count");
+        }
+        if (dxImageDesc.MipLevels != 1) {
+            PANIC("Weird DXGI image mip level count");
+        }
+        if (dxImageDesc.Format != DXGI_FORMAT_B8G8R8A8_UNORM) {
+            PANIC("Weird DXGI image format");
+        }
+        if (dxImageDesc.SampleDesc.Count != 1) {
+            PANIC("Weird DXGI image sample count");
+        }
+        VkExternalMemoryImageCreateInfoKHR eii
+            = {VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO_KHR,
+               nullptr, // pNext
+               VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D12_RESOURCE_BIT_KHR};
+        ASSERT(dxImageDesc.Width <= UINT32_MAX);
+        const VkImageCreateInfo ii = {
+            VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+            &eii,
+            0, // flags
+            VK_IMAGE_TYPE_2D,
+            format,
+            {static_cast<uint32_t>(dxImageDesc.Width),
+             static_cast<uint32_t>(dxImageDesc.Height),
+             1},
+            1,
+            1,
+            VK_SAMPLE_COUNT_1_BIT,   // mip, array, samples
+            VK_IMAGE_TILING_OPTIMAL, // assumably
+            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+            VK_SHARING_MODE_EXCLUSIVE,
+            0,
+            nullptr,                  // queue families share
+            VK_IMAGE_LAYOUT_UNDEFINED // per Vk VU
+        };
+        VK_CHECK_RESULT(vkCreateImage(_device->logicalDevice, &ii, nullptr, &ctx.image[i]));
+        std::wstring sharedHandleName
+            = std::wstring(L"Local\\SomeBullshitNameIDontNeedAnyway") + std::to_wstring(i);
+        DX_CHECK(ctx.chainDXGI->m_pDevice->CreateSharedHandle(
+            dxImage, NULL, GENERIC_ALL, sharedHandleName.data(), &ctx.sharedImageHandles[i]
+        ));
+
+        VkMemoryWin32HandlePropertiesKHR w32MemProps{
+            VK_STRUCTURE_TYPE_MEMORY_WIN32_HANDLE_PROPERTIES_KHR, nullptr, 0xcdcdcdcd};
+
+        PFN_vkGetMemoryWin32HandlePropertiesKHR pfnGetMemoryWin32HandlePropertiesKHR
+            = (PFN_vkGetMemoryWin32HandlePropertiesKHR
+            )vkGetInstanceProcAddr(_instance, "vkGetMemoryWin32HandlePropertiesKHR");
+
+        VK_CHECK_RESULT(pfnGetMemoryWin32HandlePropertiesKHR(
+            _device->logicalDevice,
+            VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D12_RESOURCE_BIT,
+            ctx.sharedImageHandles[i],
+            &w32MemProps
+        ));
+        VkMemoryRequirements memReq;
+        vkGetImageMemoryRequirements(_device->logicalDevice, ctx.image[i], &memReq);
+        if (w32MemProps.memoryTypeBits == 0xcdcdcdcd)
+            w32MemProps.memoryTypeBits = memReq.memoryTypeBits;
+        else
+            w32MemProps.memoryTypeBits &= memReq.memoryTypeBits;
+
+        VkPhysicalDeviceMemoryProperties memProps;
+        vkGetPhysicalDeviceMemoryProperties(_device->physicalDevice, &memProps);
+        int memTypeIndex = -1;
+        for (uint32_t im = 0; im < memProps.memoryTypeCount; ++im) {
+            const uint32_t current_bit = 0x1 << im;
+            if (w32MemProps.memoryTypeBits == current_bit) {
+                if (memProps.memoryTypes[im].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+                    memTypeIndex = im;
+                break;
+            }
+        }
+
+        if (memTypeIndex < 0) {
+            PANIC("Device local import memory not found !");
+        }
+
+        // DX12 Resource has to be dedicated per Vk spec
+        const VkMemoryDedicatedAllocateInfoKHR dii = {
+            VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO,
+            nullptr, // pNext
+            ctx.image[i],
+            VK_NULL_HANDLE // buffer
+        };
+
+        const VkImportMemoryWin32HandleInfoKHR imi{
+            VK_STRUCTURE_TYPE_IMPORT_MEMORY_WIN32_HANDLE_INFO_KHR,
+            &dii,
+            VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D12_RESOURCE_BIT_KHR,
+            ctx.sharedImageHandles[i],
+            nullptr // handle name -- redundant
+        };
+
+        const VkMemoryAllocateInfo mi{
+            VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+            &imi,
+            memReq.size,
+            static_cast<uint32_t>(memTypeIndex)};
+
+        VK_CHECK_RESULT(
+            vkAllocateMemory(_device->logicalDevice, &mi, nullptr, &ctx.sharedImageMemories[i])
+        );
+        VK_CHECK_RESULT(
+            vkBindImageMemory(_device->logicalDevice, ctx.image[i], ctx.sharedImageMemories[i], 0)
+        );
+    }
+
+
+    
+    //// Game loop
+    //MSG msg = {0};
+    //while (WM_QUIT != msg.message) {
+    //    if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
+    //        TranslateMessage(&msg);
+    //        DispatchMessage(&msg);
+    //    }
+
+    //    // Clear the back buffer (replace with your rendering logic)
+    //    // swapChain.m_pDeviceContext->ClearRenderTargetView(nullptr, D3DXCOLOR(0.0f, 0.2f,
+    //    // 0.4f, 1.0f));
+
+    //    // Present the back buffer
+    //    ctx.chainDXGI->Present();
+    //    ctx.chainDXGI->GetVBlankCount();
+    //}
+
+    //exit(0);
 
 #endif // WIN32
 	

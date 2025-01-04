@@ -39,4 +39,6 @@ void Init();
         }                                                                                          \
     }
 
+#define DX_CHECK(expr) ASSERT(SUCCEEDED(expr))
+
 #define INIT_LOGS() Logging::Init()

@@ -50,6 +50,9 @@ const std::vector<const char*> Tetrium::EVEN_ODD_HARDWARE_DEVICE_EXTENSIONS = {
 #if __linux__
     VK_EXT_DISPLAY_CONTROL_EXTENSION_NAME, // to wake up display
 #endif
+#if defined(WIN32)
+    VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME
+#endif // WIN32
 };
 
 const std::vector<const char*> Tetrium::EVEN_ODD_SOFTWARE_DEVICE_EXTENSIONS = {
