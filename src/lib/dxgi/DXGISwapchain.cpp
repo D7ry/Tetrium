@@ -1,4 +1,7 @@
 #if defined(WIN32)
+#include "DXGIContext.h"
+
+
 #include "DXGISwapchain.h"
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi")
@@ -12,7 +15,7 @@ DXGISwapChain::DXGISwapChain(DXGISwapchainCreateContext& window)
       m_refreshRate(window.refreshRate),
       m_pSwapChain(nullptr),
       m_pDevice(window.device),
-      m_pDeviceContext(window.deviceContext)
+      m_pAdapter(window.adapter)
 {
 }
 
@@ -23,14 +26,13 @@ DXGISwapChain::~DXGISwapChain()
         m_pSwapChain = nullptr;
     }
 
-    if (m_pDeviceContext) {
-        m_pDeviceContext->Release();
-        m_pDeviceContext = nullptr;
-    }
-
     if (m_pDevice) {
         m_pDevice->Release();
         m_pDevice = nullptr;
+    }
+
+	if (m_pAdapter) {
+        m_pAdapter->Release();
     }
 }
 
@@ -40,8 +42,7 @@ HRESULT DXGISwapChain::Create()
     HRESULT hr = S_OK;
 
     // Create a factory
-    IDXGIFactory* pFactory = nullptr;
-    hr = CreateDXGIFactory1(__uuidof(IDXGIFactory), (void**)&pFactory);
+    IDXGIFactory* pFactory = DXGIContext::factory4;
     if (FAILED(hr)) {
         PANIC("Failed to create DXGI factory");
     }
@@ -60,15 +61,13 @@ HRESULT DXGISwapChain::Create()
     sd.SampleDesc.Quality = 0;
     sd.Windowed = false; // always full-screen
 
+    ASSERT(m_pDevice);
     // Create device and swap chain
     hr = pFactory->CreateSwapChain(m_pDevice, &sd, &m_pSwapChain);
     if (FAILED(hr)) {
         PANIC("Failed to create swapchain");
     }
 	
-    // Release interfaces
-    pFactory->Release();
-
     return S_OK;
 }
 
@@ -97,10 +96,7 @@ DXGISwapchainCreateContext PickFullscreenDXGIWindow()
     DXGISwapchainCreateContext ret{};
     std::vector<IDXGIAdapter*> adapters;
 
-    IDXGIFactory1* pFactory = nullptr;
-    if (FAILED(CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void**)&pFactory))) {
-        PANIC("Failed to create DXGI Factory.")
-    }
+    IDXGIFactory1* pFactory = DXGIContext::factory4;
 
     UINT adapterIndex = 0;
     IDXGIAdapter* pAdapter = nullptr;
@@ -127,6 +123,7 @@ DXGISwapchainCreateContext PickFullscreenDXGIWindow()
     } while (selectedIndex >= adapters.size());
 
     pAdapter = adapters.at(selectedIndex);
+    pAdapter->AddRef(); // keep the selected adapter alive, as we decref all adapters at the end.
 
     std::vector<IDXGIOutput*> outputs;
     std::cout << "========== Choose Display ==========" << std::endl;

@@ -13,6 +13,7 @@ struct DXGISwapchainCreateContext
     DXGI_RATIONAL refreshRate;
     ID3D11Device* device;
     ID3D11DeviceContext* deviceContext;
+    IDXGIAdapter* adapter;
 };
 class DXGISwapChain
 {
@@ -29,6 +30,7 @@ public:
     IDXGISwapChain* m_pSwapChain;
     ID3D11Device* m_pDevice;
     ID3D11DeviceContext* m_pDeviceContext;
+    IDXGIAdapter* m_pAdapter;
 
     HWND m_hWnd;
     uint32_t m_width;
