@@ -36,20 +36,22 @@ int main(int argc, char** argv)
 
 
     Tetrium::InitOptions options{.tetraMode = Tetrium::TetraMode::kEvenOddSoftwareSync};
-    Tetrium engine;
+    Tetrium* engine = new Tetrium();
 
     for (auto& [app, appName] : apps) {
-        engine.RegisterApp(app, appName);
+        engine->RegisterApp(app, appName);
     }
 
-    engine.Init(options);
-    engine.Run();
-    engine.Cleanup();
+    engine->Init(options);
+    engine->Run();
+    engine->Cleanup();
 
 
     for (auto& [app, appName] : apps) {
         delete app;
     }
+	
+	delete engine;
 
     return 0;
 }
