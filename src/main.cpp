@@ -7,6 +7,8 @@
 #include "apps/AppImageViewer.h"
 #include "apps/AppPainter.h"
 
+#include "D3dx9math.h"
+#include "lib/dxgi/DXGISwapchain.h"
 void printGreetingBanner()
 {
     // cool banner
@@ -26,6 +28,27 @@ int main(int argc, char** argv)
 #if !defined(NDEBUG)
     DEBUG("running in debug mode");
 #endif // !NDEBUG
+
+    auto swapChain = DXGI::PickDisplayAndCreateSwapchain();
+    // Game loop
+    MSG msg = { 0 };
+    while (WM_QUIT != msg.message)
+    {
+        if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
+        {
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
+
+        // Clear the back buffer (replace with your rendering logic)
+        //swapChain.m_pDeviceContext->ClearRenderTargetView(nullptr, D3DXCOLOR(0.0f, 0.2f, 0.4f, 1.0f));
+
+        // Present the back buffer
+        swapChain.Present();
+    }
+    
+
+    exit(0);
 
     std::vector<std::pair<TetriumApp::App*, const char*>> apps = {
         {new TetriumApp::AppScreeningTest(), "Screening Test"},

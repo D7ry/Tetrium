@@ -1,13 +1,17 @@
 #if defined(WIN32)
 #include "DXGISwapchain.h"
+#pragma comment(lib, "d3d11.lib")
+#pragma comment(lib, "dxgi")
 
-DXGISwapChain::DXGISwapChain(HWND hWnd, uint32_t width, uint32_t height)
-    : m_hWnd(hWnd),
-      m_width(width),
-      m_height(height),
+
+DXGISwapChain::DXGISwapChain(DXGISwapchainCreateContext& window)
+    : m_hWnd(window.window),
+      m_width(window.width),
+      m_height(window.height),
+      m_refreshRate(window.refreshRate),
       m_pSwapChain(nullptr),
-      m_pDevice(nullptr),
-      m_pDeviceContext(nullptr)
+      m_pDevice(window.device),
+      m_pDeviceContext(window.deviceContext)
 {
 }
 
@@ -37,8 +41,9 @@ HRESULT DXGISwapChain::Create()
     // Create a factory
     IDXGIFactory* pFactory = nullptr;
     hr = CreateDXGIFactory1(__uuidof(IDXGIFactory), (void**)&pFactory);
-    if (FAILED(hr))
-        return hr;
+    if (FAILED(hr)) {
+        PANIC("Failed to create DXGI factory");
+    }
 
     // Define swap chain description
     DXGI_SWAP_CHAIN_DESC sd;
@@ -47,8 +52,7 @@ HRESULT DXGISwapChain::Create()
     sd.BufferDesc.Width = m_width;
     sd.BufferDesc.Height = m_height;
     sd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-    sd.BufferDesc.RefreshRate.Numerator = 60;
-    sd.BufferDesc.RefreshRate.Denominator = 1;
+    sd.BufferDesc.RefreshRate = m_refreshRate;
     sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
     sd.OutputWindow = m_hWnd;
     sd.SampleDesc.Count = 1;
@@ -56,33 +60,13 @@ HRESULT DXGISwapChain::Create()
     sd.Windowed = false; // always full-screen
 
     // Create device and swap chain
-    hr = pFactory->CreateSwapChain(nullptr, &sd, &m_pSwapChain);
+    hr = pFactory->CreateSwapChain(m_pDevice, &sd, &m_pSwapChain);
     if (FAILED(hr)) {
-        pFactory->Release();
-        return hr;
+        PANIC("Failed to create swapchain");
     }
-
-    // Obtain DXGI factory from swap chain.
-    IDXGIDevice* pDXGIDevice = nullptr;
-    hr = m_pSwapChain->GetDevice(__uuidof(IDXGIDevice), (void**)&pDXGIDevice);
-    if (FAILED(hr)) {
-        pFactory->Release();
-        return hr;
-    }
-
-    // Create device and device context.
-    hr = pDXGIDevice->GetParent(__uuidof(ID3D11Device), (void**)&m_pDevice);
-    if (FAILED(hr)) {
-        pFactory->Release();
-        pDXGIDevice->Release();
-        return hr;
-    }
-
-    m_pDevice->GetImmediateContext(&m_pDeviceContext);
-
+	
     // Release interfaces
     pFactory->Release();
-    pDXGIDevice->Release();
 
     return S_OK;
 }
@@ -91,9 +75,9 @@ void DXGISwapChain::Present() { m_pSwapChain->Present(1, 0); }
 
 
 
-DXGIWindow PickFullscreenDXGIWindow()
+DXGISwapchainCreateContext PickFullscreenDXGIWindow()
 {
-    DXGIWindow ret{};
+    DXGISwapchainCreateContext ret{};
     std::vector<IDXGIAdapter*> adapters;
 
     IDXGIFactory1* pFactory = nullptr;
@@ -230,6 +214,23 @@ DXGIWindow PickFullscreenDXGIWindow()
         PANIC("Failed to create window");
     }
 
+    auto res = D3D11CreateDevice(
+        pAdapter,
+        D3D_DRIVER_TYPE_UNKNOWN,
+        0,
+        D3D11_CREATE_DEVICE_BGRA_SUPPORT,
+        0,
+        0,
+        D3D11_SDK_VERSION,
+        &ret.device,
+        nullptr,
+        &ret.deviceContext
+    );
+
+	if (res != 0) {
+        PANIC("Failed to create device");
+    }
+
     // release resources
 	for (auto* output : outputs) {
         output->Release();
@@ -241,5 +242,20 @@ DXGIWindow PickFullscreenDXGIWindow()
 	
     return ret;
 }
+
+DXGISwapChain DXGI::PickDisplayAndCreateSwapchain() {
+    // Get the window handle for fullscreen mode
+    auto window = PickFullscreenDXGIWindow();
+
+    // Create an instance of DXGISwapChain
+    DXGISwapChain swapChain(window); // Fullscreen mode
+
+    //// Create the swap chain
+    if (FAILED(swapChain.Create())) {
+        PANIC("Failed to create swap chain");
+    }
+    return swapChain;
+}
+
 
 #endif // WIN32

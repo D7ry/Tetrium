@@ -4,23 +4,26 @@
 #include <dxgi.h>
 #include <tchar.h>
 #include <iostream>
-#pragma comment(lib, "dxgi")
 
-struct DXGIWindow
+struct DXGISwapchainCreateContext
 {
     HWND window;
     uint32_t width;
     uint32_t height;
     DXGI_RATIONAL refreshRate;
+    ID3D11Device* device;
+    ID3D11DeviceContext* deviceContext;
 };
 class DXGISwapChain
 {
 public:
-    DXGISwapChain(HWND hWnd, uint32_t width, uint32_t height);
+    DXGISwapChain(DXGISwapchainCreateContext& window);
     ~DXGISwapChain();
 
     HRESULT Create();
     void Present();
+
+ private:
 
     IDXGISwapChain* m_pSwapChain;
     ID3D11Device* m_pDevice;
@@ -29,8 +32,12 @@ public:
     HWND m_hWnd;
     uint32_t m_width;
     uint32_t m_height;
+    DXGI_RATIONAL m_refreshRate;
 };
 
-DXGIWindow PickFullscreenDXGIWindow();
+namespace DXGI
+{
+DXGISwapChain PickDisplayAndCreateSwapchain();
+}
 
 #endif // WIN32
