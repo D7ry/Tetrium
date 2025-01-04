@@ -20,6 +20,7 @@ void ImGuiWidgetDeviceInfo::Draw(Tetrium* engine, ColorSpace colorSpace)
     }
     { // Display
         ImGui::SeparatorText("Display");
+#if defined(WIN32)
         if (engine->_tetraMode == Tetrium::TetraMode::kEvenOddHardwareSync) {
             Tetrium::DisplayContext display = engine->_mainProjectorDisplay;
             ASSERT(display.display);
@@ -27,6 +28,7 @@ void ImGuiWidgetDeviceInfo::Draw(Tetrium* engine, ColorSpace colorSpace)
             ImGui::Text("Size: %i x %i", display.extent.width, display.extent.height);
             ImGui::Text("Refresh Rate: %i hz", static_cast<int>(display.refreshrate / 1000.0f));
         }
+#endif // WIN32
         GLFWmonitor* monitor = glfwGetWindowMonitor(engine->_window);
         if (monitor) {
             ImGui::Text("Device: %s", glfwGetMonitorName(monitor));
