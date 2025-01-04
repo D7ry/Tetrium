@@ -7,22 +7,22 @@ void Tetrium::Run()
 
     // Game loop
 
-    MSG msg = {0};
-    while (WM_QUIT != msg.message) {
-        if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
-        }
+    //MSG msg = {0};
+    //while (WM_QUIT != msg.message) {
+    //    if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
+    //        TranslateMessage(&msg);
+    //        DispatchMessage(&msg);
+    //    }
 
-        // Present the back buffer
-        //_swapChain.chainDXGI->Present();
-        //_swapChain.chainDXGI->GetVBlankCount();
+    //    // Present the back buffer
+    //    //_swapChain.chainDXGI->Present();
+    //    //_swapChain.chainDXGI->GetVBlankCount();
 
-        glfwPollEvents();
-        Tick();
-    }
+    //    glfwPollEvents();
+    //    Tick();
+    //}
 
-    exit(0);
+    //exit(0);
 	
     DEBUG("Starting run loop...");
     ASSERT(_window);
