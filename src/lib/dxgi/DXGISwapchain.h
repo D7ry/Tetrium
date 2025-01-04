@@ -31,6 +31,6 @@ public:
     uint32_t m_height;
 };
 
-DXGIWindow PickFullscreenWindow();
+DXGIWindow PickFullscreenDXGIWindow();
 
 #endif // WIN32

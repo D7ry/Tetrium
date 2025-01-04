@@ -91,7 +91,7 @@ void DXGISwapChain::Present() { m_pSwapChain->Present(1, 0); }
 
 
 
-DXGIWindow PickFullscreenWindow()
+DXGIWindow PickFullscreenDXGIWindow()
 {
     DXGIWindow ret{};
     std::vector<IDXGIAdapter*> adapters;
@@ -208,22 +208,22 @@ DXGIWindow PickFullscreenWindow()
         return 0;
     };
     wc.hInstance = GetModuleHandle(nullptr);
-    wc.lpszClassName = "FullscreenWindow";
+    wc.lpszClassName = "Tetrium";
     RegisterClassEx(&wc);
 	
-    ret.window = CreateWindowExW(
-         0,
-         L"FullscreenWindow",
-         L"FullscreenWindow",
-         WS_POPUP,
-         0,
-         0,
-         ret.width,
-         ret.height,
-         nullptr,
-         nullptr,
-         wc.hInstance,
-         nullptr
+    // https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-createwindoww
+    ret.window = CreateWindowW(
+        L"Tetrium",
+        L"Tetrium",
+        WS_VISIBLE | WS_POPUP,
+        0,
+        0,
+        ret.width,
+        ret.height,
+        nullptr,
+        nullptr,
+        nullptr,
+        nullptr
     );
 
 	if (ret.window == nullptr) {
@@ -238,12 +238,8 @@ DXGIWindow PickFullscreenWindow()
         adapter->Release();
     }
     pFactory->Release();
-    while (1) {
-        continue;
-    }
 	
     return ret;
-
 }
 
 #endif // WIN32
