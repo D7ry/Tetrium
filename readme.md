@@ -14,10 +14,26 @@ applications that writes to both RGB and OCV color spaces.
 
 ## Build
 
+### All Systems Before Building
+
+```bash
+conda create --name tetrium -python=3.11.9
+conda activate tetrium
+```
+### UNIX
 ```bash
 mkdir build && cd build
 cmake ../ && make
 ```
+
+### Windows
+```bash
+cmake --preset vs2022-windows
+```
+
+`vcpkg` is required.
+
+
 
 ### Dependencies
 

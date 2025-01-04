@@ -12,6 +12,7 @@
 
 #if defined(WIN32)
 #include "lib/dxgi/DXGISwapchain.h"
+#include "lib/dxgi/DXGIDisplayContext.h"
 #endif
 
 // vq library
@@ -228,6 +229,9 @@ class Tetrium
     void recreateSwapChain(SwapChainContext& ctx);
     void cleanupSwapChain(SwapChainContext& ctx);
     void createSwapChain(Tetrium::SwapChainContext& ctx, const VkSurfaceKHR surface);
+#if defined(WIN32)
+    void createSwapChainDXGI(Tetrium::SwapChainContext& ctx, const VkSurfaceKHR surface);
+#endif // WIN32
     void createImageViews(SwapChainContext& ctx);
     void createDepthBuffer(SwapChainContext& ctx);
     void createSwapchainFrameBuffers(SwapChainContext& ctx, VkRenderPass rgbOrCnyPass);

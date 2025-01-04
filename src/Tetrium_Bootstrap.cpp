@@ -642,11 +642,13 @@ VkPhysicalDevice Tetrium::pickPhysicalDevice()
 void Tetrium::createSwapChain(Tetrium::SwapChainContext& ctx, const VkSurfaceKHR surface)
 {
     DEBUG("creating swapchain...");
+#if defined(WIN32)
+    createSwapChainDXGI(ctx, VK_NULL_HANDLE);
+#else
     ASSERT(_device);
-    VQDevice::SwapChainSupport swapChainSupport;
     // create vulkan swapchain
-#if defined(__linux__) || defined(__APPLE__)
-    swapChainSupport  = _device->GetSwapChainSupportForSurface(surface);
+    VQDevice::SwapChainSupport swapChainSupport;
+    swapChainSupport = _device->GetSwapChainSupportForSurface(surface);
     VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
     VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
     DEBUG("present mode: {}", string_VkPresentModeKHR(presentMode));
@@ -699,7 +701,7 @@ void Tetrium::createSwapChain(Tetrium::SwapChainContext& ctx, const VkSurfaceKHR
         swapChainCounterCreateInfo.pNext = createInfo.pNext;
         createInfo.pNext = &swapChainCounterCreateInfo;
 #else
-       NEEDS_IMPLEMENTATION();
+        NEEDS_IMPLEMENTATION();
 #endif // __linux__
     }
 
@@ -718,10 +720,39 @@ void Tetrium::createSwapChain(Tetrium::SwapChainContext& ctx, const VkSurfaceKHR
     vkGetSwapchainImagesKHR(this->_device->logicalDevice, ctx.chain, &imageCount, ctx.image.data());
     ctx.imageFormat = surfaceFormat.format;
     ctx.numImages = imageCount;
-#endif
-    // create DXGI swapchain instead of vulkan swapchain
-    //github.com/krOoze/Hello_Triangle/blob/e8e66c060757c2d5ae0d5e544060332f9ccf3556/src/WSI/DxgiWsi.h#L464
+#endif // WIN32
+}
+
+void Tetrium::cleanupSwapChain(SwapChainContext& ctx)
+{
+    DEBUG("Cleaning up swap chain...");
+    vkDestroyImageView(_device->logicalDevice, ctx.depthImageView, nullptr);
+    vkDestroyImage(_device->logicalDevice, ctx.depthImage, nullptr);
+    vkFreeMemory(_device->logicalDevice, ctx.depthImageMemory, nullptr);
+
+    for (VkFramebuffer framebuffer : ctx.frameBuffer) {
+        vkDestroyFramebuffer(this->_device->logicalDevice, framebuffer, nullptr);
+    }
+    for (VkImageView imageView : ctx.imageView) {
+        vkDestroyImageView(this->_device->logicalDevice, imageView, nullptr);
+    }
+#if !defined(WIN32)
+    vkDestroySwapchainKHR(this->_device->logicalDevice, ctx.chain, nullptr);
+#else
+    // clean up DXGI swap chain
+    delete ctx.chainDXGI;
+    for (auto memory : ctx.sharedImageMemories) {
+        vkFreeMemory(this->_device->logicalDevice, memory, nullptr);
+    }
+#endif // WIN32
+}
+
 #if defined(WIN32)
+
+void Tetrium::createSwapChainDXGI(Tetrium::SwapChainContext& ctx, const VkSurfaceKHR surface)
+{
+    // create DXGI swapchain instead of vulkan swapchain
+    // github.com/krOoze/Hello_Triangle/blob/e8e66c060757c2d5ae0d5e544060332f9ccf3556/src/WSI/DxgiWsi.h#L464
     ASSERT(surface == VK_NULL_HANDLE); // don't need surface for dxgi
     VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
     DXGI_FORMAT dxgiFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -765,9 +796,9 @@ void Tetrium::createSwapChain(Tetrium::SwapChainContext& ctx, const VkSurfaceKHR
         if (dxImageDesc.MipLevels != 1) {
             PANIC("Weird DXGI image mip level count");
         }
-        //if (dxImageDesc.Format != DXGI_FORMAT_B8G8R8A8_UNORM) {
-        //    PANIC("Weird DXGI image format");
-        //}
+        // if (dxImageDesc.Format != DXGI_FORMAT_B8G8R8A8_UNORM) {
+        //     PANIC("Weird DXGI image format");
+        // }
         if (dxImageDesc.SampleDesc.Count != 1) {
             PANIC("Weird DXGI image sample count");
         }
@@ -867,33 +898,12 @@ void Tetrium::createSwapChain(Tetrium::SwapChainContext& ctx, const VkSurfaceKHR
             vkBindImageMemory(_device->logicalDevice, ctx.image[i], ctx.sharedImageMemories[i], 0)
         );
     }
+}
 
 #endif // WIN32
-	
-
-    DEBUG("Swap chain created!");
-}
-
-void Tetrium::cleanupSwapChain(SwapChainContext& ctx)
-{
-    DEBUG("Cleaning up swap chain...");
-    vkDestroyImageView(_device->logicalDevice, ctx.depthImageView, nullptr);
-    vkDestroyImage(_device->logicalDevice, ctx.depthImage, nullptr);
-    vkFreeMemory(_device->logicalDevice, ctx.depthImageMemory, nullptr);
-
-    for (VkFramebuffer framebuffer : ctx.frameBuffer) {
-        vkDestroyFramebuffer(this->_device->logicalDevice, framebuffer, nullptr);
-    }
-    for (VkImageView imageView : ctx.imageView) {
-        vkDestroyImageView(this->_device->logicalDevice, imageView, nullptr);
-    }
-    vkDestroySwapchainKHR(this->_device->logicalDevice, ctx.chain, nullptr);
-}
 
 void Tetrium::recreateVirtualFrameBuffers()
 {
-    // FIXME: add RYGB framebuffer recreation
-
     // imgui's fb are associated with render contexts, so initialize them here
     reinitImGuiFrameBuffers(_imguiCtx);
 }

@@ -5,6 +5,30 @@ set(CMAKE_CXX_STANDARD 20)
 
 project(Tetrium)
 
+# ---------- Organize files for MS builds ---------- #
+if (WIN32)
+    set(ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+    set(SOURCE_DIR "${ROOT_DIR}/src")
+    file(GLOB_RECURSE SOURCE_FILES "${SOURCE_DIR}/*.cpp")	
+    file(GLOB_RECURSE HEADER_FILES "${SOURCE_DIR}/*.h" "${SOURCE_DIR}/*.hpp")
+    list(APPEND SOURCE_FILES ${HEADER_FILES})
+
+    # 对 SourceFile 变量里面的所有文件分类(保留资源管理器的目录结构)
+    foreach(fileItem ${SOURCE_FILES})       
+        # Get the directory of the source file
+        get_filename_component(PARENT_DIR "${fileItem}" DIRECTORY)
+        # Remove common directory prefix to make the group
+        string(REPLACE "${CMAKE_CURRENT_SOURCE_DIR}" "" GROUP "${PARENT_DIR}")
+        # Make sure we are using windows slashes
+        string(REPLACE "/" "\\" GROUP "${GROUP}")
+        # Group into "Source Files" and "Header Files"
+        set(GROUP "${GROUP}")
+        source_group("${GROUP}" FILES "${fileItem}")
+    endforeach()
+
+    source_group(TREE "${ROOT_DIR}" FILES ${SOURCE_FILES})
+endif()
+
 # ---------- Configure Apple Settings ---------- #
 if (APPLE)
     set(VULKAN_LIB_PATH $ENV{HOME}/lib/VulkanSDK/1.3.290.1/macOS/lib/libvulkan.1.3.290.dylib)
@@ -64,11 +88,6 @@ if (APPLE)
     set(OPENAL_LIBRARY "${OPENAL_ROOT_DIR}/lib/libopenal.dylib")
 endif()
 
-
-find_package(OpenAL CONFIG REQUIRED)
-find_package(Freetype REQUIRED)
-find_package(SndFile CONFIG REQUIRED)
-
 set(SOURCES
         src/lib/Utils.cpp
         src/main.cpp
@@ -119,6 +138,7 @@ set(SOURCES
 
 if (WIN32)
     list(APPEND SOURCES src/lib/dxgi/DXGISwapchain.cpp)
+    list(APPEND SOURCES src/lib/dxgi/DXGIDisplayContext.cpp)
     list(APPEND SOURCES src/lib/dxgi/DXGIContext.cpp)
 endif()
 
@@ -156,8 +176,6 @@ if (UNIX)
 endif() # LINUX
 endif() # APPLE
 
-find_package(TIFF REQUIRED)
-
 if (WIN32)
     set(VULKAN_SDK_PATH "C:/VulkanSDK/1.3.290.0")
     set(Vulkan_LIBRARY "${VULKAN_SDK_PATH}/Lib/vulkan-1.lib")
@@ -174,6 +192,11 @@ if (WIN32)
     find_package(dxsdk-d3dx CONFIG REQUIRED)
     target_link_libraries(${PROJECT_NAME} Microsoft::D3DX9 Microsoft::D3DX10 Microsoft::D3DX11)
 endif() # WIN32
+
+find_package(OpenAL CONFIG REQUIRED)
+find_package(Freetype REQUIRED)
+find_package(SndFile CONFIG REQUIRED)
+find_package(TIFF REQUIRED)
 
 target_include_directories(${PROJECT_NAME}
     PRIVATE ${TETRIUMCOLOR_INCLUDE}

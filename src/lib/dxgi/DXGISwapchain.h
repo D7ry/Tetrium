@@ -7,15 +7,8 @@
 #include <tchar.h>
 #include <iostream>
 
-struct DXGIDisplayContext
-{
-    HWND window;
-    uint32_t width;
-    uint32_t height;
-    DXGI_RATIONAL refreshRate;
-    ID3D12Device5* device;
-    IDXGIAdapter4* adapter;
-};
+#include "DXGIDisplayContext.h"
+
 class DXGISwapChain
 {
 public:
@@ -25,7 +18,6 @@ public:
     HRESULT Create(int count, DXGI_FORMAT format);
     void Present();
     unsigned int GetVBlankCount();
-
 
     IDXGISwapChain4* m_pSwapChain;
     ID3D12Device5* m_pDevice;
@@ -37,10 +29,5 @@ public:
     uint32_t m_height;
     DXGI_RATIONAL m_refreshRate;
 };
-
-namespace DXGI
-{
-DXGIDisplayContext PickAndInitDXGIDisplayContext();
-}
 
 #endif // WIN32

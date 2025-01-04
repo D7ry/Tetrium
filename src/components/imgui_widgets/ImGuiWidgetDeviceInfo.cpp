@@ -20,7 +20,7 @@ void ImGuiWidgetDeviceInfo::Draw(Tetrium* engine, ColorSpace colorSpace)
     }
     { // Display
         ImGui::SeparatorText("Display");
-#if defined(WIN32)
+#if !defined(WIN32)
         if (engine->_tetraMode == Tetrium::TetraMode::kEvenOddHardwareSync) {
             Tetrium::DisplayContext display = engine->_mainProjectorDisplay;
             ASSERT(display.display);

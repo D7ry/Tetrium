@@ -4,27 +4,7 @@
 
 void Tetrium::Run()
 {
-
-    // Game loop
-
-    //MSG msg = {0};
-    //while (WM_QUIT != msg.message) {
-    //    if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
-    //        TranslateMessage(&msg);
-    //        DispatchMessage(&msg);
-    //    }
-
-    //    // Present the back buffer
-    //    //_swapChain.chainDXGI->Present();
-    //    //_swapChain.chainDXGI->GetVBlankCount();
-
-    //    glfwPollEvents();
-    //    Tick();
-    //}
-
-    //exit(0);
-	
-    DEBUG("Starting run loop...");
+    DEBUG("Starting game loop...");
     ASSERT(_window);
     glfwShowWindow(_window);
     while (!glfwWindowShouldClose(_window)) {
@@ -41,7 +21,7 @@ void Tetrium::Run()
         glfwPollEvents();
         Tick();
     }
-    DEBUG("Ending run loop...");
+    DEBUG("Ending game loop...");
 }
 
 void Tetrium::Tick()
