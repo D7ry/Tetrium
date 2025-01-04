@@ -60,7 +60,7 @@ void VQDevice::CreateLogicalDeviceAndQueue(const std::vector<const char*>& exten
     vkGetDeviceQueue(this->logicalDevice, queueFamilyIndices.computeFamily.value(), 0, &this->computeQueue);
 }
 
-void VQDevice::InitQueueFamilyIndices(VkSurfaceKHR surface) {
+void VQDevice::InitQueueFamilyIndices() {
     DEBUG("Finding graphics and presentation queue families...");
     uint32_t queueFamilyCount = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, nullptr);
@@ -77,14 +77,21 @@ void VQDevice::InitQueueFamilyIndices(VkSurfaceKHR surface) {
             this->queueFamilyIndices.graphicsFamily = i;
             DEBUG("Graphics family found at {}", i);
         }
-        vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, surface, &presentationSupport);
-        if (presentationSupport) {
+        // naively assume the device supporting compute & graphics family would support presentation family.
+        // it is usually the case.
+        if (this->queueFamilyIndices.computeFamily.has_value()
+            && this->queueFamilyIndices.graphicsFamily.has_value()) {
             this->queueFamilyIndices.presentationFamily = i;
-            DEBUG("Presentation family found at {}", i);
-        }
-        if (this->queueFamilyIndices.isComplete()) {
             break;
         }
+        //vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, surface, &presentationSupport);
+        //if (presentationSupport) {
+        //    this->queueFamilyIndices.presentationFamily = i;
+        //    DEBUG("Presentation family found at {}", i);
+        //}
+        //if (this->queueFamilyIndices.isComplete()) {
+        //    break;
+        //}
         i++;
     }
 }

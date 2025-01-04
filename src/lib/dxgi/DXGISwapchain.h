@@ -7,7 +7,7 @@
 #include <tchar.h>
 #include <iostream>
 
-struct DXGISwapchainCreateContext
+struct DXGIDisplayContext
 {
     HWND window;
     uint32_t width;
@@ -19,14 +19,13 @@ struct DXGISwapchainCreateContext
 class DXGISwapChain
 {
 public:
-    DXGISwapChain(DXGISwapchainCreateContext& window);
+    DXGISwapChain(DXGIDisplayContext& window);
     ~DXGISwapChain();
 
-    HRESULT Create();
+    HRESULT Create(int count, DXGI_FORMAT format);
     void Present();
     unsigned int GetVBlankCount();
 
- private:
 
     IDXGISwapChain4* m_pSwapChain;
     ID3D12Device5* m_pDevice;
@@ -41,7 +40,7 @@ public:
 
 namespace DXGI
 {
-DXGISwapChain PickDisplayAndCreateSwapchain();
+DXGIDisplayContext PickAndInitDXGIDisplayContext();
 }
 
 #endif // WIN32

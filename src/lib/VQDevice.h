@@ -84,9 +84,8 @@ struct VQDevice
      * @brief Query Vulkan API to find the queue family indices that support graphics and
      * presentation.
      *
-     * @param surface The surface on which the presentation queue will present to.
      */
-    void InitQueueFamilyIndices(VkSurfaceKHR surface);
+    void InitQueueFamilyIndices();
 
     /**
      * @brief Create a Logical Device, and create a graphics queue and a presentation queue.

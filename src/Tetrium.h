@@ -10,6 +10,10 @@
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_core.h>
 
+#if defined(WIN32)
+#include "lib/dxgi/DXGISwapchain.h"
+#endif
+
 // vq library
 #include "lib/VQBuffer.h"
 #include "lib/VQDevice.h"
@@ -109,6 +113,9 @@ class Tetrium
         VkDeviceMemory depthImageMemory;
         VkImageView depthImageView;
         VkSurfaceKHR surface;
+#if defined(WIN32)
+        DXGISwapChain* chainDXGI = nullptr;
+#endif
     };
 
     // Dedicated display context, used only under `kEvenOddHardwareSync`
@@ -311,6 +318,9 @@ class Tetrium
     /* ---------- Prensentation ---------- */
     GLFWwindow* _window;
     DisplayContext _mainProjectorDisplay;
+#if defined(WIN32)
+    DXGIDisplayContext _dxgiDisplay;
+#endif // WIN32
 
     // ctx for rendering onto the RYGB FB.
     // the FB needs to be transformed into either RGB or OCV format

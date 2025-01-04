@@ -10,7 +10,7 @@ using namespace Microsoft::WRL;
 
 // https://github.com/krOoze/Hello_Triangle/blob/dxgi_interop/src/WSI/DxgiWsi.h#L634
 
-DXGISwapChain::DXGISwapChain(DXGISwapchainCreateContext& window)
+DXGISwapChain::DXGISwapChain(DXGIDisplayContext& window)
     : m_hWnd(window.window),
       m_width(window.width),
       m_height(window.height),
@@ -39,7 +39,7 @@ DXGISwapChain::~DXGISwapChain()
 }
 
 
-HRESULT DXGISwapChain::Create()
+HRESULT DXGISwapChain::Create(int count, DXGI_FORMAT format)
 {
     HRESULT hr = S_OK;
 
@@ -58,11 +58,11 @@ HRESULT DXGISwapChain::Create()
     const DXGI_SWAP_CHAIN_DESC1 swapchainDesc{
         m_width,
         m_height,
-        DXGI_FORMAT_B8G8R8A8_UNORM,
+        format,
         FALSE,  // Stereo
         {1, 0}, // Samples
         DXGI_USAGE_RENDER_TARGET_OUTPUT,
-        2, // image count
+        count, // image count
         DXGI_SCALING_NONE,
         DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL,
         DXGI_ALPHA_MODE_IGNORE,
@@ -86,6 +86,8 @@ HRESULT DXGISwapChain::Create()
     if (FAILED(hr)) {
         PANIC("Failed to create swapchain");
     }
+
+	pFactory->MakeWindowAssociation(m_hWnd, 0);
 	
     return S_OK;
 }
@@ -108,11 +110,14 @@ unsigned int DXGISwapChain::GetVBlankCount()
     return stats.SyncRefreshCount;
 }
 
+// TODO: we manually choose the GPU here, but the Vulkan chooses its own GPU(it prefers discrete GPU,
+// if they choose different GPUs it may be a problem. Maybe should just enforce a constraint of having one discrete GPU 
+// and automatically have both DXGI and Vulkan choose the same GPU.
 
-
-static DXGISwapchainCreateContext PickFullscreenDXGIWindow()
+// TODO: move to a separate file DXGIDisplayContext.h
+DXGIDisplayContext DXGI::PickAndInitDXGIDisplayContext()
 {
-    DXGISwapchainCreateContext ret{};
+    DXGIDisplayContext ret{};
     std::vector<IDXGIAdapter*> adapters;
 
     IDXGIFactory1* pFactory = DXGIContext::factory7;
@@ -265,20 +270,5 @@ static DXGISwapchainCreateContext PickFullscreenDXGIWindow()
 	
     return ret;
 }
-
-DXGISwapChain DXGI::PickDisplayAndCreateSwapchain() {
-    // Get the window handle for fullscreen mode
-    auto window = PickFullscreenDXGIWindow();
-
-    // Create an instance of DXGISwapChain
-    DXGISwapChain swapChain(window); // Fullscreen mode
-
-    //// Create the swap chain
-    if (FAILED(swapChain.Create())) {
-        PANIC("Failed to create swap chain");
-    }
-    return swapChain;
-}
-
 
 #endif // WIN32

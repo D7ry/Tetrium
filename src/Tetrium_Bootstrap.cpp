@@ -33,6 +33,10 @@
 #if __linux__
 #endif // __linux__
 
+#if defined(WIN32)
+#include "lib/dxgi/DXGIContext.h"
+#endif // WIN32
+
 #define SCHEDULE_DELETE(...) this->_deletionStack.push([this]() { __VA_ARGS__ });
 
 #define VIRTUAL_VSYNC 0
@@ -126,6 +130,10 @@ void Tetrium::Init(const Tetrium::InitOptions& options)
 #if __APPLE__
     MoltenVKConfig::Setup();
 #endif // __APPLE__
+#if defined(WIN32)
+    DXGIContext::Init();
+    SCHEDULE_DELETE(DXGIContext::Destroy();)
+#endif // WIN32
     _window = initGLFW(false);
     glfwSetWindowUserPointer(_window, this);
     SCHEDULE_DELETE(glfwDestroyWindow(_window); glfwTerminate();)
@@ -266,8 +274,14 @@ void Tetrium::initVulkan()
 
     switch (_tetraMode) {
     case TetraMode::kEvenOddHardwareSync:
+#if __linux__
         this->initExclusiveDisplay(_mainProjectorDisplay);
         mainWindowSurface = _mainProjectorDisplay.surface;
+#endif // __linux__
+#if defined(WIN32)
+        _dxgiDisplay = DXGI::PickAndInitDXGIDisplayContext();
+        // note here we don't set mainWindowSurface
+#endif 
         break;
     case TetraMode::kEvenOddSoftwareSync:
         mainWindowSurface = createGlfwWindowSurface(_window);
@@ -276,9 +290,7 @@ void Tetrium::initVulkan()
         NEEDS_IMPLEMENTATION();
     };
 
-    ASSERT(mainWindowSurface);
-
-    this->_device->InitQueueFamilyIndices(mainWindowSurface);
+    this->_device->InitQueueFamilyIndices();
     this->_device->CreateLogicalDeviceAndQueue(getRequiredDeviceExtensions());
     this->_device->CreateGraphicsCommandPool();
     this->_device->CreateGraphicsCommandBuffer(NUM_FRAME_IN_FLIGHT);
@@ -631,7 +643,10 @@ void Tetrium::createSwapChain(Tetrium::SwapChainContext& ctx, const VkSurfaceKHR
 {
     DEBUG("creating swapchain...");
     ASSERT(_device);
-    VQDevice::SwapChainSupport swapChainSupport = _device->GetSwapChainSupportForSurface(surface);
+    VQDevice::SwapChainSupport swapChainSupport;
+    // create vulkan swapchain
+#if defined(__linux__) || defined(__APPLE__)
+    swapChainSupport  = _device->GetSwapChainSupportForSurface(surface);
     VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
     VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
     DEBUG("present mode: {}", string_VkPresentModeKHR(presentMode));
@@ -679,13 +694,13 @@ void Tetrium::createSwapChain(Tetrium::SwapChainContext& ctx, const VkSurfaceKHR
         .surfaceCounters = VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_BIT_EXT};
 
     if (_tetraMode == TetraMode::kEvenOddHardwareSync) {
-#if __linux__ || defined(WIN32)
+#if __linux__
         DEBUG("swapchain created with counter support!");
         swapChainCounterCreateInfo.pNext = createInfo.pNext;
         createInfo.pNext = &swapChainCounterCreateInfo;
 #else
        NEEDS_IMPLEMENTATION();
-#endif // __linux__ || defined(WIN32)
+#endif // __linux__
     }
 
     VkSwapchainKHR swapChain = VK_NULL_HANDLE;
@@ -703,6 +718,40 @@ void Tetrium::createSwapChain(Tetrium::SwapChainContext& ctx, const VkSurfaceKHR
     vkGetSwapchainImagesKHR(this->_device->logicalDevice, ctx.chain, &imageCount, ctx.image.data());
     ctx.imageFormat = surfaceFormat.format;
     ctx.numImages = imageCount;
+#endif
+    // create DXGI swapchain instead of vulkan swapchain
+    //github.com/krOoze/Hello_Triangle/blob/e8e66c060757c2d5ae0d5e544060332f9ccf3556/src/WSI/DxgiWsi.h#L464
+#if defined(WIN32)
+    VkFormat format = VK_FORMAT_B8G8R8A8_UNORM;
+    DXGI_FORMAT dxgiFormat = DXGI_FORMAT_B8G8R8A8_UNORM;
+    uint32_t imageCount = 3; // hardcoded here, all modern GPUs should have 2+ backbuffers
+
+	ctx.chainDXGI = new DXGISwapChain(_dxgiDisplay);
+    ctx.chainDXGI->Create(imageCount, dxgiFormat);
+
+    
+    // Game loop
+    MSG msg = {0};
+    while (WM_QUIT != msg.message) {
+        if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
+
+        // Clear the back buffer (replace with your rendering logic)
+        // swapChain.m_pDeviceContext->ClearRenderTargetView(nullptr, D3DXCOLOR(0.0f, 0.2f,
+        // 0.4f, 1.0f));
+
+        // Present the back buffer
+        ctx.chainDXGI->Present();
+        ctx.chainDXGI->GetVBlankCount();
+    }
+
+    exit(0);
+
+#endif // WIN32
+	
+
     DEBUG("Swap chain created!");
 }
 
