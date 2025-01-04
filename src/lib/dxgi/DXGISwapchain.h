@@ -22,6 +22,7 @@ public:
 
     HRESULT Create();
     void Present();
+    unsigned int GetVBlankCount();
 
  private:
 

@@ -3,6 +3,7 @@
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi")
 
+// https://github.com/krOoze/Hello_Triangle/blob/dxgi_interop/src/WSI/DxgiWsi.h#L634
 
 DXGISwapChain::DXGISwapChain(DXGISwapchainCreateContext& window)
     : m_hWnd(window.window),
@@ -71,7 +72,23 @@ HRESULT DXGISwapChain::Create()
     return S_OK;
 }
 
-void DXGISwapChain::Present() { m_pSwapChain->Present(1, 0); }
+void DXGISwapChain::Present() { 
+    m_pSwapChain->Present(1, 0);
+}
+
+unsigned int DXGISwapChain::GetVBlankCount()
+{
+    // https://learn.microsoft.com/en-us/windows/win32/api/dxgi/ns-dxgi-dxgi_frame_statistics
+    // the manual states that `QueryPerformanceCounter` call updates vblank count, it actually not necessary
+	// but we're just keeping it here.
+    LARGE_INTEGER buf;
+    QueryPerformanceCounter(&buf);
+    DXGI_FRAME_STATISTICS stats;
+    HRESULT res = m_pSwapChain->GetFrameStatistics(&stats);
+    // note we don't ASSERT on the result here as it may fail on the first couple of frames.
+    DEBUG("vblank: {}", stats.SyncRefreshCount);
+    return stats.SyncRefreshCount;
+}
 
 
 
