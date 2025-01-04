@@ -58,12 +58,10 @@ void Tetrium::setupHardwareEvenOddFrame()
 // even or odd.
 void Tetrium::checkHardwareEvenOddFrameSupport()
 {
-#ifdef WIN32
+#if defined(__APPLE__)
     NEEDS_IMPLEMENTATION();
-#endif // WIN32
-#ifndef __linux__
-    return;
-#endif // __linux__
+#endif
+
     // check instance extensions
     uint32_t numExtensions = 0;
     VkResult result = VK_SUCCESS;
@@ -88,9 +86,10 @@ void Tetrium::checkHardwareEvenOddFrameSupport()
         for (const std::string& extension : evenOddExtensions) {
             ERROR(extension);
         }
-        PANIC("Even-odd frame not supported!");
+        PANIC("Hardware Even-odd frame not supported!");
     }
 
+#if defined(__LINUX__)
     VkSurfaceCapabilities2EXT capabilities{
         .sType = VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES_2_EXT, .pNext = VK_NULL_HANDLE
     };
@@ -112,6 +111,11 @@ void Tetrium::checkHardwareEvenOddFrameSupport()
     if (!hasVerticalBlankingCounter) {
         PANIC("Even-odd frame not supported!");
     }
+#endif
+
+#if defined(WIN32)
+    NEEDS_IMPLEMENTATION();
+#endif // WIN32
 
     DEBUG("Even-odd frame support check passed!");
 }
