@@ -128,13 +128,7 @@ std::array<float, 4> AppPainter::getPixel(uint32_t x, uint32_t y) const
 void AppPainter::brush(uint32_t xBegin, uint32_t yBegin, uint32_t xEnd, uint32_t yEnd)
 {
     auto color = _colorPicker.GetSelectedColorRYGBData();
-
-    if (_paintingState.prevCanvasMousePos.has_value()) {
-        ImVec2 prevCanvasMousePos = _paintingState.prevCanvasMousePos.value();
-        xBegin = static_cast<uint32_t>(prevCanvasMousePos.x);
-        yBegin = static_cast<uint32_t>(prevCanvasMousePos.y);
-        // DEBUG("Prev canvas interact at ({}, {})", xBegin, yBegin);
-    }
+    
 
     // Handle the brush size from _paintingState
     uint32_t brushSize = _paintingState.brushSize;

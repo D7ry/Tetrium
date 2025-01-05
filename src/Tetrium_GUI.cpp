@@ -172,17 +172,23 @@ void Tetrium::drawImGui(ColorSpace colorSpace, int currentFrameInFlight)
         io.DisplayFramebufferScale = {1, 1};
         ImGui::GetMainViewport()->Size = projectorDisplaySize;
     }
-    if (ImGui::IsKeyPressed(ImGuiKey_Tab)) {
-        _windowFocused = !_windowFocused;
-    }
-    if (!_windowFocused) {
-        ImGuiU::DrawCenteredText("Press Tab to enable input", ImVec4(0, 0, 0, 0.8));
-    } else if (_uiMode) { // window focused and in ui mode, draw cursor
+
+    if (_captureCursor) {
+#if defined(WIN32)
+#else
+        glfwSetInputMode(_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         ImGuiTexture imguiTexture = _engineTextures[(int)EngineTexture::kCursor].second;
         Tetrium_GUI::drawCursor(imguiTexture);
+#endif // WIN32
+    } else {
+#if defined(WIN32)
+#else
+        glfwSetInputMode(_window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+#endif // WIN32
+        ImGuiU::DrawCenteredText("Press Tab to enable input", ImVec4(0, 0, 0, 0.8));
     }
 
-    std::string footnoteText = (const char*)u8"🧩 Tetrium 0.7a";
+    std::string footnoteText = (const char*)u8"🧩 Tetrium 0.9a";
     switch (_rocvPresentMode) {
         case ROCVPresentMode::kNormal:
             footnoteText += " | Normal Mode";

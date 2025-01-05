@@ -20,7 +20,7 @@ ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam
 
 static LRESULT winEventHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     if (ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam))
-        return true;
+        return 0;
     switch (msg) {
     case WM_DESTROY:
         PostQuitMessage(0);

@@ -13,7 +13,8 @@ void AppPainter::canvasInteract(const ImVec2& canvasMousePos)
         return;
     }
 
-    brush(_paintingState.prevCanvasMousePos->x, _paintingState.prevCanvasMousePos->y, x, y);
+    ImVec2 prevPos = _paintingState.prevCanvasMousePos.value_or(canvasMousePos);
+    brush(prevPos.x, prevPos.y, x, y);
 }
 
 // TODO: impl

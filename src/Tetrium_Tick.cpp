@@ -43,7 +43,6 @@ void Tetrium::Tick()
             // CPU-exclusive workloads
             double deltaTime = _deltaTimer.GetDeltaTime();
             _timeSinceStartSeconds += deltaTime;
-            _inputManager.Tick(deltaTime);
             ColorSpace colorSpace = getCurrentColorSpace();
             drawImGui(colorSpace, _currentFrame);
             drawFrame(colorSpace, _currentFrame);
@@ -58,10 +57,43 @@ void Tetrium::Tick()
     _numTicks++;
 }
 
+void Tetrium::triggerClose()
+{
+#if defined(WIN32)
+    PostMessage(_swapChain.chainDXGI->m_hWnd, WM_QUIT, 0, 0);
+#else
+    glfwSetWindowShouldClose(_window, GLFW_TRUE);
+#endif // WIN32
+}
+
 void Tetrium::pollInputs()
 {
+#if defined(WIN32)
+    // trigger window capture
+    // note that none-win32 system uses GLFW for input capture,
+    // win32 uses only one window
+    if (ImGui::IsKeyPressed(ImGuiKey_Tab)) {
+        _captureCursor = !_captureCursor;
+    }
+#endif // WIN32
+    // quit engine
     if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
-        PostMessage(_swapChain.chainDXGI->m_hWnd, WM_QUIT, 0, 0);
+        triggerClose();
+    }
+
+    // quit application
+    if (ImGui::IsKeyPressed(ImGuiKey_GraveAccent)) {
+        if (_primaryApp.has_value()) {
+            _primaryApp.value()->OnClose();
+            _primaryApp = std::nullopt;
+            _soundManager.DisableMusic();
+        }
+    }
+    if (ImGui::IsKeyPressed(ImGuiKey_Period)) {
+        _rocvPresentMode = (ROCVPresentMode)(((int)_rocvPresentMode + 1) % 3);
+    }
+    if (ImGui::IsKeyPressed(ImGuiKey_Comma)) {
+        _flipEvenOdd = !_flipEvenOdd; 
     }
 }
 

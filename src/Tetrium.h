@@ -261,7 +261,7 @@ class Tetrium
     static void framebufferResizeCallback(GLFWwindow* window, int width, int height);
     void cursorPosCallback(GLFWwindow* window, double xpos, double ypos);
     void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
-    void bindDefaultInputs();
+    void triggerClose();
 
     /* ---------- Render-Time Functions ---------- */
     void drawFrame(ColorSpace colorSpace, uint8_t frameIdx);
@@ -269,9 +269,8 @@ class Tetrium
     void drawImGui(ColorSpace colorSpace, int currentFrameInFlight);
 
     void drawAppsImGui(ColorSpace colorSpace, int currentFrameInFlight);
-
-	void pollInputs();
-
+    void pollInputs();
+    
     void getFullScreenViewportAndScissor(
         const SwapChainContext& swapChain,
         VkViewport& viewport,
@@ -355,11 +354,8 @@ class Tetrium
     bool _framebufferResized = false;
     uint8_t _currentFrame = 0;
 
-    // whether we are locking the cursor within the glfw window
-    bool _windowFocused = false;
-    // UI mode: ImGui processes user inputs,
-    // and movement / camera inputs disables
-    bool _uiMode = true;
+    // whether we are locking the cursor within the created window
+    bool _captureCursor = false;
 
     // engine level pause, toggle with P key
     bool _paused = false;
@@ -401,7 +397,6 @@ class Tetrium
     DeletionStack _deletionStack;
     TextureManager _textureManager;
     DeltaTimer _deltaTimer;
-    InputManager _inputManager;
     Profiler _profiler;
     TaskQueue _taskQueue;
     SoundManager _soundManager;

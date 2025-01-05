@@ -47,21 +47,10 @@ void Tetrium::keyCallback(GLFWwindow* window, int key, int scancode, int action,
     if (key == GLFW_KEY_SLASH && action == GLFW_PRESS) {
         _paused = !_paused;
     }
-    _inputManager.OnKeyInput(window, key, scancode, action, mods);
 
     // toggle cursor lock
     if (key == GLFW_KEY_TAB && action == GLFW_PRESS) {
-        _windowFocused = !_windowFocused;
-        if (_windowFocused) {
-            glfwSetInputMode(_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-        } else {
-            glfwSetInputMode(_window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-        }
-        // only activate input on cursor lock
-        _inputManager.SetActive(_windowFocused);
-    }
-    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
-        glfwSetWindowShouldClose(_window, GLFW_TRUE);
+        _captureCursor = !_captureCursor;
     }
 }
 
@@ -109,13 +98,7 @@ void Tetrium::initDefaultStates()
     _clearValues[1].depthStencil = vk::ClearDepthStencilValue(1.f, 0.f);
 
     // input states
-    // by default, unlock cursor, disable imgui inputs, disable input handling
-    _windowFocused = false;
-    _inputManager.SetActive(_windowFocused);
-    _uiMode = true;
-
-    // ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoMouse;
-    // ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoKeyboard;
+    _captureCursor = false;
 };
 
 void Tetrium::Init(const Tetrium::InitOptions& options)
@@ -152,7 +135,6 @@ void Tetrium::Init(const Tetrium::InitOptions& options)
             pThis->cursorPosCallback(window, xpos, ypos);
         };
         glfwSetCursorPosCallback(this->_window, cursorPosCallback);
-        bindDefaultInputs();
     }
 #endif // WIN32
 
@@ -1281,54 +1263,6 @@ void Tetrium::createDepthBuffer(SwapChainContext& ctx)
     );
     ctx.depthImageView = VulkanUtils::createImageView(
         ctx.depthImage, _device->logicalDevice, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT
-    );
-}
-
-// FIXME: glfw calls from a differnt thread; may need to add critical sections
-// currently for perf reasons we're leaving it as is.
-void Tetrium::bindDefaultInputs()
-{
-    // ui mode toggle
-    _inputManager.RegisterCallback(GLFW_KEY_U, InputManager::KeyCallbackCondition::PRESS, [this]() {
-        _uiMode = !_uiMode;
-        ImGuiIO& io = ImGui::GetIO();
-        if (_uiMode) {
-            io.ConfigFlags &= ~ImGuiConfigFlags_NoMouse;
-            io.ConfigFlags &= ~ImGuiConfigFlags_NoKeyboard;
-            io.MousePos = ImVec2{
-                static_cast<float>(_swapChain.extent.width) / 2,
-                static_cast<float>(_swapChain.extent.height) / 2};
-            io.WantSetMousePos = true;
-        } else {
-            io.ConfigFlags |= (ImGuiConfigFlags_NoMouse | ImGuiConfigFlags_NoKeyboard);
-        }
-        io.WantSetMousePos = _uiMode;
-    });
-    // close app with "`" key
-    _inputManager.RegisterCallback(
-        GLFW_KEY_GRAVE_ACCENT,
-        InputManager::KeyCallbackCondition::PRESS,
-        [this]() {
-            if (_primaryApp.has_value()) {
-                _primaryApp.value()->OnClose();
-                _primaryApp = std::nullopt;
-                _soundManager.DisableMusic();
-            }
-        }
-    );
-
-    // "." key to toggle only even / only odd / both
-    _inputManager.RegisterCallback(
-        GLFW_KEY_PERIOD,
-        InputManager::KeyCallbackCondition::PRESS,
-        [this]() { _rocvPresentMode = (ROCVPresentMode)(((int)_rocvPresentMode + 1) % 3); }
-    );
-
-    // ";" key to toggle rgb/ocv to even/odd mapping
-    _inputManager.RegisterCallback(
-        GLFW_KEY_SEMICOLON,
-        InputManager::KeyCallbackCondition::PRESS,
-        [this]() { _flipEvenOdd = !_flipEvenOdd; }
     );
 }
 
