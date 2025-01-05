@@ -280,18 +280,6 @@ class Tetrium
     void resetBackbufferRenderingFence(uint8_t frameIdx);
     void blockOnBackbufferRenderingFence(uint8_t frameIdx);
 
-    void initRYGB2ROCVTransform(InitContext* ctx);
-    void cleanupRYGB2ROCVTransform();
-    void transformToROCVframeBuffer(
-        VirtualFrameBuffer& rgybFrameBuffer,
-        SwapChainContext& rocvSwapChain,
-        uint32_t frameIdx,
-        uint32_t swapChainImageIndex,
-        ColorSpace colorSpace,
-        vk::CommandBuffer CB,
-        bool skip
-    );
-
     /* ---------- Even-Odd frame ---------- */
     void initEvenOdd(); // initialize resources for even-odd rendering
     void cleanupEvenOdd();

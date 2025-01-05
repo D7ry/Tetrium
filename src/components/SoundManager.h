@@ -3,21 +3,21 @@
 #include <AL/al.h>
 #include <AL/alc.h>
 
+#include "Pathing.h"
 #include "structs/SharedEngineStructs.h"
 
 class SoundManager
 {
   public:
 
-    inline static const std::unordered_map<Sound, const char*> SOUNDS_FILES
-        = {{Sound::kProgramStart, "../assets/sounds/costco.wav"},
-           {Sound::kVineBoom, "../assets/sounds/vine_boom.wav"},
-           {Sound::kMusicGameMenu, "../assets/sounds/music/wii.wav"},
-           {Sound::kMusicGamePlay, "../assets/sounds/music/sneaky.wav"},
-           {Sound::kCorrectAnswer, "../assets/sounds/correct.wav"},
-           {Sound::kMusicInterstellar, "../assets/sounds/music/spin.wav"},
-           // {Sound::kMusicGamePlay, "../assets/sounds/music/powerup.wav"},
-        };
+    inline static const std::unordered_map<Sound, std::string> SOUNDS_FILES = {
+        {Sound::kProgramStart, ASSETS_PATH + "sounds/costco.wav"},
+        {Sound::kVineBoom, ASSETS_PATH + "sounds/vine_boom.wav"},
+        {Sound::kMusicGameMenu, ASSETS_PATH + "sounds/music/wii.wav"},
+        {Sound::kMusicGamePlay, ASSETS_PATH + "sounds/music/sneaky.wav"},
+        {Sound::kCorrectAnswer, ASSETS_PATH + "sounds/correct.wav"},
+        {Sound::kMusicInterstellar, ASSETS_PATH + "sounds/music/spin.wav"},
+    };
 
 
     SoundManager();

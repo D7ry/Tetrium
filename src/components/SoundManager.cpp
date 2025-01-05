@@ -113,7 +113,7 @@ void SoundManager::LoadAllSounds()
         // Load sound data from file (pseudo-code, replace with actual loading code)
         ALsizei size, freq;
         ALenum format;
-        ALvoid* data = loadSoundFile(file, &size, &freq, &format);
+        ALvoid* data = loadSoundFile(file.c_str(), &size, &freq, &format);
 
         alBufferData(buffer, format, data, size, freq);
         free(data); // Free the loaded data

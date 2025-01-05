@@ -102,7 +102,6 @@ set(SOURCES
         src/Tetrium_Windowing.cpp
         src/Tetrium_Config.cpp
         src/Tetrium_ImGui.cpp
-        src/Tetrium_RYGB.cpp
         src/components/TaskQueue.cpp
         src/components/SoundManager.cpp
         src/components/Logging.cpp

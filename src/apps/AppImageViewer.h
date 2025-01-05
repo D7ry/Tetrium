@@ -1,5 +1,6 @@
 #include "App.h"
 
+#include "Pathing.h"
 namespace TetriumApp
 {
 // image file browser + viewer for RGB/OCV images
@@ -34,7 +35,8 @@ class AppImageViewer : public App
 
     int _currTetraImage = -1;
 
-    inline static const char* TETRA_IMAGE_FOLDER_PATH = "../assets/apps/AppImageViewer/tetra_images/";
+    inline static const char* TETRA_IMAGE_FOLDER_PATH
+        = std::string(ASSETS_PATH + "apps/AppImageViewer/tetra_images/").c_str();
 
     // scaling params
     float _zoom = 1.f;               // zoom factor, disabled when _adaptiveImageSize = true

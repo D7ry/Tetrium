@@ -165,29 +165,7 @@ void Tetrium::Init(const Tetrium::InitOptions& options)
     } else {
         NEEDS_IMPLEMENTATION()
     }
-
-    // init applications
-    InitContext initCtx;
-    { // populate initData
-        initCtx.device = this->_device.get();
-        initCtx.textureManager = &_textureManager;
-        initCtx.swapChainImageFormat = _swapChain.imageFormat;
-        initCtx.rygbRenderPass = _renderContextRYGB.renderPass;
-        initCtx.rocvTransformRenderPass = _rocvTransformRenderPass;
-        for (int i = 0; i < _engineUBOStatic.size(); i++) {
-            initCtx.engineUBOStaticDescriptorBufferInfo[i].range = sizeof(EngineUBOStatic);
-            initCtx.engineUBOStaticDescriptorBufferInfo[i].buffer = _engineUBOStatic[i].buffer;
-            initCtx.engineUBOStaticDescriptorBufferInfo[i].offset = 0;
-        }
-    }
-
-    // _rgbyRenderers.imageDisplay.Init(&initCtx);
-    // _deletionStack.push([this]() { _rgbyRenderers.imageDisplay.Cleanup(); });
-    // _rgbyRenderers.imageDisplay.LoadTexture("../assets/textures/spot.png"); // just for testing
-
-    initRYGB2ROCVTransform(&initCtx);
-    SCHEDULE_DELETE(cleanupRYGB2ROCVTransform();)
-
+    
     initDefaultStates();
 
     _soundManager.LoadAllSounds();

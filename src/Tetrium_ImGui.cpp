@@ -8,6 +8,8 @@
 
 #include "Tetrium.h"
 
+#include <Pathing.h>
+
 namespace Tetrium_ImGui
 {
 // context arrays that gets populated after Tetrium::initImGuiContext() is called
@@ -272,7 +274,7 @@ void initFonts()
     cfg.FontBuilderFlags |= ImGuiFreeTypeBuilderFlags_LoadColor;
 
     atlas->AddFontFromFileTTF(
-        "../assets/fonts/seguiemj.ttf", DEFAULTS::ImGui::DEFAULT_FONT_SIZE, &cfg, ranges
+        std::string(ASSETS_PATH + "fonts/seguiemj.ttf").c_str(), DEFAULTS::ImGui::DEFAULT_FONT_SIZE, &cfg, ranges
     );
 
     atlas->Build();

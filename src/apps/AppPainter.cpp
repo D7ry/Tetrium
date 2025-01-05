@@ -5,6 +5,8 @@
 
 #include "AppPainter.h"
 
+#include <Pathing.h>
+
 namespace TetriumApp
 {
 
@@ -316,16 +318,16 @@ void AppPainter::initPaintToViewSpaceContext(TetriumApp::InitContext& ctx)
 
     /* create pipeline */
     {
-        const char* VERTEX_SHADER_PATH
-            = "../assets/apps/AppPainter/shaders/paint_to_view_space.vert.spv";
-        const char* FRAGMENT_SHADER_PATH
-            = "../assets/apps/AppPainter/shaders/paint_to_view_space.frag.spv";
+        std::string VERTEX_SHADER_PATH
+            = std::string(ASSETS_PATH + "apps/AppPainter/shaders/paint_to_view_space.vert.spv");
+        std::string FRAGMENT_SHADER_PATH
+            = std::string(ASSETS_PATH + "apps/AppPainter/shaders/paint_to_view_space.frag.spv");
 
         // shader modules
         vk::ShaderModule vertShaderModule
-            = ShaderCreation::createShaderModule(ctx.device.logicalDevice, VERTEX_SHADER_PATH);
+            = ShaderCreation::createShaderModule(ctx.device.logicalDevice, VERTEX_SHADER_PATH.c_str());
         vk::ShaderModule fragShaderModule
-            = ShaderCreation::createShaderModule(ctx.device.logicalDevice, FRAGMENT_SHADER_PATH);
+            = ShaderCreation::createShaderModule(ctx.device.logicalDevice, FRAGMENT_SHADER_PATH.c_str());
 
         std::array<vk::PipelineShaderStageCreateInfo, 2> shaderStages
             = {vk::PipelineShaderStageCreateInfo(

@@ -1,12 +1,12 @@
 #include "imgui.h"
 #include <filesystem>
 
+#include "Pathing.h"
+
 #include "AppImageViewer.h"
 
 namespace
 {
-const char* TETRA_IMAGE_FOLDER_PATH = "../assets/textures/tetra_images/";
-
 ImVec2 calculateFitSize(const ImGuiTexture& texture, const ImVec2& availableSize)
 {
     float aspectRatio = (float)texture.width / (float)texture.height;

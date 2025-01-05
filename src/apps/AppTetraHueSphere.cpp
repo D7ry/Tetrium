@@ -8,6 +8,8 @@
 
 #include "AppTetraHueSphere.h"
 
+#include "Pathing.h"
+
 namespace TetriumApp
 {
 
@@ -21,22 +23,21 @@ unsigned int FB_HEIGHT = 1024;
 
 static const VkFormat FB_IMAGE_FORMAT = VK_FORMAT_R8G8B8A8_SRGB;
 
-// TODO: get rid of this
-const char* VERTEX_SHADER_PATH = "../assets/apps/AppTetraHueSphere/shader.vert.spv";
-const char* FRAGMENT_SHADER_PATH = "../assets/apps/AppTetraHueSphere/shader.frag.spv";
+std::string VERTEX_SHADER_PATH = ASSETS_PATH + "apps/AppTetraHueSphere/shader.vert.spv";
+std::string FRAGMENT_SHADER_PATH = ASSETS_PATH + "apps/AppTetraHueSphere/shader.frag.spv";
 
-// const char* HUE_SPHERE_MODEL_PATH = "../assets/apps/AppTetraHueSphere/ugly_sphere.obj";
+std::string HUE_SPHERE_UGLY_MODEL_PATH
+    = ASSETS_PATH + "apps/AppTetraHueSphere/fibonacci_sampled.obj";
+std::string HUE_SPHERE_UGLY_TEXTURE_PATH_RGB
+    = ASSETS_PATH + "apps/AppTetraHueSphere/cubemaps/cubemap_RGB.png";
+std::string HUE_SPHERE_UGLY_TEXTURE_PATH_OCV
+    = ASSETS_PATH + "apps/AppTetraHueSphere/cubemaps/cubemap_OCV.png";
 
-const char* HUE_SPHERE_UGLY_MODEL_PATH = "../assets/apps/AppTetraHueSphere/fibonacci_sampled.obj";
-const char* HUE_SPHERE_UGLY_TEXTURE_PATH_RGB = "../assets/apps/AppTetraHueSphere/cubemaps/cubemap_RGB.png";
-const char* HUE_SPHERE_UGLY_TEXTURE_PATH_OCV = "../assets/apps/AppTetraHueSphere/cubemaps/cubemap_OCV.png";
+std::string HUE_SPHERE_PRETTY_MODEL_PATH = ASSETS_PATH + "apps/AppTetraHueSphere/pretty_sphere.obj";
 
-// const char* HUE_SPHERE_UGLY_TEXTURE_PATH_RGB = "../assets/apps/AppTetraHueSphere/cubemaps/test_RGB.png";
-// const char* HUE_SPHERE_UGLY_TEXTURE_PATH_OCV = "../assets/apps/AppTetraHueSphere/cubemaps/test_OCV.png";
+std::string HUE_SPHERE_PRETTY_TEXTURE_PATH_RGB = HUE_SPHERE_UGLY_TEXTURE_PATH_RGB;
+std::string HUE_SPHERE_PRETTY_TEXTURE_PATH_OCV = HUE_SPHERE_UGLY_TEXTURE_PATH_OCV;
 
-const char* HUE_SPHERE_PRETTY_MODEL_PATH = "../assets/apps/AppTetraHueSphere/pretty_sphere.obj";
-const char* HUE_SPHERE_PRETTY_TEXTURE_PATH_RGB = HUE_SPHERE_UGLY_TEXTURE_PATH_RGB;
-const char* HUE_SPHERE_PRETTY_TEXTURE_PATH_OCV = HUE_SPHERE_UGLY_TEXTURE_PATH_OCV;
 
 } // namespace
 
@@ -515,9 +516,9 @@ void AppTetraHueSphere::initRasterization(TetriumApp::InitContext& initCtx)
     {
         // shader modules
         vk::ShaderModule vertShaderModule
-            = ShaderCreation::createShaderModule(initCtx.device.logicalDevice, VERTEX_SHADER_PATH);
+            = ShaderCreation::createShaderModule(initCtx.device.logicalDevice, VERTEX_SHADER_PATH.c_str());
         vk::ShaderModule fragShaderModule = ShaderCreation::createShaderModule(
-            initCtx.device.logicalDevice, FRAGMENT_SHADER_PATH
+            initCtx.device.logicalDevice, FRAGMENT_SHADER_PATH.c_str()
         );
 
         std::array<vk::PipelineShaderStageCreateInfo, 2> shaderStages
@@ -647,14 +648,14 @@ void AppTetraHueSphere::initRasterization(TetriumApp::InitContext& initCtx)
     // load in hue sphere model
     {
         VQUtils::meshToBuffer(
-            HUE_SPHERE_UGLY_MODEL_PATH,
+            HUE_SPHERE_UGLY_MODEL_PATH.c_str(),
             initCtx.device,
             _rasterizationCtx.uglySphereMesh.vertexBuffer,
             _rasterizationCtx.uglySphereMesh.indexBuffer
         );
 
         VQUtils::meshToBuffer(
-            HUE_SPHERE_PRETTY_MODEL_PATH,
+            HUE_SPHERE_PRETTY_MODEL_PATH.c_str(),
             initCtx.device,
             _rasterizationCtx.prettySphereMesh.vertexBuffer,
             _rasterizationCtx.prettySphereMesh.indexBuffer

@@ -5,6 +5,8 @@
 
 #include "AppScreeningTest.h"
 
+#include <Pathing.h>
+
 namespace
 {
 ImVec2 calculateFitSize(float width, float height, const ImVec2& availableSize)
@@ -47,7 +49,7 @@ static std::array<int, 4> PickRandomFourIshiharaPlates()
 
 static std::string GetIshiharaPlateAnswerTexturePath(int plateNumber)
 {
-    return "../assets/textures/apps/AppScreeningTest/solutions/" + std::to_string(plateNumber)
+    return ASSETS_PATH + "textures/apps/AppScreeningTest/solutions/" + std::to_string(plateNumber)
            + ".png";
 }
 
@@ -487,7 +489,7 @@ void AppScreeningTest::Init(TetriumApp::InitContext& ctx)
     }
     // load bair logo
     // FIXME: free the logo texture when cleaning up
-    _textures.bairLogo = ctx.api.InitImGuiTexture(ctx.api.LoadTexture("../assets/textures/BAIR_logo.png"));
+    _textures.bairLogo = ctx.api.InitImGuiTexture(ctx.api.LoadTexture(ASSETS_PATH + "textures/BAIR_logo.png"));
 };
 
 void AppScreeningTest::Cleanup(TetriumApp::CleanupContext& ctx){
