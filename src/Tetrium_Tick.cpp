@@ -5,22 +5,26 @@
 void Tetrium::Run()
 {
     DEBUG("Starting game loop...");
-    ASSERT(_window);
-    glfwShowWindow(_window);
-    while (!glfwWindowShouldClose(_window)) {
 #if defined(WIN32)
-        MSG msg = {0};
-        if (WM_QUIT == msg.message) {
-            break;
-        }
+    MSG msg = {0};
+    while (1) {
         if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
             TranslateMessage(&msg);
             DispatchMessage(&msg);
+             if (WM_QUIT == msg.message || WM_CLOSE == msg.message) {
+                break;
+            }
         }
-#endif // WIN32
+        Tick();
+    }
+#else
+    ASSERT(_window);
+    glfwShowWindow(_window);
+    while (!glfwWindowShouldClose(_window)) {
         glfwPollEvents();
         Tick();
     }
+#endif // WIN32
     DEBUG("Ending game loop...");
 }
 
@@ -32,6 +36,7 @@ void Tetrium::Tick()
     }
     _deltaTimer.Tick();
     _soundManager.Tick();
+    pollInputs();
     {
         {
             PROFILE_SCOPE(&_profiler, "Render Loop");
@@ -51,6 +56,12 @@ void Tetrium::Tick()
     }
     _lastProfilerData = _profiler.NewProfile();
     _numTicks++;
+}
+
+void Tetrium::pollInputs()
+{ if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+        PostMessage(_swapChain.chainDXGI->m_hWnd, WM_QUIT, 0, 0);
+    }
 }
 
 void Tetrium::getFullScreenViewportAndScissor(
@@ -88,7 +99,6 @@ void Tetrium::drawFrame(ColorSpace colorSpace, uint8_t frameIdx)
     { // Asynchronously acquire an image from the swap chain,
 #if defined(WIN32)
         swapchainImageIndex = _swapChain.chainDXGI->m_pSwapChain->GetCurrentBackBufferIndex();
-        DEBUG("Drawing to {}", swapchainImageIndex);
 #else
         result = vkAcquireNextImageKHR(
             this->_device->logicalDevice,

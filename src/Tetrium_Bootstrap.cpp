@@ -133,7 +133,7 @@ void Tetrium::Init(const Tetrium::InitOptions& options)
 #if defined(WIN32)
     DXGIContext::Init();
     SCHEDULE_DELETE(DXGIContext::Destroy();)
-#endif // WIN32
+#else
     _window = initGLFW(false);
     glfwSetWindowUserPointer(_window, this);
     SCHEDULE_DELETE(glfwDestroyWindow(_window); glfwTerminate();)
@@ -152,6 +152,8 @@ void Tetrium::Init(const Tetrium::InitOptions& options)
         glfwSetCursorPosCallback(this->_window, cursorPosCallback);
         bindDefaultInputs();
     }
+#endif // WIN32
+
     // frame buffer never resizes, so no need for callback
     // glfwSetFramebufferSizeCallback(_window, this->framebufferResizeCallback);
     this->initVulkan();
@@ -415,11 +417,13 @@ VkInstance Tetrium::createInstance()
     std::vector<const char*> instanceExtensions = DEFAULT_INSTANCE_EXTENSIONS;
     // get glfw Extensions
     {
+#if !defined(WIN32)
         uint32_t glfwExtensionCount = 0;
         const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
         for (int i = 0; i < glfwExtensionCount; i++) {
             instanceExtensions.push_back(glfwExtensions[i]);
         }
+#endif
     }
 // https://stackoverflow.com/questions/72789012/why-does-vkcreateinstance-return-vk-error-incompatible-driver-on-macos-despite
 #if __APPLE__
@@ -762,6 +766,8 @@ void Tetrium::createSwapChainDXGI(Tetrium::SwapChainContext& ctx, const VkSurfac
     ctx.chainDXGI->Create(imageCount, dxgiFormat);
 
     ctx.surface = VK_NULL_HANDLE;
+    
+	DEBUG("creating swapchain of size {} {}", ctx.chainDXGI->m_width, ctx.chainDXGI->m_height);
     ctx.extent = {ctx.chainDXGI->m_width, ctx.chainDXGI->m_height};
 
     ctx.image.resize(imageCount);
@@ -783,6 +789,7 @@ void Tetrium::createSwapChainDXGI(Tetrium::SwapChainContext& ctx, const VkSurfac
     for (size_t i = 0; i < dxImages.size(); ++i) {
         const auto& dxImage = dxImages[i];
         const auto dxImageDesc = dxImage->GetDesc();
+        DEBUG("image size: {} {}", dxImageDesc.Width, dxImageDesc.Height);
         D3D12_HEAP_PROPERTIES dxImageHeap;
         D3D12_HEAP_FLAGS dxImageHeapFlags;
         DX_CHECK(dxImage->GetHeapProperties(&dxImageHeap, &dxImageHeapFlags));
@@ -829,7 +836,7 @@ void Tetrium::createSwapChainDXGI(Tetrium::SwapChainContext& ctx, const VkSurfac
         VK_CHECK_RESULT(vkCreateImage(_device->logicalDevice, &ii, nullptr, &ctx.image[i]));
         std::wstring sharedHandleName
             = std::wstring(L"Local\\SomeBullshitNameIDontNeedAnyway") + std::to_wstring(i);
-        DX_CHECK(ctx.chainDXGI->m_pDevice->CreateSharedHandle(
+        DX_CHECK(DXGIContext::device->CreateSharedHandle(
             dxImage, NULL, GENERIC_ALL, NULL, &ctx.sharedImageHandles[i]
         ));
 

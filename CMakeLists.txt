@@ -56,6 +56,10 @@ set(IMGUI_SRC
     extern/implot/implot_items.cpp
 )
 
+if (WIN32)
+    list(APPEND IMGUI_SRC extern/imgui/backends/imgui_impl_win32.cpp)
+endif()
+
 # stb
 set(STB_INCLUDE extern/stb)
 set(STB_IMG_SRC extern/stb/stb_image_impl.cpp)

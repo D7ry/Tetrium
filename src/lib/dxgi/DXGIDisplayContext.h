@@ -8,8 +8,6 @@ struct DXGIDisplayContext
     uint32_t width;
     uint32_t height;
     DXGI_RATIONAL refreshRate;
-    ID3D12Device5* device;
-    IDXGIAdapter4* adapter;
 };
 
 namespace DXGI

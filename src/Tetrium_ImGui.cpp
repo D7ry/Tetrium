@@ -1,5 +1,6 @@
 // ImGui initialization and resource management
 #include "backends/imgui_impl_glfw.h"
+#include "backends/imgui_impl_win32.h"
 #include "backends/imgui_impl_vulkan.h"
 #include "imgui.h"
 #include "implot.h"
@@ -300,7 +301,11 @@ void Tetrium::destroyImGuiContext(Tetrium::ImGuiRenderContext& ctx)
     // not a big problem for now since we only shut down at very end, but
     // it leads to ugly validation errors
     ImGui_ImplVulkan_Shutdown();
+#if defined(WIN32)
+    ImGui_ImplWin32_Shutdown();
+#else
     ImGui_ImplGlfw_Shutdown();
+#endif
     ImPlot::DestroyContext();
     ImGui::DestroyContext();
 
@@ -365,7 +370,11 @@ void Tetrium::initImGuiRenderContext(Tetrium::ImGuiRenderContext& ctx)
     ImPlot::SetCurrentContext(ctx.backendImPlotContext);
 
     bool installCallbacks = true;
+#if defined(WIN32)
+    ImGui_ImplWin32_Init(_swapChain.chainDXGI->m_hWnd);
+#else
     ImGui_ImplGlfw_InitForVulkan(_window, installCallbacks);
+#endif
     ImGui_ImplVulkan_Init(&initInfo);
 
     ImGuiIO& io = ImGui::GetIO();
@@ -429,7 +438,11 @@ void Tetrium::recordImGuiDrawCommandBuffer(
 void Tetrium::clearImGuiDrawData()
 {
     ImGui_ImplVulkan_NewFrame();
+#if defined(WIN32)
+    ImGui_ImplWin32_NewFrame();
+#else
     ImGui_ImplGlfw_NewFrame();
+#endif
 
     ImGui::NewFrame();
     ImGui::Render();

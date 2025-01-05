@@ -270,6 +270,8 @@ class Tetrium
 
     void drawAppsImGui(ColorSpace colorSpace, int currentFrameInFlight);
 
+	void pollInputs();
+
     void getFullScreenViewportAndScissor(
         const SwapChainContext& swapChain,
         VkViewport& viewport,

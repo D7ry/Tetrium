@@ -20,8 +20,6 @@ public:
     unsigned int GetVBlankCount();
 
     IDXGISwapChain4* m_pSwapChain;
-    ID3D12Device5* m_pDevice;
-    IDXGIAdapter4* m_pAdapter;
     ID3D12CommandQueue* m_commandQueue;
 
     HWND m_hWnd;

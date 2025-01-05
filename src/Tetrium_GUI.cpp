@@ -1,6 +1,7 @@
 // ImGUI subroutine implementations
 
 #include "backends/imgui_impl_glfw.h"
+#include "backends/imgui_impl_win32.h"
 #include "backends/imgui_impl_vulkan.h"
 #include "imgui.h"
 #include "implot.h"
@@ -144,7 +145,11 @@ void Tetrium::drawImGui(ColorSpace colorSpace, int currentFrameInFlight)
     PROFILE_SCOPE(&_profiler, "ImGui Draw");
 
     ImGui_ImplVulkan_NewFrame();
+#if defined(WIN32)
+    ImGui_ImplWin32_NewFrame();
+#else
     ImGui_ImplGlfw_NewFrame();
+#endif
     ImGui::NewFrame();
 
     // imgui is associated with the glfw window to handle inputs,
@@ -167,7 +172,9 @@ void Tetrium::drawImGui(ColorSpace colorSpace, int currentFrameInFlight)
         io.DisplayFramebufferScale = {1, 1};
         ImGui::GetMainViewport()->Size = projectorDisplaySize;
     }
-
+    if (ImGui::IsKeyPressed(ImGuiKey_Tab)) {
+        _windowFocused = !_windowFocused;
+    }
     if (!_windowFocused) {
         ImGuiU::DrawCenteredText("Press Tab to enable input", ImVec4(0, 0, 0, 0.8));
     } else if (_uiMode) { // window focused and in ui mode, draw cursor
