@@ -255,6 +255,9 @@ void Tetrium::drawFrame(ColorSpace colorSpace, uint8_t frameIdx)
         };
 
         vk::Queue queue = _device->graphicsQueue;
+#if defined(WIN32)
+        resetBackbufferRenderingFence(frameIdx);
+#endif // WIN32
         VkResult result = static_cast<VkResult>(
             queue.submit(submitInfos.size(), submitInfos.data(), sync.fenceBackbufferRendering)
         );

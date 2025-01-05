@@ -751,8 +751,8 @@ void Tetrium::createSwapChainDXGI(Tetrium::SwapChainContext& ctx, const VkSurfac
     ctx.chainDXGI->Create(imageCount, dxgiFormat);
 
     ctx.surface = VK_NULL_HANDLE;
-    
-	DEBUG("creating swapchain of size {} {}", ctx.chainDXGI->m_width, ctx.chainDXGI->m_height);
+
+    DEBUG("creating swapchain of size {} {}", ctx.chainDXGI->m_width, ctx.chainDXGI->m_height);
     ctx.extent = {ctx.chainDXGI->m_width, ctx.chainDXGI->m_height};
 
     ctx.image.resize(imageCount);
@@ -811,7 +811,7 @@ void Tetrium::createSwapChainDXGI(Tetrium::SwapChainContext& ctx, const VkSurfac
             1,
             1,
             VK_SAMPLE_COUNT_1_BIT,   // mip, array, samples
-            VK_IMAGE_TILING_OPTIMAL, // assumably
+            VK_IMAGE_TILING_OPTIMAL,
             VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
             VK_SHARING_MODE_EXCLUSIVE,
             0,
@@ -889,6 +889,11 @@ void Tetrium::createSwapChainDXGI(Tetrium::SwapChainContext& ctx, const VkSurfac
         VK_CHECK_RESULT(
             vkBindImageMemory(_device->logicalDevice, ctx.image[i], ctx.sharedImageMemories[i], 0)
         );
+
+    }
+
+    for (ID3D12Resource* image : dxImages) {
+        image->Release();
     }
 }
 
