@@ -35,8 +35,8 @@ class AppImageViewer : public App
 
     int _currTetraImage = -1;
 
-    inline static const char* TETRA_IMAGE_FOLDER_PATH
-        = std::string(ASSETS_PATH + "apps/AppImageViewer/tetra_images/").c_str();
+    inline static const std::string TETRA_IMAGE_FOLDER_PATH
+        = std::string(ASSETS_PATH + "apps/AppImageViewer/tetra_images/");
 
     // scaling params
     float _zoom = 1.f;               // zoom factor, disabled when _adaptiveImageSize = true

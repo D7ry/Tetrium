@@ -710,6 +710,10 @@ void Tetrium::cleanupSwapChain(SwapChainContext& ctx)
     for (auto memory : ctx.sharedImageMemories) {
         vkFreeMemory(this->_device->logicalDevice, memory, nullptr);
     }
+    // DXGI swapchains allocates their own images which we're responsible for freeing
+    for (auto image : ctx.image) {
+        vkDestroyImage(this->_device->logicalDevice, image, nullptr);
+    }
     delete ctx.chainDXGI;
 #endif // WIN32
 }
