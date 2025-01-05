@@ -139,7 +139,7 @@ class Tetrium
         VkSemaphore semaImageCopyFinished;
         VkSemaphore semaAppVulkanFinished;
         VkSemaphore semaVsync;
-        VkFence fenceInFlight;
+        VkFence fenceBackbufferRendering;
         VkFence fenceRenderFinished;
     };
 
@@ -277,6 +277,9 @@ class Tetrium
         VkViewport& viewport,
         VkRect2D& scissor
     );
+
+    void resetBackbufferRenderingFence(uint8_t frameIdx);
+    void blockOnBackbufferRenderingFence(uint8_t frameIdx);
 
     void initRYGB2ROCVTransform(InitContext* ctx);
     void cleanupRYGB2ROCVTransform();

@@ -11,7 +11,7 @@ void Tetrium::Run()
         if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
             TranslateMessage(&msg);
             DispatchMessage(&msg);
-             if (WM_QUIT == msg.message || WM_CLOSE == msg.message) {
+            if (WM_QUIT == msg.message || WM_CLOSE == msg.message) {
                 break;
             }
         }
@@ -59,7 +59,8 @@ void Tetrium::Tick()
 }
 
 void Tetrium::pollInputs()
-{ if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+{
+    if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
         PostMessage(_swapChain.chainDXGI->m_hWnd, WM_QUIT, 0, 0);
     }
 }
@@ -81,22 +82,41 @@ void Tetrium::getFullScreenViewportAndScissor(
     scissor.extent = extend;
 }
 
+void Tetrium::resetBackbufferRenderingFence(uint8_t frameIdx)
+{
+    SyncPrimitives& sync = _syncProjector[frameIdx];
+
+    VK_CHECK_RESULT(vkResetFences(this->_device->logicalDevice, 1, &sync.fenceBackbufferRendering))
+}
+
+void Tetrium::blockOnBackbufferRenderingFence(uint8_t frameIdx)
+{
+    SyncPrimitives& sync = _syncProjector[frameIdx];
+
+    PROFILE_SCOPE(&_profiler, "vkWaitForFences: fenceBackbufferRendering");
+    VK_CHECK_RESULT(vkWaitForFences(
+        _device->logicalDevice, 1, &sync.fenceBackbufferRendering, VK_TRUE, UINT64_MAX
+    ))
+}
+
 void Tetrium::drawFrame(ColorSpace colorSpace, uint8_t frameIdx)
 {
     SyncPrimitives& sync = _syncProjector[frameIdx];
     VkResult result;
-    uint32_t swapchainImageIndex;
-
-    { // wait for previous render -- note the fence is for render, not presentation.
-        PROFILE_SCOPE(&_profiler, "vkWaitForFences: fenceInFlight");
-        VK_CHECK_RESULT(
-            vkWaitForFences(_device->logicalDevice, 1, &sync.fenceInFlight, VK_TRUE, UINT64_MAX)
-        );
-        VK_CHECK_RESULT(vkResetFences(this->_device->logicalDevice, 1, &sync.fenceInFlight));
+    uint8_t swapchainImageIndex = 0;
+    
+    { // wait for the rendering resources
+#if defined(WIN32)
+        // when using DXGI swapchain, backbuffer rendering resources are always ready at this point;
+        // because we block on them right before presenting
+#else
+        // when using Vulkan swapchain, we can be simultaneously rendering to multiple backbuffers.
+        blockOnBackbufferRenderingFence(frameIdx);
+        resetBackbufferRenderingFence(frameIdx);
+#endif
     }
-
-
-    { // Asynchronously acquire an image from the swap chain,
+    
+    { // acquire image from swap chain
 #if defined(WIN32)
         swapchainImageIndex = _swapChain.chainDXGI->m_pSwapChain->GetCurrentBackBufferIndex();
 #else
@@ -162,14 +182,17 @@ void Tetrium::drawFrame(ColorSpace colorSpace, uint8_t frameIdx)
         std::array<vk::CommandBuffer, 1> appCBs = {appCB};
         std::array<vk::CommandBuffer, 1> engineCBs = {engineCB};
 
-        //std::array<vk::Semaphore, 2> engineWaits = {
-        //    sync.semaAppVulkanFinished, // app rendering finished
-        //    sync.semaImageAvailable,    // screen fb availability
-        //};
-        // FIXME: add back image available wait, or do we need it?
+#if defined(WIN32)
         std::array<vk::Semaphore, 1> engineWaits = {
             sync.semaAppVulkanFinished, // app rendering finished
         };
+#else
+        std::array<vk::Semaphore, 2> engineWaits = {
+            sync.semaAppVulkanFinished, // app rendering finished
+            sync.semaImageAvailable,    // screen fb availability
+        };
+#endif // WIN32
+
         std::array<vk::PipelineStageFlags, 2> engineWaitStages = {
             vk::PipelineStageFlagBits::eTopOfPipe, // conservatively wait for all app rendering to
                                                    // finish
@@ -177,8 +200,12 @@ void Tetrium::drawFrame(ColorSpace colorSpace, uint8_t frameIdx)
         };
 
         std::array<vk::Semaphore, 1> appSignals = {sync.semaAppVulkanFinished};
-        //std::array<vk::Semaphore, 1> engineSignals = {sync.semaRenderFinished};
-        std::array<vk::Semaphore, 0> engineSignals = {}; // FIXME: should wait for render finish
+
+#if defined(WIN32)
+        std::array<vk::Semaphore, 0> engineSignals = {};
+#else
+        std::array<vk::Semaphore, 1> engineSignals = {sync.semaRenderFinished};
+#endif // WIN32
 
         std::array<vk::SubmitInfo, 2> submitInfos = {
             vk::SubmitInfo(
@@ -197,16 +224,19 @@ void Tetrium::drawFrame(ColorSpace colorSpace, uint8_t frameIdx)
 
         vk::Queue queue = _device->graphicsQueue;
         VkResult result = static_cast<VkResult>(
-            queue.submit(submitInfos.size(), submitInfos.data(), sync.fenceInFlight)
+            queue.submit(submitInfos.size(), submitInfos.data(), sync.fenceBackbufferRendering)
         );
         VK_CHECK_RESULT(result);
     }
 
-    { // Presented the swapchain, which at this point contains a rendered RGB/OCV image
-        PROFILE_SCOPE(&_profiler, "Queue Present");
+    { // Presented the swap chain
+        PROFILE_SCOPE(&_profiler, "Queue Present")
 #if defined(WIN32)
+        // since the Present() call immediately shoves in the FB, the CPU has to wait
+        // here for the back buffer rendering to finish.
+        blockOnBackbufferRenderingFence(frameIdx);
+        resetBackbufferRenderingFence(frameIdx);
         _swapChain.chainDXGI->Present();
-
 #else
         //  Present the swap chain image
         VkPresentInfoKHR presentInfo{};
@@ -234,6 +264,5 @@ void Tetrium::drawFrame(ColorSpace colorSpace, uint8_t frameIdx)
             this->_framebufferResized = false;
         }
 #endif
-
     }
 }

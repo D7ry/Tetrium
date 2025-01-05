@@ -15,7 +15,7 @@ public:
     DXGISwapChain(DXGIDisplayContext& window);
     ~DXGISwapChain();
 
-    HRESULT Create(int count, DXGI_FORMAT format);
+    HRESULT Create(uint32_t count, DXGI_FORMAT format);
     void Present();
     unsigned int GetVBlankCount();
 
@@ -23,6 +23,7 @@ public:
     ID3D12CommandQueue* m_commandQueue;
 
     HWND m_hWnd;
+    IDXGIOutput* m_output;
     uint32_t m_width;
     uint32_t m_height;
     DXGI_RATIONAL m_refreshRate;

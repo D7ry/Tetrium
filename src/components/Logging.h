@@ -23,13 +23,18 @@ void Init();
     SPDLOG_CRITICAL("Engine Panic; Exiting");                                                      \
     exit(1);
 #ifndef NDEBUG
+#define DBG_ASSERT(...)                                                                                \
+    if (!(__VA_ARGS__)) {                                                                          \
+        PANIC("Debug Assertion failed: {}", #__VA_ARGS__);                                               \
+    }
+#else
+#define DBG_ASSERT(...)
+#endif // NDEBUG
+
 #define ASSERT(...)                                                                                \
     if (!(__VA_ARGS__)) {                                                                          \
         PANIC("Assertion failed: {}", #__VA_ARGS__);                                               \
     }
-#else
-#define ASSERT(...)
-#endif // NDEBUG
 
 #define VK_CHECK_RESULT(expr)                                                                      \
     {                                                                                              \
@@ -40,5 +45,6 @@ void Init();
     }
 
 #define DX_CHECK(expr) ASSERT(SUCCEEDED(expr))
+#define VK_CHECK(expr) ASSERT(expr == VK_SUCCESS)
 
 #define INIT_LOGS() Logging::Init()

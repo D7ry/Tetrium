@@ -15,7 +15,8 @@ DXGISwapChain::DXGISwapChain(DXGIDisplayContext& window)
       m_hWnd(window.window),
       m_width(window.width),
       m_height(window.height),
-      m_refreshRate(window.refreshRate)
+      m_refreshRate(window.refreshRate),
+      m_output(window.output)
 {
 }
 
@@ -30,7 +31,7 @@ DXGISwapChain::~DXGISwapChain()
     }
 }
 
-HRESULT DXGISwapChain::Create(int count, DXGI_FORMAT format)
+HRESULT DXGISwapChain::Create(uint32_t count, DXGI_FORMAT format)
 {
     HRESULT hr = S_OK;
 
@@ -54,7 +55,7 @@ HRESULT DXGISwapChain::Create(int count, DXGI_FORMAT format)
         DXGI_USAGE_RENDER_TARGET_OUTPUT,
         (UINT)count, // image count
         DXGI_SCALING_NONE,
-        DXGI_SWAP_EFFECT_FLIP_DISCARD,
+        DXGI_SWAP_EFFECT_FLIP_DISCARD, // discard back buffer
         DXGI_ALPHA_MODE_IGNORE,
     };
 
@@ -66,7 +67,7 @@ HRESULT DXGISwapChain::Create(int count, DXGI_FORMAT format)
     };
     IDXGISwapChain1* swapchain1 = nullptr;
     hr = pFactory->CreateSwapChainForHwnd(
-        m_commandQueue, m_hWnd, &swapchainDesc, &fullscreenDesc, nullptr, &swapchain1
+        m_commandQueue, m_hWnd, &swapchainDesc, &fullscreenDesc, m_output, &swapchain1
     );
     if (SUCCEEDED(hr)) {
         IDXGISwapChain3* swapChain3 = nullptr;
@@ -89,7 +90,13 @@ HRESULT DXGISwapChain::Create(int count, DXGI_FORMAT format)
     return S_OK;
 }
 
-void DXGISwapChain::Present() { m_pSwapChain->Present(1, 0); }
+void DXGISwapChain::Present()
+{
+    const UINT syncInterval = 1;
+    DXGI_PRESENT_PARAMETERS presentParams{};
+    const UINT presentFlags = DXGI_PRESENT_RESTART; // discard outstanding queued frames
+    m_pSwapChain->Present1(syncInterval, presentFlags, &presentParams);
+}
 
 unsigned int DXGISwapChain::GetVBlankCount()
 {

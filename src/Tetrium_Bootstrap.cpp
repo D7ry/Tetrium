@@ -131,6 +131,8 @@ void Tetrium::Init(const Tetrium::InitOptions& options)
     MoltenVKConfig::Setup();
 #endif // __APPLE__
 #if defined(WIN32)
+    // override hardware sync TODO: get rid of software-hardware sync altogether
+    const_cast<InitOptions&>(options).tetraMode = TetraMode::kEvenOddHardwareSync;
     DXGIContext::Init();
     SCHEDULE_DELETE(DXGIContext::Destroy();)
 #else
@@ -282,6 +284,7 @@ void Tetrium::initVulkan()
 #endif // __linux__
 #if defined(WIN32)
         _dxgiDisplay = DXGI::PickAndInitDXGIDisplayContext();
+        SCHEDULE_DELETE(DXGI::CleanupDXGIDisplayContext(_dxgiDisplay);)
         // note here we don't set mainWindowSurface
 #endif 
         break;
@@ -744,10 +747,10 @@ void Tetrium::cleanupSwapChain(SwapChainContext& ctx)
     vkDestroySwapchainKHR(this->_device->logicalDevice, ctx.chain, nullptr);
 #else
     // clean up DXGI swap chain
-    delete ctx.chainDXGI;
     for (auto memory : ctx.sharedImageMemories) {
         vkFreeMemory(this->_device->logicalDevice, memory, nullptr);
     }
+    delete ctx.chainDXGI;
 #endif // WIN32
 }
 
@@ -1043,8 +1046,9 @@ void Tetrium::createSynchronizationObjects(
             VK_CHECK_RESULT(vkCreateSemaphore(_device->logicalDevice, &semaphoreInfo, nullptr, sema)
             );
         }
-        VK_CHECK_RESULT(
-            vkCreateFence(_device->logicalDevice, &fenceInfo, nullptr, &primitive.fenceInFlight)
+        VK_CHECK_RESULT(vkCreateFence(
+            _device->logicalDevice, &fenceInfo, nullptr, &primitive.fenceBackbufferRendering
+        )
         );
         VK_CHECK_RESULT(vkCreateFence(
             _device->logicalDevice, &fenceInfo, nullptr, &primitive.fenceRenderFinished
@@ -1074,7 +1078,9 @@ void Tetrium::createSynchronizationObjects(
                                primitive.semaImageAvailable}) {
                 vkDestroySemaphore(this->_device->logicalDevice, sema, nullptr);
             }
-            vkDestroyFence(this->_device->logicalDevice, primitive.fenceInFlight, nullptr);
+            vkDestroyFence(
+                this->_device->logicalDevice, primitive.fenceBackbufferRendering, nullptr
+            );
             vkDestroyFence(this->_device->logicalDevice, primitive.fenceRenderFinished, nullptr);
         }
     });
