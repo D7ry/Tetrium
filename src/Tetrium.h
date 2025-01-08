@@ -36,7 +36,6 @@
 
 #include "components/imgui_widgets/ImGuiWidgetColorTile.h"
 #include "components/imgui_widgets/ImGuiWidgetEvenOddCalibration.h"
-#include "components/imgui_widgets/ImGuiWidgetTemp.h"
 #include "components/imgui_widgets/ImGuiWidgetBlobHunter.h"
 
 // Applications
