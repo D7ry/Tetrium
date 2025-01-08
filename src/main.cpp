@@ -2,14 +2,12 @@
 
 #include "Tetrium.h"
 
-#include "apps/AppScreeningTest.h"
-#include "apps/AppTetraHueSphere.h"
 #include "apps/AppImageViewer.h"
 #include "apps/AppPainter.h"
+#include "apps/AppScreeningTest.h"
+#include "apps/AppTetraHueSphere.h"
 
-#include "D3dx9math.h"
-#include "lib/dxgi/DXGISwapchain.h"
-void printGreetingBanner()
+static void printGreetingBanner()
 {
     // cool banner
     const char* asciiLine = "--------------------------------";
@@ -29,15 +27,12 @@ int main(int argc, char** argv)
     DEBUG("running in debug mode");
 #endif // !NDEBUG
 
-
-
     std::vector<std::pair<TetriumApp::App*, const char*>> apps = {
         {new TetriumApp::AppScreeningTest(), "Screening Test"},
         {new TetriumApp::AppTetraHueSphere(), "Tetra Hue Sphere"},
         {new TetriumApp::AppImageViewer(), "Image Viewer"},
         {new TetriumApp::AppPainter(), "Painter"},
     };
-
 
     Tetrium::InitOptions options{.tetraMode = Tetrium::TetraMode::kEvenOddHardwareSync};
     Tetrium* engine = new Tetrium();
@@ -50,12 +45,11 @@ int main(int argc, char** argv)
     engine->Run();
     engine->Cleanup();
 
-
     for (auto& [app, appName] : apps) {
         delete app;
     }
-	
-	delete engine;
+
+    delete engine;
 
     return 0;
 }

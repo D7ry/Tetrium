@@ -5,65 +5,16 @@ set(CMAKE_CXX_STANDARD 20)
 
 project(Tetrium)
 
-# ---------- Organize files ---------- #
-set(ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
-set(SOURCE_DIR "${ROOT_DIR}/src")
-file(GLOB_RECURSE SOURCE_FILES "${SOURCE_DIR}/*.cpp")	
-file(GLOB_RECURSE HEADER_FILES "${SOURCE_DIR}/*.h" "${SOURCE_DIR}/*.hpp")
-
- 
-# ---------- Deps in extern/ ---------- #
-# imgui
-set(IMPLOT_INCLUDE extern/implot)
-set(IMGUI_INCLUDE extern/imgui)
-set(IMGUI_SRC 
-    extern/imgui/imgui.cpp
-    extern/imgui/imgui_draw.cpp
-    extern/imgui/imgui_demo.cpp
-    extern/imgui/imgui_widgets.cpp
-    extern/imgui/imgui_tables.cpp
-    extern/imgui/backends/imgui_impl_glfw.cpp
-    extern/imgui/backends/imgui_impl_vulkan.cpp
-    extern/imgui/misc/cpp/imgui_stdlib.cpp
-    extern/imgui/misc/freetype/imgui_freetype.cpp
-    extern/implot/implot.cpp
-    extern/implot/implot_items.cpp
-)
-
-if (WIN32)
-    list(APPEND IMGUI_SRC extern/imgui/backends/imgui_impl_win32.cpp)
+if (APPLE)
+    set(IS_APPLE TRUE)
+elseif(UNIX)
+    set(IS_LINUX TRUE)
+elseif(WIN32)
+    set(IS_WINDOWS TRUE)
 endif()
 
-# stb
-set(STB_INCLUDE extern/stb)
-set(STB_IMG_SRC extern/stb/stb_image_impl.cpp)
-
-# spdlog
-add_subdirectory(extern/spdlog)
-set(SPDLOG_INCLUDE extern/spdlog/include)
-
-# glfw
-add_subdirectory(extern/glfw)
-set(GLFW_INCLUDE extern/glfw/include)
-
-# glm
-set(GLM_INCLUDE extern/glm)
-
-# tinyobjloader
-set(TINY_OBJ_LOADER_INCLUDE extern/tinyobjloader)
-
-# tetriumColor
-add_subdirectory(extern/TetriumColor)
-
-# Vulkan
-if (DEFINED ENV{VULKAN_SDK})
-    set(VULKAN_SDK_PATH $ENV{VULKAN_SDK})
-else()
-    message(FATAL_ERROR "VULKAN_SDK is not set, please configure this environment variable to point to the Vulkan SDK")
-endif()
-
-
-set(SOURCES
+# ---------- Files ---------- #
+set(SOURCES_BUILD
         src/lib/Utils.cpp
         src/main.cpp
         src/Tetrium_Bootstrap.cpp
@@ -108,65 +59,126 @@ set(SOURCES
 )
 
 if (WIN32)
-    list(APPEND SOURCES src/lib/dxgi/DXGISwapchain.cpp)
-    list(APPEND SOURCES src/lib/dxgi/DXGIDisplayContext.cpp)
-    list(APPEND SOURCES src/lib/dxgi/DXGIContext.cpp)
+    list(APPEND SOURCES_BUILD src/lib/dxgi/DXGISwapchain.cpp)
+    list(APPEND SOURCES_BUILD src/lib/dxgi/DXGIDisplayContext.cpp)
+    list(APPEND SOURCES_BUILD src/lib/dxgi/DXGIContext.cpp)
 endif()
 
-add_executable(${PROJECT_NAME} ${SOURCES} ${HEADER_FILES})
+# SOURCE_FILES and HEADER_FILES are used to group files in the IDE,
+# primarily used to organize for VS solution explorer
+set(ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+set(SOURCE_DIR "${ROOT_DIR}/src")
+file(GLOB_RECURSE SOURCE_FILES "${SOURCE_DIR}/*.cpp")	
+file(GLOB_RECURSE HEADER_FILES "${SOURCE_DIR}/*.h" "${SOURCE_DIR}/*.hpp")
+ 
+add_executable(${PROJECT_NAME} ${SOURCES_BUILD} ${HEADER_FILES})
+
+# ---------- Deps in extern/ ---------- #
+# imgui
+set(IMPLOT_INCLUDE extern/implot)
+set(IMGUI_INCLUDE extern/imgui)
+set(IMGUI_SRC 
+    extern/imgui/imgui.cpp
+    extern/imgui/imgui_draw.cpp
+    extern/imgui/imgui_demo.cpp
+    extern/imgui/imgui_widgets.cpp
+    extern/imgui/imgui_tables.cpp
+    extern/imgui/backends/imgui_impl_glfw.cpp
+    extern/imgui/backends/imgui_impl_vulkan.cpp
+    extern/imgui/misc/cpp/imgui_stdlib.cpp
+    extern/imgui/misc/freetype/imgui_freetype.cpp
+    extern/implot/implot.cpp
+    extern/implot/implot_items.cpp
+)
+
+# Windows uses win32 backend, linux + apple use glfw
+if (IS_WINDOWS)
+    list(APPEND IMGUI_SRC extern/imgui/backends/imgui_impl_win32.cpp)
+else() # Apple or LINUX
+    list(APPEND IMGUI_SRC extern/imgui/backends/imgui_impl_glfw.cpp)
+endif()
+
+# stb
+set(STB_INCLUDE extern/stb)
+set(STB_IMG_SRC extern/stb/stb_image_impl.cpp)
+
+# spdlog
+add_subdirectory(extern/spdlog)
+set(SPDLOG_INCLUDE extern/spdlog/include)
+
+# glfw
+add_subdirectory(extern/glfw)
+set(GLFW_INCLUDE extern/glfw/include)
+
+# glm
+set(GLM_INCLUDE extern/glm)
+
+# tinyobjloader
+set(TINY_OBJ_LOADER_INCLUDE extern/tinyobjloader)
+
+# tetriumColor
+add_subdirectory(extern/TetriumColor)
+
+# ---------- Vulkan ---------- #
+if (DEFINED ENV{VULKAN_SDK})
+    set(VULKAN_SDK_PATH $ENV{VULKAN_SDK})
+else()
+    message(FATAL_ERROR "VULKAN_SDK is not set, please configure this environment variable to point to the Vulkan SDK")
+endif()
 
 target_sources(${PROJECT_NAME} 
     PRIVATE ${IMGUI_SRC}
     PRIVATE ${STB_IMG_SRC}
 )
 
-# vulkan
-if (UNIX)
-    if(APPLE)
-        set(VULKAN_LIB_PATH $ENV{HOME}/lib/VulkanSDK/1.3.290.1/macOS/lib/libvulkan.1.3.290.dylib)
-        set(MOLTENVK_LIB_PATH $ENV{HOME}/lib/VulkanSDK/1.3.290.1/macOS/lib/libMoltenVK.dylib)
-        set(FREETYPE_INCLUDE_DIRS "/opt/homebrew/include/freetype2")
-        set(FREETYPE_LIBRARIES "/opt/homebrew/lib/libfreetype.dylib")
-        # hard-coded path for openal-soft
-        set(OPENAL_ROOT_DIR "/opt/homebrew/opt/openal-soft")
-        set(OPENAL_INCLUDE_DIR "${OPENAL_ROOT_DIR}/include")
-        set(OPENAL_LIBRARY "${OPENAL_ROOT_DIR}/lib/libopenal.dylib")
-        set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)
-        include_directories(~/lib/VulkanSDK/1.3.290.1/macOS/include)
-        target_link_libraries(${PROJECT_NAME} 
-            ${VULKAN_LIB_PATH}
-            ${MOLTENVK_LIB_PATH}
-        )
-        target_compile_definitions(${PROJECT_NAME} PRIVATE VK_USE_PLATFORM_MACOS_MVK)
-    else()
-    # linux
-    find_package(X11 REQUIRED)
+# ---------- Platform-Specific Libs ---------- #
+if(IS_APPLE)
+    set(VULKAN_LIB_PATH $ENV{HOME}/lib/VulkanSDK/1.3.290.1/macOS/lib/libvulkan.1.3.290.dylib)
+    set(MOLTENVK_LIB_PATH $ENV{HOME}/lib/VulkanSDK/1.3.290.1/macOS/lib/libMoltenVK.dylib)
+    set(FREETYPE_INCLUDE_DIRS "/opt/homebrew/include/freetype2")
+    set(FREETYPE_LIBRARIES "/opt/homebrew/lib/libfreetype.dylib")
+    # hard-coded path for openal-soft
+    set(OPENAL_ROOT_DIR "/opt/homebrew/opt/openal-soft")
+    set(OPENAL_INCLUDE_DIR "${OPENAL_ROOT_DIR}/include")
+    set(OPENAL_LIBRARY "${OPENAL_ROOT_DIR}/lib/libopenal.dylib")
+    set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)
+    include_directories(~/lib/VulkanSDK/1.3.290.1/macOS/include)
+    target_link_libraries(${PROJECT_NAME} 
+        ${VULKAN_LIB_PATH}
+        ${MOLTENVK_LIB_PATH}
+    )
+    target_compile_definitions(${PROJECT_NAME} PRIVATE VK_USE_PLATFORM_MACOS_MVK)
+endif() # IS_APPLE
+
+if(IS_LINUX)
     find_package(PkgConfig REQUIRED)
+    find_package(X11 REQUIRED)
     pkg_check_modules(DRM REQUIRED libdrm)
     pkg_check_modules(SNDFILE REQUIRED sndfile)
     include_directories(${DRM_INCLUDE_DIRS})
-    target_link_libraries(${PROJECT_NAME} Vulkan::Vulkan
+    target_link_libraries(${PROJECT_NAME}
         ${X11_LIBRARIES}
         ${DRM_LIBRARIES}
         Xrandr
     )
-endif() # LINUX
-endif() # APPLE
+endif() # IS_LINUX
 
-if (WIN32)
+if (IS_WINDOWS)
+    # Vulkan
     set(Vulkan_LIBRARIES "${VULKAN_SDK_PATH}/Lib/vulkan-1.lib")
     set(Vulkan_INCLUDE_DIRS "${VULKAN_SDK_PATH}/Include")
     include_directories(${Vulkan_INCLUDE_DIRS})
     target_link_libraries(${PROJECT_NAME} ${Vulkan_LIBRARIES})
     target_compile_definitions(${PROJECT_NAME} PRIVATE VK_USE_PLATFORM_WIN32_KHR)
-    if(MSVC)
-        add_compile_options(/W4 /wd4100 /wd4201)
-    endif()
 
     # DirectX
     find_package(dxsdk-d3dx CONFIG REQUIRED)
     target_link_libraries(${PROJECT_NAME} Microsoft::D3DX9 Microsoft::D3DX10 Microsoft::D3DX11)
-endif() # WIN32
+
+    if(MSVC)
+        add_compile_options(/W4 /wd4100 /wd4201)
+    endif()
+endif() # IS_WINDOWS
 
 find_package(Vulkan REQUIRED)
 find_package(OpenAL CONFIG REQUIRED)
@@ -207,7 +219,7 @@ if(CMAKE_BUILD_TYPE MATCHES Release)
 endif()
 
 # For MS builds, group files so that they show up in hierarrchical order in VS solution explorer
-if (WIN32)
+if (IS_WINDOWS)
     foreach(fileItem ${SOURCE_FILES})       
         # Get the directory of the source file
         get_filename_component(PARENT_DIR "${fileItem}" DIRECTORY)
@@ -218,7 +230,6 @@ if (WIN32)
         # Group into "Source Files" and "Header Files"
         set(GROUP "${GROUP}")
         source_group("${GROUP}" FILES "${fileItem}")
-	    message("Group file item: ${GROUP} | ${fileItem}")
     endforeach()
     foreach(fileItem ${HEADER_FILES})       
         # Get the directory of the source file
@@ -230,6 +241,5 @@ if (WIN32)
         # Group into "Source Files" and "Header Files"
         set(GROUP "${GROUP}")
         source_group("${GROUP}" FILES "${fileItem}")
-	    message("Group file item: ${GROUP} | ${fileItem}")
     endforeach()
 endif()
