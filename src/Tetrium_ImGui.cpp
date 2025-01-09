@@ -1,165 +1,29 @@
-// ImGui initialization and resource management
-#include "backends/imgui_impl_glfw.h"
-#include "backends/imgui_impl_win32.h"
-#include "backends/imgui_impl_vulkan.h"
+﻿// ImGui initialization and resource management
+
+
 #include "imgui.h"
 #include "implot.h"
 #include "misc/freetype/imgui_freetype.h"
 
+#if defined(WIN32)
+#include "backends/imgui_impl_win32.h"
+#else 
+#include "backends/imgui_impl_glfw.h"
+#endif // WIN32
+
+#include "backends/imgui_impl_vulkan.h"
+
+#include "lib/ImGuiUtils.h"
 #include "Tetrium.h"
 
-#include <Pathing.h>
+#include "Pathing.h"
+
+// TODO: localize contexts
+
+#pragma region ImGui Contexts
 
 namespace Tetrium_ImGui
 {
-// context arrays that gets populated after Tetrium::initImGuiContext() is called
-// stores the same data as `Tetrium::_imguiCtx.ctxImGui` and `Tetrium::_imguiCtx.ctxImPlot`
-// [[deprecated]] static ImGuiContext* ctxImGui[ColorSpace::ColorSpaceSize] = {};
-// [[deprecated]] static ImPlotContext* ctxImPlot[ColorSpace::ColorSpaceSize] = {};
-
-// namespace GLFW
-// {
-// struct
-// {
-//     GLFWwindowfocusfun WindowFocus = nullptr;
-//     GLFWcursorenterfun CursorEnter = nullptr;
-//     GLFWcursorposfun CursorPos = nullptr;
-//     GLFWmousebuttonfun MouseButton = nullptr;
-//     GLFWscrollfun Scroll = nullptr;
-//     GLFWkeyfun Key = nullptr;
-//     GLFWcharfun Char = nullptr;
-//     GLFWmonitorfun Monitor = nullptr;
-// } prevCallbacks;
-//
-// [[deprecated]] void ImGuiCustomWindowFocusCallback(GLFWwindow* window, int focused)
-// {
-//     for (int i = 0; i < ColorSpace::ColorSpaceSize; ++i) {
-//         ImGui::SetCurrentContext(ctxImGui[i]);
-//         ImPlot::SetCurrentContext(ctxImPlot[i]);
-//         ImGui_ImplGlfw_WindowFocusCallback(window, focused);
-//     }
-//
-//     if (prevCallbacks.WindowFocus)
-//         prevCallbacks.WindowFocus(window, focused);
-// }
-//
-// [[deprecated]] void ImGuiCustomCursorEnterCallback(GLFWwindow* window, int entered)
-// {
-//     for (int i = 0; i < ColorSpace::ColorSpaceSize; ++i) {
-//         ImGui::SetCurrentContext(ctxImGui[i]);
-//         ImPlot::SetCurrentContext(ctxImPlot[i]);
-//         ImGui_ImplGlfw_CursorEnterCallback(window, entered);
-//     }
-//
-//     if (prevCallbacks.CursorEnter)
-//         prevCallbacks.CursorEnter(window, entered);
-// }
-//
-// [[deprecated]] void ImGuiCustomCursorPosCallback(GLFWwindow* window, double xpos, double ypos)
-// {
-//     for (int i = 0; i < ColorSpace::ColorSpaceSize; ++i) {
-//         ImGui::SetCurrentContext(ctxImGui[i]);
-//         ImPlot::SetCurrentContext(ctxImPlot[i]);
-//         ImGui_ImplGlfw_CursorPosCallback(window, xpos, ypos);
-//     }
-//
-//     if (prevCallbacks.CursorPos)
-//         prevCallbacks.CursorPos(window, xpos, ypos);
-// }
-//
-// [[deprecated]] void ImGuiCustomMouseButtonCallback(
-//     GLFWwindow* window,
-//     int button,
-//     int action,
-//     int mods
-// )
-// {
-//     for (int i = 0; i < ColorSpace::ColorSpaceSize; ++i) {
-//         ImGui::SetCurrentContext(ctxImGui[i]);
-//         ImPlot::SetCurrentContext(ctxImPlot[i]);
-//         ImGui_ImplGlfw_MouseButtonCallback(window, button, action, mods);
-//     }
-//
-//     if (prevCallbacks.MouseButton)
-//         prevCallbacks.MouseButton(window, button, action, mods);
-// }
-//
-// [[deprecated]] void ImGuiCustomScrollCallback(GLFWwindow* window, double xoffset, double yoffset)
-// {
-//     for (int i = 0; i < ColorSpace::ColorSpaceSize; ++i) {
-//         ImGui::SetCurrentContext(ctxImGui[i]);
-//         ImPlot::SetCurrentContext(ctxImPlot[i]);
-//         ImGui_ImplGlfw_ScrollCallback(window, xoffset, yoffset);
-//     }
-//
-//     if (prevCallbacks.Scroll)
-//         prevCallbacks.Scroll(window, xoffset, yoffset);
-// }
-//
-// [[deprecated]] void ImGuiCustomKeyCallback(
-//     GLFWwindow* window,
-//     int key,
-//     int scancode,
-//     int action,
-//     int mods
-// )
-// {
-//     for (int i = 0; i < ColorSpace::ColorSpaceSize; ++i) {
-//         ImGui::SetCurrentContext(ctxImGui[i]);
-//         ImPlot::SetCurrentContext(ctxImPlot[i]);
-//         ImGui_ImplGlfw_KeyCallback(window, key, scancode, action, mods);
-//     }
-//
-//     if (prevCallbacks.Key)
-//         prevCallbacks.Key(window, key, scancode, action, mods);
-// }
-//
-// [[deprecated]] void ImGuiCustomCharCallback(GLFWwindow* window, unsigned int c)
-// {
-//     for (int i = 0; i < ColorSpace::ColorSpaceSize; ++i) {
-//         ImGui::SetCurrentContext(ctxImGui[i]);
-//         ImPlot::SetCurrentContext(ctxImPlot[i]);
-//         ImGui_ImplGlfw_CharCallback(window, c);
-//     }
-//
-//     if (prevCallbacks.Char)
-//         prevCallbacks.Char(window, c);
-// }
-//
-// [[deprecated]] void ImGuiCustomMonitorCallback(GLFWmonitor* monitor, int event)
-// {
-//     for (int i = 0; i < ColorSpace::ColorSpaceSize; ++i) {
-//         ImGui::SetCurrentContext(ctxImGui[i]);
-//         ImPlot::SetCurrentContext(ctxImPlot[i]);
-//         ImGui_ImplGlfw_MonitorCallback(monitor, event);
-//     }
-//
-//     if (prevCallbacks.Monitor)
-//         prevCallbacks.Monitor(monitor, event);
-// }
-//
-// } // namespace GLFW
-
-// Set up custom callback functions that invokes on both RGB
-// and OCV imgui contexts; Naively binding all callbacks through
-// GLFW doesn't work, as the callbacks do not handle context switching.
-// [[deprecated]] void setupCustomCallbacks(GLFWwindow* window)
-// {
-//     // Store previous callbacks and set new ones
-//     GLFW::prevCallbacks.WindowFocus
-//         = glfwSetWindowFocusCallback(window, GLFW::ImGuiCustomWindowFocusCallback);
-//     GLFW::prevCallbacks.CursorEnter
-//         = glfwSetCursorEnterCallback(window, GLFW::ImGuiCustomCursorEnterCallback);
-//     GLFW::prevCallbacks.CursorPos
-//         = glfwSetCursorPosCallback(window, GLFW::ImGuiCustomCursorPosCallback);
-//     GLFW::prevCallbacks.MouseButton
-//         = glfwSetMouseButtonCallback(window, GLFW::ImGuiCustomMouseButtonCallback);
-//     GLFW::prevCallbacks.Scroll = glfwSetScrollCallback(window, GLFW::ImGuiCustomScrollCallback);
-//     GLFW::prevCallbacks.Key = glfwSetKeyCallback(window, GLFW::ImGuiCustomKeyCallback);
-//     GLFW::prevCallbacks.Char = glfwSetCharCallback(window, GLFW::ImGuiCustomCharCallback);
-//     GLFW::prevCallbacks.Monitor = glfwSetMonitorCallback(GLFW::ImGuiCustomMonitorCallback);
-// }
-
 void InitializeFrameBuffer(
     VkDevice device,
     VkExtent2D extent,
@@ -449,3 +313,166 @@ void Tetrium::clearImGuiDrawData()
     ImGui::NewFrame();
     ImGui::Render();
 }
+
+#pragma endregion
+
+#pragma region ImGui Draw
+void Tetrium::drawAppsImGui(ColorSpace colorSpace, int currentFrameInFlight)
+{
+    if (_primaryApp.has_value()) {
+
+        TetriumApp::App* app = _primaryApp.value();
+        TetriumApp::TickContextImGui ctxImGui{
+            .currentFrameInFlight = currentFrameInFlight,
+            .colorSpace = colorSpace,
+            .apis = {
+                .PlaySound = [this](Sound sound) { _soundManager.PlaySound(sound); },
+                .LoadTexture = [this](const std::string& path) { return _textureManager.LoadTexture(path); },
+                .InitImGuiTexture = [this](uint32_t textureHandle) {
+                    _textureManager.LoadImGuiTexture(textureHandle);
+                    return _textureManager.GetImGuiTexture(textureHandle);
+                },
+                .UnloadTexture = [this](uint32_t textureHandle) { _textureManager.UnLoadTexture(textureHandle); }
+            },
+            .controls = {.wantExit = false, .musicOverride = std::nullopt}
+        };
+
+        app->TickImGui(ctxImGui);
+
+        if (ctxImGui.controls.wantExit) {
+            _primaryApp.value()->OnClose();
+            _primaryApp = std::nullopt;
+            _soundManager.DisableMusic();
+        } else {
+            if (ctxImGui.controls.musicOverride.has_value()) {
+                _soundManager.SetMusic(ctxImGui.controls.musicOverride.value());
+            }
+        }
+    }
+}
+
+void Tetrium::drawMainMenu(ColorSpace colorSpace)
+{
+    int fullScreenFlags = ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove
+                          | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus;
+
+    ImGui::SetNextWindowPos(ImVec2(0, 0));
+    ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
+
+    if (ImGui::Begin(DEFAULTS::Engine::APPLICATION_NAME, NULL, fullScreenFlags)) {
+        if (ImGui::BeginTabBar("Engine Tab")) {
+            if (ImGui::BeginTabItem("🛸Even-Odd")) {
+                _widgetEvenOdd.Draw(this, colorSpace);
+                ImGui::EndTabItem();
+            }
+
+            if (ImGui::BeginTabItem("🎨Apps")) {
+                // show all apps
+                for (auto& [appName, app] : _appMap) {
+                    if (ImGui::Button(appName.c_str())) {
+                        if (_primaryApp.has_value() && _primaryApp.value() != app) {
+                            _primaryApp.value()->OnClose();
+                        }
+                        _primaryApp = app;
+                        app->OnOpen();
+                    }
+                }
+                ImGui::EndTabItem();
+            }
+
+            if (ImGui::BeginTabItem("🚀Performance")) {
+                _widgetPerfPlot.Draw(this, colorSpace);
+                ImGui::EndTabItem();
+            }
+
+            if (ImGui::BeginTabItem("💻Device")) {
+                _widgetDeviceInfo.Draw(this, colorSpace);
+                ImGui::EndTabItem();
+            }
+
+
+            if (ImGui::BeginTabItem("Color Tile")) {
+                _widgetColorTile.Draw(this, colorSpace);
+                ImGui::EndTabItem();
+            }
+
+            ImGui::EndTabBar(); // Engine Tab
+        }
+    }
+
+    ImGui::End();
+}
+
+void Tetrium::drawImGui(ColorSpace colorSpace, int currentFrameInFlight)
+{
+
+    // ---------- Prologue ----------
+    PROFILE_SCOPE(&_profiler, "ImGui Draw");
+
+    ImGui_ImplVulkan_NewFrame();
+#if defined(WIN32)
+    ImGui_ImplWin32_NewFrame();
+#else
+    ImGui_ImplGlfw_NewFrame();
+#endif
+    ImGui::NewFrame();
+
+    // imgui is associated with the glfw window to handle inputs,
+    // but its actual fb is associated with the projector display;
+    // so we need to manually re-adjust the display size for the scissors/
+    // viewports/clipping to be consistent
+    bool imguiDisplaySizeOverride = _tetraMode == TetraMode::kEvenOddHardwareSync;
+    if (imguiDisplaySizeOverride) {
+        ImVec2 projectorDisplaySize{
+#if defined(WIN32)
+            static_cast<float>(_swapChain.extent.width),
+            static_cast<float>(_swapChain.extent.height)
+#else
+            static_cast<float>(_mainProjectorDisplay.extent.width),
+            static_cast<float>(_mainProjectorDisplay.extent.height)
+#endif
+        };
+        ImGuiIO& io = ImGui::GetIO();
+        io.DisplaySize = projectorDisplaySize;
+        io.DisplayFramebufferScale = {1, 1};
+        ImGui::GetMainViewport()->Size = projectorDisplaySize;
+    }
+
+    if (_captureCursor) {
+#if defined(WIN32)
+#else
+        glfwSetInputMode(_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        ImGuiTexture imguiTexture = _engineTextures[(int)EngineTexture::kCursor].second;
+        ImGuiU::DrawCursor(imguiTexture);
+#endif // WIN32
+    } else {
+#if defined(WIN32)
+#else
+        glfwSetInputMode(_window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+#endif // WIN32
+        ImGuiU::DrawCenteredText("Press Tab to enable input", ImVec4(0, 0, 0, 0.8));
+    }
+
+    std::string footnoteText = (const char*)u8"🧩 Tetrium 0.9a";
+    switch (_rocvPresentMode) {
+        case ROCVPresentMode::kNormal:
+            footnoteText += " | Normal Mode";
+            break;
+        case ROCVPresentMode::kRGBOnly:
+            footnoteText += " | RGB Only Mode";
+            break;
+        case ROCVPresentMode::kOCVOnly:
+            footnoteText += " | OCV Only Mode";
+            break;
+    }
+    ImGuiU::DrawFootNote(footnoteText.c_str());
+
+    if (_primaryApp.has_value()) {
+        drawAppsImGui(colorSpace, currentFrameInFlight);
+    } else {
+        drawMainMenu(colorSpace);
+    }
+
+    ImGui::Render();
+}
+#pragma endregion
