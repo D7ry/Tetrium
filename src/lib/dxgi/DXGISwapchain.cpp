@@ -94,22 +94,43 @@ void DXGISwapChain::Present()
 {
     const UINT syncInterval = 1;
     DXGI_PRESENT_PARAMETERS presentParams{};
-    const UINT presentFlags = DXGI_PRESENT_RESTART; // discard outstanding queued frames
+    const UINT presentFlags = 0;
     m_pSwapChain->Present1(syncInterval, presentFlags, &presentParams);
 }
 
 unsigned int DXGISwapChain::GetVBlankCount()
 {
     // https://learn.microsoft.com/en-us/windows/win32/api/dxgi/ns-dxgi-dxgi_frame_statistics
-    // the manual states that `QueryPerformanceCounter` call updates vblank count, it actually not
-    // necessary but we're just keeping it here.
-    LARGE_INTEGER buf;
-    QueryPerformanceCounter(&buf);
+    // https://learn.microsoft.com/en-us/windows/win32/direct3d9/d3dpresentstats#remarks
     DXGI_FRAME_STATISTICS stats;
     HRESULT res = m_pSwapChain->GetFrameStatistics(&stats);
     // note we don't ASSERT on the result here as it may fail on the first couple of frames.
     // DEBUG("vblank: {}", stats.SyncRefreshCount);
     return stats.SyncRefreshCount;
 }
+
+unsigned int DXGISwapChain::GetNumDroppedFrames()
+{
+    if (!m_obtainedFirstStats) {
+        HRESULT res = m_pSwapChain->GetFrameStatistics(&m_firstStats);
+        if (SUCCEEDED(res) && m_firstStats.PresentRefreshCount != 0
+            && m_firstStats.PresentCount != 0
+            ) {
+            m_obtainedFirstStats = true;
+        }
+        return 0;
+    }
+
+    DXGI_FRAME_STATISTICS stats;
+    HRESULT res = m_pSwapChain->GetFrameStatistics(&stats);
+
+    unsigned int vblankDiff = stats.PresentRefreshCount - m_firstStats.PresentRefreshCount;
+    unsigned int numPresented = stats.PresentCount - m_firstStats.PresentCount;
+
+    unsigned int ret = vblankDiff - numPresented;
+
+    return ret;
+}
+
 
 #endif // WIN32

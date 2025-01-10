@@ -168,7 +168,17 @@ uint64_t Tetrium::getSurfaceCounterValue()
     return surfaceCounter;
 }
 
-bool Tetrium::isEvenFrame() { return getSurfaceCounterValue() % 2 == 0; }
+bool Tetrium::isEvenFrame()
+{
+    uint64_t surfaceCounterValue = getSurfaceCounterValue();
+#if defined(WIN32)
+    // offset the surface counter with # of dropped frames,
+    // dropping a frame leads to a wrong swapchain offset, here we
+    // offset it back.
+    surfaceCounterValue += _swapChain.chainDXGI->GetNumDroppedFrames();
+#endif // WIN32
+    return surfaceCounterValue % 2 == 0;
+}
 
 ColorSpace Tetrium::getCurrentColorSpace() {
     ColorSpace cs = isEvenFrame() ? ColorSpace::RGB : ColorSpace::OCV;

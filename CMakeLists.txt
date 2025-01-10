@@ -5,6 +5,8 @@ set(CMAKE_CXX_STANDARD 20)
 
 project(Tetrium)
 
+set(ENV{CONDA_PREFIX} "conda placeholder")
+
 if (APPLE)
     set(IS_APPLE TRUE)
 elseif(UNIX)
@@ -18,7 +20,6 @@ set(SOURCES_BUILD
         src/lib/Utils.cpp
         src/main.cpp
         src/Tetrium_Bootstrap.cpp
-        src/Tetrium_GUI.cpp
         src/Tetrium_EvenOdd.cpp
         src/Tetrium_Tick.cpp
         src/Tetrium_Windowing.cpp
