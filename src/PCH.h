@@ -1,3 +1,7 @@
+#if defined(WIN32)
+#include <corecrt.h>
+#endif
+
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include "components/Logging.h"
