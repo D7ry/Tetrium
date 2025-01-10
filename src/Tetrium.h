@@ -99,6 +99,15 @@ class Tetrium
     /* ---------- Packed Structs ---------- */
     // context for a single swapchain;
     // each window & display manages their separate
+
+    struct VirtualFrameBuffer
+    {
+        std::vector<VkFramebuffer> frameBuffer;
+        std::vector<VkImage> image;
+        std::vector<VkImageView> imageView;
+        std::vector<VkDeviceMemory> imageMemory; // memory to hold virtual swap chain
+    };
+
     // swapchain context
     struct SwapChainContext
     {
@@ -117,6 +126,12 @@ class Tetrium
         DXGISwapChain* chainDXGI = nullptr;
         std::vector<HANDLE> sharedImageHandles;
         std::vector<VkDeviceMemory> sharedImageMemories;
+
+        // DXGI swapchain uses a physical extent that's diff from the extent
+        // of the fb that we render onto.
+        VkExtent2D trueImageExtent; // image extent of `image`, `imageView`, and `frameBuffer`
+        VkExtent2D& virtualFBExtent = extent;
+        VirtualFrameBuffer virtualFB{}; // the fb we render onto
 #endif
     };
 
@@ -140,14 +155,6 @@ class Tetrium
         VkSemaphore semaVsync;
         VkFence fenceBackbufferRendering;
         VkFence fenceRenderFinished;
-    };
-
-    struct VirtualFrameBuffer
-    {
-        std::vector<VkFramebuffer> frameBuffer;
-        std::vector<VkImage> image;
-        std::vector<VkImageView> imageView;
-        std::vector<VkDeviceMemory> imageMemory; // memory to hold virtual swap chain
     };
 
     // Render context for RGV/OCV color space
@@ -239,9 +246,11 @@ class Tetrium
     void recreateVirtualFrameBuffers();
     void createVirtualFrameBuffer(
         VkRenderPass renderPass,
-        const SwapChainContext& swapChain,
         VirtualFrameBuffer& vfb,
-        uint32_t numFrameBuffers
+        uint32_t numFrameBuffers,
+        VkExtent2D extent,
+        VkFormat imageFormat,
+        VkImageView depthImageView
     );
     void clearVirtualFrameBuffer(VirtualFrameBuffer& vfb);
 
