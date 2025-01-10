@@ -204,6 +204,11 @@ void ImGuiWidgetEvenOddCalibration::Draw(Tetrium* engine, ColorSpace colorSpace)
 
     ImGui::Text("Num Frame: %llu", numFrames);
 
+#if defined(WIN32)
+    unsigned int numDroppedFrames = engine->_swapChain.chainDXGI->GetNumDroppedFrames();
+    engine->_evenOddDebugCtx.numDroppedFrames = numDroppedFrames;
+#endif // WIN32
+
     ImGui::Text("Num Dropped Frame: %u", engine->_evenOddDebugCtx.numDroppedFrames);
     ImGui::SameLine();
     if (ImGui::Button("Reset") && colorSpace == ColorSpace::RGB) {

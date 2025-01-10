@@ -18,6 +18,7 @@ public:
     HRESULT Create(uint32_t count, DXGI_FORMAT format);
     void Present();
     unsigned int GetVBlankCount();
+    unsigned int GetNumDroppedFrames();
 
     IDXGISwapChain4* m_pSwapChain;
     ID3D12CommandQueue* m_commandQueue;
@@ -26,7 +27,12 @@ public:
     IDXGIOutput* m_output;
     uint32_t m_width;
     uint32_t m_height;
+
+    uint32_t m_droppedFrames;
     DXGI_RATIONAL m_refreshRate;
+
+    DXGI_FRAME_STATISTICS m_firstStats;
+    bool m_obtainedFirstStats = false;
 };
 
 #endif // WIN32
