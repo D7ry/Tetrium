@@ -33,6 +33,8 @@ public:
 
     DXGI_FRAME_STATISTICS m_firstStats;
     bool m_obtainedFirstStats = false;
+
+    bool m_firstPresented = false;
 };
 
 #endif // WIN32
