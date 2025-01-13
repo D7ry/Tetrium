@@ -172,6 +172,7 @@ bool Tetrium::isEvenFrame()
 {
     uint64_t surfaceCounterValue = getSurfaceCounterValue();
 #if defined(WIN32)
+    // TODO: test if this may fix things if we turn it back on
     // offset the surface counter with # of dropped frames,
     // dropping a frame leads to a wrong swapchain offset, here we
     // offset it back.

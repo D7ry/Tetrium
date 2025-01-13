@@ -41,7 +41,7 @@ void Tetrium::Tick()
         {
             PROFILE_SCOPE(&_profiler, "Render Loop");
             //_swapChain.chainDXGI->waitForPreviousFrame();
-            _swapChain.chainDXGI->m_output->WaitForVBlank();
+            //_swapChain.chainDXGI->m_output->WaitForVBlank();
             updateSurfaceCounterValue();
             // CPU-exclusive workloads
             double deltaTime = _deltaTimer.GetDeltaTime();
