@@ -93,7 +93,7 @@ HRESULT DXGISwapChain::Create(uint32_t count, DXGI_FORMAT format)
     m_fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
     ASSERT(m_fenceEvent != nullptr)
     DX_CHECK(DXGIContext::device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)))
-    waitForPreviousFrame();
+    //waitForPreviousFrame();
     return S_OK;
 }
 

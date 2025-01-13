@@ -125,7 +125,7 @@ void Tetrium::checkHardwareEvenOddFrameSupport()
 // the new counter takes the max of the image id so far presented.
 #define FAKE_SOFTWARE_FRAME_COUNTER 1
 
-uint64_t Tetrium::getSurfaceCounterValue()
+void Tetrium::updateSurfaceCounterValue()
 {
     uint64_t surfaceCounter;
     switch (_tetraMode) {
@@ -165,7 +165,7 @@ uint64_t Tetrium::getSurfaceCounterValue()
         surfaceCounter = 0;
     }
 
-    return surfaceCounter;
+    _surfaceCounterValue = surfaceCounter;
 }
 
 bool Tetrium::isEvenFrame()
@@ -175,9 +175,14 @@ bool Tetrium::isEvenFrame()
     // offset the surface counter with # of dropped frames,
     // dropping a frame leads to a wrong swapchain offset, here we
     // offset it back.
-    surfaceCounterValue += _swapChain.chainDXGI->GetNumDroppedFrames();
+    //surfaceCounterValue += _swapChain.chainDXGI->GetNumDroppedFrames();
 #endif // WIN32
     return surfaceCounterValue % 2 == 0;
+    
+}
+
+uint64_t Tetrium::getSurfaceCounterValue() {
+    return _surfaceCounterValue;
 }
 
 ColorSpace Tetrium::getCurrentColorSpace() {

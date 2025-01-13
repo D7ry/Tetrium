@@ -278,6 +278,7 @@ class Tetrium
 
     void drawAppsImGui(ColorSpace colorSpace, int currentFrameInFlight);
     void pollInputs();
+    void updateSurfaceCounterValue();
     
     void getFullScreenViewportAndScissor(
         const SwapChainContext& swapChain,
@@ -382,6 +383,8 @@ class Tetrium
         int timeOffset = 0;           // time offset added to the time that's used
                                       // to evaluate current frame, used for the old counter method
     } _softwareEvenOddCtx;
+
+    uint64_t _surfaceCounterValue = 0;
 
     struct
     {
