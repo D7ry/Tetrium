@@ -56,7 +56,7 @@ HRESULT DXGISwapChain::Create(uint32_t count, DXGI_FORMAT format)
         DXGI_USAGE_RENDER_TARGET_OUTPUT,
         (UINT)count, // image count
         DXGI_SCALING_NONE,
-        DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL, // discard back buffer
+        DXGI_SWAP_EFFECT_FLIP_DISCARD, // discard back buffer
         DXGI_ALPHA_MODE_IGNORE,
     };
 
@@ -90,6 +90,10 @@ HRESULT DXGISwapChain::Create(uint32_t count, DXGI_FORMAT format)
 
     m_pSwapChain->SetFullscreenState(true, nullptr);
 
+    m_fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+    ASSERT(m_fenceEvent != nullptr)
+    DX_CHECK(DXGIContext::device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)))
+    waitForPreviousFrame();
     return S_OK;
 }
 
@@ -102,7 +106,6 @@ void DXGISwapChain::Present()
     if (SUCCEEDED(res)) {
         m_firstPresented = true;
     }
-    m_output->WaitForVBlank();
 }
 
 unsigned int DXGISwapChain::GetVBlankCount()
@@ -136,6 +139,7 @@ unsigned int DXGISwapChain::GetNumDroppedFrames()
 
     if (stats.PresentRefreshCount < m_firstStats.PresentRefreshCount
         || stats.PresentCount < m_firstStats.PresentCount) {
+        INFO("Resetting dropped frames counter!");
         return 0;
     }
 
@@ -147,6 +151,23 @@ unsigned int DXGISwapChain::GetNumDroppedFrames()
     //m_firstStats = stats;
 
     return ret;
+}
+
+// https://github.com/microsoft/DirectX-Graphics-Samples/blob/master/Samples/Desktop/D3D12HelloWorld/src/HelloTriangle/D3D12HelloTriangle.cpp
+void DXGISwapChain::waitForPreviousFrame()
+{
+    // Signal and increment the fence value.
+    const UINT64 fence = m_fenceValue;
+    m_commandQueue->Signal(m_fence, fence);
+    m_fenceValue++;
+
+    // Wait until the previous frame is finished.
+    if (m_fence->GetCompletedValue() < fence)
+    {
+        DX_CHECK(m_fence->SetEventOnCompletion(fence, m_fenceEvent))
+        WaitForSingleObject(m_fenceEvent, INFINITE);
+    }
+
 }
 
 

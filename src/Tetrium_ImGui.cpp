@@ -465,6 +465,12 @@ void Tetrium::drawImGui(ColorSpace colorSpace, int currentFrameInFlight)
             footnoteText += " | OCV Only Mode";
             break;
     }
+
+#ifndef NDEBUG
+#if defined(WIN32)
+    footnoteText += "| Dropped Frames: " + std::to_string(_swapChain.chainDXGI->GetNumDroppedFrames());
+#endif
+#endif
     ImGuiU::DrawFootNote(footnoteText.c_str());
 
     if (_primaryApp.has_value()) {

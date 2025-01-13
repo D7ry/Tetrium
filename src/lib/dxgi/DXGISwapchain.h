@@ -35,6 +35,12 @@ public:
     bool m_obtainedFirstStats = false;
 
     bool m_firstPresented = false;
+
+    HANDLE m_fenceEvent;
+    ID3D12Fence* m_fence;
+    UINT64 m_fenceValue;
+
+    void waitForPreviousFrame();
 };
 
 #endif // WIN32
