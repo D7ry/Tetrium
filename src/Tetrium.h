@@ -100,6 +100,14 @@ class Tetrium
     // context for a single swapchain;
     // each window & display manages their separate
 
+
+    struct DepthBuffer
+    {
+        vk::Image image;
+        vk::ImageView view;
+        vk::DeviceMemory memory;
+    };
+
     struct VirtualFrameBuffer
     {
         std::vector<VkFramebuffer> frameBuffer;
@@ -116,22 +124,13 @@ class Tetrium
         VkExtent2D extent; // resolution of the swapchain images
         std::vector<VkImage> image;
         std::vector<VkImageView> imageView;
-        std::vector<VkFramebuffer> frameBuffer;
+        [[deprecated]] std::vector<VkFramebuffer> frameBuffer;
         size_t numImages;
-        VkImage depthImage;
-        VkDeviceMemory depthImageMemory;
-        VkImageView depthImageView;
         VkSurfaceKHR surface;
 #if defined(WIN32)
         DXGISwapChain* chainDXGI = nullptr;
         std::vector<HANDLE> sharedImageHandles;
         std::vector<VkDeviceMemory> sharedImageMemories;
-
-        // DXGI swapchain uses a physical extent that's diff from the extent
-        // of the fb that we render onto.
-        VkExtent2D trueImageExtent; // image extent of `image`, `imageView`, and `frameBuffer`
-        VkExtent2D& virtualFBExtent = extent;
-        VirtualFrameBuffer virtualFB{}; // the fb we render onto
 #endif
     };
 
@@ -239,7 +238,8 @@ class Tetrium
     void createSwapChainDXGI(Tetrium::SwapChainContext& ctx, const VkSurfaceKHR surface);
 #endif // WIN32
     void createImageViews(SwapChainContext& ctx);
-    void createDepthBuffer(SwapChainContext& ctx);
+    void createDepthBuffer(DepthBuffer& depthBuffer, vk::Extent2D extent);
+    void destroyDepthBuffer(DepthBuffer& depthBuffer);
     void createSwapchainFrameBuffers(SwapChainContext& ctx, VkRenderPass rgbOrCnyPass);
 
     /* ---------- FrameBuffers ---------- */
@@ -319,7 +319,9 @@ class Tetrium
     VkDebugUtilsMessengerEXT _debugMessenger;
     std::shared_ptr<VQDevice> _device;
 
+    DepthBuffer _depthBuffer;
     SwapChainContext _swapChain;
+    VirtualFrameBuffer _framBuffer;
     ImGuiRenderContext _imguiCtx;
 
     /* ---------- Prensentation ---------- */

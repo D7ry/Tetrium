@@ -149,6 +149,7 @@ void initFonts()
 
 void Tetrium::reinitImGuiFrameBuffers(Tetrium::ImGuiRenderContext& ctx)
 {
+    NEEDS_IMPLEMENTATION()
     Tetrium_ImGui::InitializeFrameBuffer(
         _device->Get(),
         _swapChain.extent,
