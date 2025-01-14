@@ -260,15 +260,12 @@ void Tetrium::initVulkan()
     this->_device->CreateGraphicsCommandPool();
     this->_device->CreateGraphicsCommandBuffer(NUM_FRAME_IN_FLIGHT);
 
-    const uint32_t fbWidth = 800;
-    const uint32_t fbHeight = 600;
-    _frameBufferExtent = vk::Extent2D{fbWidth, fbHeight};
 
     createSwapChain(_swapChain, mainWindowSurface);
     createImageViews(_swapChain);
     ASSERT(_swapChain.imageFormat);
     // FIXME: depthbuffer should be decoupled from swapchain size
-    createDepthBuffer(_depthBuffer, _frameBufferExtent);
+    createDepthBuffer(_depthBuffer, GLOBALS::DISPLAY_EXTENT);
     SCHEDULE_DELETE(destroyDepthBuffer(_depthBuffer);)
 
     // set up context for RYGB off-screen rendering
@@ -290,7 +287,7 @@ void Tetrium::initVulkan()
         _renderContextRYGB.renderPass,
         _renderContextRYGB.virtualFrameBuffer,
         _swapChain.numImages,
-        _frameBufferExtent,
+        GLOBALS::DISPLAY_EXTENT,
         _swapChain.imageFormat,
         _depthBuffer.view
     );

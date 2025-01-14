@@ -5,6 +5,8 @@
 #include <vulkan/vulkan_beta.h> // VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME, for molten-vk support
 #endif
 
+#include "vulkan/vulkan.hpp"
+
 // absolute constants
 const int NUM_FRAME_IN_FLIGHT = 2; // how many frames to pipeline
 const int TEXTURE_ARRAY_SIZE = 16; // size of the texture array for bindless texture indexing
@@ -87,3 +89,17 @@ namespace DIRECTORIES
 const std::string ASSETS = "../assets/";
 const std::string SHADERS = "../shaders/";
 } // namespace DIRECTORIES
+
+namespace GLOBALS
+{
+    /**
+     * Expected extent of the DLP's presented content.
+     * This extent is different from the projector's swapchain; the swapchain's pixels maps 1:1 to the individual physical lights
+     * of the DLP. The DLP optically squishes the output from the LED into a view of DISPLAY_EXTENT.
+     * When rendering in none-pattern mode, the DLP internally re-samples the HDMI input to this extent, projects the light, and
+     * then optically corrects the aspect ratio using its lenses.
+     * When rendering in pattern mode, however,, the re-sampling does not happen in DLP. Therefore we we-sample the image ourselves.
+     */
+    const vk::Extent2D DISPLAY_EXTENT{1280, 720};
+
+}

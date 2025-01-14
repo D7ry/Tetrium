@@ -322,7 +322,6 @@ class Tetrium
     DepthBuffer _depthBuffer;
     SwapChainContext _swapChain;
     VirtualFrameBuffer _framBuffer;
-    vk::Extent2D _frameBufferExtent;
     ImGuiRenderContext _imguiCtx;
 
     /* ---------- Prensentation ---------- */

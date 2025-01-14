@@ -209,7 +209,7 @@ void Tetrium::initImGuiRenderContext(Tetrium::ImGuiRenderContext& ctx)
     );
     Tetrium_ImGui::InitializeFrameBuffer(
         _device->Get(),
-        _frameBufferExtent,
+        GLOBALS::DISPLAY_EXTENT,
         ctx.renderPass,
         //_renderContextRYGB.virtualFrameBuffer.imageView,
         _renderContextRYGB.virtualFrameBuffer.imageView, // render to vfb to be rescaled onto swapchain
@@ -427,8 +427,8 @@ void Tetrium::drawImGui(ColorSpace colorSpace, int currentFrameInFlight)
     if (imguiDisplaySizeOverride) {
         ImVec2 projectorDisplaySize{
 #if defined(WIN32)
-            static_cast<float>(_frameBufferExtent.width),
-            static_cast<float>(_frameBufferExtent.height)
+            static_cast<float>(GLOBALS::DISPLAY_EXTENT.width),
+            static_cast<float>(GLOBALS::DISPLAY_EXTENT.height)
 #else
             static_cast<float>(_mainProjectorDisplay.extent.width),
             static_cast<float>(_mainProjectorDisplay.extent.height)
