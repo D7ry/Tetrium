@@ -260,11 +260,15 @@ void Tetrium::initVulkan()
     this->_device->CreateGraphicsCommandPool();
     this->_device->CreateGraphicsCommandBuffer(NUM_FRAME_IN_FLIGHT);
 
+    const uint32_t fbWidth = 800;
+    const uint32_t fbHeight = 600;
+    _frameBufferExtent = vk::Extent2D{fbWidth, fbHeight};
+
     createSwapChain(_swapChain, mainWindowSurface);
     createImageViews(_swapChain);
     ASSERT(_swapChain.imageFormat);
     // FIXME: depthbuffer should be decoupled from swapchain size
-    createDepthBuffer(_depthBuffer, _swapChain.extent);
+    createDepthBuffer(_depthBuffer, _frameBufferExtent);
     SCHEDULE_DELETE(destroyDepthBuffer(_depthBuffer);)
 
     // set up context for RYGB off-screen rendering
@@ -286,14 +290,14 @@ void Tetrium::initVulkan()
         _renderContextRYGB.renderPass,
         _renderContextRYGB.virtualFrameBuffer,
         _swapChain.numImages,
-        _swapChain.extent,
+        _frameBufferExtent,
         _swapChain.imageFormat,
         _depthBuffer.view
     );
     SCHEDULE_DELETE(clearVirtualFrameBuffer(_renderContextRYGB.virtualFrameBuffer);)
 
-    // set up render pass for rocv transfer
-    // the rocv transfer pass directly paints onto swapchain's FB
+    // NOTE: we use the rocv pass as dummy pass for physical fb creation
+    // TODO: create actual dummy pass instead of repurposing it
     _rocvTransformRenderPass = createRenderPass(
         _device->logicalDevice,
         VK_IMAGE_LAYOUT_UNDEFINED,
@@ -302,7 +306,7 @@ void Tetrium::initVulkan()
         _swapChain.imageFormat,
         VK_ATTACHMENT_LOAD_OP_CLEAR,
         VK_ATTACHMENT_STORE_OP_STORE,
-        true,
+        false,
         VkSubpassDependency{
             .srcSubpass = VK_SUBPASS_EXTERNAL, // all previous submitted subpass, in this case it's
                                                // `_renderContextRYGB.renderPass`
@@ -1213,7 +1217,7 @@ void Tetrium::createSwapchainFrameBuffers(SwapChainContext& ctx, VkRenderPass re
     DEBUG("Creating framebuffers..");
     // iterate through image views and create framebuffers
     for (size_t i = 0; i < ctx.image.size(); i++) {
-        VkImageView attachments[] = {ctx.imageView[i], _depthBuffer.view};
+        VkImageView attachments[] = {ctx.imageView[i]};
         VkFramebufferCreateInfo framebufferInfo{};
         framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         // NOTE: framebuffer DOES NOT need to have a dedicated render pass,

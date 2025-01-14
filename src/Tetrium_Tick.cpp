@@ -195,8 +195,7 @@ void Tetrium::drawFrame(ColorSpace colorSpace, uint8_t frameIdx)
         engineCB.reset();
         engineCB.begin(vk::CommandBufferBeginInfo());
         {
-            vk::Extent2D extend = _swapChain.extent;
-            vk::Rect2D renderArea(VkOffset2D{0, 0}, extend);
+            vk::Extent2D extend = _frameBufferExtent;
             VkViewport viewport{};
             VkRect2D scissor{};
             getFullScreenViewportAndScissor(_swapChain, viewport, scissor);
@@ -206,6 +205,39 @@ void Tetrium::drawFrame(ColorSpace colorSpace, uint8_t frameIdx)
 
             recordImGuiDrawCommandBuffer(
                 _imguiCtx, engineCB, extend, swapchainImageIndex, colorSpace
+            );
+            int32_t srcWidth = _frameBufferExtent.width;
+            int32_t srcHeight = _frameBufferExtent.height;
+
+            int32_t dstWidth = _swapChain.extent.width;
+            int32_t dstHeight = _swapChain.extent.height;
+
+            VkImageBlit blitRegion = {};
+            blitRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            blitRegion.srcSubresource.mipLevel = 0; // Use the base level of the source image
+            blitRegion.srcSubresource.baseArrayLayer = 0;
+            blitRegion.srcSubresource.layerCount = 1;
+
+            blitRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            blitRegion.dstSubresource.mipLevel = 0; // Use the base level of the destination image
+            blitRegion.dstSubresource.baseArrayLayer = 0;
+            blitRegion.dstSubresource.layerCount = 1;
+
+            blitRegion.srcOffsets[0] = { 0, 0, 0 }; // Top-left corner of the source image
+            blitRegion.srcOffsets[1] = { srcWidth, srcHeight, 1 }; // Bottom-right corner of the source image
+
+            blitRegion.dstOffsets[0] = { 0, 0, 0 }; // Top-left corner of the destination image
+            blitRegion.dstOffsets[1] = { dstWidth, dstHeight, 1 }; // Bottom-right corner of the destination image
+
+            vkCmdBlitImage(
+                engineCB,
+                _renderContextRYGB.virtualFrameBuffer.image[swapchainImageIndex],
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                _swapChain.image[swapchainImageIndex],
+                VK_IMAGE_LAYOUT_UNDEFINED,
+                1,
+                &blitRegion,
+                VK_FILTER_NEAREST
             );
         }
         engineCB.end();

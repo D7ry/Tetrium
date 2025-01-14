@@ -34,6 +34,7 @@ void InitializeFrameBuffer(
 {
     DEBUG("Creating imgui frame buffers...");
     int bufferCount = imageView.size();
+    ASSERT(bufferCount != 0)
     // FIXME: cleanup
     framebuffer.resize(bufferCount);
     VkImageView attachment[1];
@@ -208,10 +209,10 @@ void Tetrium::initImGuiRenderContext(Tetrium::ImGuiRenderContext& ctx)
     );
     Tetrium_ImGui::InitializeFrameBuffer(
         _device->Get(),
-        _swapChain.extent,
+        _frameBufferExtent,
         ctx.renderPass,
         //_renderContextRYGB.virtualFrameBuffer.imageView,
-        _swapChain.imageView, // render directly to swapchain
+        _renderContextRYGB.virtualFrameBuffer.imageView, // render to vfb to be rescaled onto swapchain
         ctx.frameBuffer
     );
 
@@ -426,8 +427,8 @@ void Tetrium::drawImGui(ColorSpace colorSpace, int currentFrameInFlight)
     if (imguiDisplaySizeOverride) {
         ImVec2 projectorDisplaySize{
 #if defined(WIN32)
-            static_cast<float>(_swapChain.extent.width),
-            static_cast<float>(_swapChain.extent.height)
+            static_cast<float>(_frameBufferExtent.width),
+            static_cast<float>(_frameBufferExtent.height)
 #else
             static_cast<float>(_mainProjectorDisplay.extent.width),
             static_cast<float>(_mainProjectorDisplay.extent.height)
