@@ -393,7 +393,7 @@ void Tetrium::drawMainMenu(ColorSpace colorSpace)
             }
 
 
-            if (ImGui::BeginTabItem("Color Tile")) {
+            if (false && ImGui::BeginTabItem("Color Tile")) {
                 _widgetColorTile.Draw(this, colorSpace);
                 ImGui::EndTabItem();
             }
