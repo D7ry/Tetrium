@@ -260,12 +260,17 @@ void Tetrium::initVulkan()
     this->_device->CreateGraphicsCommandPool();
     this->_device->CreateGraphicsCommandBuffer(NUM_FRAME_IN_FLIGHT);
 
+
     createSwapChain(_swapChain, mainWindowSurface);
     createImageViews(_swapChain);
     ASSERT(_swapChain.imageFormat);
-    createDepthBuffer(_swapChain);
+    // FIXME: depthbuffer should be decoupled from swapchain size
+    createDepthBuffer(_depthBuffer, GLOBALS::DISPLAY_EXTENT);
+    SCHEDULE_DELETE(destroyDepthBuffer(_depthBuffer);)
 
     // set up context for RYGB off-screen rendering
+    // NOTE: this pass currenlty does nothing. we simply use it as a dummy pass for fb creation ATM
+    // TODO: create fb without render pass
     _renderContextRYGB.renderPass = createRenderPass(
         _device->logicalDevice,
         VK_IMAGE_LAYOUT_UNDEFINED,
@@ -282,14 +287,14 @@ void Tetrium::initVulkan()
         _renderContextRYGB.renderPass,
         _renderContextRYGB.virtualFrameBuffer,
         _swapChain.numImages,
-        _swapChain.extent,
+        GLOBALS::DISPLAY_EXTENT,
         _swapChain.imageFormat,
-        _swapChain.depthImageView
+        _depthBuffer.view
     );
     SCHEDULE_DELETE(clearVirtualFrameBuffer(_renderContextRYGB.virtualFrameBuffer);)
 
-    // set up render pass for rocv transfer
-    // the rocv transfer pass directly paints onto swapchain's FB
+    // NOTE: we use the rocv pass as dummy pass for physical fb creation
+    // TODO: create actual dummy pass instead of repurposing it
     _rocvTransformRenderPass = createRenderPass(
         _device->logicalDevice,
         VK_IMAGE_LAYOUT_UNDEFINED,
@@ -298,7 +303,7 @@ void Tetrium::initVulkan()
         _swapChain.imageFormat,
         VK_ATTACHMENT_LOAD_OP_CLEAR,
         VK_ATTACHMENT_STORE_OP_STORE,
-        true,
+        false,
         VkSubpassDependency{
             .srcSubpass = VK_SUBPASS_EXTERNAL, // all previous submitted subpass, in this case it's
                                                // `_renderContextRYGB.renderPass`
@@ -695,9 +700,6 @@ void Tetrium::createSwapChain(Tetrium::SwapChainContext& ctx, const VkSurfaceKHR
 void Tetrium::cleanupSwapChain(SwapChainContext& ctx)
 {
     DEBUG("Cleaning up swap chain...");
-    vkDestroyImageView(_device->logicalDevice, ctx.depthImageView, nullptr);
-    vkDestroyImage(_device->logicalDevice, ctx.depthImage, nullptr);
-    vkFreeMemory(_device->logicalDevice, ctx.depthImageMemory, nullptr);
 
     for (VkFramebuffer framebuffer : ctx.frameBuffer) {
         vkDestroyFramebuffer(this->_device->logicalDevice, framebuffer, nullptr);
@@ -891,6 +893,7 @@ void Tetrium::recreateVirtualFrameBuffers()
 
 void Tetrium::recreateSwapChain(SwapChainContext& ctx)
 {
+    NEEDS_IMPLEMENTATION()
     // need to recreate render pass for HDR changing, we're not doing that
     // for now
     DEBUG("Recreating swap chain...");
@@ -907,7 +910,8 @@ void Tetrium::recreateSwapChain(SwapChainContext& ctx)
 
     this->createSwapChain(ctx, ctx.surface);
     this->createImageViews(ctx);
-    this->createDepthBuffer(ctx);
+    // TODO: depthbuffer should be decoupled from swapchain size
+    this->createDepthBuffer(_depthBuffer, ctx.extent);
     this->createSwapchainFrameBuffers(ctx, _rocvTransformRenderPass);
     DEBUG("Swap chain recreated.");
 }
@@ -1210,7 +1214,7 @@ void Tetrium::createSwapchainFrameBuffers(SwapChainContext& ctx, VkRenderPass re
     DEBUG("Creating framebuffers..");
     // iterate through image views and create framebuffers
     for (size_t i = 0; i < ctx.image.size(); i++) {
-        VkImageView attachments[] = {ctx.imageView[i], ctx.depthImageView};
+        VkImageView attachments[] = {ctx.imageView[i]};
         VkFramebufferCreateInfo framebufferInfo{};
         framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         // NOTE: framebuffer DOES NOT need to have a dedicated render pass,
@@ -1230,9 +1234,20 @@ void Tetrium::createSwapchainFrameBuffers(SwapChainContext& ctx, VkRenderPass re
     }
 }
 
-void Tetrium::createDepthBuffer(SwapChainContext& ctx)
+void Tetrium::destroyDepthBuffer(DepthBuffer& depthBuffer)
+{
+    vkDestroyImageView(_device->logicalDevice, depthBuffer.view, nullptr);
+    vkDestroyImage(_device->logicalDevice, depthBuffer.image, nullptr);
+    vkFreeMemory(_device->logicalDevice, depthBuffer.memory, nullptr);
+}
+
+void Tetrium::createDepthBuffer(DepthBuffer& depthBuffer, vk::Extent2D extent)
 {
     DEBUG("Creating depth buffer...");
+    VkImage image;
+    VkDeviceMemory memory;
+    VkImageView view;
+
     VkFormat depthFormat = VulkanUtils::findBestFormat(
         {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT},
         VK_IMAGE_TILING_OPTIMAL,
@@ -1240,20 +1255,25 @@ void Tetrium::createDepthBuffer(SwapChainContext& ctx)
         _device->physicalDevice
     );
     VulkanUtils::createImage(
-        ctx.extent.width,
-        ctx.extent.height,
+        extent.width,
+        extent.height,
         depthFormat,
         VK_IMAGE_TILING_OPTIMAL,
         VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        ctx.depthImage,
-        ctx.depthImageMemory,
+        image,
+        memory,
         _device->physicalDevice,
         _device->logicalDevice
     );
-    ctx.depthImageView = VulkanUtils::createImageView(
-        ctx.depthImage, _device->logicalDevice, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT
+
+    view = VulkanUtils::createImageView(
+        image, _device->logicalDevice, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT
     );
+
+    depthBuffer.image = image;
+    depthBuffer.memory = memory;
+    depthBuffer.view = view;
 }
 
 // https://www.saschawillems.de/blog/2018/07/19/vulkan-input-attachments-and-sub-passes/
