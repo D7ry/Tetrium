@@ -38,7 +38,7 @@ const float MAX_FPS = 60.f;
 namespace ImGui
 {
 #if !__APPLE__
-const float DEFAULT_FONT_SIZE = 17;
+const float DEFAULT_FONT_SIZE = 44;
 #else
 const float DEFAULT_FONT_SIZE = 34;
 #endif // __APPLE__
@@ -100,6 +100,6 @@ namespace GLOBALS
      * then optically corrects the aspect ratio using its lenses.
      * When rendering in pattern mode, however,, the re-sampling does not happen in DLP. Therefore we we-sample the image ourselves.
      */
-    const vk::Extent2D DISPLAY_EXTENT{1280, 720};
+    const vk::Extent2D DISPLAY_EXTENT{2560, 1600};
 
 }

@@ -139,7 +139,7 @@ unsigned int DXGISwapChain::GetNumDroppedFrames()
 
     if (stats.PresentRefreshCount < m_firstStats.PresentRefreshCount
         || stats.PresentCount < m_firstStats.PresentCount) {
-        INFO("Resetting dropped frames counter!");
+        //INFO("Resetting dropped frames counter!");
         return 0;
     }
 
