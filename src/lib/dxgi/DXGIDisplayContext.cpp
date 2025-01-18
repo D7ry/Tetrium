@@ -28,6 +28,7 @@ bool prevFocused = true;
 // handle mouse input and translate such into ImGui mouse delta.
 // we do this instead of using ImGui's mouse function because we render
 // to a window of different size than the ImGui main viewport.
+// https://stackoverflow.com/questions/1257844/getting-mouse-position-unbounded-by-screen-size-c-windows
 bool HandleImGuiMouse(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
 

@@ -79,8 +79,8 @@ void Tetrium::pollInputs()
         GlobalStates::isWindowFocused = !GlobalStates::isWindowFocused;
         if (GlobalStates::isWindowFocused) {
             centerImGuiMousePos();
-        } 
-        ShowCursor(GlobalStates::isWindowFocused);
+            SetCursor(NULL);
+        }
     }
 #endif // WIN32
     // quit engine
