@@ -444,13 +444,13 @@ void Tetrium::drawImGui(ColorSpace colorSpace, int currentFrameInFlight)
         ImGuiTexture cursorTexture = _engineTextures[(int)EngineTexture::kCursor].second;
         ImGuiU::DrawCursor(cursorTexture);
 #if defined(WIN32)
-        SetCapture(_dxgiDisplay.window);
+        //SetCapture(_dxgiDisplay.window);
 #else
         glfwSetInputMode(_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 #endif // WIN32
     } else {
 #if defined(WIN32)
-        ReleaseCapture();
+        //ReleaseCapture();
 #else
         glfwSetInputMode(_window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 #endif // WIN32
