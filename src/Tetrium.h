@@ -21,6 +21,8 @@
 
 #include "lib/DeletionStack.h"
 
+#include "GlobalStates.h"
+
 // structs
 #include "structs/ImGuiTexture.h"
 #include "structs/SharedEngineStructs.h"
@@ -311,6 +313,8 @@ class Tetrium
         int swapChainImageIndex,
         ColorSpace colorSpace
     );
+    void centerImGuiMousePos();
+    void clipImGuiMousePos();
 
     void clearImGuiDrawData();
 
@@ -352,9 +356,6 @@ class Tetrium
     /* ---------- Tick-dynamic Data ---------- */
     bool _framebufferResized = false;
     uint8_t _currentFrame = 0;
-
-    // whether we are locking the cursor within the created window
-    bool _captureCursor = false;
 
     // engine level pause, toggle with P key
     bool _paused = false;

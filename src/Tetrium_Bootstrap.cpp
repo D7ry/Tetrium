@@ -50,7 +50,7 @@ void Tetrium::keyCallback(GLFWwindow* window, int key, int scancode, int action,
 
     // toggle cursor lock
     if (key == GLFW_KEY_TAB && action == GLFW_PRESS) {
-        _captureCursor = !_captureCursor;
+        GlobalStates::isWindowFocused = !GlobalStates::isWindowFocused;
     }
 }
 
@@ -97,8 +97,6 @@ void Tetrium::initDefaultStates()
     _clearValues[0].color = {0.0f, 0.0f, 0.f, 1.f};
     _clearValues[1].depthStencil = vk::ClearDepthStencilValue(1.f, 0.f);
 
-    // input states
-    _captureCursor = false;
 };
 
 void Tetrium::Init(const Tetrium::InitOptions& options)

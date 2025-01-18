@@ -76,7 +76,11 @@ void Tetrium::pollInputs()
     // note that none-win32 system uses GLFW for input capture,
     // win32 uses only one window
     if (ImGui::IsKeyPressed(ImGuiKey_Tab)) {
-        _captureCursor = !_captureCursor;
+        GlobalStates::isWindowFocused = !GlobalStates::isWindowFocused;
+        if (GlobalStates::isWindowFocused) {
+            centerImGuiMousePos();
+        } 
+        ShowCursor(GlobalStates::isWindowFocused);
     }
 #endif // WIN32
     // quit engine

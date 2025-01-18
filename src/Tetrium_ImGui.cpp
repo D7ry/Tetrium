@@ -253,7 +253,27 @@ void Tetrium::initImGuiRenderContext(Tetrium::ImGuiRenderContext& ctx)
     Tetrium_ImGui::setupImGuiStyle();
     Tetrium_ImGui::initFonts();
 
+    centerImGuiMousePos();
     DEBUG("imgui context initialized");
+}
+
+void Tetrium::centerImGuiMousePos()
+{
+    auto io = ImGui::GetIO();
+    // center cursor
+    auto windowCenter = ImVec2(io.DisplaySize.x / 2, io.DisplaySize.y / 2);
+    io.MousePos = windowCenter;
+    io.AddMousePosEvent(windowCenter.x, windowCenter.y);
+}
+
+// clip imgui's mouse pos to the window
+void Tetrium::clipImGuiMousePos()
+{
+    auto io = ImGui::GetIO();
+    auto windowSize = ImVec2(io.DisplaySize.x, io.DisplaySize.y);
+    io.MousePos.x = std::clamp(io.MousePos.x, 0.0f, windowSize.x);
+    io.MousePos.y = std::clamp(io.MousePos.y, 0.0f, windowSize.y);
+    io.AddMousePosEvent(io.MousePos.x, io.MousePos.y);
 }
 
 void Tetrium::recordImGuiDrawCommandBuffer(
@@ -419,6 +439,11 @@ void Tetrium::drawImGui(ColorSpace colorSpace, int currentFrameInFlight)
 #endif
     ImGui::NewFrame();
 
+    ImGuiIO& io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
+
+    clipImGuiMousePos();
+
     // imgui is associated with the glfw window to handle inputs,
     // but its actual fb is associated with the projector display;
     // so we need to manually re-adjust the display size for the scissors/
@@ -434,13 +459,12 @@ void Tetrium::drawImGui(ColorSpace colorSpace, int currentFrameInFlight)
             static_cast<float>(_mainProjectorDisplay.extent.height)
 #endif
         };
-        ImGuiIO& io = ImGui::GetIO();
         io.DisplaySize = projectorDisplaySize;
         io.DisplayFramebufferScale = {1, 1};
         ImGui::GetMainViewport()->Size = projectorDisplaySize;
     }
 
-    if (_captureCursor) {
+    if (GlobalStates::isWindowFocused) {
         ImGuiTexture cursorTexture = _engineTextures[(int)EngineTexture::kCursor].second;
         ImGuiU::DrawCursor(cursorTexture);
 #if defined(WIN32)
