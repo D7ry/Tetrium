@@ -24,21 +24,41 @@ namespace TetriumApp
 class AppPainter : public App
 {
   private:
+#define APP_PAINTER_USE_IDENTITY_TRANSFORM 0
     // transformation matrices from RYGB to RGB and OCV color spaces
     // the project renders in RGB and OCV color space.
-    std::array<glm::mat4x3, ColorSpace::ColorSpaceSize> _tranformMatrixFromRygb
-        = {// RYGB -> RGB
-           glm::mat4x3{
-               {0.00227389, 0.02027033, 0.84088907},
-               {0.09871685, 0.82513837, 0.08254044},
-               {-0.0825074, 0.09203826, -0.01052114},
-               {0.98151666, -0.02124976, -0.0095099}},
-           // RYGB -> OCV
-           glm::mat4x3{
-               {-0.03549117, 0., 0.},
-               {-0.30406722, 0., 0.},
-               {0.95542715, 0., 0.},
-               {0.06836908, 0., 0.}}};
+    // NOTE: the 4th row is not used but required for std140 layout padding
+    std::array<glm::mat4x4, ColorSpace::ColorSpaceSize> _tranformMatrixFromRygb = {
+#if APP_PAINTER_USE_IDENTITY_TRANSFORM
+        // RYGB -> RGB
+        glm::mat4x4{
+            {1, 0, 0, 0},
+            {0, 0, 0, 0},
+            {0, 1, 0, 0},
+            {0, 0, 1, 0},
+        },
+        // RYGB -> OCV
+        glm::mat4x4{
+            {1, 0, 0, 0},
+            {0, 0, 0, 0},
+            {0, 1, 0, 0},
+            {0, 0, 1, 0},
+        },
+#else
+        glm::mat4x4{
+            {0.9815166593137846, -0.021249756545876134, -0.009509897322450037, 0.0},
+            {-0.08250740137899303, 0.0920382578273052, -0.010521143643565989, 0.0},
+            {0.09871685006945341, 0.8251383685884338, 0.08254044197374301, 0.0},
+            {0.0022738919957916515, 0.02027032667801149, 0.8408890714703111, 0.0},
+        },
+        glm::mat4x4{
+            {0.06836907784191643, 0.0, 0.0, 0.0},
+            {0.9554271494416933, 0.0, 0.0, 0.0},
+            {-0.3040672192082057, 0.0, 0.0, 0.0},
+            {-0.035491169221697684, 0.0, 0.0, 0.0},
+        },
+#endif
+    };
 
     // Color picker widget that visualizes RYGB color space through slice of
     // tetrachromatic hue sphere.
@@ -146,7 +166,8 @@ class AppPainter : public App
     struct UBO
     {
         // either RYGB -> RGB or RYGB -> OCV
-        glm::mat4x3 transformMatrix;
+        // note the 4th row is unused in shader and is only used for std140 padding.
+        glm::mat4x4 transformMatrix;
     };
 
     // Render pass that samples from the paint space fb

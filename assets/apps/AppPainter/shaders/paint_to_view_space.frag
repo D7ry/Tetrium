@@ -1,8 +1,8 @@
 
 #version 450
 
-layout(binding = 0) uniform UBO {
-    mat4x3 transformMat;
+layout(std140, binding = 0) uniform UBO {
+    mat4x4 transformMat;
 } ubo;
 
 // samplers that samples frame buffer from RYGB pass
@@ -17,7 +17,8 @@ void main() {
     vec4 colorRYGB = texture(canvasRYGB, fragUV);
 
     // apply color transform matrix, converting RYGB to RGB/OCV
-    vec4 colorViewSpace = vec4(ubo.transformMat * colorRYGB, 1.f);
+    vec4 colorViewSpace = vec4((ubo.transformMat * colorRYGB).xyz, 1.f);
 
     outColor = colorViewSpace;
+    //outColor = vec4(colorRYGB.rba, 1.f);
 }
