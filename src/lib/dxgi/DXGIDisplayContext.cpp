@@ -53,6 +53,7 @@ bool HandleImGuiMouse(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
         ImGuiIO& io = ImGui::GetIO();
         POINT cursorPos;
         GetCursorPos(&cursorPos);
+        ScreenToClient(hWnd, &cursorPos);
         int deltaX = 0;
         int deltaY = 0;
         // only calculate delta X and Y if we were previously focused
