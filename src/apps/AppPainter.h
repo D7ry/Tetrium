@@ -60,6 +60,41 @@ class AppPainter : public App
 #endif
     };
 
+    // Render pass that samples from the paint space fb
+    // and transforms the colors to RGB and OCV color spaces.
+    // the pass relies on a shader that renders onto a full-screen quad.
+    //
+    // The shader
+    // 1. samples from the paint space frame buffer as a texture
+    // 2. applies 4x4 transformation matrix
+    // depending on the color space,
+    struct RYGBToViewSpaceContext
+    {
+        vk::RenderPass renderPass = VK_NULL_HANDLE;
+
+        vk::PipelineLayout pipelineLayout = VK_NULL_HANDLE;
+        vk::Pipeline pipeline = VK_NULL_HANDLE;
+
+        vk::DescriptorPool descriptorPool = VK_NULL_HANDLE;
+        vk::DescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
+
+        std::array<VQBuffer, NUM_FRAME_IN_FLIGHT> ubo = {};
+        std::array<vk::Sampler, NUM_FRAME_IN_FLIGHT> samplers = {};
+    };
+
+    enum class RYGBToViewSpaceBindingLocation : uint32_t
+    {
+        ubo = 0,
+        textureSampler = 1
+    };
+
+    struct RYGBToViewSpaceUBO
+    {
+        // either RYGB -> RGB or RYGB -> OCV
+        // note the 4th row is unused in shader and is only used for std140 padding.
+        glm::mat4x4 transformMatrix;
+    };
+
     // GPU-accessible texture to sample from in paint space.
     struct SharedTexture
     {
@@ -78,11 +113,13 @@ class AppPainter : public App
     class ColorPicker
     {
       public:
-        void Init();
+        void Init(RYGBToViewSpaceContext* rygbToViewspaceCtx);
         void Cleanup();
 
         // Draw the color picker widget
         void TickImGui(const TetriumApp::TickContextImGui& ctx);
+
+        void TickVulkan(TetriumApp::TickContextVulkan& ctx);
 
         // Get the selected color in RYGB color space
         inline glm::vec4 GetSelectedColorRYGB() const;
@@ -94,22 +131,23 @@ class AppPainter : public App
         // luminance, and saturation. Must be called after any of the above changes.
         void updateSelectedColor();
 
+        void initCubemapTexture();
+        void cleanupCubemapTexture();
+
         // currently we only use a fixed texture -- which kind of works for its dimension
 
         // selected color in RYGB color space
         glm::vec4 _selectedColorRYGB = glm::vec4(1.f);
 
         // Cubemap texture
-        // TODO: add field
-        // TODO: implement real-time cubemap that reacts to the sliders.
-        // Texture _cubemapTexture;
-
         SharedTexture _cubemapTexture;
 
 
         // slider values for luminance and saturation
         float _luminance = 1.f;
         float _saturation = 1.f;
+
+        bool _needGenerateNewCubemap = true;
     };
 
   public:
@@ -161,44 +199,15 @@ class AppPainter : public App
 
     // ---------- Paint to view space transformation context ----------
 
-    enum class BindingLocation : uint32_t
-    {
-        ubo = 0,
-        canvasSampler = 1
-    };
-
-    struct UBO
-    {
-        // either RYGB -> RGB or RYGB -> OCV
-        // note the 4th row is unused in shader and is only used for std140 padding.
-        glm::mat4x4 transformMatrix;
-    };
-
-    // Render pass that samples from the paint space fb
-    // and transforms the colors to RGB and OCV color spaces.
-    // the pass relies on a shader that renders onto a full-screen quad.
-    //
-    // The shader
-    // 1. samples from the paint space frame buffer as a texture
-    // 2. applies 4x4 transformation matrix
-    // depending on the color space,
-    struct
-    {
-        vk::RenderPass renderPass = VK_NULL_HANDLE;
-
-        vk::PipelineLayout pipelineLayout = VK_NULL_HANDLE;
-        vk::Pipeline pipeline = VK_NULL_HANDLE;
-
-        vk::DescriptorPool descriptorPool = VK_NULL_HANDLE;
-        vk::DescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
-        std::array<vk::DescriptorSet, NUM_FRAME_IN_FLIGHT> descriptorSets = {};
-
-        std::array<VQBuffer, NUM_FRAME_IN_FLIGHT> ubo = {};
-        std::array<vk::Sampler, NUM_FRAME_IN_FLIGHT> samplers = {};
-    } _paintToViewSpaceContext;
+    // shared between painter and color picker
+    RYGBToViewSpaceContext _paintToViewSpaceContext;
+    // descriptor sets 
+    std::array<vk::DescriptorSet, NUM_FRAME_IN_FLIGHT> _canvasToViewSpaceDescriptorSets = {};
 
     void initPaintToViewSpaceContext(TetriumApp::InitContext& ctx);
     void cleanupPaintToViewSpaceContext(TetriumApp::CleanupContext& ctx);
+
+    void initDescriptorSets(TetriumApp::InitContext& ctx);
 
     std::array<vk::ClearValue, 2> _clearValues; // [color, depthStencil]
 

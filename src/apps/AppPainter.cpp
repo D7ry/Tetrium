@@ -150,7 +150,7 @@ void AppPainter::initPaintToViewSpaceContext(TetriumApp::InitContext& ctx)
     /* create UBO */
     for (VQBuffer& ubo : _paintToViewSpaceContext.ubo) {
         ctx.device.CreateBufferInPlace(
-            sizeof(UBO),
+            sizeof(RYGBToViewSpaceUBO),
             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
             ubo
@@ -175,10 +175,10 @@ void AppPainter::initPaintToViewSpaceContext(TetriumApp::InitContext& ctx)
     /* create descriptor pool */
     {
         vk::DescriptorPoolSize poolSizes[]
-            = {{vk::DescriptorType::eUniformBuffer, NUM_FRAME_IN_FLIGHT},
-               {vk::DescriptorType::eCombinedImageSampler, NUM_FRAME_IN_FLIGHT}};
+            = {{vk::DescriptorType::eUniformBuffer, NUM_FRAME_IN_FLIGHT * 2},
+               {vk::DescriptorType::eCombinedImageSampler, NUM_FRAME_IN_FLIGHT * 2}};
 
-        vk::DescriptorPoolCreateInfo poolCreateInfo({}, NUM_FRAME_IN_FLIGHT * 2, 2, poolSizes);
+        vk::DescriptorPoolCreateInfo poolCreateInfo({}, NUM_FRAME_IN_FLIGHT * 4, 2, poolSizes);
 
         _paintToViewSpaceContext.descriptorPool = device.createDescriptorPool(poolCreateInfo);
     }
@@ -188,7 +188,7 @@ void AppPainter::initPaintToViewSpaceContext(TetriumApp::InitContext& ctx)
         std::array<vk::DescriptorSetLayoutBinding, 2> descriptorSetLayoutBindings
             = {// UBO
                vk::DescriptorSetLayoutBinding(
-                   (uint32_t)BindingLocation::ubo,
+                   (uint32_t)RYGBToViewSpaceBindingLocation::ubo,
                    vk::DescriptorType::eUniformBuffer,
                    1,
                    vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
@@ -197,7 +197,7 @@ void AppPainter::initPaintToViewSpaceContext(TetriumApp::InitContext& ctx)
                ),
                // paint space texture sampler
                vk::DescriptorSetLayoutBinding(
-                   (uint32_t)BindingLocation::canvasSampler,
+                   (uint32_t)RYGBToViewSpaceBindingLocation::textureSampler,
                    vk::DescriptorType::eCombinedImageSampler,
                    1,
                    vk::ShaderStageFlagBits::eFragment,
@@ -213,62 +213,6 @@ void AppPainter::initPaintToViewSpaceContext(TetriumApp::InitContext& ctx)
         ASSERT(res == vk::Result::eSuccess);
     }
 
-    /* allocate descriptor sets */
-    {
-        std::vector<vk::DescriptorSetLayout> layouts(
-            NUM_FRAME_IN_FLIGHT, _paintToViewSpaceContext.descriptorSetLayout
-        );
-        vk::DescriptorSetAllocateInfo descriptorSetAllocateInfo(
-            _paintToViewSpaceContext.descriptorPool, NUM_FRAME_IN_FLIGHT, layouts.data()
-        );
-        std::vector<vk::DescriptorSet> res
-            = device.allocateDescriptorSets(descriptorSetAllocateInfo);
-        ASSERT(res.size() == _paintToViewSpaceContext.descriptorSets.size());
-        for (size_t i = 0; i < res.size(); i++) {
-            _paintToViewSpaceContext.descriptorSets[i] = res[i];
-        }
-    }
-
-    /* update descriptor sets */
-    {
-        for (int i = 0; i < _paintToViewSpaceContext.descriptorSets.size(); i++) {
-            vk::DescriptorSet descriptorSet = _paintToViewSpaceContext.descriptorSets[i];
-
-            vk::DescriptorBufferInfo bufferInfo(
-                _paintToViewSpaceContext.ubo[i].buffer, 0, sizeof(UBO)
-            );
-
-            vk::DescriptorImageInfo imageInfo(
-                _paintToViewSpaceContext.samplers[i],
-                _paintSpaceTexture[0].imageView,
-                vk::ImageLayout::eGeneral
-            );
-
-            device.updateDescriptorSets(
-                {vk::WriteDescriptorSet(
-                     descriptorSet,
-                     (uint32_t)BindingLocation::ubo,
-                     0,
-                     1,
-                     vk::DescriptorType::eUniformBuffer,
-                     nullptr,
-                     &bufferInfo,
-                     nullptr
-                 ),
-                 vk::WriteDescriptorSet(
-                     descriptorSet,
-                     (uint32_t)BindingLocation::canvasSampler,
-                     0,
-                     1,
-                     vk::DescriptorType::eCombinedImageSampler,
-                     &imageInfo,
-                     nullptr,
-                     nullptr
-                 )},
-                nullptr
-            );
-        }
-    }
 
     /* create renderpass */
     {
@@ -480,18 +424,80 @@ void AppPainter::cleanupPaintToViewSpaceContext(TetriumApp::CleanupContext& ctx)
     device.destroyPipelineLayout(_paintToViewSpaceContext.pipelineLayout);
 }
 
+void AppPainter::initDescriptorSets(TetriumApp::InitContext& ctx)
+{
+    auto device = ctx.device.Get();
+    /* allocate descriptor sets */
+    {
+        std::vector<vk::DescriptorSetLayout> layouts(
+            NUM_FRAME_IN_FLIGHT, _paintToViewSpaceContext.descriptorSetLayout
+        );
+        vk::DescriptorSetAllocateInfo descriptorSetAllocateInfo(
+            _paintToViewSpaceContext.descriptorPool, NUM_FRAME_IN_FLIGHT, layouts.data()
+        );
+        std::vector<vk::DescriptorSet> res
+            = device.allocateDescriptorSets(descriptorSetAllocateInfo);
+        ASSERT(res.size() == _canvasToViewSpaceDescriptorSets.size());
+        for (size_t i = 0; i < res.size(); i++) {
+            _canvasToViewSpaceDescriptorSets[i] = res[i];
+        }
+    }
+
+    /* update descriptor sets */
+    {
+        for (int i = 0; i < _canvasToViewSpaceDescriptorSets.size(); i++) {
+            vk::DescriptorSet descriptorSet = _canvasToViewSpaceDescriptorSets[i];
+
+            vk::DescriptorBufferInfo bufferInfo(
+                _paintToViewSpaceContext.ubo[i].buffer, 0, sizeof(RYGBToViewSpaceUBO)
+            );
+
+            vk::DescriptorImageInfo imageInfo(
+                _paintToViewSpaceContext.samplers[i],
+                _paintSpaceTexture[i].imageView,
+                vk::ImageLayout::eGeneral
+            );
+
+            device.updateDescriptorSets(
+                {vk::WriteDescriptorSet(
+                     descriptorSet,
+                     (uint32_t)RYGBToViewSpaceBindingLocation::ubo,
+                     0,
+                     1,
+                     vk::DescriptorType::eUniformBuffer,
+                     nullptr,
+                     &bufferInfo,
+                     nullptr
+                 ),
+                 vk::WriteDescriptorSet(
+                     descriptorSet,
+                     (uint32_t)RYGBToViewSpaceBindingLocation::textureSampler,
+                     0,
+                     1,
+                     vk::DescriptorType::eCombinedImageSampler,
+                     &imageInfo,
+                     nullptr,
+                     nullptr
+                 )},
+                nullptr
+            );
+        }
+    }
+}
+
 void AppPainter::Init(TetriumApp::InitContext& ctx)
 {
     initPaintSpaceBuffer(ctx);
     initPaintSpaceTexture(ctx);
     initPaintToViewSpaceContext(ctx);
+    initDescriptorSets(ctx);
     initViewSpaceFrameBuffer(ctx);
 
     _clearValues
         = {vk::ClearColorValue(std::array<float, 4>{0.0f, 0.0f, 0.0f, 1.0f}),
            vk::ClearDepthStencilValue(1.0f, 0)};
 
-    _colorPicker.Init();
+    _colorPicker.Init(&_paintToViewSpaceContext);
 }
 
 void AppPainter::Cleanup(TetriumApp::CleanupContext& ctx)
@@ -545,7 +551,7 @@ void AppPainter::TickVulkan(TetriumApp::TickContextVulkan& ctx)
     }
 
     // flush UBO
-    UBO* pUBO = reinterpret_cast<UBO*>(
+    RYGBToViewSpaceUBO* pUBO = reinterpret_cast<RYGBToViewSpaceUBO*>(
         _paintToViewSpaceContext.ubo[ctx.currentFrameInFlight].bufferAddress
     );
 
@@ -571,7 +577,7 @@ void AppPainter::TickVulkan(TetriumApp::TickContextVulkan& ctx)
         _paintToViewSpaceContext.pipelineLayout,
         0,
         1,
-        &_paintToViewSpaceContext.descriptorSets[ctx.currentFrameInFlight],
+        &_canvasToViewSpaceDescriptorSets[ctx.currentFrameInFlight],
         0,
         nullptr,
         vk::getDispatchLoaderStatic()
@@ -579,6 +585,8 @@ void AppPainter::TickVulkan(TetriumApp::TickContextVulkan& ctx)
     // draw a full-screen quad
     cb.draw(3, 1, 0, 0);
     cb.endRenderPass();
+
+    _colorPicker.TickVulkan(ctx);
 }
 
 } // namespace TetriumApp

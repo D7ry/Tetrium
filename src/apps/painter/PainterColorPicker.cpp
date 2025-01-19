@@ -10,6 +10,17 @@
  * to a texture. The CPU then addresses the texture to get the selected RYGB color.
  * Presenting the RYGB cubemap is similar to presenting the canvas, where we
  * transform the RYGB color space into RGB/OCV using a 4x3 mat.
+ *
+ * At Tick time:
+ * ---- ImGUI Tick
+ * The color picker uses the current offset to read from the CPU-accessilbe cubemap texture.
+ * ---- Vulkan Tick
+ * If there is a change to either saturation and luminance:
+ * | 1. the cubemap texture generation pass runs, updating cubemap texture using saturation and luminance,
+ * |   for each coordinate on the cubemap
+ * | 2. the cubemap texture gets copied to the CPU-accessilbe cubemap staging buffer
+ * Render the RYGB cubemap texture, transforming it to RGB/OCV space using the 4x3 mat.
+ *
  */
 
 #include "apps/AppPainter.h"
@@ -18,7 +29,7 @@ namespace TetriumApp
 {
 
 // TODO: impl
-void AppPainter::ColorPicker::Init()
+void AppPainter::ColorPicker::Init(RYGBToViewSpaceContext* rygbToViewspaceCtx)
 {
     // Load cubemap texture
 }
@@ -27,6 +38,11 @@ void AppPainter::ColorPicker::Init()
 void AppPainter::ColorPicker::Cleanup()
 {
     // Cleanup cubemap texture
+}
+
+void AppPainter::ColorPicker::TickVulkan(TetriumApp::TickContextVulkan& ctx)
+{
+    
 }
 
 void AppPainter::ColorPicker::TickImGui(const TetriumApp::TickContextImGui& ctx)
@@ -39,6 +55,11 @@ void AppPainter::ColorPicker::TickImGui(const TetriumApp::TickContextImGui& ctx)
         ImGui::SliderFloat("Y", &_selectedColorRYGB.g, -1.0f, 1.0f);
         ImGui::SliderFloat("G", &_selectedColorRYGB.b, -1.0f, 1.0f);
         ImGui::SliderFloat("B", &_selectedColorRYGB.a, -1.0f, 1.0f);
+
+        bool luminanceChanged = ImGui::SliderFloat("Luminance", &_luminance, 0, 1);
+        bool saturationChanged = ImGui::SliderFloat("Saturation", &_saturation, 0, 1);
+
+        _needGenerateNewCubemap = _needGenerateNewCubemap || luminanceChanged || saturationChanged;
     }
 
 
