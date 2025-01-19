@@ -113,8 +113,8 @@ class AppPainter : public App
     class ColorPicker
     {
       public:
-        void Init(RYGBToViewSpaceContext* rygbToViewspaceCtx);
-        void Cleanup();
+        void Init(TetriumApp::InitContext& ctx, RYGBToViewSpaceContext* rygbToViewspaceCtx);
+        void Cleanup(TetriumApp::CleanupContext& ctx);
 
         // Draw the color picker widget
         void TickImGui(const TetriumApp::TickContextImGui& ctx);
@@ -127,27 +127,63 @@ class AppPainter : public App
         std::array<float, 4> GetSelectedColorRYGBData() const;
 
       private:
+        enum class CubemapGenerationBindingLocation : uint32_t
+        {
+            ubo = 0,
+        };
         // update the selected color based on cubemap texture coordinate,
         // luminance, and saturation. Must be called after any of the above changes.
         void updateSelectedColor();
-
-        void initCubemapTexture();
-        void cleanupCubemapTexture();
 
         // currently we only use a fixed texture -- which kind of works for its dimension
 
         // selected color in RYGB color space
         glm::vec4 _selectedColorRYGB = glm::vec4(1.f);
 
-        // Cubemap texture
-        SharedTexture _cubemapTexture;
+        // Cubemap texture that we `_cubemapGenerateContext` render into
+        // the texture is used for:
+        // 1. RYGB color space texture that is sampled by `RYGBToViewSpaceContext`'s
+        // pass to generate view space cubemap texture -- _cubemapTextureViewSpace
+        // 2.[TODO] being copied to CPU-accessible staging buffer for color-picking
+        TextureFrameBuffer _cubemapTexture;
 
+        // view space cubemap texture in RGB/OCV color space
+        TextureFrameBuffer _cubemapTextureViewSpace;
 
         // slider values for luminance and saturation
         float _luminance = 1.f;
         float _saturation = 1.f;
 
         bool _needGenerateNewCubemap = true;
+
+        std::array<vk::ClearValue, 2> _clearValues; // [color, depthStencil]
+
+        static const uint32_t CUBEMAP_CUBE_SIZE = 256;
+        static const uint32_t CUBEMAP_WIDTH = 4 * CUBEMAP_CUBE_SIZE;
+        static const uint32_t CUBEMAP_HEIGHT = 3 * CUBEMAP_CUBE_SIZE;
+
+        RYGBToViewSpaceContext* _rygbToViewSpaceCtx;
+
+        // render context to generate an RYGB cubemap texture,
+        // using luminance, saturation, and cubemap texture coordinate.
+        // writes to `_cubemapTexture`
+        struct
+        {
+            vk::RenderPass renderPass = VK_NULL_HANDLE;
+
+            vk::PipelineLayout pipelineLayout = VK_NULL_HANDLE;
+            vk::Pipeline pipeline = VK_NULL_HANDLE;
+
+            vk::DescriptorPool descriptorPool = VK_NULL_HANDLE;
+            vk::DescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
+
+            vk::DescriptorSet descriptorSet = VK_NULL_HANDLE;
+
+            VQBuffer ubo = {};
+        } _cubemapGenerateContext;
+
+        void initCubemapGenerateContext(TetriumApp::InitContext& ctx);
+        void cleanupCubemapGenerateContext();
     };
 
   public:

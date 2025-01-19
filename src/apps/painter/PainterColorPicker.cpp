@@ -19,29 +19,397 @@
  * | 1. the cubemap texture generation pass runs, updating cubemap texture using saturation and luminance,
  * |   for each coordinate on the cubemap
  * | 2. the cubemap texture gets copied to the CPU-accessilbe cubemap staging buffer
+ * | 3. the cubemap texture gets sampled by the RYGBToViewSpaceContext pass to generate view space(RGB/OCV) texture
+ * |    for ImGui to render
  * Render the RYGB cubemap texture, transforming it to RGB/OCV space using the 4x3 mat.
  *
  */
 
 #include "apps/AppPainter.h"
+#include <Pathing.h>
+#include <components/ShaderUtils.h>
 
 namespace TetriumApp
 {
 
-// TODO: impl
-void AppPainter::ColorPicker::Init(RYGBToViewSpaceContext* rygbToViewspaceCtx)
+void AppPainter::ColorPicker::initCubemapGenerateContext(TetriumApp::InitContext& ctx)
 {
-    // Load cubemap texture
+    vk::Device device = ctx.device.logicalDevice;
+
+    /* create UBO */
+    ctx.device.CreateBufferInPlace(
+        sizeof(RYGBToViewSpaceUBO),
+        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        _cubemapGenerateContext.ubo
+    );
+
+    /* Descriptors */
+    /* create descriptor pool */
+    {
+        // TODO: use clean descriptor pool sizing
+        vk::DescriptorPoolSize poolSizes[]
+            = {{vk::DescriptorType::eUniformBuffer, NUM_FRAME_IN_FLIGHT * 2},
+               {vk::DescriptorType::eCombinedImageSampler, NUM_FRAME_IN_FLIGHT * 2}};
+
+        vk::DescriptorPoolCreateInfo poolCreateInfo({}, NUM_FRAME_IN_FLIGHT * 4, 2, poolSizes);
+
+        _cubemapGenerateContext.descriptorPool = device.createDescriptorPool(poolCreateInfo);
+    }
+
+    /* create descriptor set layout */
+    {
+        std::array<vk::DescriptorSetLayoutBinding, 1> descriptorSetLayoutBindings
+            = {// UBO
+               vk::DescriptorSetLayoutBinding(
+                   (uint32_t)CubemapGenerationBindingLocation::ubo,
+                   vk::DescriptorType::eUniformBuffer,
+                   1,
+                   vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
+                   nullptr
+
+               ),
+               };
+        vk::DescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo(
+            {}, descriptorSetLayoutBindings.size(), descriptorSetLayoutBindings.data()
+        );
+
+        vk::Result res = device.createDescriptorSetLayout(
+            &descriptorSetLayoutCreateInfo, nullptr, &_cubemapGenerateContext.descriptorSetLayout
+        );
+        ASSERT(res == vk::Result::eSuccess);
+    }
+
+    /* create descriptor set*/
+    {
+        /* allocate descriptor sets */
+        {
+            std::vector<vk::DescriptorSetLayout> layouts(
+                1, _cubemapGenerateContext.descriptorSetLayout
+            );
+            vk::DescriptorSetAllocateInfo descriptorSetAllocateInfo(
+                _cubemapGenerateContext.descriptorPool, 1, layouts.data()
+            );
+            std::vector<vk::DescriptorSet> res
+                = device.allocateDescriptorSets(descriptorSetAllocateInfo);
+            ASSERT(res.size() == 1)
+            _cubemapGenerateContext.descriptorSet = res[0];
+        }
+
+        /* update descriptor sets */
+        {
+            vk::DescriptorSet descriptorSet = _cubemapGenerateContext.descriptorSet;
+
+            vk::DescriptorBufferInfo bufferInfo(
+                _cubemapGenerateContext.ubo.buffer, 0, sizeof(RYGBToViewSpaceUBO)
+            );
+
+
+            device.updateDescriptorSets(
+                {vk::WriteDescriptorSet(
+                     descriptorSet,
+                     (uint32_t)RYGBToViewSpaceBindingLocation::ubo,
+                     0,
+                     1,
+                     vk::DescriptorType::eUniformBuffer,
+                     nullptr,
+                     &bufferInfo,
+                     nullptr
+                 ),
+                 },
+                nullptr
+            );
+        }
+    }
+
+
+    /* create renderpass */
+    {
+        vk::AttachmentReference colorAttachmentRef(0, vk::ImageLayout::eColorAttachmentOptimal);
+        vk::AttachmentReference depthAttachmentRef(
+            1, vk::ImageLayout::eDepthStencilAttachmentOptimal
+        );
+        vk::SubpassDescription subpass(
+            {},
+            vk::PipelineBindPoint::eGraphics,
+            0,
+            nullptr,
+            1,
+            &colorAttachmentRef,
+            nullptr,
+            &depthAttachmentRef
+        );
+        vk::AttachmentDescription attachments[2]
+            = {// color attachment
+               vk::AttachmentDescription(
+                   {},
+                   vk::Format::eR32G32B32A32Sfloat,
+                   vk::SampleCountFlagBits::e1,
+                   vk::AttachmentLoadOp::eClear,
+                   vk::AttachmentStoreOp::eStore,
+                   vk::AttachmentLoadOp::eDontCare,
+                   vk::AttachmentStoreOp::eDontCare,
+                   vk::ImageLayout::eUndefined,
+                   vk::ImageLayout::eShaderReadOnlyOptimal // write to imgui texture
+               ),
+               // depth attachment
+               vk::AttachmentDescription(
+                   {},
+                   vk::Format(ctx.device.depthFormat),
+                   vk::SampleCountFlagBits::e1,
+                   vk::AttachmentLoadOp::eClear,
+                   vk::AttachmentStoreOp::eDontCare,
+                   vk::AttachmentLoadOp::eDontCare,
+                   vk::AttachmentStoreOp::eDontCare,
+                   vk::ImageLayout::eUndefined,
+                   vk::ImageLayout::eDepthStencilAttachmentOptimal
+               )};
+        vk::RenderPassCreateInfo createInfo({}, 2, attachments, 1, &subpass, 0);
+        _cubemapGenerateContext.renderPass = device.createRenderPass(createInfo);
+        ASSERT(_cubemapGenerateContext.renderPass != VK_NULL_HANDLE);
+    }
+
+    /* create pipeline */
+    {
+        std::string VERTEX_SHADER_PATH
+            = std::string(ASSETS_PATH + "apps/AppPainter/shaders/cubemap_rygb_gen.vert.spv");
+        std::string FRAGMENT_SHADER_PATH
+            = std::string(ASSETS_PATH + "apps/AppPainter/shaders/cubemap_rygb_gen.frag.spv");
+
+        // shader modules
+        vk::ShaderModule vertShaderModule
+            = ShaderCreation::createShaderModule(ctx.device.logicalDevice, VERTEX_SHADER_PATH.c_str());
+        vk::ShaderModule fragShaderModule
+            = ShaderCreation::createShaderModule(ctx.device.logicalDevice, FRAGMENT_SHADER_PATH.c_str());
+
+        std::array<vk::PipelineShaderStageCreateInfo, 2> shaderStages
+            = {vk::PipelineShaderStageCreateInfo(
+                   {}, vk::ShaderStageFlagBits::eVertex, vertShaderModule, "main"
+               ),
+               vk::PipelineShaderStageCreateInfo(
+                   {}, vk::ShaderStageFlagBits::eFragment, fragShaderModule, "main"
+               )};
+
+        // no vertex input -- use full screen quad only
+        vk::PipelineVertexInputStateCreateInfo vertexInputInfo({}, 0, nullptr, 0, nullptr);
+
+        vk::PipelineInputAssemblyStateCreateInfo inputAssembly(
+            {}, vk::PrimitiveTopology::eTriangleList, VK_FALSE
+        );
+
+        vk::PipelineDepthStencilStateCreateInfo depthStencil(
+            {}, VK_TRUE, VK_TRUE, vk::CompareOp::eLess, VK_FALSE, VK_FALSE
+        );
+
+        // viewport + scissor
+        std::vector<vk::DynamicState> dynamicStates
+            = {vk::DynamicState::eViewport, vk::DynamicState::eScissor};
+
+        vk::PipelineDynamicStateCreateInfo dynamicState(
+            {}, dynamicStates.size(), dynamicStates.data()
+        );
+
+        vk::Viewport viewport(
+            0.f, 0.f, CUBEMAP_WIDTH, CUBEMAP_HEIGHT, 0.f, 1.f
+        );
+        vk::Rect2D scissor(
+            {0, 0},
+            {
+                CUBEMAP_WIDTH,
+                CUBEMAP_HEIGHT,
+            }
+        );
+        vk::PipelineViewportStateCreateInfo viewportState({}, 1, &viewport, 1, &scissor);
+
+        // rasterizer
+        vk::PipelineRasterizationStateCreateInfo rasterizer(
+            vk::PipelineRasterizationStateCreateFlags(),
+            VK_FALSE, // depthClampEnable
+            VK_FALSE, // rasterizerDiscardEnable
+            vk::PolygonMode::eFill,
+            vk::CullModeFlagBits::eNone,
+            vk::FrontFace::eCounterClockwise,
+            VK_FALSE, // depthBiasEnable
+            0.0f,     // depthBiasConstantFactor
+            0.0f,     // depthBiasClamp
+            0.0f,     // depthBiasSlopeFactor
+            1.0f      // lineWidth
+        );
+
+        vk::PipelineMultisampleStateCreateInfo multisampling(
+            vk::PipelineMultisampleStateCreateFlags(),
+            vk::SampleCountFlagBits::e1,
+            VK_FALSE, // sampleShadingEnable
+            1.0f,     // minSampleShading
+            nullptr,  // pSampleMask
+            VK_FALSE, // alphaToCoverageEnable
+            VK_FALSE  // alphaToOneEnable
+        );
+
+        vk::PipelineColorBlendAttachmentState colorBlendAttachment(
+            VK_FALSE, // blendEnable
+            vk::BlendFactor::eOne,
+            vk::BlendFactor::eZero,
+            vk::BlendOp::eAdd,
+            vk::BlendFactor::eOne,
+            vk::BlendFactor::eZero,
+            vk::BlendOp::eAdd,
+            vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG
+                | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA
+        );
+
+        vk::PipelineColorBlendStateCreateInfo colorBlending(
+            vk::PipelineColorBlendStateCreateFlags(),
+            VK_FALSE, // logicOpEnable
+            vk::LogicOp::eCopy,
+            1,
+            &colorBlendAttachment,
+            {0.0f, 0.0f, 0.0f, 0.0f} // blendConstants
+        );
+
+        vk::PipelineLayoutCreateInfo pipelineLayoutInfo(
+            vk::PipelineLayoutCreateFlags(),
+            1,
+            &_cubemapGenerateContext.descriptorSetLayout,
+            0,
+            nullptr
+        );
+
+        if (device.createPipelineLayout(
+                &pipelineLayoutInfo, nullptr, &_cubemapGenerateContext.pipelineLayout
+            )
+            != vk::Result::eSuccess) {
+            FATAL("Failed to create pipeline layout!");
+        }
+
+        vk::GraphicsPipelineCreateInfo pipelineInfo(
+            vk::PipelineCreateFlags(),               // flags
+            shaderStages.size(),                     // stageCount
+            shaderStages.data(),                     // pStages
+            &vertexInputInfo,                        // pVertexInputState
+            &inputAssembly,                          // pInputAssemblyState
+            nullptr,                                 // pTessellationState
+            &viewportState,                          // pViewportState
+            &rasterizer,                             // pRasterizationState
+            &multisampling,                          // pMultisampleState
+            &depthStencil,                           // pDepthStencilState
+            &colorBlending,                          // pColorBlendState
+            &dynamicState,                           // pDynamicState
+            _cubemapGenerateContext.pipelineLayout, // layout
+            _cubemapGenerateContext.renderPass,     // renderPass
+            0,                                       // subpass
+            vk::Pipeline(),                          // basePipelineHandle
+            -1                                       // basePipelineIndex
+        );
+
+        if (device.createGraphicsPipelines(
+                nullptr, 1, &pipelineInfo, nullptr, &_cubemapGenerateContext.pipeline
+            )
+            != vk::Result::eSuccess) {
+            FATAL("Failed to create graphics pipeline!");
+        }
+
+        device.destroyShaderModule(fragShaderModule, nullptr);
+        device.destroyShaderModule(vertShaderModule, nullptr);
+    }
+}
+
+void AppPainter::ColorPicker::cleanupCubemapGenerateContext()
+{
+    NEEDS_IMPLEMENTATION()
+    
+}
+
+
+// TODO: impl
+void AppPainter::ColorPicker::Init(TetriumApp::InitContext& ctx, RYGBToViewSpaceContext* rygbToViewspaceCtx)
+{
+    initCubemapGenerateContext(ctx);
+    DEBUG("here1");
+    ASSERT(_cubemapGenerateContext.renderPass)
+    _cubemapTexture.Init(
+        ctx.device.logicalDevice,
+        ctx.device.physicalDevice,
+        _cubemapGenerateContext.renderPass,
+        CUBEMAP_WIDTH,
+        CUBEMAP_HEIGHT,
+        VK_FORMAT_R32G32B32A32_SFLOAT, // RYGB color space
+        ctx.device.depthFormat,
+        true // TODO: set to false, true for debugging rygb only
+    );
+
+    _rygbToViewSpaceCtx = rygbToViewspaceCtx;
+    
+    ASSERT(_rygbToViewSpaceCtx->renderPass)
+    _cubemapTextureViewSpace.Init(
+        ctx.device.logicalDevice,
+        ctx.device.physicalDevice,
+        _rygbToViewSpaceCtx->renderPass, // TODO: put RYGBTOviewspaceContext to a separate file
+        CUBEMAP_WIDTH,
+        CUBEMAP_HEIGHT,
+        VK_FORMAT_R8G8B8A8_SRGB, // RGB / OCV color space
+        ctx.device.depthFormat,
+        true
+    );
+
+    _clearValues
+        = {vk::ClearColorValue(std::array<float, 4>{0.0f, 0.0f, 0.0f, 1.0f}),
+           vk::ClearDepthStencilValue(1.0f, 0)};
+    DEBUG("here3");
+
 }
 
 // TODO: impl
-void AppPainter::ColorPicker::Cleanup()
+void AppPainter::ColorPicker::Cleanup(TetriumApp::CleanupContext& ctx)
 {
-    // Cleanup cubemap texture
+    cleanupCubemapGenerateContext();
+    _cubemapTextureViewSpace.Cleanup();
+    _cubemapTexture.Cleanup();
 }
 
 void AppPainter::ColorPicker::TickVulkan(TetriumApp::TickContextVulkan& ctx)
 {
+    vk::CommandBuffer& cb = ctx.commandBuffer;
+    if (_needGenerateNewCubemap) {
+        // begin render pass to write into new cubemap
+
+        vk::Extent2D extent(CUBEMAP_WIDTH, CUBEMAP_HEIGHT);
+        vk::Rect2D renderArea(VkOffset2D{0, 0}, extent);
+        vk::RenderPassBeginInfo renderPassBeginInfo(
+            _cubemapGenerateContext.renderPass,
+            _cubemapTexture.GetFrameBuffer(),
+            renderArea,
+            _clearValues.size(),
+            _clearValues.data()
+        );
+
+        cb.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
+        cb.setViewport(0, vk::Viewport(0.f, 0.f, extent.width, extent.height, 0.f, 1.f));
+        cb.setScissor(0, vk::Rect2D({0, 0}, extent));
+
+        cb.bindPipeline(vk::PipelineBindPoint::eGraphics, _cubemapGenerateContext.pipeline);
+
+        cb.bindDescriptorSets(
+            vk::PipelineBindPoint::eGraphics,
+            _cubemapGenerateContext.pipelineLayout,
+            0,
+            1,
+            &_cubemapGenerateContext.descriptorSet,
+            0,
+            nullptr,
+            vk::getDispatchLoaderStatic()
+        );
+        cb.draw(3, 1, 0, 0);
+        cb.endRenderPass();
+
+        // TODO: copy cubemap into CPU-accessible staging buffer
+
+        // TODO: set _needGenerateNewCubemap to false
+    }
+
+    // transform cubemap into view space
+    //NEEDS_IMPLEMENTATION()
+    
     
 }
 
@@ -56,10 +424,17 @@ void AppPainter::ColorPicker::TickImGui(const TetriumApp::TickContextImGui& ctx)
         ImGui::SliderFloat("G", &_selectedColorRYGB.b, -1.0f, 1.0f);
         ImGui::SliderFloat("B", &_selectedColorRYGB.a, -1.0f, 1.0f);
 
-        bool luminanceChanged = ImGui::SliderFloat("Luminance", &_luminance, 0, 1);
-        bool saturationChanged = ImGui::SliderFloat("Saturation", &_saturation, 0, 1);
+        /// render cubemap
+        void* cubemapViewSpaceTextureId = _cubemapTexture.GetImGuiTextureId();
+        ImGui::Image(cubemapViewSpaceTextureId, ImVec2{CUBEMAP_WIDTH, CUBEMAP_HEIGHT});
+
+        bool luminanceChanged = 
+            ImGui::SliderFloat("Luminance", &_luminance, 0, 1);
+        bool saturationChanged = 
+            ImGui::SliderFloat("Saturation", &_saturation, 0, 1);
 
         _needGenerateNewCubemap = _needGenerateNewCubemap || luminanceChanged || saturationChanged;
+
     }
 
 
