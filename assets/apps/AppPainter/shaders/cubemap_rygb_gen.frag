@@ -13,10 +13,127 @@ layout(location = 0) out vec4 outColor;
 
 layout(location = 1) in vec2 fragUV; // outUV from vertex shader
 
+const mat4 g_heringToRYGB = mat4(
+    vec4(0.5, 0.5, 0.5, 0.5),
+    vec4(-0.28867513459481287, -0.28867513459481287, -0.28867513459481287, 0.866025403784439),
+    vec4(-0.408248290463863, -0.408248290463863, 0.8164965809277261, -3.183243964787847e-17),
+    vec4(-0.7071067811865477, 0.7071067811865476, -9.80883324026333e-17, -7.571128974804755e-19)
+);
+
+const mat4 g_heringToDisp = mat4(
+    vec4(0.5000000000000183, 0.5000000000000026, 0.5000000000000002, 0.499999999999987),
+    vec4(-0.2860494702830666, -0.2631280610866057, 0.7861275057955296, -0.34856903388084665),
+    vec4(-0.2864170221014012, 0.7038041314050284, 0.08365259538586325, -0.9736861462436817),
+    vec4(-0.7523786286615098, 0.08743393179139701, -0.0007915212975174189, 0.9167057740993428)
+);
+
+const mat3 g_invMetamericDirMat = mat3(
+    vec3(0.9865474651933757, 0.009838790494736325, -0.16317872754169252),
+    vec3(0.009838790494736328, 0.9928041963993547, 0.11934414863508082),
+    vec3(0.16317872754169252, -0.11934414863508083, 0.9793516615927303)
+);
+
+vec3 convertCartesianToSpherical(vec3 xyz) {
+    float x = xyz.x;
+    float y = xyz.y;
+    float z = xyz.z;
+
+    float radius = length(xyz);
+    float theta = atan(y, x);
+    float phi = acos(clamp(z / radius, -1.0, 1.0));
+
+    return vec3(radius, theta, phi);
+}
+
+vec3 convertSphericalToCartesian(vec3 spherical) {
+    float r = spherical.x;
+    float theta = spherical.y;
+    float phi = spherical.z;
+    
+    float x = r * sin(phi) * cos(theta);
+    float y = r * sin(phi) * sin(theta);
+    float z = r * cos(phi);
+
+    return vec3(x, y, z);
+}
+
+vec4 convertVSHHToHering(vec4 vshh) {
+    return vec4(vshh.x, convertSphericalToCartesian(vshh.yzw));
+}
+
+vec4 convertHeringToVSHH(vec4 hering) {
+    float luminance = hering.x;
+    vec3 spherical = convertCartesianToSpherical(hering.yzw);
+    
+    float radius = spherical.x;
+    float theta = spherical.y;
+    float phi = spherical.z;
+    
+    return vec4(luminance, radius, theta, phi);
+}
+
+float solveForBoundary(float luminance, float max_l, float luminance_cusp, float saturation_cusp) {
+    if (luminance >= luminance_cusp) {
+        float slope = -(max_l - luminance_cusp) / saturation_cusp;
+        return (luminance - max_l) / slope;
+    } else {
+        float slope = luminance_cusp / saturation_cusp;
+        return luminance / slope;
+    }
+}
+
+// @returns: [luminance cusp, saturation cusp]
+vec2 findMaxSaturationForVSHH(vec4 vshh) {
+    vec4 heringTemp = convertVSHHToHering(vshh);
+    vec4 cartesian = g_heringToDisp * heringTemp;
+    float hueDirection = cartesian.x;
+    // FIXME: actually implement
+    return vec2(1.0, 1.0);
+}
+
+vec4 remapVSHHGamutPoints(vec4 vshh) {
+    // FIXME: get max_L from jess
+    const float max_l = 1.f;
+
+    float vshhLuminance = vshh.x;
+    float vshhSaturation = vshh.y;
+    float vshhTheta = vshh.z;
+    float vshhPhi = vshh.w;
+    
+    vec2 maxSaturations = findMaxSaturationForVSHH(vec4(0, 1, vshhTheta, vshhPhi));
+    float luminanceCusp = maxSaturations.x;
+    float saturationCusp = maxSaturations.y;
+
+    float remappedSaturation = solveForBoundary(vshhLuminance, max_l, luminanceCusp, saturationCusp);
+    remappedSaturation = min(remappedSaturation, vshhSaturation);
+    
+    vec4 remappedVSHH = vec4(vshhLuminance, remappedSaturation, vshhTheta, vshhPhi);
+    return remappedVSHH;
+}
+
+// Convert spherical cartesian coordinates, into RYGB color space
+// basically a parallelized version of :
+// https://github.com/imjal/TetriumColor/blob/6e73833890068f72b79b152b00b9044224e657c0/TetriumColor/PsychoPhys/HueSphere.py#L100C1-L101C1
+vec4 convertCartesianToRYGB(vec3 xyz, float luminance, float saturation) {
+    vec4 hering = vec4(luminance, xyz);
+    vec4 vshh = convertHeringToVSHH(hering);
+    vshh.y = saturation; // override radius component with saturation
+    
+    hering = convertVSHHToHering(vshh); // convert back to hering space
+    
+    vec4 colorRYGB = g_heringToRYGB * hering;
+
+    // vec4 vshhRemapped = remapVSHHGamutPoints(vshh);
+    // vec4 heringremapped = convertvshhtohering(vshhremapped);
+    // vec4 colorrygb = g_heringtorygb * heringremapped;
+
+    return colorRYGB;
+}
+
 // Convert UV coordinates from a full cubemap into XYZ coordinates
 // assuming the cubemap faces are arranged in a 3x2 grid.
 // u and v should be in the range [0.0, 1.0].
-vec3 convertCubemapUVToXYZ(vec2 uv, float radius) {
+vec3 convertCubemapUVToCartesian(vec2 uv, float radius) {
     // Assumes a 4x3 grid layout for the cubemap faces (4 columns, 3 rows)
     float faceWidth = 1.0 / 4.0;
     float faceHeight = 1.0 / 3.0;
@@ -63,11 +180,24 @@ vec3 convertCubemapUVToXYZ(vec2 uv, float radius) {
     return xyz;
 }
 void main() {
-    // TODO: use luminance and saturation from UBO
+    bool visualizeCubemapCartesian = false;
+
+    float luminance = ubo.luminance;
+    float saturation = ubo.saturation;
 
     // use only fragUV for now
-    vec3 xyz = convertCubemapUVToXYZ(fragUV, ubo.saturation);
-    xyz = (xyz + 1.0) * 0.5;
-    outColor = vec4(xyz, 1.0);
+    vec3 xyz = convertCubemapUVToCartesian(fragUV, saturation);
+    
+    xyz = g_invMetamericDirMat * xyz;
+    
+    if (visualizeCubemapCartesian) {
+        xyz = (xyz + 1.0) * 0.5;
+        outColor = vec4(xyz, 1.0);
+        return;
+    }
+    
+    vec4 rygb = convertCartesianToRYGB(xyz, luminance, saturation);
+
+    outColor = vec4(rygb.xzw, 1.0);
     //outColor = vec4(xyz.x, 0.0, 0.0, 1.0);
 }
