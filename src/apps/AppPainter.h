@@ -180,6 +180,7 @@ class AppPainter : public App
             vk::DescriptorSet descriptorSet = VK_NULL_HANDLE;
 
             VQBuffer ubo = {};
+
         } _cubemapGenerateContext;
 
         struct CubemapGenerateUBO
@@ -208,7 +209,7 @@ class AppPainter : public App
   private:
     ColorPicker _colorPicker;
 
-    bool _wantDrawColorPicker = false;
+    bool _wantDrawColorPicker = true;
 
     // ---------- Paint space(RYGB) buffers ----------
     //
