@@ -32,13 +32,14 @@
 namespace TetriumApp
 {
 
+// TODO: all these pipeline creation should be better abstracted
 void AppPainter::ColorPicker::initCubemapGenerateContext(TetriumApp::InitContext& ctx)
 {
     vk::Device device = ctx.device.logicalDevice;
 
     /* create UBO */
     ctx.device.CreateBufferInPlace(
-        sizeof(RYGBToViewSpaceUBO),
+        sizeof(CubemapGenerateUBO),
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
         _cubemapGenerateContext.ubo
@@ -101,14 +102,14 @@ void AppPainter::ColorPicker::initCubemapGenerateContext(TetriumApp::InitContext
             vk::DescriptorSet descriptorSet = _cubemapGenerateContext.descriptorSet;
 
             vk::DescriptorBufferInfo bufferInfo(
-                _cubemapGenerateContext.ubo.buffer, 0, sizeof(RYGBToViewSpaceUBO)
+                _cubemapGenerateContext.ubo.buffer, 0, sizeof(CubemapGenerateUBO)
             );
 
 
             device.updateDescriptorSets(
                 {vk::WriteDescriptorSet(
                      descriptorSet,
-                     (uint32_t)RYGBToViewSpaceBindingLocation::ubo,
+                     (uint32_t)CubemapGenerationBindingLocation::ubo,
                      0,
                      1,
                      vk::DescriptorType::eUniformBuffer,
@@ -379,8 +380,14 @@ void AppPainter::ColorPicker::TickVulkan(TetriumApp::TickContextVulkan& ctx)
 {
     vk::CommandBuffer& cb = ctx.commandBuffer;
     if (_needGenerateNewCubemap) {
-        // begin render pass to write into new cubemap
+        // flush UBO
+        CubemapGenerateUBO* pUBO = reinterpret_cast<CubemapGenerateUBO*>(
+            _cubemapGenerateContext.ubo.bufferAddress
+        );
+        pUBO->luminance = _luminance;
+        pUBO->saturation = _saturation;
 
+        // begin render pass to write into new cubemap
         vk::Extent2D extent(CUBEMAP_WIDTH, CUBEMAP_HEIGHT);
         vk::Rect2D renderArea(VkOffset2D{0, 0}, extent);
         vk::RenderPassBeginInfo renderPassBeginInfo(

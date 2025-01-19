@@ -182,6 +182,12 @@ class AppPainter : public App
             VQBuffer ubo = {};
         } _cubemapGenerateContext;
 
+        struct CubemapGenerateUBO
+        {
+            float luminance;
+            float saturation;
+        };
+
         void initCubemapGenerateContext(TetriumApp::InitContext& ctx);
         void cleanupCubemapGenerateContext(TetriumApp::CleanupContext& ctx);
     };
