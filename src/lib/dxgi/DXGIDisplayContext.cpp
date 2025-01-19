@@ -109,6 +109,7 @@ DXGIDisplayContext DXGI::PickAndInitDXGIDisplayContext()
     std::vector<IDXGIOutput*> outputs;
     std::vector<RECT> outputRects;
     std::cout << "========== Choose Display ==========" << std::endl;
+    std::flush(std::cout);
 
     UINT outputIndex = 0;
     IDXGIOutput* pOutput = nullptr;
@@ -116,6 +117,8 @@ DXGIDisplayContext DXGI::PickAndInitDXGIDisplayContext()
         outputs.push_back(pOutput);
         outputIndex++;
     }
+
+    std::flush(std::cout);
 
     if (outputs.empty()) {
         PANIC("GPU is not connected to any display!");
@@ -138,6 +141,8 @@ DXGIDisplayContext DXGI::PickAndInitDXGIDisplayContext()
         );
         outputRects.push_back(rect);
     }
+
+    std::flush(std::cout);
 
     size_t selectedDisplayIndex = 0;
     do {

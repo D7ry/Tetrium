@@ -48,7 +48,7 @@ void AppPainter::initPaintSpaceTexture(TetriumApp::InitContext& ctx)
     imageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
     imageViewCreateInfo.subresourceRange.layerCount = 1;
 
-    for (PaintSpaceTexture& fb : _paintSpaceTexture) {
+    for (SharedTexture& fb : _paintSpaceTexture) {
         VkImage image{};
         VkDeviceMemory memory{};
         VkImageView imageView{};
@@ -110,7 +110,7 @@ void AppPainter::initPaintSpaceTexture(TetriumApp::InitContext& ctx)
 void AppPainter::cleanupPaintSpaceTexture(TetriumApp::CleanupContext& ctx)
 {
     vk::Device device = ctx.device.logicalDevice;
-    for (PaintSpaceTexture& fb : _paintSpaceTexture) {
+    for (SharedTexture& fb : _paintSpaceTexture) {
         device.destroyImage(fb.image);
         device.destroyImageView(fb.imageView);
         device.freeMemory(fb.memory);
@@ -197,7 +197,7 @@ void AppPainter::initPaintToViewSpaceContext(TetriumApp::InitContext& ctx)
                ),
                // paint space texture sampler
                vk::DescriptorSetLayoutBinding(
-                   (uint32_t)BindingLocation::sampler,
+                   (uint32_t)BindingLocation::canvasSampler,
                    vk::DescriptorType::eCombinedImageSampler,
                    1,
                    vk::ShaderStageFlagBits::eFragment,
@@ -257,7 +257,7 @@ void AppPainter::initPaintToViewSpaceContext(TetriumApp::InitContext& ctx)
                  ),
                  vk::WriteDescriptorSet(
                      descriptorSet,
-                     (uint32_t)BindingLocation::sampler,
+                     (uint32_t)BindingLocation::canvasSampler,
                      0,
                      1,
                      vk::DescriptorType::eCombinedImageSampler,
@@ -508,7 +508,7 @@ void AppPainter::Cleanup(TetriumApp::CleanupContext& ctx)
 
 void AppPainter::TickVulkan(TetriumApp::TickContextVulkan& ctx)
 {
-    PaintSpaceTexture& canvas = _paintSpaceTexture[ctx.currentFrameInFlight];
+    SharedTexture& canvas = _paintSpaceTexture[ctx.currentFrameInFlight];
     vk::CommandBuffer& cb = ctx.commandBuffer;
 
     // update paint space texture if needed

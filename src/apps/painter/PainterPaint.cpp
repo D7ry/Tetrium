@@ -178,7 +178,7 @@ void AppPainter::brush(uint32_t xBegin, uint32_t yBegin, uint32_t xEnd, uint32_t
 
 void AppPainter::flagTexturesForUpdate()
 {
-    for (PaintSpaceTexture& texture : _paintSpaceTexture) {
+    for (SharedTexture& texture : _paintSpaceTexture) {
         texture.needsUpdate = true;
     }
 }

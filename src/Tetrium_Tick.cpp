@@ -238,9 +238,9 @@ void Tetrium::drawFrame(ColorSpace colorSpace, uint8_t frameIdx)
                 vkCmdBlitImage(
                     engineCB,
                     _renderContextRYGB.virtualFrameBuffer.image[swapchainImageIndex],
-                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                    VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                     _swapChain.image[swapchainImageIndex],
-                    VK_IMAGE_LAYOUT_UNDEFINED,
+                    VK_IMAGE_LAYOUT_GENERAL,
                     1,
                     &blitRegion,
                     VK_FILTER_NEAREST

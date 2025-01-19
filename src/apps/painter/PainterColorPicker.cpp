@@ -1,4 +1,16 @@
 // Color picker implementation for the painter app.
+/**
+ * real-time 4D color picker.
+ * The user visually specifies the four dimensions by:
+ * 1. select luminance and saturation using two sliders (2 dims)
+ * 2. select a point from the tetrachromatic hue sphere, using a flattened out cubemap(2 dims)
+ * The cubmap texture is computed real-time based on luminance and saturation
+ *
+ * Internally, the fragment shader performs all the color math and writes the RYGB cubemap
+ * to a texture. The CPU then addresses the texture to get the selected RYGB color.
+ * Presenting the RYGB cubemap is similar to presenting the canvas, where we
+ * transform the RYGB color space into RGB/OCV using a 4x3 mat.
+ */
 
 #include "apps/AppPainter.h"
 

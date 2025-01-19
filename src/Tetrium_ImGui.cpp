@@ -190,9 +190,8 @@ void Tetrium::initImGuiRenderContext(Tetrium::ImGuiRenderContext& ctx)
     // create render pass
     VkImageLayout imguiInitialLayout, imguiFinalLayout;
     imguiInitialLayout = VK_IMAGE_LAYOUT_UNDEFINED; // for first pass
-    // imguiFinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; // for RYGB conversion pass, if
-    // run imgui pass before
-    imguiFinalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR; // if painting to physical fb
+    // imguiFinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    imguiFinalLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL; // frame buffer after imgui pass gets blitted
 
     ctx.renderPass = createRenderPass(
         _device->Get(),

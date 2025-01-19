@@ -32,10 +32,10 @@ class AppPainter : public App
 #if APP_PAINTER_USE_IDENTITY_TRANSFORM
         // RYGB -> RGB
         glm::mat4x4{
-            {1, 0, 0, 0},
-            {0, 0, 0, 0},
-            {0, 1, 0, 0},
-            {0, 0, 1, 0},
+            {1, 0, 0, 0}, // perfect R
+            {0, 0, 0, 0}, // Y don't map to anything
+            {0, 1, 0, 0}, // perfect G
+            {0, 0, 1, 0}, // perfect B
         },
         // RYGB -> OCV
         glm::mat4x4{
@@ -58,6 +58,16 @@ class AppPainter : public App
             {-0.035491169221697684, 0.0, 0.0, 0.0},
         },
 #endif
+    };
+
+    // GPU-accessible texture to sample from in paint space.
+    struct SharedTexture
+    {
+        vk::Image image = VK_NULL_HANDLE;
+        vk::ImageView imageView = VK_NULL_HANDLE;
+        vk::DeviceMemory memory = VK_NULL_HANDLE;
+        bool needsUpdate = true; // whether the frame buffer needs to be staged, set to `true` when
+                                 // `_paintSpaceBuffer` is updated
     };
 
     // Color picker widget that visualizes RYGB color space through slice of
@@ -93,6 +103,9 @@ class AppPainter : public App
         // TODO: add field
         // TODO: implement real-time cubemap that reacts to the sliders.
         // Texture _cubemapTexture;
+
+        SharedTexture _cubemapTexture;
+
 
         // slider values for luminance and saturation
         float _luminance = 1.f;
@@ -133,17 +146,8 @@ class AppPainter : public App
     void initPaintSpaceBuffer(TetriumApp::InitContext& ctx);
     void cleanupPaintSpaceBuffer(TetriumApp::CleanupContext& ctx);
 
-    // GPU-accessible texture to sample from in paint space.
-    struct PaintSpaceTexture
-    {
-        vk::Image image = VK_NULL_HANDLE;
-        vk::ImageView imageView = VK_NULL_HANDLE;
-        vk::DeviceMemory memory = VK_NULL_HANDLE;
-        bool needsUpdate = true; // whether the frame buffer needs to be staged, set to `true` when
-                                 // `_paintSpaceBuffer` is updated
-    };
 
-    std::array<PaintSpaceTexture, NUM_FRAME_IN_FLIGHT> _paintSpaceTexture;
+    std::array<SharedTexture, NUM_FRAME_IN_FLIGHT> _paintSpaceTexture;
     void initPaintSpaceTexture(TetriumApp::InitContext& ctx);
     void cleanupPaintSpaceTexture(TetriumApp::CleanupContext& ctx);
 
@@ -160,7 +164,7 @@ class AppPainter : public App
     enum class BindingLocation : uint32_t
     {
         ubo = 0,
-        sampler = 1
+        canvasSampler = 1
     };
 
     struct UBO
