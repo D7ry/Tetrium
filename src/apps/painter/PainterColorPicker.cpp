@@ -314,10 +314,18 @@ void AppPainter::ColorPicker::initCubemapGenerateContext(TetriumApp::InitContext
     }
 }
 
-void AppPainter::ColorPicker::cleanupCubemapGenerateContext()
+void AppPainter::ColorPicker::cleanupCubemapGenerateContext(TetriumApp::CleanupContext& ctx)
 {
-    NEEDS_IMPLEMENTATION()
-    
+
+    vk::Device device = ctx.device.logicalDevice;
+
+    _cubemapGenerateContext.ubo.Cleanup();
+
+    device.destroyDescriptorSetLayout(_cubemapGenerateContext.descriptorSetLayout);
+    device.destroyDescriptorPool(_cubemapGenerateContext.descriptorPool);
+    device.destroyRenderPass(_cubemapGenerateContext.renderPass);
+    device.destroyPipeline(_cubemapGenerateContext.pipeline);
+    device.destroyPipelineLayout(_cubemapGenerateContext.pipelineLayout);
 }
 
 
@@ -362,7 +370,7 @@ void AppPainter::ColorPicker::Init(TetriumApp::InitContext& ctx, RYGBToViewSpace
 // TODO: impl
 void AppPainter::ColorPicker::Cleanup(TetriumApp::CleanupContext& ctx)
 {
-    cleanupCubemapGenerateContext();
+    cleanupCubemapGenerateContext(ctx);
     _cubemapTextureViewSpace.Cleanup();
     _cubemapTexture.Cleanup();
 }

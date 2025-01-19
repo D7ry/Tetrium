@@ -183,7 +183,7 @@ class AppPainter : public App
         } _cubemapGenerateContext;
 
         void initCubemapGenerateContext(TetriumApp::InitContext& ctx);
-        void cleanupCubemapGenerateContext();
+        void cleanupCubemapGenerateContext(TetriumApp::CleanupContext& ctx);
     };
 
   public:
