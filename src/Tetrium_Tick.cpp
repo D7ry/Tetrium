@@ -28,6 +28,8 @@ void Tetrium::Run()
     DEBUG("Ending game loop...");
 }
 
+// mono color space for testing purposes, this avoids burning the monitor
+#define MONO_COLOR_SPACE 1
 void Tetrium::Tick()
 {
     if (_paused) {
@@ -47,6 +49,9 @@ void Tetrium::Tick()
             double deltaTime = _deltaTimer.GetDeltaTime();
             _timeSinceStartSeconds += deltaTime;
             ColorSpace colorSpace = getCurrentColorSpace();
+#if MONO_COLOR_SPACE
+            colorSpace = _flipEvenOdd ? OCV : RGB;
+#endif
             drawImGui(colorSpace, _currentFrame);
             drawFrame(colorSpace, _currentFrame);
             _currentFrame = (_currentFrame + 1) % NUM_FRAME_IN_FLIGHT;
