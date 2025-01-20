@@ -31,7 +31,9 @@ void AppPainter::TickImGui(const TetriumApp::TickContextImGui& ctx)
                 | ImGuiWindowFlags_NoScrollWithMouse
         )) {
 
-        if (ImGui::BeginTable("Painter", 2)) {
+        if (ImGui::BeginTable("Painter", 2, 
+                ImGuiTableFlags_BordersV
+            )) {
 
             ImGui::TableNextColumn();
 

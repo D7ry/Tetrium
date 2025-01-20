@@ -180,16 +180,6 @@ void AppPainter::ColorPicker::updatePickedColor()
 void AppPainter::ColorPicker::TickImGui(const TetriumApp::TickContextImGui& ctx)
 {
     updatePickedColor();
-    // manual rygb control
-    bool manualColorOverride = false;
-    manualColorOverride |= ImGui::SliderFloat("R", &_selectedColorRYGB.r, 0, 1.0f);
-    manualColorOverride |= ImGui::SliderFloat("Y", &_selectedColorRYGB.g, 0, 1.0f);
-    manualColorOverride |= ImGui::SliderFloat("G", &_selectedColorRYGB.b, 0, 1.0f);
-    manualColorOverride |= ImGui::SliderFloat("B", &_selectedColorRYGB.a, 0, 1.0f);
-
-    if (manualColorOverride) {
-        ResetColorPickerCursor();
-    }
 
     /// render cubemap
     constexpr ImVec2 cubemapSize{CUBEMAP_WIDTH, CUBEMAP_HEIGHT};
@@ -266,25 +256,52 @@ void AppPainter::ColorPicker::TickImGui(const TetriumApp::TickContextImGui& ctx)
         );
     }
 
-
+    ImGui::Dummy(ImVec2(0.0f, 10.0f));
     bool luminanceChanged = 
         ImGui::SliderFloat("Luminance", &_luminance, 0, 1);
+
+    ImGui::Dummy(ImVec2(0.0f, 5.0f));
     bool saturationChanged = 
         ImGui::SliderFloat("Saturation", &_saturation, 0, 1);
 
+
     _needGenerateNewCubemap = _needGenerateNewCubemap || luminanceChanged || saturationChanged;
 
-    // draw color preview
-    glm::vec4 selectedColorViewSpace = _tranformMatrixFromRygb[ctx.colorSpace] * _selectedColorRYGB;
-    for (int i = 0; i < 4; i++) {
-        selectedColorViewSpace[i] = std::clamp(selectedColorViewSpace[i], 0.f, 1.f);
-    }
 
-    ImGui::ColorButton("Selected Color", 
-        ImVec4{selectedColorViewSpace.r, selectedColorViewSpace.g, selectedColorViewSpace.b, 1.f},
-        0,
-        ImVec2(150, 150)
-    );
+    ImGui::Dummy(ImVec2(0.0f, 20.0f));
+    ImGui::Separator();
+
+    ImGui::Dummy(ImVec2(0.0f, 20.0f));
+    if (ImGui::BeginTable("RYGBColorPreview", 2)) {
+        const uint32_t colorPreviewSize = 150;
+        ImGui::TableSetupColumn("Color Preview", ImGuiTableColumnFlags_WidthFixed, colorPreviewSize);
+        ImGui::TableNextColumn();
+        // draw color preview
+        glm::vec4 selectedColorViewSpace = _tranformMatrixFromRygb[ctx.colorSpace] * _selectedColorRYGB;
+        for (int i = 0; i < 4; i++) {
+            selectedColorViewSpace[i] = std::clamp(selectedColorViewSpace[i], 0.f, 1.f);
+        }
+
+        ImGui::ColorButton("Selected Color", 
+            ImVec4{selectedColorViewSpace.r, selectedColorViewSpace.g, selectedColorViewSpace.b, 1.f},
+            0,
+            ImVec2(colorPreviewSize, colorPreviewSize)
+        );
+
+        ImGui::TableNextColumn();
+        // manual rygb control
+        bool manualColorOverride = false;
+        manualColorOverride |= ImGui::SliderFloat("R", &_selectedColorRYGB.r, 0, 1.0f);
+        manualColorOverride |= ImGui::SliderFloat("Y", &_selectedColorRYGB.g, 0, 1.0f);
+        manualColorOverride |= ImGui::SliderFloat("G", &_selectedColorRYGB.b, 0, 1.0f);
+        manualColorOverride |= ImGui::SliderFloat("B", &_selectedColorRYGB.a, 0, 1.0f);
+
+        if (manualColorOverride) {
+            ResetColorPickerCursor();
+        }
+
+        ImGui::EndTable();
+    }
 }
 
 } // namespace TetriumApp
