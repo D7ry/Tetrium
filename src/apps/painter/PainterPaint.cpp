@@ -125,11 +125,8 @@ std::array<float, 4> AppPainter::getPixel(uint32_t x, uint32_t y) const
     return {pPixel[0], pPixel[1], pPixel[2], pPixel[3]};
 }
 
-void AppPainter::brush(uint32_t xBegin, uint32_t yBegin, uint32_t xEnd, uint32_t yEnd)
+void AppPainter::brush(uint32_t xBegin, uint32_t yBegin, uint32_t xEnd, uint32_t yEnd, const glm::vec4& color)
 {
-    auto color = _colorPicker.GetSelectedColorRYGBData();
-    
-
     // Handle the brush size from _paintingState
     uint32_t brushSize = _paintingState.brushSize;
 
@@ -141,6 +138,7 @@ void AppPainter::brush(uint32_t xBegin, uint32_t yBegin, uint32_t xEnd, uint32_t
     int err = (dx > dy ? dx : -dy) / 2;
     int e2;
 
+    std::array<float, 4> colorData = {color.r, color.g, color.b, color.a};
     // not the most efficient way to paint -- brushstroke is ideally implemented through a shader.
     // CPU-based approach is performant enough for now however.
     while (true) {
@@ -148,7 +146,7 @@ void AppPainter::brush(uint32_t xBegin, uint32_t yBegin, uint32_t xEnd, uint32_t
 
         BrushStrokeArgs args{
             xBegin, yBegin,
-            _colorPicker.GetSelectedColorRYGBData(),
+            colorData,
             _paintingState.brushSize,
             _canvasWidth, _canvasHeight,
             [this](uint32_t x, uint32_t y, const std::array<float,4>& c) {

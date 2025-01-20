@@ -104,7 +104,7 @@ class AppPainter : public App
         void TickVulkan(TetriumApp::TickContextVulkan& ctx);
 
         // Get the selected color in RYGB color space
-        inline glm::vec4 GetSelectedColorRYGB() const;
+        glm::vec4 GetSelectedColorRYGB() const;
 
         std::array<float, 4> GetSelectedColorRYGBData() const;
 
@@ -302,13 +302,22 @@ class AppPainter : public App
         BrushStrokeType brushType = BrushStrokeType::Circle;
     } _paintingState;
 
+    enum CursorFunction
+    {
+        Draw,
+        Erase,
+        Dropper
+    };
+
+    CursorFunction _cursorFunction = CursorFunction::Draw;
+
     void clearCanvas();
 
     void flagTexturesForUpdate();
 
     // Drawing and brushstrokes
-    void canvasInteract(const ImVec2& canvasMousePos);
-    void brush(uint32_t xBegin, uint32_t yBegin, uint32_t xEnd, uint32_t yEnd);
+    void canvasInteract(const ImVec2& canvasMousePos,const TetriumApp::TickContextImGui& ctx);
+    void brush(uint32_t xBegin, uint32_t yBegin, uint32_t xEnd, uint32_t yEnd, const glm::vec4& color);
     void fillPixel(uint32_t x, uint32_t y, const std::array<float, 4>& color);
     std::array<float, 4> getPixel(uint32_t x, uint32_t y) const;
 

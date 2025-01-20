@@ -1,3 +1,4 @@
+#include "GlobalStates.h"
 #include "apps/AppPainter.h"
 
 #include "imgui.h"
@@ -5,7 +6,7 @@
 namespace TetriumApp
 {
 
-void AppPainter::canvasInteract(const ImVec2& canvasMousePos)
+void AppPainter::canvasInteract(const ImVec2& canvasMousePos,const TetriumApp::TickContextImGui& ctx)
 {
     uint32_t x = static_cast<uint32_t>(canvasMousePos.x);
     uint32_t y = static_cast<uint32_t>(canvasMousePos.y);
@@ -14,10 +15,50 @@ void AppPainter::canvasInteract(const ImVec2& canvasMousePos)
     }
 
     ImVec2 prevPos = _paintingState.prevCanvasMousePos.value_or(canvasMousePos);
-    brush(prevPos.x, prevPos.y, x, y);
+
+    if (_cursorFunction == CursorFunction::Draw) {
+        if (ImGui::IsKeyDown(ImGuiKey_MouseLeft)) {
+            brush(prevPos.x, prevPos.y, x, y, _colorPicker.GetSelectedColorRYGB());
+        }
+    } else if (_cursorFunction == CursorFunction::Erase) {
+        if (ImGui::IsKeyDown(ImGuiKey_MouseLeft)) {
+            glm::vec4 eraserColor = {0.0f, 0.0f, 0.0f, 0.0f};
+            brush(prevPos.x, prevPos.y, x, y, eraserColor);
+        }
+    } else if (_cursorFunction == CursorFunction::Dropper) {
+        // dropper widget
+        std::array<float, 4> currentPixelColorRYGB = getPixel(x, y);
+        glm::vec4 currentPixel = glm::vec4(
+            currentPixelColorRYGB[0],
+            currentPixelColorRYGB[1],
+            currentPixelColorRYGB[2],
+            currentPixelColorRYGB[3]
+        );
+
+        glm::vec4 currentPixelColorViewSpace = 
+            _tranformMatrixFromRygb[ctx.colorSpace] * currentPixel;
+        if (ImGui::BeginTooltip()) {
+            ImGui::ColorButton(
+                "Dropper Selected Color",
+                ImVec4(
+                    currentPixelColorViewSpace.r,
+                    currentPixelColorViewSpace.g,
+                    currentPixelColorViewSpace.b,
+                    currentPixelColorViewSpace.a
+                ),
+                0,
+                ImVec2(50, 50)
+            );
+            ImGui::EndTooltip();
+        }
+
+        if (ImGui::IsKeyReleased(ImGuiKey_MouseLeft)) {
+            _colorPicker.SetPickedColor(currentPixel);
+            _cursorFunction = CursorFunction::Draw; // switch back to draw
+        }
+    }
 }
 
-// TODO: impl
 void AppPainter::TickImGui(const TetriumApp::TickContextImGui& ctx)
 {
     ImGuiIO& io = ImGui::GetIO();
@@ -41,11 +82,28 @@ void AppPainter::TickImGui(const TetriumApp::TickContextImGui& ctx)
                 clearCanvas();
             }
 
+            ImGui::SameLine();
             if (ImGui::Button("save")) {
                 saveCanvasToFile("canvas.tiff");
             }
+
+            ImGui::SameLine();
             if (ImGui::Button("load")) {
                 loadCanvasFromFile("canvas.tiff");
+            }
+
+            if (ImGui::RadioButton("Draw", _cursorFunction == CursorFunction::Draw)) {
+                _cursorFunction = CursorFunction::Draw;
+            }
+            ImGui::SameLine();
+
+            if (ImGui::RadioButton("Erase", _cursorFunction == CursorFunction::Erase)) {
+                _cursorFunction = CursorFunction::Erase;
+            }
+            ImGui::SameLine();
+
+            if (ImGui::RadioButton("Dropper", _cursorFunction == CursorFunction::Dropper)) {
+                _cursorFunction = CursorFunction::Dropper;
             }
 
             int brushSize = _paintingState.brushSize;
@@ -74,9 +132,7 @@ void AppPainter::TickImGui(const TetriumApp::TickContextImGui& ctx)
                 if (mousePos.x >= canvasPos.x && mousePos.x < canvasPos.x + canvasSize.x
                     && mousePos.y >= canvasPos.y && mousePos.y < canvasPos.y + canvasSize.y) {
                     ImVec2 canvasMousePos = ImVec2(mousePos.x - canvasPos.x, mousePos.y - canvasPos.y);
-                    if (ImGui::IsKeyDown(ImGuiKey_MouseLeft)) {
-                        canvasInteract(canvasMousePos);
-                    }
+                    canvasInteract(canvasMousePos, ctx);
                     _paintingState.prevCanvasMousePos = canvasMousePos;
                 } else {
                     _paintingState.prevCanvasMousePos = std::nullopt;
