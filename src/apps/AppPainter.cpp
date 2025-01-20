@@ -494,7 +494,7 @@ void AppPainter::Init(TetriumApp::InitContext& ctx)
     initViewSpaceFrameBuffer(ctx);
 
     _clearValues
-        = {vk::ClearColorValue(std::array<float, 4>{0.0f, 0.0f, 0.0f, 1.0f}),
+        = {vk::ClearColorValue(std::array<float, 4>{0.0f, 0.0f, 0.0f, 0.0f}),
            vk::ClearDepthStencilValue(1.0f, 0)};
 
     _colorPicker.Init(ctx, &_paintToViewSpaceContext);

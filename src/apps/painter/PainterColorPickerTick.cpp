@@ -131,29 +131,68 @@ void AppPainter::ColorPicker::TickVulkan(TetriumApp::TickContextVulkan& ctx)
     
 }
 
+void AppPainter::ColorPicker::SetPickedColor(glm::vec4 rygb)
+{
+    _selectedColorRYGB = rygb;
+    ResetColorPickerCursor();
+}
+
+void AppPainter::ColorPicker::ResetColorPickerCursor()
+{
+    _colorPickerCursorPos = {-1, -1};
+}
+
+// update the picked color based on the current cursor position,
+// by sampling the pixel from the cubemap texture.
+void AppPainter::ColorPicker::updatePickedColor()
+{
+    int x = _colorPickerCursorPos.x;
+    int y = _colorPickerCursorPos.y;
+    if (x < 0 || y < 0 || x >= CUBEMAP_WIDTH || y >= CUBEMAP_HEIGHT) {
+        return;
+    }
+
+    int rygbColorPixelIndex = x + y * CUBEMAP_WIDTH;
+
+    constexpr size_t pixelColorSize = sizeof(float) * 4;
+
+    //DEBUG("{} {} | {}", x, y, rygbColorPixelIndex);
+
+    // grab the color
+    char* colorBegin = static_cast<char*>(_cubemapRYGBTextureCPU.bufferAddress);
+    float* color
+        = reinterpret_cast<float*>(pixelColorSize * rygbColorPixelIndex + colorBegin);
+
+    memcpy(&_selectedColorRYGB.x, color, pixelColorSize);
+}
+
+
 void AppPainter::ColorPicker::TickImGui(const TetriumApp::TickContextImGui& ctx)
 {
-    // a floating window
-    if (ImGui::Begin("Color Picker")) {
-        ImGui::Text("RYGB Color Picker");
-        // manual rygb control
-        ImGui::SliderFloat("R", &_selectedColorRYGB.r, -1.0f, 1.0f);
-        ImGui::SliderFloat("Y", &_selectedColorRYGB.g, -1.0f, 1.0f);
-        ImGui::SliderFloat("G", &_selectedColorRYGB.b, -1.0f, 1.0f);
-        ImGui::SliderFloat("B", &_selectedColorRYGB.a, -1.0f, 1.0f);
+    updatePickedColor();
+    // manual rygb control
+    bool manualColorOverride = false;
+    manualColorOverride |= ImGui::SliderFloat("R", &_selectedColorRYGB.r, 0, 1.0f);
+    manualColorOverride |= ImGui::SliderFloat("Y", &_selectedColorRYGB.g, 0, 1.0f);
+    manualColorOverride |= ImGui::SliderFloat("G", &_selectedColorRYGB.b, 0, 1.0f);
+    manualColorOverride |= ImGui::SliderFloat("B", &_selectedColorRYGB.a, 0, 1.0f);
 
-        /// render cubemap
-        constexpr ImVec2 cubemapSize{CUBEMAP_WIDTH, CUBEMAP_HEIGHT};
-        void* cubemapViewSpaceTextureId = _cubemapTextureViewSpace.GetImGuiTextureId();
-        ImGui::Image(cubemapViewSpaceTextureId, cubemapSize);
+    if (manualColorOverride) {
+        ResetColorPickerCursor();
+    }
 
-        // cubemap selection logic
-        if (ImGui::IsItemClicked()) {
+    /// render cubemap
+    constexpr ImVec2 cubemapSize{CUBEMAP_WIDTH, CUBEMAP_HEIGHT};
+    void* cubemapViewSpaceTextureId = _cubemapTextureViewSpace.GetImGuiTextureId();
+    ImGui::Image(cubemapViewSpaceTextureId, cubemapSize);
+
+    ImVec2 imagePos = ImGui::GetItemRectMin(); // The top-left corner of the cubemap image
+
+    // cubemap selection logic
+    if (ImGui::IsItemHovered()) {
+        if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
             // Get the mouse position in screen coordinates
             ImVec2 mousePos = ImGui::GetMousePos();
-
-            // Get the position of the cubemap image on the screen
-            ImVec2 imagePos = ImGui::GetItemRectMin(); // The top-left corner of the cubemap image
 
             // Calculate the mouse position relative to the cubemap image
             ImVec2 relativePos = mousePos - imagePos;
@@ -162,36 +201,40 @@ void AppPainter::ColorPicker::TickImGui(const TetriumApp::TickContextImGui& ctx)
             int x = relativePos.x;
             int y = relativePos.y;
 
-            int rygbColorPixelIndex = x + y * CUBEMAP_WIDTH;
-
-
-            INFO("{} {} | {}", x, y, rygbColorPixelIndex);
-            char* colorBegin = (char*)_cubemapRYGBTextureCPU.bufferAddress;
-            
-            float* color
-                = reinterpret_cast<float*>(sizeof(float) * 4 * rygbColorPixelIndex + colorBegin);
-
-            _selectedColorRYGB.r = color[0];
-            _selectedColorRYGB.g = color[1];
-            _selectedColorRYGB.b = color[2];
-            _selectedColorRYGB.a = color[3];
-
+            _colorPickerCursorPos = {x, y};
+            DEBUG(
+                "picked color: {} {} {} {}",
+                _selectedColorRYGB.x,
+                _selectedColorRYGB.y,
+                _selectedColorRYGB.z,
+                _selectedColorRYGB.w
+            );
         }
+    }
 
-        // for debug only
-        //ImGui::Image(_cubemapTexture.GetImGuiTextureId(), ImVec2{CUBEMAP_WIDTH, CUBEMAP_HEIGHT});
-
-        bool luminanceChanged = 
-            ImGui::SliderFloat("Luminance", &_luminance, 0, 1);
-        bool saturationChanged = 
-            ImGui::SliderFloat("Saturation", &_saturation, 0, 1);
-
-        _needGenerateNewCubemap = _needGenerateNewCubemap || luminanceChanged || saturationChanged;
-
+    // draw picked color indicator on the cubemap
+    if (_colorPickerCursorPos.x >= 0 && _colorPickerCursorPos.y >= 0) {
+        ImVec2 cursorPos = imagePos + ImVec2(_colorPickerCursorPos.x, _colorPickerCursorPos.y);
+        float cursorSize = 5;
+        ImGui::GetWindowDrawList()->AddCircle(
+            cursorPos, cursorSize, IM_COL32(255, 255, 255, 255), 0, 3.f
+        );
     }
 
 
-    ImGui::End(); // Color Picker
+    bool luminanceChanged = 
+        ImGui::SliderFloat("Luminance", &_luminance, 0, 1);
+    bool saturationChanged = 
+        ImGui::SliderFloat("Saturation", &_saturation, 0, 1);
+
+    _needGenerateNewCubemap = _needGenerateNewCubemap || luminanceChanged || saturationChanged;
+
+    // draw color preview
+    glm::vec4 selectedColorViewSpace = _tranformMatrixFromRygb[ctx.colorSpace] * _selectedColorRYGB;
+
+    ImGui::ColorButton("Selected Color", 
+        ImVec4{selectedColorViewSpace.r, selectedColorViewSpace.g, selectedColorViewSpace.b, 1.f}
+    );
 }
 
 } // namespace TetriumApp

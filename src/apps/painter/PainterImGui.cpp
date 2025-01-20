@@ -30,62 +30,65 @@ void AppPainter::TickImGui(const TetriumApp::TickContextImGui& ctx)
                 | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus
                 | ImGuiWindowFlags_NoScrollWithMouse
         )) {
-        // Draw color picker widget
-        if (ImGui::Button("Color Picker")) {
-            _wantDrawColorPicker = true;
-        }
 
-        if (ImGui::Button("Clear Canvas")) {
-            clearCanvas();
-        }
+        if (ImGui::BeginTable("Painter", 2)) {
 
-        if (ImGui::Button("save")) {
-            saveCanvasToFile("canvas.tiff");
-        }
-        if (ImGui::Button("load")) {
-            loadCanvasFromFile("canvas.tiff");
-        }
+            ImGui::TableNextColumn();
 
-        int brushSize = _paintingState.brushSize;
-        if (ImGui::SliderInt("Brush Size", &brushSize, 1, 100)) {
-            _paintingState.brushSize = brushSize;
-        }
-
-        static const char* brushStrokeNames[] = {"Circle", "Square", "Diamond", "SoftCircle"};
-        int currentBrush = static_cast<int>(_paintingState.brushType);
-        if (ImGui::Combo("Brush Stroke", &currentBrush, brushStrokeNames,
-                         IM_ARRAYSIZE(brushStrokeNames))) {
-            _paintingState.brushType = static_cast<BrushStrokeType>(currentBrush);
-        }
-
-        // Draw canvas
-        //
-        ImVec2 canvasSize = ImVec2(_canvasWidth, _canvasHeight);
-        {
-            const TextureFrameBuffer& fb = _viewSpaceFrameBuffer[ctx.currentFrameInFlight];
-            ImGui::Image(fb.GetImGuiTextureId(), canvasSize);
-        }
-        ImVec2 canvasPos = ImGui::GetItemRectMin();
-        {
-            // check if mouse is within canvas
-            ImVec2 mousePos = ImGui::GetMousePos();
-            if (mousePos.x >= canvasPos.x && mousePos.x < canvasPos.x + canvasSize.x
-                && mousePos.y >= canvasPos.y && mousePos.y < canvasPos.y + canvasSize.y) {
-                ImVec2 canvasMousePos = ImVec2(mousePos.x - canvasPos.x, mousePos.y - canvasPos.y);
-                if (ImGui::IsKeyDown(ImGuiKey_MouseLeft)) {
-                    canvasInteract(canvasMousePos);
-                }
-                _paintingState.prevCanvasMousePos = canvasMousePos;
-            } else {
-                _paintingState.prevCanvasMousePos = std::nullopt;
+            if (ImGui::Button("Clear Canvas")) {
+                clearCanvas();
             }
-        }
 
+            if (ImGui::Button("save")) {
+                saveCanvasToFile("canvas.tiff");
+            }
+            if (ImGui::Button("load")) {
+                loadCanvasFromFile("canvas.tiff");
+            }
 
-        // Draw color picker widget
-        if (_wantDrawColorPicker) {
+            int brushSize = _paintingState.brushSize;
+            if (ImGui::SliderInt("Brush Size", &brushSize, 1, 100)) {
+                _paintingState.brushSize = brushSize;
+            }
+
+            static const char* brushStrokeNames[] = {"Circle", "Square", "Diamond", "SoftCircle"};
+            int currentBrush = static_cast<int>(_paintingState.brushType);
+            if (ImGui::Combo("Brush Stroke", &currentBrush, brushStrokeNames,
+                             IM_ARRAYSIZE(brushStrokeNames))) {
+                _paintingState.brushType = static_cast<BrushStrokeType>(currentBrush);
+            }
+
+            // Draw canvas
+            //
+            ImVec2 canvasSize = ImVec2(_canvasWidth, _canvasHeight);
+            {
+                const TextureFrameBuffer& fb = _viewSpaceFrameBuffer[ctx.currentFrameInFlight];
+                ImGui::Image(fb.GetImGuiTextureId(), canvasSize);
+            }
+            ImVec2 canvasPos = ImGui::GetItemRectMin();
+            {
+                // check if mouse is within canvas
+                ImVec2 mousePos = ImGui::GetMousePos();
+                if (mousePos.x >= canvasPos.x && mousePos.x < canvasPos.x + canvasSize.x
+                    && mousePos.y >= canvasPos.y && mousePos.y < canvasPos.y + canvasSize.y) {
+                    ImVec2 canvasMousePos = ImVec2(mousePos.x - canvasPos.x, mousePos.y - canvasPos.y);
+                    if (ImGui::IsKeyDown(ImGuiKey_MouseLeft)) {
+                        canvasInteract(canvasMousePos);
+                    }
+                    _paintingState.prevCanvasMousePos = canvasMousePos;
+                } else {
+                    _paintingState.prevCanvasMousePos = std::nullopt;
+                }
+            }
+
+            ImGui::TableNextColumn();
+
+            // Draw color picker widget
             _colorPicker.TickImGui(ctx);
+
+            ImGui::EndTable();
         }
+
     }
 
     ImGui::End(); // Painter

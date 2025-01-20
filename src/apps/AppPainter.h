@@ -24,27 +24,10 @@ namespace TetriumApp
 class AppPainter : public App
 {
   private:
-#define APP_PAINTER_USE_IDENTITY_TRANSFORM 0
     // transformation matrices from RYGB to RGB and OCV color spaces
     // the project renders in RGB and OCV color space.
     // NOTE: the 4th row is not used but required for std140 layout padding
-    std::array<glm::mat4x4, ColorSpace::ColorSpaceSize> _tranformMatrixFromRygb = {
-#if APP_PAINTER_USE_IDENTITY_TRANSFORM
-        // RYGB -> RGB
-        glm::mat4x4{
-            {1, 0, 0, 0}, // perfect R
-            {0, 0, 0, 0}, // Y don't map to anything
-            {0, 1, 0, 0}, // perfect G
-            {0, 0, 1, 0}, // perfect B
-        },
-        // RYGB -> OCV
-        glm::mat4x4{
-            {1, 0, 0, 0},
-            {0, 0, 0, 0},
-            {0, 1, 0, 0},
-            {0, 0, 1, 0},
-        },
-#else
+    static inline std::array<glm::mat4x4, ColorSpace::ColorSpaceSize> _tranformMatrixFromRygb = {
         glm::mat4x4{
             {0.9815166593137846, -0.021249756545876134, -0.009509897322450037, 0.0},
             {-0.08250740137899303, 0.0920382578273052, -0.010521143643565989, 0.0},
@@ -57,7 +40,6 @@ class AppPainter : public App
             {-0.3040672192082057, 0.0, 0.0, 0.0},
             {-0.035491169221697684, 0.0, 0.0, 0.0},
         },
-#endif
     };
 
     // Render pass that samples from the paint space fb
@@ -125,6 +107,13 @@ class AppPainter : public App
         inline glm::vec4 GetSelectedColorRYGB() const;
 
         std::array<float, 4> GetSelectedColorRYGBData() const;
+
+        // reset the cursor position of the color picker, removing the selection
+        void ResetColorPickerCursor();
+
+        // override the picked color, at the same time resetting the cursor position
+        // to be off the cubemap.
+        void SetPickedColor(glm::vec4 rygb);
 
       private:
         enum class CubemapGenerationBindingLocation : uint32_t
@@ -200,6 +189,16 @@ class AppPainter : public App
 
         void initRYGBTransform(TetriumApp::InitContext& ctx);
 
+        // cursor position of the color picker
+        // negative values indicate no seletion
+        struct
+        {
+            int x = -1;
+            int y = -1;
+        } _colorPickerCursorPos;
+
+        void updatePickedColor();
+
         // CPU-accessible RYGB buffer
         VQBuffer _cubemapRYGBTextureCPU{};
     };
@@ -219,8 +218,6 @@ class AppPainter : public App
 
   private:
     ColorPicker _colorPicker;
-
-    bool _wantDrawColorPicker = true;
 
     // ---------- Paint space(RYGB) buffers ----------
     //

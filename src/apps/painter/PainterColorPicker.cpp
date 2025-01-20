@@ -419,11 +419,9 @@ void AppPainter::ColorPicker::cleanupCubemapGenerateContext(TetriumApp::CleanupC
 }
 
 
-// TODO: impl
 void AppPainter::ColorPicker::Init(TetriumApp::InitContext& ctx, RYGBToViewSpaceContext* rygbToViewspaceCtx)
 {
     initCubemapGenerateContext(ctx);
-    DEBUG("here1");
     ASSERT(_cubemapGenerateContext.renderPass)
     _cubemapTexture.Init(
         ctx.device.logicalDevice,
@@ -433,7 +431,7 @@ void AppPainter::ColorPicker::Init(TetriumApp::InitContext& ctx, RYGBToViewSpace
         CUBEMAP_HEIGHT,
         VK_FORMAT_R32G32B32A32_SFLOAT, // RYGB color space
         ctx.device.depthFormat,
-        true, // TODO: set to false, true for debugging rygb only
+        false,
         true // allowImageTransfer -- enable the VK_IMAGE_USAGE_TRANSFER_SRC_BIT flag
     );
 
@@ -461,11 +459,10 @@ void AppPainter::ColorPicker::Init(TetriumApp::InitContext& ctx, RYGBToViewSpace
     );
 
     _clearValues
-        = {vk::ClearColorValue(std::array<float, 4>{0.0f, 0.0f, 0.0f, 1.0f}),
+        = {vk::ClearColorValue(std::array<float, 4>{0.0f, 0.0f, 0.0f, 0.0f}),
            vk::ClearDepthStencilValue(1.0f, 0)};
 }
 
-// TODO: impl
 void AppPainter::ColorPicker::Cleanup(TetriumApp::CleanupContext& ctx)
 {
     _cubemapRYGBTextureCPU.Cleanup();
