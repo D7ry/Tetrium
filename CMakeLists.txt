@@ -53,6 +53,7 @@ set(SOURCES_BUILD
         src/apps/AppPainter.cpp
         src/apps/painter/PainterImGui.cpp
         src/apps/painter/PainterColorPicker.cpp
+        src/apps/painter/PainterColorPickerTick.cpp
         src/apps/painter/PainterPaint.cpp
         src/apps/painter/PainterSerialize.cpp
 
