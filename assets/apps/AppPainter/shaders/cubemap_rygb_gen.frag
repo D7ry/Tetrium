@@ -9,9 +9,18 @@ layout(std140, binding = 0) uniform UBO {
     float saturation;
 } ubo;
 
+layout(binding = 1) uniform sampler2D t_vshMaxSaturationLUT;
+
 layout(location = 0) out vec4 outColor;
 
 layout(location = 1) in vec2 fragUV; // outUV from vertex shader
+
+const float g_luminanceMin = 0.33837989700422405;
+const float g_luminanceRange = 1.6616201029957725;
+
+const float g_saturationMin = 0.50594715131446155;
+const float g_saturationRange = 1.0311205558296506;
+
 
 const mat4 g_heringToRYGB = mat4(
     vec4(0.5, 0.5, 0.5, 0.5),
@@ -32,6 +41,8 @@ const mat3 g_invMetamericDirMat = mat3(
     vec3(0.009838790494736328, 0.9928041963993547, 0.11934414863508082),
     vec3(0.16317872754169252, -0.11934414863508083, 0.9793516615927303)
 );
+
+const float g_maxLuminance = 2;
 
 vec3 convertCartesianToSpherical(vec3 xyz) {
     float x = xyz.x;
@@ -82,29 +93,19 @@ float solveForBoundary(float luminance, float max_l, float luminance_cusp, float
     }
 }
 
-// @returns: [luminance cusp, saturation cusp]
-vec2 findMaxSaturationForVSHH(vec4 vshh) {
-    vec4 heringTemp = convertVSHHToHering(vshh);
-    vec4 cartesian = g_heringToDisp * heringTemp;
-    float hueDirection = cartesian.x;
-    // FIXME: actually implement
-    return vec2(1.0, 1.0);
-}
-
 vec4 remapVSHHGamutPoints(vec4 vshh) {
-    // FIXME: get max_L from jess
-    const float max_l = 1.f;
 
     float vshhLuminance = vshh.x;
     float vshhSaturation = vshh.y;
     float vshhTheta = vshh.z;
     float vshhPhi = vshh.w;
     
-    vec2 maxSaturations = findMaxSaturationForVSHH(vec4(0, 1, vshhTheta, vshhPhi));
-    float luminanceCusp = maxSaturations.x;
-    float saturationCusp = maxSaturations.y;
+    vec2 lutResult = texture(t_vshMaxSaturationLUT, fragUV).xy;
 
-    float remappedSaturation = solveForBoundary(vshhLuminance, max_l, luminanceCusp, saturationCusp);
+    float luminanceCusp = lutResult.x * g_luminanceMin + g_luminanceRange;
+    float saturationCusp = lutResult.y * g_saturationMin + g_saturationRange;
+
+    float remappedSaturation = solveForBoundary(vshhLuminance, g_maxLuminance, luminanceCusp, saturationCusp);
     remappedSaturation = min(remappedSaturation, vshhSaturation);
     
     vec4 remappedVSHH = vec4(vshhLuminance, remappedSaturation, vshhTheta, vshhPhi);
@@ -121,11 +122,11 @@ vec4 convertCartesianToRYGB(vec3 xyz, float luminance, float saturation) {
     
     hering = convertVSHHToHering(vshh); // convert back to hering space
     
-    vec4 colorRYGB = g_heringToRYGB * hering;
+    //vec4 colorRYGB = g_heringToRYGB * hering;
 
-    // vec4 vshhRemapped = remapVSHHGamutPoints(vshh);
-    // vec4 heringremapped = convertvshhtohering(vshhremapped);
-    // vec4 colorrygb = g_heringtorygb * heringremapped;
+    vec4 vshhRemapped = remapVSHHGamutPoints(vshh);
+    vec4 heringRemapped = convertVSHHToHering(vshhRemapped);
+    vec4 colorRYGB = g_heringToRYGB * heringRemapped;
 
     return colorRYGB;
 }
@@ -198,6 +199,6 @@ void main() {
     
     vec4 rygb = convertCartesianToRYGB(xyz, luminance, saturation);
 
-    outColor = vec4(rygb.xzw, 1.0);
+    outColor = rygb;
     //outColor = vec4(xyz.x, 0.0, 0.0, 1.0);
 }

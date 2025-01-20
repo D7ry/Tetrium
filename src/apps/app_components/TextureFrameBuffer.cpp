@@ -10,7 +10,8 @@ void TextureFrameBuffer::Init(
     uint32_t height,
     VkFormat imageFormat,
     VkFormat depthFormat,
-    bool createImguiTexture
+    bool createImguiTexture,
+    bool allowImageTransfer
 )
 {
     _device = device;
@@ -19,6 +20,10 @@ void TextureFrameBuffer::Init(
     _imageFormat = imageFormat;
     _depthFormat = depthFormat;
 
+    VkImageUsageFlags imageFlags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    if (allowImageTransfer) {
+        imageFlags |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    }
     // Create color image & image view
     VulkanUtils::createImage(
         width,

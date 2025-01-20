@@ -16,11 +16,14 @@ class TextureFrameBuffer
         uint32_t height,
         VkFormat imageFormat,
         VkFormat depthFormat,
-        bool createImguiTexture = true
+        bool createImguiTexture = true,
+        bool allowImageTransfer = false
     );
     void Cleanup();
 
     vk::Framebuffer GetFrameBuffer() const { return _frameBuffer; }
+
+    vk::ImageView GetImageView() const { return _deviceImage.view; }
 
     void* GetImGuiTextureId() const { return _imguiTextureId; }
 

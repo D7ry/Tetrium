@@ -130,6 +130,7 @@ class AppPainter : public App
         enum class CubemapGenerationBindingLocation : uint32_t
         {
             ubo = 0,
+            vshMaxSaturationLUT = 1
         };
         // update the selected color based on cubemap texture coordinate,
         // luminance, and saturation. Must be called after any of the above changes.
@@ -162,7 +163,7 @@ class AppPainter : public App
         static const uint32_t CUBEMAP_WIDTH = 4 * CUBEMAP_CUBE_SIZE;
         static const uint32_t CUBEMAP_HEIGHT = 3 * CUBEMAP_CUBE_SIZE;
 
-        RYGBToViewSpaceContext* _rygbToViewSpaceCtx;
+        RYGBToViewSpaceContext* _rygbToViewSpaceCtx; // points to painter's transform context TODO: make it better
 
         // render context to generate an RYGB cubemap texture,
         // using luminance, saturation, and cubemap texture coordinate.
@@ -181,7 +182,12 @@ class AppPainter : public App
 
             VQBuffer ubo = {};
 
+            uint32_t vshMaxSaturationLUTTextureHandle = 0;
+
         } _cubemapGenerateContext;
+
+        // descriptor sets for transforming from rygb fb to imgui fb
+        std::array<vk::DescriptorSet, NUM_FRAME_IN_FLIGHT> _rygbTransformDescriptorSets{};
 
         struct CubemapGenerateUBO
         {
@@ -191,6 +197,11 @@ class AppPainter : public App
 
         void initCubemapGenerateContext(TetriumApp::InitContext& ctx);
         void cleanupCubemapGenerateContext(TetriumApp::CleanupContext& ctx);
+
+        void initRYGBTransform(TetriumApp::InitContext& ctx);
+
+        // CPU-accessible RYGB buffer
+        VQBuffer _cubemapRYGBTextureCPU{};
     };
 
   public:
