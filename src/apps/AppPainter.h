@@ -197,6 +197,8 @@ class AppPainter : public App
             int y = -1;
         } _colorPickerCursorPos;
 
+        glm::vec4 getColorFromCubemapCoord(int x, int y);
+
         void updatePickedColor();
 
         // CPU-accessible RYGB buffer

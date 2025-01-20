@@ -142,6 +142,27 @@ void AppPainter::ColorPicker::ResetColorPickerCursor()
     _colorPickerCursorPos = {-1, -1};
 }
 
+glm::vec4 AppPainter::ColorPicker::getColorFromCubemapCoord(int x, int y)
+{
+    if (x < 0 || y < 0 || x >= CUBEMAP_WIDTH || y >= CUBEMAP_HEIGHT) {
+        return {0, 0, 0, 0};
+    }
+
+    glm::vec4 color;
+
+    int rygbColorPixelIndex = x + y * CUBEMAP_WIDTH;
+    constexpr size_t pixelColorSize = sizeof(float) * 4;
+    char* colorBegin = static_cast<char*>(_cubemapRYGBTextureCPU.bufferAddress);
+
+    float* pColor
+        = reinterpret_cast<float*>(pixelColorSize * rygbColorPixelIndex + colorBegin);
+
+    memcpy(&color.x, pColor, pixelColorSize);
+
+    return color;
+}
+
+
 // update the picked color based on the current cursor position,
 // by sampling the pixel from the cubemap texture.
 void AppPainter::ColorPicker::updatePickedColor()
@@ -152,18 +173,7 @@ void AppPainter::ColorPicker::updatePickedColor()
         return;
     }
 
-    int rygbColorPixelIndex = x + y * CUBEMAP_WIDTH;
-
-    constexpr size_t pixelColorSize = sizeof(float) * 4;
-
-    //DEBUG("{} {} | {}", x, y, rygbColorPixelIndex);
-
-    // grab the color
-    char* colorBegin = static_cast<char*>(_cubemapRYGBTextureCPU.bufferAddress);
-    float* color
-        = reinterpret_cast<float*>(pixelColorSize * rygbColorPixelIndex + colorBegin);
-
-    memcpy(&_selectedColorRYGB.x, color, pixelColorSize);
+    _selectedColorRYGB = getColorFromCubemapCoord(x, y);
 }
 
 
@@ -190,25 +200,60 @@ void AppPainter::ColorPicker::TickImGui(const TetriumApp::TickContextImGui& ctx)
 
     // cubemap selection logic
     if (ImGui::IsItemHovered()) {
-        if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
-            // Get the mouse position in screen coordinates
-            ImVec2 mousePos = ImGui::GetMousePos();
+        ImVec2 mousePos = ImGui::GetMousePos();
+        // Calculate the mouse position relative to the cubemap image
+        ImVec2 relativePos = mousePos - imagePos;
+        relativePos.x = std::clamp(relativePos.x, 0.0f, cubemapSize.x);
+        relativePos.y = std::clamp(relativePos.y, 0.0f, cubemapSize.y);
+        int x = relativePos.x;
+        int y = relativePos.y;
 
-            // Calculate the mouse position relative to the cubemap image
-            ImVec2 relativePos = mousePos - imagePos;
-            relativePos.x = std::clamp(relativePos.x, 0.0f, cubemapSize.x);
-            relativePos.y = std::clamp(relativePos.y, 0.0f, cubemapSize.y);
-            int x = relativePos.x;
-            int y = relativePos.y;
+        // calculated hovered color
+        glm::vec4 hoveredColorRYGB = getColorFromCubemapCoord(x, y);
+        glm::vec4 hoeveredColorViewSpace = _tranformMatrixFromRygb[ctx.colorSpace] * hoveredColorRYGB;
+        for (int i = 0; i < 4; i++) {
+            hoeveredColorViewSpace[i] = std::clamp(hoeveredColorViewSpace[i], 0.f, 1.f);
+        }
 
-            _colorPickerCursorPos = {x, y};
-            DEBUG(
-                "picked color: {} {} {} {}",
-                _selectedColorRYGB.x,
-                _selectedColorRYGB.y,
-                _selectedColorRYGB.z,
-                _selectedColorRYGB.w
+        if (ImGui::BeginTooltip()) {
+            ImGui::ColorButton(
+                "hovered color",
+                ImVec4{
+                    hoeveredColorViewSpace.r,
+                    hoeveredColorViewSpace.g,
+                    hoeveredColorViewSpace.b,
+                    1.f
+                }
             );
+            ImGui::Text(
+                "%.3f %.3f %.3f %.3f",
+                hoveredColorRYGB.r,
+                hoveredColorRYGB.g,
+                hoveredColorRYGB.b,
+                hoveredColorRYGB.a
+            );
+            ImGui::EndTooltip();
+        }
+
+
+        //DEBUG(
+        //    " {} {} {} {}",
+        //    hoeveredColorViewSpace.r,
+        //    hoeveredColorViewSpace.g,
+        //    hoeveredColorViewSpace.b,
+        //    hoeveredColorViewSpace.w
+        //);
+
+        // update persistent cursor position on click
+        if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+            _colorPickerCursorPos = {x, y};
+            //DEBUG(
+            //    "picked color: {} {} {} {}",
+            //    _selectedColorRYGB.x,
+            //    _selectedColorRYGB.y,
+            //    _selectedColorRYGB.z,
+            //    _selectedColorRYGB.w
+            //);
         }
     }
 
@@ -231,9 +276,14 @@ void AppPainter::ColorPicker::TickImGui(const TetriumApp::TickContextImGui& ctx)
 
     // draw color preview
     glm::vec4 selectedColorViewSpace = _tranformMatrixFromRygb[ctx.colorSpace] * _selectedColorRYGB;
+    for (int i = 0; i < 4; i++) {
+        selectedColorViewSpace[i] = std::clamp(selectedColorViewSpace[i], 0.f, 1.f);
+    }
 
     ImGui::ColorButton("Selected Color", 
-        ImVec4{selectedColorViewSpace.r, selectedColorViewSpace.g, selectedColorViewSpace.b, 1.f}
+        ImVec4{selectedColorViewSpace.r, selectedColorViewSpace.g, selectedColorViewSpace.b, 1.f},
+        0,
+        ImVec2(150, 150)
     );
 }
 
