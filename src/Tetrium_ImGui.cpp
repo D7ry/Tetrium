@@ -369,6 +369,10 @@ void Tetrium::drawAppsImGui(ColorSpace colorSpace, int currentFrameInFlight)
                 _soundManager.SetMusic(ctxImGui.controls.musicOverride.value());
             }
         }
+
+        if (ctxImGui.controls.wantDrawCursor) {
+            drawCursor();
+        }
     }
 }
 
@@ -464,8 +468,6 @@ void Tetrium::drawImGui(ColorSpace colorSpace, int currentFrameInFlight)
     }
 
     if (GlobalStates::isWindowFocused) {
-        ImGuiTexture cursorTexture = _engineTextures[(int)EngineTexture::kCursor].second;
-        ImGuiU::DrawCursor(cursorTexture);
 #if defined(WIN32)
         //SetCapture(_dxgiDisplay.window);
 #else
@@ -502,8 +504,16 @@ void Tetrium::drawImGui(ColorSpace colorSpace, int currentFrameInFlight)
         drawAppsImGui(colorSpace, currentFrameInFlight);
     } else {
         drawMainMenu(colorSpace);
+        drawCursor();
     }
 
     ImGui::Render();
 }
+
+void Tetrium::drawCursor()
+{
+    ImGuiTexture cursorTexture = _engineTextures[(int)EngineTexture::kCursor].second;
+    ImGuiU::DrawCursor(cursorTexture);
+}
+
 #pragma endregion

@@ -56,6 +56,7 @@ struct TickContextImGui
 
     mutable struct
     {
+        bool wantDrawCursor = true;
         bool wantExit = false;
         std::optional<Sound> musicOverride;
     } controls;

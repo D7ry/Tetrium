@@ -16,6 +16,38 @@ void AppPainter::canvasInteract(const ImVec2& canvasMousePos,const TetriumApp::T
 
     ImVec2 prevPos = _paintingState.prevCanvasMousePos.value_or(canvasMousePos);
 
+    if (_cursorFunction != CursorFunction::Dropper) {
+        glm::vec4 selectedColorViewSpace;
+
+        if (_cursorFunction == CursorFunction::Draw) {
+            selectedColorViewSpace = 
+                _tranformMatrixFromRygb[ctx.colorSpace] * _colorPicker.GetSelectedColorRYGB();
+            selectedColorViewSpace *= 255.0f;
+            selectedColorViewSpace = glm::clamp(selectedColorViewSpace, 0.0f, 255.0f);
+            selectedColorViewSpace.a = 255.0f; // override alpha value which is always 0
+        } else {
+            selectedColorViewSpace = glm::vec4(0, 0, 0, 0);
+        }
+
+        // draw brush size preview
+        ImGui::GetWindowDrawList()->AddCircleFilled(
+            ImGui::GetMousePos(),
+            static_cast<float>(_paintingState.brushSize) / 2.0f,
+            IM_COL32(
+                static_cast<int>(selectedColorViewSpace.r),
+                static_cast<int>(selectedColorViewSpace.g),
+                static_cast<int>(selectedColorViewSpace.b),
+                static_cast<int>(selectedColorViewSpace.a)
+            )
+        );
+
+        ImGui::GetWindowDrawList()->AddCircle(
+            ImGui::GetMousePos(), static_cast<float>(_paintingState.brushSize) / 2.0f,
+            IM_COL32(255, 255, 255, 255), 0, 2.f
+        );
+        ctx.controls.wantDrawCursor = false;
+    }
+
     if (_cursorFunction == CursorFunction::Draw) {
         if (ImGui::IsKeyDown(ImGuiKey_MouseLeft)) {
             brush(prevPos.x, prevPos.y, x, y, _colorPicker.GetSelectedColorRYGB());
@@ -119,7 +151,6 @@ void AppPainter::TickImGui(const TetriumApp::TickContextImGui& ctx)
             }
 
             // Draw canvas
-            //
             ImVec2 canvasSize = ImVec2(_canvasWidth, _canvasHeight);
             {
                 const TextureFrameBuffer& fb = _viewSpaceFrameBuffer[ctx.currentFrameInFlight];

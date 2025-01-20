@@ -174,9 +174,10 @@ vec3 convertCubemapUVToCartesian(vec2 uv, float radius) {
         // Back (Negative Z)
         xyz = vec3(-uc, vc, -1.0);
     }
-
-    // Normalize to the given radius if requested
-    xyz = normalize(xyz) * radius;
+    
+    if (any(notEqual(xyz, vec3(0.0, 0.0, 0.0)))) {
+        xyz = normalize(xyz) * radius; // scale to radius, only if not zero vector
+    }
 
     return xyz;
 }
@@ -188,6 +189,11 @@ void main() {
 
     // use only fragUV for now
     vec3 xyz = convertCubemapUVToCartesian(fragUV, saturation);
+    
+    if (xyz == vec3(0.0, 0.0, 0.0)) {
+        outColor = vec4(0.0, 0.0, 0.0, 0.0);
+        return;
+    }
     
     xyz = g_invMetamericDirMat * xyz;
     

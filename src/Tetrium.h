@@ -277,6 +277,7 @@ class Tetrium
     void drawFrame(ColorSpace colorSpace, uint8_t frameIdx);
     void drawMainMenu(ColorSpace colorSpace);
     void drawImGui(ColorSpace colorSpace, int currentFrameInFlight);
+    void drawCursor();
 
     void drawAppsImGui(ColorSpace colorSpace, int currentFrameInFlight);
     void pollInputs();
