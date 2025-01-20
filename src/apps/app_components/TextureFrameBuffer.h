@@ -25,6 +25,8 @@ class TextureFrameBuffer
 
     vk::ImageView GetImageView() const { return _deviceImage.view; }
 
+    vk::Image GetImage() const { return _deviceImage.image; }
+
     void* GetImGuiTextureId() const { return _imguiTextureId; }
 
     void Resize(uint32_t width, uint32_t height);

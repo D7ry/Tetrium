@@ -240,7 +240,7 @@ void AppPainter::ColorPicker::initCubemapGenerateContext(TetriumApp::InitContext
                    vk::AttachmentLoadOp::eDontCare,
                    vk::AttachmentStoreOp::eDontCare,
                    vk::ImageLayout::eUndefined,
-                   vk::ImageLayout::eShaderReadOnlyOptimal // write to imgui texture
+                   vk::ImageLayout::eShaderReadOnlyOptimal // to be sampled by RYGB transform pass
                ),
                // depth attachment
                vk::AttachmentDescription(
@@ -468,6 +468,7 @@ void AppPainter::ColorPicker::Init(TetriumApp::InitContext& ctx, RYGBToViewSpace
 // TODO: impl
 void AppPainter::ColorPicker::Cleanup(TetriumApp::CleanupContext& ctx)
 {
+    _cubemapRYGBTextureCPU.Cleanup();
     cleanupCubemapGenerateContext(ctx);
     _cubemapTextureViewSpace.Cleanup();
     _cubemapTexture.Cleanup();
@@ -562,8 +563,31 @@ void AppPainter::ColorPicker::TickVulkan(TetriumApp::TickContextVulkan& ctx)
             cb.draw(3, 1, 0, 0);
             cb.endRenderPass();
         }
+        { // TODO: use a memory barrier to block buffer transfer
 
-        // TODO: copy cubemap into CPU-accessible staging buffer
+        }
+        {
+            VkBufferImageCopy region = {};
+            region.bufferOffset = 0;
+            region.bufferRowLength = 0;
+            region.bufferImageHeight = 0;
+            region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            region.imageSubresource.mipLevel = 0;
+            region.imageSubresource.baseArrayLayer = 0;
+            region.imageSubresource.layerCount = 1;
+            region.imageOffset = {0, 0, 0};
+            region.imageExtent = {CUBEMAP_WIDTH, CUBEMAP_HEIGHT, 1};
+
+            vk::BufferImageCopy vkRegion(region);
+
+            cb.copyImageToBuffer(
+                _cubemapTexture.GetImage(),
+                vk::ImageLayout::eShaderReadOnlyOptimal,
+                _cubemapRYGBTextureCPU.buffer,
+                1,
+                &vkRegion
+            );
+        }
 
         // FIXME: currently ColorPicker uses one resources across all frames -- this 
         // isn't a huge synchronization issue unless we turn on conditional generation,
@@ -586,8 +610,40 @@ void AppPainter::ColorPicker::TickImGui(const TetriumApp::TickContextImGui& ctx)
         ImGui::SliderFloat("B", &_selectedColorRYGB.a, -1.0f, 1.0f);
 
         /// render cubemap
+        constexpr ImVec2 cubemapSize{CUBEMAP_WIDTH, CUBEMAP_HEIGHT};
         void* cubemapViewSpaceTextureId = _cubemapTextureViewSpace.GetImGuiTextureId();
-        ImGui::Image(cubemapViewSpaceTextureId, ImVec2{CUBEMAP_WIDTH, CUBEMAP_HEIGHT});
+        ImGui::Image(cubemapViewSpaceTextureId, cubemapSize);
+
+        // cubemap selection logic
+        if (ImGui::IsItemClicked()) {
+            // Get the mouse position in screen coordinates
+            ImVec2 mousePos = ImGui::GetMousePos();
+
+            // Get the position of the cubemap image on the screen
+            ImVec2 imagePos = ImGui::GetItemRectMin(); // The top-left corner of the cubemap image
+
+            // Calculate the mouse position relative to the cubemap image
+            ImVec2 relativePos = mousePos - imagePos;
+            relativePos.x = std::clamp(relativePos.x, 0.0f, cubemapSize.x);
+            relativePos.y = std::clamp(relativePos.y, 0.0f, cubemapSize.y);
+            int x = relativePos.x;
+            int y = relativePos.y;
+
+            int rygbColorPixelIndex = x + y * CUBEMAP_WIDTH;
+
+
+            INFO("{} {} | {}", x, y, rygbColorPixelIndex);
+            char* colorBegin = (char*)_cubemapRYGBTextureCPU.bufferAddress;
+            
+            float* color
+                = reinterpret_cast<float*>(sizeof(float) * 4 * rygbColorPixelIndex + colorBegin);
+
+            _selectedColorRYGB.r = color[0];
+            _selectedColorRYGB.g = color[1];
+            _selectedColorRYGB.b = color[2];
+            _selectedColorRYGB.a = color[3];
+
+        }
 
         // for debug only
         //ImGui::Image(_cubemapTexture.GetImGuiTextureId(), ImVec2{CUBEMAP_WIDTH, CUBEMAP_HEIGHT});
