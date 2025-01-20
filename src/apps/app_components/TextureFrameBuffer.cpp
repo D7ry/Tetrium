@@ -30,7 +30,7 @@ void TextureFrameBuffer::Init(
         height,
         imageFormat,
         VK_IMAGE_TILING_OPTIMAL,
-        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        imageFlags,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         _deviceImage.image,
         _deviceImage.memory,

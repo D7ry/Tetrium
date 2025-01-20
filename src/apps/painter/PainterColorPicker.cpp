@@ -64,7 +64,7 @@ void AppPainter::ColorPicker::initRYGBTransform(TetriumApp::InitContext& ctx)
             vk::DescriptorImageInfo imageInfo(
                 _rygbToViewSpaceCtx->samplers[i],
                 _cubemapTexture.GetImageView(),
-                vk::ImageLayout::eShaderReadOnlyOptimal
+                vk::ImageLayout::eGeneral
             );
 
             // Update descriptor set with the buffer and image info
@@ -240,7 +240,7 @@ void AppPainter::ColorPicker::initCubemapGenerateContext(TetriumApp::InitContext
                    vk::AttachmentLoadOp::eDontCare,
                    vk::AttachmentStoreOp::eDontCare,
                    vk::ImageLayout::eUndefined,
-                   vk::ImageLayout::eShaderReadOnlyOptimal // to be sampled by RYGB transform pass
+                   vk::ImageLayout::eGeneral // to be 1. sampled by RYGB transform 2. copied to CPU-accessible buffer
                ),
                // depth attachment
                vk::AttachmentDescription(
@@ -455,7 +455,7 @@ void AppPainter::ColorPicker::Init(TetriumApp::InitContext& ctx, RYGBToViewSpace
     // init CPU-accessible color picker texture
     ctx.device.CreateBufferInPlace(
         sizeof(float) * 4 * CUBEMAP_HEIGHT * CUBEMAP_WIDTH,
-        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
         _cubemapRYGBTextureCPU
     );
@@ -582,7 +582,7 @@ void AppPainter::ColorPicker::TickVulkan(TetriumApp::TickContextVulkan& ctx)
 
             cb.copyImageToBuffer(
                 _cubemapTexture.GetImage(),
-                vk::ImageLayout::eShaderReadOnlyOptimal,
+                vk::ImageLayout::eGeneral,
                 _cubemapRYGBTextureCPU.buffer,
                 1,
                 &vkRegion
