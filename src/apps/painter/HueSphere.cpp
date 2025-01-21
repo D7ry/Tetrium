@@ -5,8 +5,8 @@
 #include "imgui.h"
 #include <lib/VQUtils.h>
 
-std::string VERTEX_SHADER_PATH = ASSETS_PATH + "apps/AppTetraHueSphere/shader.vert.spv";
-std::string FRAGMENT_SHADER_PATH = ASSETS_PATH + "apps/AppTetraHueSphere/shader.frag.spv";
+std::string VERTEX_SHADER_PATH = ASSETS_PATH + "apps/AppPainter/shaders/hue_sphere.vert.spv";
+std::string FRAGMENT_SHADER_PATH = ASSETS_PATH + "apps/AppPainter/shaders/hue_sphere.frag.spv";
 
 std::string HUE_SPHERE_UGLY_MODEL_PATH
     = ASSETS_PATH + "apps/AppTetraHueSphere/fibonacci_sampled.obj";
@@ -24,6 +24,36 @@ void HueSphere::DrawHuesphereInImGui(const TetriumApp::TickContextImGui& ctx)
 {
     auto& fb = _renderContexts[ctx.colorSpace].fb;
     ImGui::Image(fb.GetImGuiTextureId(), ImVec2{(float)_fbWidth, (float)_fbHeight});
+
+    auto io = ImGui::GetIO();
+
+    if (ImGui::IsItemHovered()) {
+        // if (io.MouseWheel != 0) {
+        //     _rasterizationCtx.camera.Move(io.MouseWheel * 0.2, 0, 0);
+        // };
+        if (io.MouseDown[0]) {
+            _rasterizationCtx.camera.ModRotation(-io.MouseDelta.x, -io.MouseDelta.y, 0);
+        }
+        // minecraft movement controls
+        if (io.KeysDown[ImGuiKey_Space]) {
+            _rasterizationCtx.camera.Move(0, 0, io.DeltaTime);
+        }
+        if (io.KeyShift) {
+            _rasterizationCtx.camera.Move(0, 0, -io.DeltaTime);
+        }
+        if (io.KeysDown[ImGuiKey_W]) {
+            _rasterizationCtx.camera.Move(io.DeltaTime, 0, 0);
+        }
+        if (io.KeysDown[ImGuiKey_S]) {
+            _rasterizationCtx.camera.Move(-io.DeltaTime, 0, 0);
+        }
+        if (io.KeysDown[ImGuiKey_A]) {
+            _rasterizationCtx.camera.Move(0, io.DeltaTime, 0);
+        }
+        if (io.KeysDown[ImGuiKey_D]) {
+            _rasterizationCtx.camera.Move(0, -io.DeltaTime, 0);
+        }
+    }
 }
 
 void HueSphere::TickVulkan(TetriumApp::TickContextVulkan& ctx)
@@ -115,13 +145,15 @@ void HueSphere::Cleanup(TetriumApp::CleanupContext& ctx)
 
     vk::Device device = ctx.device.logicalDevice;
     device.destroyRenderPass(_renderPass);
+    //cleanupCubemapTexture(ctx);
 };
 
-void HueSphere::Init(TetriumApp::InitContext& ctx, uint32_t fbWidth, uint32_t fbHeight, uint32_t cubemapSize)
+void HueSphere::Init(TetriumApp::InitContext& ctx, uint32_t fbWidth, uint32_t fbHeight, uint32_t cubemapSize, TextureFrameBuffer& cubemapTexture)
 {
     DEBUG("Initializing Huesphere...");
     _fbWidth = fbWidth;
     _fbHeight = fbHeight;
+    //initCubemapTexture(ctx, cubemapSize);
 
     initRenderPass(ctx);
 
@@ -134,7 +166,7 @@ void HueSphere::Init(TetriumApp::InitContext& ctx, uint32_t fbWidth, uint32_t fb
     _clearValues[0].color = {0.0f, 0.0f, 0.0f, 0.f};
     _clearValues[1].depthStencil = vk::ClearDepthStencilValue(1.f, 0.f);
 
-    initRasterization(ctx);
+    initRasterization(ctx, cubemapTexture);
 
     _rasterizationCtx.camera.SetPosition(-0.75, 0, 0);
 };
@@ -243,7 +275,7 @@ void HueSphere::initRenderPass(TetriumApp::InitContext& initCtx)
     DEBUG("render pass created");
 }
 
-void HueSphere::initRasterization(TetriumApp::InitContext& initCtx)
+void HueSphere::initRasterization(TetriumApp::InitContext& initCtx, TextureFrameBuffer& cubemapTexture)
 {
     vk::Device device = initCtx.device.logicalDevice;
     // allocate device memory for UBO
@@ -260,7 +292,7 @@ void HueSphere::initRasterization(TetriumApp::InitContext& initCtx)
     // bind & allocate descriptor sets
     {
         const size_t UBO_DESCRIPTOR_COUNT = 1;
-        const size_t SAMPLER_DESCRIPTOR_COUNT = 4; // [uglyRGB, uglyOCV, prettyRGB, prettyOCV]
+        const size_t SAMPLER_DESCRIPTOR_COUNT = 1; // [uglyRGB, uglyOCV, prettyRGB, prettyOCV]
 
         vk::DescriptorSetLayoutBinding uboLayoutBinding(
             (uint32_t)BindingLocation::UBO,
@@ -272,7 +304,7 @@ void HueSphere::initRasterization(TetriumApp::InitContext& initCtx)
         vk::DescriptorSetLayoutBinding samplerLayoutBinding(
             (uint32_t)BindingLocation::TEXTURE_SAMPLER,
             vk::DescriptorType::eCombinedImageSampler,
-            SAMPLER_DESCRIPTOR_COUNT,
+            1,
             vk::ShaderStageFlagBits::eFragment
         );
         std::array<vk::DescriptorSetLayoutBinding, 2> bindings
@@ -332,29 +364,16 @@ void HueSphere::initRasterization(TetriumApp::InitContext& initCtx)
                 nullptr
             );
 
-            uint32_t imageInfoUglyRGBHandle = initCtx.api.LoadCubemapTexture(HUE_SPHERE_UGLY_TEXTURE_PATH_RGB);
-            uint32_t imageInfoUglyOCVHandle = initCtx.api.LoadCubemapTexture(HUE_SPHERE_UGLY_TEXTURE_PATH_OCV);
-            uint32_t imageInfoPrettyRGBHandle = initCtx.api.LoadCubemapTexture(HUE_SPHERE_PRETTY_TEXTURE_PATH_RGB);
-            uint32_t imageInfoPrettyOCVHandle = initCtx.api.LoadCubemapTexture(HUE_SPHERE_PRETTY_TEXTURE_PATH_OCV);
 
-            // sampler
-            vk::DescriptorImageInfo imageInfoUglyRGB = initCtx.api.GetTextureDescriptorImageInfo(imageInfoUglyRGBHandle);
-            vk::DescriptorImageInfo imageInfoUglyOCV = initCtx.api.GetTextureDescriptorImageInfo(imageInfoUglyOCVHandle);
-            vk::DescriptorImageInfo imageInfoPrettyRGB = initCtx.api.GetTextureDescriptorImageInfo(imageInfoPrettyRGBHandle);
-            vk::DescriptorImageInfo imageInfoPrettyOCV = initCtx.api.GetTextureDescriptorImageInfo(imageInfoPrettyOCVHandle);
-
-            _rasterizationCtx.loadedTextures.push_back(imageInfoUglyRGBHandle);
-
-            std::array<vk::DescriptorImageInfo, SAMPLER_DESCRIPTOR_COUNT> imageInfos
-                = {imageInfoUglyRGB, imageInfoUglyOCV, imageInfoPrettyRGB, imageInfoPrettyOCV};
+            vk::DescriptorImageInfo cubemapTextureInfo = cubemapTexture.GetDescriptorImageInfo();
 
             descriptorWrites[1] = vk::WriteDescriptorSet(
                 _rasterizationCtx.descriptors.sets[i],
                 (uint32_t)BindingLocation::TEXTURE_SAMPLER,
                 0,
-                imageInfos.size(),
+                1,
                 vk::DescriptorType::eCombinedImageSampler,
-                imageInfos.data(),
+                &cubemapTextureInfo,
                 nullptr,
                 nullptr
             );
@@ -498,12 +517,6 @@ void HueSphere::initRasterization(TetriumApp::InitContext& initCtx)
 
     // load in hue sphere model
     {
-        VQUtils::meshToBuffer(
-            HUE_SPHERE_UGLY_MODEL_PATH.c_str(),
-            initCtx.device,
-            _rasterizationCtx.uglySphereMesh.vertexBuffer,
-            _rasterizationCtx.uglySphereMesh.indexBuffer
-        );
 
         VQUtils::meshToBuffer(
             HUE_SPHERE_PRETTY_MODEL_PATH.c_str(),
@@ -552,7 +565,101 @@ void HueSphere::cleanupRasterization(TetriumApp::CleanupContext& cleanupCtx)
     // Destroy vertex and index buffers
     _rasterizationCtx.prettySphereMesh.vertexBuffer.Cleanup();
     _rasterizationCtx.prettySphereMesh.indexBuffer.Cleanup();
+}
 
-    _rasterizationCtx.uglySphereMesh.vertexBuffer.Cleanup();
-    _rasterizationCtx.uglySphereMesh.indexBuffer.Cleanup();
+static uint32_t findMemoryType(
+    VkPhysicalDevice physicalDevice,
+    uint32_t typeFilter,
+    VkMemoryPropertyFlags properties
+)
+{
+    VkPhysicalDeviceMemoryProperties memProperties;
+    vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
+
+    for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
+        if ((typeFilter & (1 << i))
+            && (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+            return i;
+        }
+    }
+    PANIC("Failed to find suitable memory type!");
+}
+
+void HueSphere::initCubemapTexture(TetriumApp::InitContext& ctx, uint32_t faceSize)
+{
+    auto& device = ctx.device;
+    VkImageCreateInfo imageCreateInfo = {};
+    imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+    imageCreateInfo.format = VK_FORMAT_R8G8B8A8_SRGB;
+    imageCreateInfo.extent.width = faceSize;
+    imageCreateInfo.extent.height = faceSize;
+    imageCreateInfo.extent.depth = 1;
+    imageCreateInfo.mipLevels = 1;
+    imageCreateInfo.arrayLayers = 6;
+    imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+    imageCreateInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    imageCreateInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+    imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    VK_CHECK(vkCreateImage(ctx.device.Get(), &imageCreateInfo, nullptr, &_cubemapTexture.image));
+    
+    VkMemoryAllocateInfo allocInfo = {};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    VkMemoryRequirements memRequirements;
+    vkGetImageMemoryRequirements(ctx.device.Get(), _cubemapTexture.image, &memRequirements);
+    allocInfo.allocationSize = memRequirements.size;
+    allocInfo.memoryTypeIndex = findMemoryType(
+        device.physicalDevice, memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+    );
+    VK_CHECK(
+        vkAllocateMemory(device.logicalDevice, &allocInfo, nullptr, &_cubemapTexture.imageMemory)
+    )
+    VK_CHECK(vkBindImageMemory(
+        device.logicalDevice, _cubemapTexture.image, _cubemapTexture.imageMemory, 0
+    ))
+
+    VkImageViewCreateInfo viewCreateInfo = {};
+    viewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    viewCreateInfo.image = _cubemapTexture.image;
+    viewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_CUBE;
+    viewCreateInfo.format = VK_FORMAT_R8G8B8A8_SRGB;
+    viewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    viewCreateInfo.subresourceRange.baseMipLevel = 0;
+    viewCreateInfo.subresourceRange.levelCount = 1;
+    viewCreateInfo.subresourceRange.baseArrayLayer = 0;
+    viewCreateInfo.subresourceRange.layerCount = 6;
+
+    VK_CHECK(
+        vkCreateImageView(device.logicalDevice, &viewCreateInfo, nullptr, &_cubemapTexture.view)
+    );
+
+    // Create sampler
+    VkSamplerCreateInfo samplerCreateInfo = {};
+    samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerCreateInfo.magFilter = VK_FILTER_LINEAR;
+    samplerCreateInfo.minFilter = VK_FILTER_LINEAR;
+    samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerCreateInfo.anisotropyEnable = VK_FALSE;
+    samplerCreateInfo.maxAnisotropy = 0;
+    // samplerCreateInfo.maxAnisotropy = 16;
+    samplerCreateInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    samplerCreateInfo.unnormalizedCoordinates = VK_FALSE;
+    samplerCreateInfo.compareEnable = VK_FALSE;
+    samplerCreateInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+    samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+
+    VK_CHECK(vkCreateSampler(
+        device.logicalDevice, &samplerCreateInfo, nullptr, &_cubemapTexture.sampler
+    ));
+}
+
+void HueSphere::cleanupCubemapTexture(TetriumApp::CleanupContext& ctx)
+{
+    vkDestroySampler(ctx.device.logicalDevice, _cubemapTexture.sampler, nullptr);
+    vkDestroyImageView(ctx.device.logicalDevice, _cubemapTexture.view, nullptr);
+    vkDestroyImage(ctx.device.logicalDevice, _cubemapTexture.image, nullptr);
+    vkFreeMemory(ctx.device.logicalDevice, _cubemapTexture.imageMemory, nullptr);
 }

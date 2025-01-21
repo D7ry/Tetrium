@@ -1,4 +1,6 @@
 #pragma once
+#include <vulkan/vulkan.hpp>
+#include <vulkan/vulkan.h>
 #include <apps/App.h>
 #include <apps/app_components/TextureFrameBuffer.h>
 #include <apps/app_components/Transform.h>
@@ -8,7 +10,7 @@
 class HueSphere
 {
     public:
-    void Init(TetriumApp::InitContext& ctx, uint32_t fbWidth, uint32_t fbHeight, uint32_t cubemapSize);
+    void Init(TetriumApp::InitContext& ctx, uint32_t fbWidth, uint32_t fbHeight, uint32_t cubemapSize, TextureFrameBuffer& cubemapTexture);
     void Cleanup(TetriumApp::CleanupContext& ctx);
 
     void TickVulkan(TetriumApp::TickContextVulkan& ctx);
@@ -30,7 +32,7 @@ class HueSphere
 
     void initRenderPass(TetriumApp::InitContext& initCtx);
 
-    void initRasterization(TetriumApp::InitContext& initCtx);
+    void initRasterization(TetriumApp::InitContext& initCtx, TextureFrameBuffer& cubemapTexture);
     void cleanupRasterization(TetriumApp::CleanupContext& cleanupCtx);
 
     enum class BindingLocation : uint32_t
@@ -74,7 +76,6 @@ class HueSphere
         } descriptors;
 
         Mesh prettySphereMesh;
-        Mesh uglySphereMesh;
 
         Camera camera;
         Transform hueSpheretransform = Transform::Identity();
@@ -88,6 +89,20 @@ class HueSphere
 
         std::vector<uint32_t> loadedTextures;
     } _rasterizationCtx;
+
+    struct
+    {
+        VkImage image;
+        VkDeviceMemory imageMemory;
+        VkImageView view;
+
+        VkSampler sampler;
+
+    } _cubemapTexture;
+
+    void initCubemapTexture(TetriumApp::InitContext& ctx, uint32_t faceSize);
+
+    void cleanupCubemapTexture(TetriumApp::CleanupContext& ctx);
 
     uint32_t _fbWidth;
     uint32_t _fbHeight;

@@ -114,3 +114,12 @@ void TextureFrameBuffer::Resize(uint32_t width, uint32_t height)
     Cleanup();
     Init(_device, _physicalDevice, _renderPass, width, height, _imageFormat, _depthFormat);
 }
+
+VkDescriptorImageInfo TextureFrameBuffer::GetDescriptorImageInfo() const
+{
+    return VkDescriptorImageInfo{
+        .sampler = _sampler,
+        .imageView = _deviceImage.view,
+        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+    };
+}

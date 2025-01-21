@@ -462,7 +462,7 @@ void AppPainter::ColorPicker::Init(TetriumApp::InitContext& ctx, RYGBToViewSpace
         = {vk::ClearColorValue(std::array<float, 4>{0.0f, 0.0f, 0.0f, 0.0f}),
            vk::ClearDepthStencilValue(1.0f, 0)};
 
-    _hueSphere.Init(ctx, 1024, 1024);
+    _hueSphere.Init(ctx, 1024, 1024, CUBEMAP_CUBE_SIZE, _cubemapTextureViewSpace);
 }
 
 void AppPainter::ColorPicker::Cleanup(TetriumApp::CleanupContext& ctx)
