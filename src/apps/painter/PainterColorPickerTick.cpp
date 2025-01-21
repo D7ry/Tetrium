@@ -223,6 +223,23 @@ void AppPainter::ColorPicker::TickVulkan(TetriumApp::TickContextVulkan& ctx)
             nullptr,
             vk::getDispatchLoaderStatic()
         );
+
+
+        struct
+        {
+            glm::vec2 cursorMarkUV;
+            float aspectRatio = (float)CUBEMAP_WIDTH / (float)CUBEMAP_HEIGHT;
+            float markRadius = 0.005f;
+        } pushConstants;
+
+        pushConstants.cursorMarkUV = glm::vec2(
+            (float)_colorPickerCursorPos.x / CUBEMAP_WIDTH,
+            (float)_colorPickerCursorPos.y / CUBEMAP_HEIGHT
+        );
+
+        cb.pushConstants(_rygbToViewSpaceCtx->pipelineLayout, vk::ShaderStageFlagBits::eFragment, 0, sizeof(pushConstants),
+            &pushConstants
+        );
         cb.draw(3, 1, 0, 0);
         cb.endRenderPass();
     }
@@ -318,7 +335,7 @@ void AppPainter::ColorPicker::updatePickedColorFromRYGB()
 
 void AppPainter::ColorPicker::TickImGuiHueSphere(const TetriumApp::TickContextImGui& ctx)
 {
-    _hueSphere.DrawHuesphereInImGui(ctx);
+    _hueSphere.DrawHuesphereInImGui(ctx, _saturation);
 }
 
 void AppPainter::ColorPicker::TickImGui(const TetriumApp::TickContextImGui& ctx)

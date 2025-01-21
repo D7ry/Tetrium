@@ -76,6 +76,7 @@ class AppPainter : public App
         // either RYGB -> RGB or RYGB -> OCV
         // note the 4th row is unused in shader and is only used for std140 padding.
         glm::mat4x4 transformMatrix;
+        glm::vec2 markUV;
     };
 
     // GPU-accessible texture to sample from in paint space.

@@ -20,9 +20,12 @@ std::string HUE_SPHERE_PRETTY_MODEL_PATH = ASSETS_PATH + "apps/AppTetraHueSphere
 std::string HUE_SPHERE_PRETTY_TEXTURE_PATH_RGB = HUE_SPHERE_UGLY_TEXTURE_PATH_RGB;
 std::string HUE_SPHERE_PRETTY_TEXTURE_PATH_OCV = HUE_SPHERE_UGLY_TEXTURE_PATH_OCV;
 
-void HueSphere::DrawHuesphereInImGui(const TetriumApp::TickContextImGui& ctx)
+void HueSphere::DrawHuesphereInImGui(const TetriumApp::TickContextImGui& ctx, float scale)
 {
     auto& fb = _renderContexts[ctx.colorSpace].fb;
+    glm::vec3 defaultScale(2, 2, 2);
+    _rasterizationCtx.hueSpheretransform.scale = defaultScale * scale;
+
     ImGui::Image(fb.GetImGuiTextureId(), ImVec2{(float)_fbWidth, (float)_fbHeight});
 
     auto io = ImGui::GetIO();

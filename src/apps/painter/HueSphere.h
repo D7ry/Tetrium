@@ -14,7 +14,7 @@ class HueSphere
     void Cleanup(TetriumApp::CleanupContext& ctx);
 
     void TickVulkan(TetriumApp::TickContextVulkan& ctx);
-    void DrawHuesphereInImGui(const TetriumApp::TickContextImGui& ctx);
+    void DrawHuesphereInImGui(const TetriumApp::TickContextImGui& ctx, float scale);
     private:
 
     std::array<vk::ClearValue, 2> _clearValues; // [color, depthStencil]

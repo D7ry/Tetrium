@@ -358,12 +358,17 @@ void AppPainter::initPaintToViewSpaceContext(TetriumApp::InitContext& ctx)
             {0.0f, 0.0f, 0.0f, 0.0f} // blendConstants
         );
 
+        // hacky way to draw the paint space mark
+        vk::PushConstantRange pushConstantRange(
+            vk::ShaderStageFlagBits::eFragment, 0, sizeof(glm::vec2) + 2 * sizeof(float)
+        );
+
         vk::PipelineLayoutCreateInfo pipelineLayoutInfo(
             vk::PipelineLayoutCreateFlags(),
             1,
             &_paintToViewSpaceContext.descriptorSetLayout,
-            0,
-            nullptr
+            1,
+            &pushConstantRange
         );
 
         if (device.createPipelineLayout(
