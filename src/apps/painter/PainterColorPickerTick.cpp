@@ -4,6 +4,8 @@
 #include <Pathing.h>
 #include <components/ShaderUtils.h>
 
+#include "lib/ImGuiUtils.h"
+
 namespace
 {
 struct ColorPickerInput
@@ -263,7 +265,7 @@ void AppPainter::ColorPicker::TickVulkan(TetriumApp::TickContextVulkan& ctx)
 void AppPainter::ColorPicker::SetPickedColor(glm::vec4 rygb)
 {
     _selectedColorRYGB = rygb;
-    ResetColorPickerCursor();
+    updatePickedColorFromRYGB();
 }
 
 void AppPainter::ColorPicker::ResetColorPickerCursor()
@@ -305,6 +307,14 @@ void AppPainter::ColorPicker::updatePickedColor()
     _selectedColorRYGB = getColorFromCubemapCoord(x, y);
 }
 
+void AppPainter::ColorPicker::updatePickedColorFromRYGB()
+{
+    ColorPickerInput input = getColorPickerInputFromRYGB(_selectedColorRYGB);
+    _luminance = input.luminance;
+    _saturation = input.saturation;
+    _colorPickerCursorPos.x = input.u * CUBEMAP_WIDTH;
+    _colorPickerCursorPos.y = input.v * CUBEMAP_HEIGHT;
+}
 
 void AppPainter::ColorPicker::TickImGui(const TetriumApp::TickContextImGui& ctx)
 {
@@ -419,19 +429,34 @@ void AppPainter::ColorPicker::TickImGui(const TetriumApp::TickContextImGui& ctx)
 
         ImGui::TableNextColumn();
         // manual rygb control
+        glm::vec4 rDisplaySpace = _tranformMatrixFromRygb[ctx.colorSpace] * glm::vec4(1, 0, 0, 0);
+        glm::vec4 yDisplaySpace = _tranformMatrixFromRygb[ctx.colorSpace] * glm::vec4(0, 1, 0, 0);
+        glm::vec4 gDisplaySpace = _tranformMatrixFromRygb[ctx.colorSpace] * glm::vec4(0, 0, 1, 0);
+        glm::vec4 bDisplaySpace = _tranformMatrixFromRygb[ctx.colorSpace] * glm::vec4(0, 0, 0, 1);
+
+        auto convertToImVec4 = [](const glm::vec4& color) -> ImVec4 {
+            return ImVec4{color.r, color.g, color.b, 1.f};
+        };
+        // Apply alpha = 1 to each color and convert to ImVec4
+        ImVec4 r = convertToImVec4(rDisplaySpace);
+        ImVec4 y = convertToImVec4(yDisplaySpace);
+        ImVec4 g = convertToImVec4(gDisplaySpace);
+        ImVec4 b = convertToImVec4(bDisplaySpace);
+
         bool manualColorOverride = false;
-        manualColorOverride |= ImGui::SliderFloat("R", &_selectedColorRYGB.r, 0, 1.0f);
-        manualColorOverride |= ImGui::SliderFloat("Y", &_selectedColorRYGB.g, 0, 1.0f);
-        manualColorOverride |= ImGui::SliderFloat("G", &_selectedColorRYGB.b, 0, 1.0f);
-        manualColorOverride |= ImGui::SliderFloat("B", &_selectedColorRYGB.a, 0, 1.0f);
+        ImVec4 black = ImVec4{0, 0, 0, 1};
+        manualColorOverride
+            |= ImGuiU::GradientSliderFloat("R", &_selectedColorRYGB.r, 0, 1.0f, black, r);
+        manualColorOverride
+            |= ImGuiU::GradientSliderFloat("Y", &_selectedColorRYGB.g, 0, 1.0f, black, y);
+        manualColorOverride
+            |= ImGuiU::GradientSliderFloat("G", &_selectedColorRYGB.b, 0, 1.0f, black, g);
+        manualColorOverride
+            |= ImGuiU::GradientSliderFloat("B", &_selectedColorRYGB.a, 0, 1.0f, black, b);
+
 
         if (manualColorOverride) {
-            ColorPickerInput input = getColorPickerInputFromRYGB(_selectedColorRYGB);
-            _luminance = input.luminance;
-            _saturation = input.saturation;
-            _colorPickerCursorPos.x = input.u * CUBEMAP_WIDTH;
-            _colorPickerCursorPos.y = input.v * CUBEMAP_HEIGHT;
-            //ResetColorPickerCursor();
+            updatePickedColorFromRYGB();
         }
 
         ImGui::EndTable();

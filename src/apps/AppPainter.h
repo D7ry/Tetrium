@@ -121,9 +121,6 @@ class AppPainter : public App
             ubo = 0,
             vshMaxSaturationLUT = 1
         };
-        // update the selected color based on cubemap texture coordinate,
-        // luminance, and saturation. Must be called after any of the above changes.
-        void updateSelectedColor();
 
         // currently we only use a fixed texture -- which kind of works for its dimension
 
@@ -198,8 +195,10 @@ class AppPainter : public App
         } _colorPickerCursorPos;
 
         glm::vec4 getColorFromCubemapCoord(int x, int y);
+        
 
         void updatePickedColor();
+        void updatePickedColorFromRYGB();
 
         // CPU-accessible RYGB buffer
         VQBuffer _cubemapRYGBTextureCPU{};
