@@ -6,7 +6,10 @@
 namespace TetriumApp
 {
 
-void AppPainter::canvasInteract(const ImVec2& canvasMousePos,const TetriumApp::TickContextImGui& ctx)
+void AppPainter::canvasInteract(
+    const ImVec2& canvasMousePos,
+    const TetriumApp::TickContextImGui& ctx
+)
 {
     uint32_t x = static_cast<uint32_t>(canvasMousePos.x);
     uint32_t y = static_cast<uint32_t>(canvasMousePos.y);
@@ -20,8 +23,8 @@ void AppPainter::canvasInteract(const ImVec2& canvasMousePos,const TetriumApp::T
         glm::vec4 selectedColorViewSpace;
 
         if (_cursorFunction == CursorFunction::Draw) {
-            selectedColorViewSpace = 
-                _tranformMatrixFromRygb[ctx.colorSpace] * _colorPicker.GetSelectedColorRYGB();
+            selectedColorViewSpace
+                = _tranformMatrixFromRygb[ctx.colorSpace] * _colorPicker.GetSelectedColorRYGB();
             selectedColorViewSpace *= 255.0f;
             selectedColorViewSpace = glm::clamp(selectedColorViewSpace, 0.0f, 255.0f);
             selectedColorViewSpace.a = 255.0f; // override alpha value which is always 0
@@ -42,8 +45,11 @@ void AppPainter::canvasInteract(const ImVec2& canvasMousePos,const TetriumApp::T
         );
 
         ImGui::GetWindowDrawList()->AddCircle(
-            ImGui::GetMousePos(), static_cast<float>(_paintingState.brushSize) / 2.0f,
-            IM_COL32(255, 255, 255, 255), 0, 2.f
+            ImGui::GetMousePos(),
+            static_cast<float>(_paintingState.brushSize) / 2.0f,
+            IM_COL32(255, 255, 255, 255),
+            0,
+            2.f
         );
         ctx.controls.wantDrawCursor = false;
     }
@@ -67,8 +73,8 @@ void AppPainter::canvasInteract(const ImVec2& canvasMousePos,const TetriumApp::T
             currentPixelColorRYGB[3]
         );
 
-        glm::vec4 currentPixelColorViewSpace = 
-            _tranformMatrixFromRygb[ctx.colorSpace] * currentPixel;
+        glm::vec4 currentPixelColorViewSpace
+            = _tranformMatrixFromRygb[ctx.colorSpace] * currentPixel;
         if (ImGui::BeginTooltip()) {
             ImGui::ColorButton(
                 "Dropper Selected Color",
@@ -104,9 +110,7 @@ void AppPainter::TickImGui(const TetriumApp::TickContextImGui& ctx)
                 | ImGuiWindowFlags_NoScrollWithMouse
         )) {
 
-        if (ImGui::BeginTable("Painter", 2, 
-                ImGuiTableFlags_BordersV
-            )) {
+        if (ImGui::BeginTable("Painter", 2, ImGuiTableFlags_BordersV)) {
 
             ImGui::TableNextColumn();
 
@@ -145,8 +149,9 @@ void AppPainter::TickImGui(const TetriumApp::TickContextImGui& ctx)
 
             static const char* brushStrokeNames[] = {"Circle", "Square", "Diamond", "SoftCircle"};
             int currentBrush = static_cast<int>(_paintingState.brushType);
-            if (ImGui::Combo("Brush Stroke", &currentBrush, brushStrokeNames,
-                             IM_ARRAYSIZE(brushStrokeNames))) {
+            if (ImGui::Combo(
+                    "Brush Stroke", &currentBrush, brushStrokeNames, IM_ARRAYSIZE(brushStrokeNames)
+                )) {
                 _paintingState.brushType = static_cast<BrushStrokeType>(currentBrush);
             }
 
@@ -162,7 +167,8 @@ void AppPainter::TickImGui(const TetriumApp::TickContextImGui& ctx)
                 ImVec2 mousePos = ImGui::GetMousePos();
                 if (mousePos.x >= canvasPos.x && mousePos.x < canvasPos.x + canvasSize.x
                     && mousePos.y >= canvasPos.y && mousePos.y < canvasPos.y + canvasSize.y) {
-                    ImVec2 canvasMousePos = ImVec2(mousePos.x - canvasPos.x, mousePos.y - canvasPos.y);
+                    ImVec2 canvasMousePos
+                        = ImVec2(mousePos.x - canvasPos.x, mousePos.y - canvasPos.y);
                     canvasInteract(canvasMousePos, ctx);
                     _paintingState.prevCanvasMousePos = canvasMousePos;
                 } else {
@@ -177,7 +183,6 @@ void AppPainter::TickImGui(const TetriumApp::TickContextImGui& ctx)
 
             ImGui::EndTable();
         }
-
     }
 
     ImGui::End(); // Painter

@@ -4,6 +4,135 @@
 #include <Pathing.h>
 #include <components/ShaderUtils.h>
 
+namespace
+{
+struct ColorPickerInput
+{
+    float u;
+    float v;
+    float luminance;
+    float saturation;
+};
+
+using namespace glm;
+
+// same as the ones in cubemap_rygb_gen.frag
+// TODO: pass matrices into UBO instead.
+const mat4 g_heringToRYGB = mat4(
+    vec4(0.5, 0.5, 0.5, 0.5),
+    vec4(-0.28867513459481287, -0.28867513459481287, -0.28867513459481287, 0.866025403784439),
+    vec4(-0.408248290463863, -0.408248290463863, 0.8164965809277261, -3.183243964787847e-17),
+    vec4(-0.7071067811865477, 0.7071067811865476, -9.80883324026333e-17, -7.571128974804755e-19)
+);
+const mat3 g_invMetamericDirMat = mat3(
+    vec3(0.9865474651933757, 0.009838790494736325, -0.16317872754169252),
+    vec3(0.009838790494736328, 0.9928041963993547, 0.11934414863508082),
+    vec3(0.16317872754169252, -0.11934414863508083, 0.9793516615927303)
+);
+
+glm::vec3 cartesianToSpherical(const glm::vec3& cartesian)
+{
+    float r = glm::length(cartesian);                // The radius
+    float theta = glm::acos(cartesian.z / r);        // Polar angle (colatitude)
+    float phi = glm::atan(cartesian.y, cartesian.x); // Azimuthal angle (longitude)
+
+    return glm::vec3(r, theta, phi);
+}
+
+glm::vec2 convertCartesianToCubemapUV(glm::vec3 xyz)
+{
+    // Constants for the 4x3 grid layout
+    const float GRID_COLS = 4.0f;
+    const float GRID_ROWS = 3.0f;
+    const float FACE_WIDTH = 1.0f / GRID_COLS;
+    const float FACE_HEIGHT = 1.0f / GRID_ROWS;
+
+    // Find the dominant axis to determine which face we're on
+    glm::vec3 absXYZ = glm::abs(xyz);
+    float maxAxis = glm::max(glm::max(absXYZ.x, absXYZ.y), absXYZ.z);
+
+    // Initialize UV coordinates
+    glm::vec2 uv(0.0f);
+
+    // Convert to local face coordinates and determine grid position
+    if (absXYZ.x > absXYZ.y && absXYZ.x > absXYZ.z) {
+        // X axis faces (left/right)
+        if (xyz.x > 0.0f) {
+            // Right face (+X)
+            uv = glm::vec2(-xyz.z, xyz.y) / absXYZ.x;
+            uv = (uv + glm::vec2(1.0f)) * 0.5f;
+            uv.x = uv.x * FACE_WIDTH + (2.0f * FACE_WIDTH); // Third column
+        } else {
+            // Left face (-X)
+            uv = glm::vec2(xyz.z, xyz.y) / absXYZ.x;
+            uv = (uv + glm::vec2(1.0f)) * 0.5f;
+            uv.x = uv.x * FACE_WIDTH + (0.0f * FACE_WIDTH); // First column
+        }
+        uv.y = uv.y * FACE_HEIGHT + FACE_HEIGHT; // Middle row
+    } else if (absXYZ.y > absXYZ.x && absXYZ.y > absXYZ.z) {
+        // Y axis faces (top/bottom)
+        if (xyz.y > 0.0f) {
+            // Top face (+Y)
+            uv = glm::vec2(xyz.x, -xyz.z) / absXYZ.y;
+            uv = (uv + glm::vec2(1.0f)) * 0.5f;
+            uv.y = uv.y * FACE_HEIGHT + (2.0f * FACE_HEIGHT); // Top row
+        } else {
+            // Bottom face (-Y)
+            uv = glm::vec2(xyz.x, xyz.z) / absXYZ.y;
+            uv = (uv + glm::vec2(1.0f)) * 0.5f;
+            uv.y = uv.y * FACE_HEIGHT + (0.0f * FACE_HEIGHT); // Bottom row
+        }
+        uv.x = uv.x * FACE_WIDTH + FACE_WIDTH; // Second column
+    } else {
+        // Z axis faces (front/back)
+        if (xyz.z > 0.0f) {
+            // Front face (+Z)
+            uv = glm::vec2(xyz.x, xyz.y) / absXYZ.z;
+            uv = (uv + glm::vec2(1.0f)) * 0.5f;
+            uv.x = uv.x * FACE_WIDTH + FACE_WIDTH; // Second column
+        } else {
+            // Back face (-Z)
+            uv = glm::vec2(-xyz.x, xyz.y) / absXYZ.z;
+            uv = (uv + glm::vec2(1.0f)) * 0.5f;
+            uv.x = uv.x * FACE_WIDTH + (3.0f * FACE_WIDTH); // Fourth column
+        }
+        uv.y = uv.y * FACE_HEIGHT + FACE_HEIGHT; // Middle row
+    }
+
+    return uv;
+}
+
+// get x, y, luminance and saturation value, given RYGB value.
+// useful for adjusting color picker input states as user directly changes RYGB values.
+ColorPickerInput getColorPickerInputFromRYGB(glm::vec4 rygb) 
+{
+    // convert RYGB to cartesian
+    mat4 rygbToHering = glm::inverse(g_heringToRYGB);
+    vec4 hering = rygbToHering * rygb;
+
+    float luminance = hering[0];
+
+    vec3 xyz = vec3(hering[1], hering[2], hering[3]);
+
+    // convert hering to vshh
+    vec3 spherical = cartesianToSpherical(vec3(hering.y, hering.z, hering.w));
+    vec4 vshh = vec4(luminance, spherical.x, spherical.y, spherical.z);
+
+    float saturation = vshh[1];
+
+    // invert xyz
+    xyz = glm::inverse(g_invMetamericDirMat) * xyz;
+
+    // get cubemap UV's
+    vec2 uv = convertCartesianToCubemapUV(xyz);
+
+    return ColorPickerInput{
+        .u = uv[0], .v = uv[1], .luminance = luminance, .saturation = saturation
+    };
+}
+
+} // namespace
+
 namespace TetriumApp
 {
 
@@ -258,7 +387,7 @@ void AppPainter::ColorPicker::TickImGui(const TetriumApp::TickContextImGui& ctx)
 
     ImGui::Dummy(ImVec2(0.0f, 10.0f));
     bool luminanceChanged = 
-        ImGui::SliderFloat("Luminance", &_luminance, 0, 1);
+        ImGui::SliderFloat("Luminance", &_luminance, 0, 2);
 
     ImGui::Dummy(ImVec2(0.0f, 5.0f));
     bool saturationChanged = 
@@ -297,7 +426,12 @@ void AppPainter::ColorPicker::TickImGui(const TetriumApp::TickContextImGui& ctx)
         manualColorOverride |= ImGui::SliderFloat("B", &_selectedColorRYGB.a, 0, 1.0f);
 
         if (manualColorOverride) {
-            ResetColorPickerCursor();
+            ColorPickerInput input = getColorPickerInputFromRYGB(_selectedColorRYGB);
+            _luminance = input.luminance;
+            _saturation = input.saturation;
+            _colorPickerCursorPos.x = input.u * CUBEMAP_WIDTH;
+            _colorPickerCursorPos.y = input.v * CUBEMAP_HEIGHT;
+            //ResetColorPickerCursor();
         }
 
         ImGui::EndTable();
