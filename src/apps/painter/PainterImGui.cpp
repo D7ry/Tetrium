@@ -97,6 +97,73 @@ void AppPainter::canvasInteract(
     }
 }
 
+void AppPainter::drawImGuiCanvas(const TetriumApp::TickContextImGui& ctx)
+{
+
+    if (ImGui::Button("Clear Canvas")) {
+        clearCanvas();
+    }
+
+    ImGui::SameLine();
+    if (ImGui::Button("save")) {
+        saveCanvasToFile("canvas.tiff");
+    }
+
+    ImGui::SameLine();
+    if (ImGui::Button("load")) {
+        loadCanvasFromFile("canvas.tiff");
+    }
+
+    if (ImGui::RadioButton("Draw", _cursorFunction == CursorFunction::Draw)) {
+        _cursorFunction = CursorFunction::Draw;
+    }
+    ImGui::SameLine();
+
+    if (ImGui::RadioButton("Erase", _cursorFunction == CursorFunction::Erase)) {
+        _cursorFunction = CursorFunction::Erase;
+    }
+    ImGui::SameLine();
+
+    if (ImGui::RadioButton("Dropper", _cursorFunction == CursorFunction::Dropper)) {
+        _cursorFunction = CursorFunction::Dropper;
+    }
+
+    int brushSize = _paintingState.brushSize;
+    if (ImGui::SliderInt("Brush Size", &brushSize, 1, 100)) {
+        _paintingState.brushSize = brushSize;
+    }
+
+    static const char* brushStrokeNames[] = {"Circle", "Square", "Diamond", "SoftCircle"};
+    int currentBrush = static_cast<int>(_paintingState.brushType);
+    if (ImGui::Combo(
+            "Brush Stroke", &currentBrush, brushStrokeNames, IM_ARRAYSIZE(brushStrokeNames)
+        )) {
+        _paintingState.brushType = static_cast<BrushStrokeType>(currentBrush);
+    }
+
+    // Draw canvas
+    ImVec2 canvasSize = ImVec2(_canvasWidth, _canvasHeight);
+    {
+        const TextureFrameBuffer& fb = _viewSpaceFrameBuffer[ctx.currentFrameInFlight];
+        ImGui::Image(fb.GetImGuiTextureId(), canvasSize);
+    }
+    ImVec2 canvasPos = ImGui::GetItemRectMin();
+    {
+        // check if mouse is within canvas
+        ImVec2 mousePos = ImGui::GetMousePos();
+        if (mousePos.x >= canvasPos.x && mousePos.x < canvasPos.x + canvasSize.x
+            && mousePos.y >= canvasPos.y && mousePos.y < canvasPos.y + canvasSize.y) {
+            ImVec2 canvasMousePos
+                = ImVec2(mousePos.x - canvasPos.x, mousePos.y - canvasPos.y);
+            canvasInteract(canvasMousePos, ctx);
+            _paintingState.prevCanvasMousePos = canvasMousePos;
+        } else {
+            _paintingState.prevCanvasMousePos = std::nullopt;
+        }
+    }
+}
+
+
 void AppPainter::TickImGui(const TetriumApp::TickContextImGui& ctx)
 {
     ImGuiIO& io = ImGui::GetIO();
@@ -109,71 +176,17 @@ void AppPainter::TickImGui(const TetriumApp::TickContextImGui& ctx)
                 | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus
                 | ImGuiWindowFlags_NoScrollWithMouse
         )) {
+        ImGui::Checkbox("Draw Huesphere", &_drawHueSphereInstead);
+
 
         if (ImGui::BeginTable("Painter", 2, ImGuiTableFlags_BordersV)) {
-
             ImGui::TableNextColumn();
-
-            if (ImGui::Button("Clear Canvas")) {
-                clearCanvas();
-            }
-
-            ImGui::SameLine();
-            if (ImGui::Button("save")) {
-                saveCanvasToFile("canvas.tiff");
-            }
-
-            ImGui::SameLine();
-            if (ImGui::Button("load")) {
-                loadCanvasFromFile("canvas.tiff");
-            }
-
-            if (ImGui::RadioButton("Draw", _cursorFunction == CursorFunction::Draw)) {
-                _cursorFunction = CursorFunction::Draw;
-            }
-            ImGui::SameLine();
-
-            if (ImGui::RadioButton("Erase", _cursorFunction == CursorFunction::Erase)) {
-                _cursorFunction = CursorFunction::Erase;
-            }
-            ImGui::SameLine();
-
-            if (ImGui::RadioButton("Dropper", _cursorFunction == CursorFunction::Dropper)) {
-                _cursorFunction = CursorFunction::Dropper;
-            }
-
-            int brushSize = _paintingState.brushSize;
-            if (ImGui::SliderInt("Brush Size", &brushSize, 1, 100)) {
-                _paintingState.brushSize = brushSize;
-            }
-
-            static const char* brushStrokeNames[] = {"Circle", "Square", "Diamond", "SoftCircle"};
-            int currentBrush = static_cast<int>(_paintingState.brushType);
-            if (ImGui::Combo(
-                    "Brush Stroke", &currentBrush, brushStrokeNames, IM_ARRAYSIZE(brushStrokeNames)
-                )) {
-                _paintingState.brushType = static_cast<BrushStrokeType>(currentBrush);
-            }
-
-            // Draw canvas
-            ImVec2 canvasSize = ImVec2(_canvasWidth, _canvasHeight);
-            {
-                const TextureFrameBuffer& fb = _viewSpaceFrameBuffer[ctx.currentFrameInFlight];
-                ImGui::Image(fb.GetImGuiTextureId(), canvasSize);
-            }
-            ImVec2 canvasPos = ImGui::GetItemRectMin();
-            {
-                // check if mouse is within canvas
-                ImVec2 mousePos = ImGui::GetMousePos();
-                if (mousePos.x >= canvasPos.x && mousePos.x < canvasPos.x + canvasSize.x
-                    && mousePos.y >= canvasPos.y && mousePos.y < canvasPos.y + canvasSize.y) {
-                    ImVec2 canvasMousePos
-                        = ImVec2(mousePos.x - canvasPos.x, mousePos.y - canvasPos.y);
-                    canvasInteract(canvasMousePos, ctx);
-                    _paintingState.prevCanvasMousePos = canvasMousePos;
-                } else {
-                    _paintingState.prevCanvasMousePos = std::nullopt;
-                }
+            // FIXME: this is a super workaround to render hue sphere, straighten
+            // dependencies!
+            if (_drawHueSphereInstead) {
+                _colorPicker.TickImGuiHueSphere(ctx);
+            } else {
+                drawImGuiCanvas(ctx);
             }
 
             ImGui::TableNextColumn();

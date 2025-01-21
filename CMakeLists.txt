@@ -56,6 +56,7 @@ set(SOURCES_BUILD
         src/apps/painter/PainterColorPickerTick.cpp
         src/apps/painter/PainterPaint.cpp
         src/apps/painter/PainterSerialize.cpp
+        src/apps/painter/HueSphere.cpp
 
         src/apps/app_components/TextureFrameBuffer.cpp
 )

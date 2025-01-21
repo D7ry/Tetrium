@@ -6,6 +6,7 @@
 
 #include "App.h"
 #include "app_components/TextureFrameBuffer.h"
+#include "painter/HueSphere.h"
 
 namespace TetriumApp
 {
@@ -100,6 +101,7 @@ class AppPainter : public App
 
         // Draw the color picker widget
         void TickImGui(const TetriumApp::TickContextImGui& ctx);
+        void TickImGuiHueSphere(const TetriumApp::TickContextImGui& ctx);
 
         void TickVulkan(TetriumApp::TickContextVulkan& ctx);
 
@@ -140,8 +142,6 @@ class AppPainter : public App
         // slider values for luminance and saturation
         float _luminance = 1.f;
         float _saturation = 1.f;
-
-        bool _needGenerateNewCubemap = true;
 
         std::array<vk::ClearValue, 2> _clearValues; // [color, depthStencil]
 
@@ -202,6 +202,8 @@ class AppPainter : public App
 
         // CPU-accessible RYGB buffer
         VQBuffer _cubemapRYGBTextureCPU{};
+
+        HueSphere _hueSphere;
     };
 
   public:
@@ -310,6 +312,8 @@ class AppPainter : public App
 
     CursorFunction _cursorFunction = CursorFunction::Draw;
 
+    void drawImGuiCanvas(const TetriumApp::TickContextImGui& ctx);
+
     void clearCanvas();
 
     void flagTexturesForUpdate();
@@ -325,5 +329,9 @@ class AppPainter : public App
     // the format supports 32-bit floating point values for up to 4 channels.
     void saveCanvasToFile(const std::string& filename);
     void loadCanvasFromFile(const std::string& filename);
+
+
+    // hacky way to draw hue sphere instead of the canvas
+    bool _drawHueSphereInstead = false;
 };
 } // namespace TetriumApp

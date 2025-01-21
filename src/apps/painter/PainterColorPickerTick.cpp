@@ -141,124 +141,124 @@ namespace TetriumApp
 void AppPainter::ColorPicker::TickVulkan(TetriumApp::TickContextVulkan& ctx)
 {
     vk::CommandBuffer& cb = ctx.commandBuffer;
-    if (_needGenerateNewCubemap) {
-        { // run cubemap generation pass
-            // flush UBO
-            CubemapGenerateUBO* pUBO
-                = reinterpret_cast<CubemapGenerateUBO*>(_cubemapGenerateContext.ubo.bufferAddress);
-            pUBO->luminance = _luminance;
-            pUBO->saturation = _saturation;
+    { // run cubemap generation pass
+        // flush UBO
+        CubemapGenerateUBO* pUBO
+            = reinterpret_cast<CubemapGenerateUBO*>(_cubemapGenerateContext.ubo.bufferAddress);
+        pUBO->luminance = _luminance;
+        pUBO->saturation = _saturation;
 
-            // begin render pass to write into new cubemap
-            vk::Extent2D extent(CUBEMAP_WIDTH, CUBEMAP_HEIGHT);
-            vk::Rect2D renderArea(VkOffset2D{0, 0}, extent);
-            vk::RenderPassBeginInfo renderPassBeginInfo(
-                _cubemapGenerateContext.renderPass,
-                _cubemapTexture.GetFrameBuffer(),
-                renderArea,
-                _clearValues.size(),
-                _clearValues.data()
-            );
+        // begin render pass to write into new cubemap
+        vk::Extent2D extent(CUBEMAP_WIDTH, CUBEMAP_HEIGHT);
+        vk::Rect2D renderArea(VkOffset2D{0, 0}, extent);
+        vk::RenderPassBeginInfo renderPassBeginInfo(
+            _cubemapGenerateContext.renderPass,
+            _cubemapTexture.GetFrameBuffer(),
+            renderArea,
+            _clearValues.size(),
+            _clearValues.data()
+        );
 
-            cb.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
-            cb.setViewport(0, vk::Viewport(0.f, 0.f, extent.width, extent.height, 0.f, 1.f));
-            cb.setScissor(0, vk::Rect2D({0, 0}, extent));
+        cb.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
+        cb.setViewport(0, vk::Viewport(0.f, 0.f, extent.width, extent.height, 0.f, 1.f));
+        cb.setScissor(0, vk::Rect2D({0, 0}, extent));
 
-            cb.bindPipeline(vk::PipelineBindPoint::eGraphics, _cubemapGenerateContext.pipeline);
+        cb.bindPipeline(vk::PipelineBindPoint::eGraphics, _cubemapGenerateContext.pipeline);
 
-            cb.bindDescriptorSets(
-                vk::PipelineBindPoint::eGraphics,
-                _cubemapGenerateContext.pipelineLayout,
-                0,
-                1,
-                &_cubemapGenerateContext.descriptorSet,
-                0,
-                nullptr,
-                vk::getDispatchLoaderStatic()
-            );
-            cb.draw(3, 1, 0, 0);
-            cb.endRenderPass();
-        }
-        { // barrier to ensure cubmap generation pass finishes
-            VkMemoryBarrier barrier = vk::MemoryBarrier(
-                vk::AccessFlagBits::eColorAttachmentWrite, // write to RYGB texture
-                vk::AccessFlagBits::eShaderRead // read from RYGB texture sampler
-            );
-            // vulkan hpp dispatch doesn't work somehow
-            vkCmdPipelineBarrier(
-                cb,
-                VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                0,
-                1,
-                &barrier,
-                0,
-                nullptr,
-                0,
-                nullptr
-            );
-        }
-        { // run rygb transformation pass
-            // we assume RYGB ubo has been flushed by the painter already.
-            vk::Extent2D extent(CUBEMAP_WIDTH, CUBEMAP_HEIGHT);
-            vk::Rect2D renderArea(VkOffset2D{0, 0}, extent);
-            vk::RenderPassBeginInfo renderPassBeginInfo(
-                _rygbToViewSpaceCtx->renderPass,
-                _cubemapTextureViewSpace.GetFrameBuffer(),
-                renderArea,
-                _clearValues.size(),
-                _clearValues.data()
-            );
-            cb.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
-            cb.setViewport(0, vk::Viewport(0.f, 0.f, extent.width, extent.height, 0.f, 1.f));
-            cb.setScissor(0, vk::Rect2D({0, 0}, extent));
-            cb.bindPipeline(vk::PipelineBindPoint::eGraphics, _rygbToViewSpaceCtx->pipeline);
-
-            cb.bindDescriptorSets(
-                vk::PipelineBindPoint::eGraphics,
-                _rygbToViewSpaceCtx->pipelineLayout,
-                0,
-                1,
-                &_rygbTransformDescriptorSets[ctx.currentFrameInFlight],
-                0,
-                nullptr,
-                vk::getDispatchLoaderStatic()
-            );
-            cb.draw(3, 1, 0, 0);
-            cb.endRenderPass();
-        }
-        { // TODO: use a memory barrier to block buffer transfer
-
-        }
-        {
-            VkBufferImageCopy region = {};
-            region.bufferOffset = 0;
-            region.bufferRowLength = 0;
-            region.bufferImageHeight = 0;
-            region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-            region.imageSubresource.mipLevel = 0;
-            region.imageSubresource.baseArrayLayer = 0;
-            region.imageSubresource.layerCount = 1;
-            region.imageOffset = {0, 0, 0};
-            region.imageExtent = {CUBEMAP_WIDTH, CUBEMAP_HEIGHT, 1};
-
-            vk::BufferImageCopy vkRegion(region);
-
-            cb.copyImageToBuffer(
-                _cubemapTexture.GetImage(),
-                vk::ImageLayout::eGeneral,
-                _cubemapRYGBTextureCPU.buffer,
-                1,
-                &vkRegion
-            );
-        }
-
-        // FIXME: currently ColorPicker uses one resources across all frames -- this 
-        // isn't a huge synchronization issue unless we turn on conditional generation,
-        // need to either add NUM_FRAME_IN_FLIGHT rendering resources, or just get rid of 
-        // conditional generation
-        //_needGenerateNewCubemap = false;
+        cb.bindDescriptorSets(
+            vk::PipelineBindPoint::eGraphics,
+            _cubemapGenerateContext.pipelineLayout,
+            0,
+            1,
+            &_cubemapGenerateContext.descriptorSet,
+            0,
+            nullptr,
+            vk::getDispatchLoaderStatic()
+        );
+        cb.draw(3, 1, 0, 0);
+        cb.endRenderPass();
     }
+    { // barrier to ensure cubmap generation pass finishes
+        VkMemoryBarrier barrier = vk::MemoryBarrier(
+            vk::AccessFlagBits::eColorAttachmentWrite, // write to RYGB texture
+            vk::AccessFlagBits::eShaderRead // read from RYGB texture sampler
+        );
+        // vulkan hpp dispatch doesn't work somehow
+        vkCmdPipelineBarrier(
+            cb,
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+            0,
+            1,
+            &barrier,
+            0,
+            nullptr,
+            0,
+            nullptr
+        );
+    }
+    { // run rygb transformation pass
+        // we assume RYGB ubo has been flushed by the painter already.
+        vk::Extent2D extent(CUBEMAP_WIDTH, CUBEMAP_HEIGHT);
+        vk::Rect2D renderArea(VkOffset2D{0, 0}, extent);
+        vk::RenderPassBeginInfo renderPassBeginInfo(
+            _rygbToViewSpaceCtx->renderPass,
+            _cubemapTextureViewSpace.GetFrameBuffer(),
+            renderArea,
+            _clearValues.size(),
+            _clearValues.data()
+        );
+        cb.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
+        cb.setViewport(0, vk::Viewport(0.f, 0.f, extent.width, extent.height, 0.f, 1.f));
+        cb.setScissor(0, vk::Rect2D({0, 0}, extent));
+        cb.bindPipeline(vk::PipelineBindPoint::eGraphics, _rygbToViewSpaceCtx->pipeline);
+
+        cb.bindDescriptorSets(
+            vk::PipelineBindPoint::eGraphics,
+            _rygbToViewSpaceCtx->pipelineLayout,
+            0,
+            1,
+            &_rygbTransformDescriptorSets[ctx.currentFrameInFlight],
+            0,
+            nullptr,
+            vk::getDispatchLoaderStatic()
+        );
+        cb.draw(3, 1, 0, 0);
+        cb.endRenderPass();
+    }
+    { // TODO: use a memory barrier to block buffer transfer
+
+    }
+    {
+        VkBufferImageCopy region = {};
+        region.bufferOffset = 0;
+        region.bufferRowLength = 0;
+        region.bufferImageHeight = 0;
+        region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        region.imageSubresource.mipLevel = 0;
+        region.imageSubresource.baseArrayLayer = 0;
+        region.imageSubresource.layerCount = 1;
+        region.imageOffset = {0, 0, 0};
+        region.imageExtent = {CUBEMAP_WIDTH, CUBEMAP_HEIGHT, 1};
+
+        vk::BufferImageCopy vkRegion(region);
+
+        cb.copyImageToBuffer(
+            _cubemapTexture.GetImage(),
+            vk::ImageLayout::eGeneral,
+            _cubemapRYGBTextureCPU.buffer,
+            1,
+            &vkRegion
+        );
+    }
+
+    _hueSphere.TickVulkan(ctx);
+
+    // FIXME: currently ColorPicker uses one resources across all frames -- this 
+    // isn't a huge synchronization issue unless we turn on conditional generation,
+    // need to either add NUM_FRAME_IN_FLIGHT rendering resources, or just get rid of 
+    // conditional generation
+    //_needGenerateNewCubemap = false;
     
 }
 
@@ -316,11 +316,19 @@ void AppPainter::ColorPicker::updatePickedColorFromRYGB()
     _colorPickerCursorPos.y = input.v * CUBEMAP_HEIGHT;
 }
 
+void AppPainter::ColorPicker::TickImGuiHueSphere(const TetriumApp::TickContextImGui& ctx)
+{
+    _hueSphere.DrawHuesphereInImGui(ctx);
+}
+
 void AppPainter::ColorPicker::TickImGui(const TetriumApp::TickContextImGui& ctx)
 {
     updatePickedColor();
 
     /// render cubemap
+
+    const uint32_t cubemapImageColumnSize = CUBEMAP_WIDTH + 10;
+
     constexpr ImVec2 cubemapSize{CUBEMAP_WIDTH, CUBEMAP_HEIGHT};
     void* cubemapViewSpaceTextureId = _cubemapTextureViewSpace.GetImGuiTextureId();
     ImGui::Image(cubemapViewSpaceTextureId, cubemapSize);
@@ -364,27 +372,12 @@ void AppPainter::ColorPicker::TickImGui(const TetriumApp::TickContextImGui& ctx)
             ImGui::EndTooltip();
         }
 
-
-        //DEBUG(
-        //    " {} {} {} {}",
-        //    hoeveredColorViewSpace.r,
-        //    hoeveredColorViewSpace.g,
-        //    hoeveredColorViewSpace.b,
-        //    hoeveredColorViewSpace.w
-        //);
-
         // update persistent cursor position on click
         if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
             _colorPickerCursorPos = {x, y};
-            //DEBUG(
-            //    "picked color: {} {} {} {}",
-            //    _selectedColorRYGB.x,
-            //    _selectedColorRYGB.y,
-            //    _selectedColorRYGB.z,
-            //    _selectedColorRYGB.w
-            //);
         }
     }
+
 
     // draw picked color indicator on the cubemap
     if (_colorPickerCursorPos.x >= 0 && _colorPickerCursorPos.y >= 0) {
@@ -403,17 +396,13 @@ void AppPainter::ColorPicker::TickImGui(const TetriumApp::TickContextImGui& ctx)
     bool saturationChanged = 
         ImGui::SliderFloat("Saturation", &_saturation, 0, 1);
 
-
-    _needGenerateNewCubemap = _needGenerateNewCubemap || luminanceChanged || saturationChanged;
-
-
     ImGui::Dummy(ImVec2(0.0f, 20.0f));
-    ImGui::Separator();
 
-    ImGui::Dummy(ImVec2(0.0f, 20.0f));
-    if (ImGui::BeginTable("RYGBColorPreview", 2)) {
+    if (ImGui::BeginTable("RYGB Slider + preview", 2)) {
         const uint32_t colorPreviewSize = 150;
-        ImGui::TableSetupColumn("Color Preview", ImGuiTableColumnFlags_WidthFixed, colorPreviewSize);
+        ImGui::TableSetupColumn(
+            "color preview", ImGuiTableColumnFlags_WidthFixed, colorPreviewSize + 10
+        );
         ImGui::TableNextColumn();
         // draw color preview
         glm::vec4 selectedColorViewSpace = _tranformMatrixFromRygb[ctx.colorSpace] * _selectedColorRYGB;
@@ -427,7 +416,6 @@ void AppPainter::ColorPicker::TickImGui(const TetriumApp::TickContextImGui& ctx)
             ImVec2(colorPreviewSize, colorPreviewSize)
         );
 
-        ImGui::TableNextColumn();
         // manual rygb control
         glm::vec4 rDisplaySpace = _tranformMatrixFromRygb[ctx.colorSpace] * glm::vec4(1, 0, 0, 0);
         glm::vec4 yDisplaySpace = _tranformMatrixFromRygb[ctx.colorSpace] * glm::vec4(0, 1, 0, 0);
@@ -443,6 +431,7 @@ void AppPainter::ColorPicker::TickImGui(const TetriumApp::TickContextImGui& ctx)
         ImVec4 g = convertToImVec4(gDisplaySpace);
         ImVec4 b = convertToImVec4(bDisplaySpace);
 
+        ImGui::TableNextColumn();
         bool manualColorOverride = false;
         ImVec4 black = ImVec4{0, 0, 0, 1};
         manualColorOverride
@@ -458,9 +447,9 @@ void AppPainter::ColorPicker::TickImGui(const TetriumApp::TickContextImGui& ctx)
         if (manualColorOverride) {
             updatePickedColorFromRYGB();
         }
-
         ImGui::EndTable();
     }
+
 }
 
 } // namespace TetriumApp
