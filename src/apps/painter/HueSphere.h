@@ -14,7 +14,7 @@ class HueSphere
     void Cleanup(TetriumApp::CleanupContext& ctx);
 
     void TickVulkan(TetriumApp::TickContextVulkan& ctx);
-    void DrawHuesphereInImGui(const TetriumApp::TickContextImGui& ctx, float scale);
+    void DrawHuesphereInImGui(const TetriumApp::TickContextImGui& ctx, float scale, float hRotation, float vRotation);
     private:
 
     std::array<vk::ClearValue, 2> _clearValues; // [color, depthStencil]
@@ -106,4 +106,6 @@ class HueSphere
 
     uint32_t _fbWidth;
     uint32_t _fbHeight;
+
+    bool _scaleToSaturation = true;
 };

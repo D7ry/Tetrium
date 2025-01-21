@@ -335,7 +335,10 @@ void AppPainter::ColorPicker::updatePickedColorFromRYGB()
 
 void AppPainter::ColorPicker::TickImGuiHueSphere(const TetriumApp::TickContextImGui& ctx)
 {
-    _hueSphere.DrawHuesphereInImGui(ctx, _saturation);
+    _hueSphere.DrawHuesphereInImGui(ctx, _saturation,
+        -((float)_colorPickerCursorPos.x  + CUBEMAP_CUBE_SIZE * 3.5)/ CUBEMAP_WIDTH,
+        (float)_colorPickerCursorPos.y / CUBEMAP_WIDTH
+    );
 }
 
 void AppPainter::ColorPicker::TickImGui(const TetriumApp::TickContextImGui& ctx)

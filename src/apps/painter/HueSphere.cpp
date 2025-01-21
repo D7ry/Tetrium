@@ -15,16 +15,19 @@ std::string HUE_SPHERE_UGLY_TEXTURE_PATH_RGB
 std::string HUE_SPHERE_UGLY_TEXTURE_PATH_OCV
     = ASSETS_PATH + "apps/AppTetraHueSphere/cubemaps/cubemap_OCV.png";
 
-std::string HUE_SPHERE_PRETTY_MODEL_PATH = ASSETS_PATH + "apps/AppTetraHueSphere/pretty_sphere.obj";
+std::string HUE_SPHERE_PRETTY_MODEL_PATH = ASSETS_PATH + "apps/AppPainter/sphere.obj";
 
 std::string HUE_SPHERE_PRETTY_TEXTURE_PATH_RGB = HUE_SPHERE_UGLY_TEXTURE_PATH_RGB;
 std::string HUE_SPHERE_PRETTY_TEXTURE_PATH_OCV = HUE_SPHERE_UGLY_TEXTURE_PATH_OCV;
 
-void HueSphere::DrawHuesphereInImGui(const TetriumApp::TickContextImGui& ctx, float scale)
+void HueSphere::DrawHuesphereInImGui(const TetriumApp::TickContextImGui& ctx, float scale, float hRotation, float vRotation)
 {
     auto& fb = _renderContexts[ctx.colorSpace].fb;
-    glm::vec3 defaultScale(2, 2, 2);
-    _rasterizationCtx.hueSpheretransform.scale = defaultScale * scale;
+    
+    glm::vec3 defaultScale(1, 1, 1);
+    _rasterizationCtx.hueSpheretransform.scale = defaultScale * (_scaleToSaturation ? scale : 1);
+    //FIXME: fix rotation
+    _rasterizationCtx.hueSpheretransform.rotation = glm::vec3(90 ,hRotation * 365,0);
 
     ImGui::Image(fb.GetImGuiTextureId(), ImVec2{(float)_fbWidth, (float)_fbHeight});
 
@@ -57,6 +60,24 @@ void HueSphere::DrawHuesphereInImGui(const TetriumApp::TickContextImGui& ctx, fl
             _rasterizationCtx.camera.Move(0, -io.DeltaTime, 0);
         }
     }
+
+    ImGui::SeparatorText("Settings");
+
+    ImGui::Text("Projection Type");
+    ImGui::RadioButton(
+        "Orthographic",
+        (int*)&_rasterizationCtx.projectionType,
+        (int)ProjectionType::Orthographic
+    );
+    ImGui::SameLine();
+    ImGui::RadioButton(
+        "Perspective", (int*)&_rasterizationCtx.projectionType, (int)ProjectionType::Perspective
+    );
+
+    ImGui::SliderFloat("Orthographic Width", &_rasterizationCtx.orthoWidth, 0.1f, 10.f);
+    ImGui::SliderFloat("Perspective FOV", &_rasterizationCtx.perspectiveFOV, 1.f, 130.f);
+
+    ImGui::Checkbox("Scale To Saturation", &_scaleToSaturation);
 }
 
 void HueSphere::TickVulkan(TetriumApp::TickContextVulkan& ctx)
@@ -171,7 +192,7 @@ void HueSphere::Init(TetriumApp::InitContext& ctx, uint32_t fbWidth, uint32_t fb
 
     initRasterization(ctx, cubemapTexture);
 
-    _rasterizationCtx.camera.SetPosition(-0.75, 0, 0);
+    _rasterizationCtx.camera.SetPosition(-2, 0, 0);
 };
 
 void HueSphere::cleanupRenderContext(

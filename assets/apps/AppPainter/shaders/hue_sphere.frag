@@ -44,6 +44,7 @@ vec2 normalToCubemapUV(vec3 normal) {
         // Y-axis face (top/bottom)
         uv = vec2(normal.x, -normal.z) / maxNAbs;  // Fixed Z orientation
         uv = uv * 0.5 + 0.5; // Convert from [-1,1] to [0,1]
+        uv = clamp(uv, -1.0, 1.0); // Clamp to avoid NaN in atan
         if (normal.y > 0.0) {
             // Positive Y face (top)
             uv = flipUV(uv, false, true);
@@ -59,6 +60,7 @@ vec2 normalToCubemapUV(vec3 normal) {
         // X-axis face (right/left)
         uv = vec2(-normal.z, -normal.y) / maxNAbs;  // Fixed orientation
         uv = uv * 0.5 + 0.5;
+        uv = clamp(uv, -1.0, 1.0); // Clamp to avoid NaN in atan
         if (normal.x > 0.0) {
             // Positive X face (right)
 
@@ -77,6 +79,7 @@ vec2 normalToCubemapUV(vec3 normal) {
         uv = vec2(normal.x, -normal.y) / maxNAbs;
         uv = uv * 0.5 + 0.5;
         
+        uv = clamp(uv, -1.0, 1.0); // Clamp to avoid NaN in atan
         if (normal.z > 0.0) {
             // Positive Z face (front)
             uv.x = uv.x * invFaceWidth + invFaceWidth;     // Second column

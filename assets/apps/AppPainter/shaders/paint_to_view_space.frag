@@ -29,7 +29,8 @@ void main() {
     distToMark.x *= pc.aspsectRatio;
     
     if (length(distToMark) < pc.markRadius) {
-        outColor = vec4(1.f, 1.f, 1.f, 1.f);
+        // take the inverse of the color view space
+        outColor = vec4(1.f - colorViewSpace.rgb, 1.f);
         return;
     }
 
