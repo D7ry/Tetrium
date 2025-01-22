@@ -445,7 +445,6 @@ void Tetrium::drawImGui(ColorSpace colorSpace, int currentFrameInFlight)
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
 
-    clipImGuiMousePos();
 
     // imgui is associated with the glfw window to handle inputs,
     // but its actual fb is associated with the projector display;
@@ -466,6 +465,7 @@ void Tetrium::drawImGui(ColorSpace colorSpace, int currentFrameInFlight)
         io.DisplayFramebufferScale = {1, 1};
         ImGui::GetMainViewport()->Size = projectorDisplaySize;
     }
+    clipImGuiMousePos();
 
     if (GlobalStates::isWindowFocused) {
 #if defined(WIN32)
