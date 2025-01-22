@@ -243,9 +243,6 @@ void AppPainter::ColorPicker::TickVulkan(TetriumApp::TickContextVulkan& ctx)
         cb.draw(3, 1, 0, 0);
         cb.endRenderPass();
     }
-    { // TODO: use a memory barrier to block buffer transfer
-
-    }
     {
         VkBufferImageCopy region = {};
         region.bufferOffset = 0;
@@ -268,7 +265,25 @@ void AppPainter::ColorPicker::TickVulkan(TetriumApp::TickContextVulkan& ctx)
             &vkRegion
         );
     }
-
+    {// barrier the hue sphere from sampling the RGB/OCV texture until the rendering is done.
+        VkMemoryBarrier barrier = vk::MemoryBarrier(
+            vk::AccessFlagBits::eColorAttachmentWrite, // write to RYGB texture
+            vk::AccessFlagBits::eShaderRead            // read from RYGB texture sampler
+        );
+        // vulkan hpp dispatch doesn't work somehow
+        vkCmdPipelineBarrier(
+            cb,
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+            0,
+            1,
+            &barrier,
+            0,
+            nullptr,
+            0,
+            nullptr
+        );
+    }
     _hueSphere.TickVulkan(ctx);
 
     // FIXME: currently ColorPicker uses one resources across all frames -- this 

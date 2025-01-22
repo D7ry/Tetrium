@@ -97,6 +97,28 @@ void AppPainter::canvasInteract(
     }
 }
 
+
+std::string getCurrentTimeForFileName()
+{
+    // Get the current time as a time_point
+    auto now = std::chrono::system_clock::now();
+
+    // Convert to time_t to obtain the time in seconds
+    std::time_t t = std::chrono::system_clock::to_time_t(now);
+
+    // Convert to tm struct for formatting
+    std::tm tm = *std::localtime(&t);
+
+    // Create a string stream to format the date/time
+    std::stringstream ss;
+
+    // Format as YYYY-MM-DD_HH-MM-SS
+    ss << std::put_time(&tm, "%Y-%m-%d_%H-%M-%S");
+
+    return ss.str();
+}
+
+
 void AppPainter::drawImGuiCanvas(const TetriumApp::TickContextImGui& ctx)
 {
 
@@ -105,8 +127,11 @@ void AppPainter::drawImGuiCanvas(const TetriumApp::TickContextImGui& ctx)
     }
 
     ImGui::SameLine();
+    static std::string snapShotDefaultName = "snapshot";
+    auto snapShotFileName = snapShotDefaultName + getCurrentTimeForFileName() + ".tiff";
     if (ImGui::Button("save")) {
         saveCanvasToFile("canvas.tiff");
+        saveCanvasToFile(snapShotFileName);
     }
 
     ImGui::SameLine();
@@ -161,6 +186,26 @@ void AppPainter::drawImGuiCanvas(const TetriumApp::TickContextImGui& ctx)
             _paintingState.prevCanvasMousePos = std::nullopt;
         }
     }
+
+    // quick switch between eraser normal and dropper
+    if (ImGui::IsKeyPressed(ImGuiKey_Z)) {
+        _cursorFunction = CursorFunction::Draw;
+    }
+    if (ImGui::IsKeyPressed(ImGuiKey_X)) {
+        _cursorFunction = CursorFunction::Erase;
+    }
+    if (ImGui::IsKeyPressed(ImGuiKey_C)) {
+        _cursorFunction = CursorFunction::Dropper;
+    }
+    if (ImGui::IsKeyPressed(ImGuiKey_A)) {
+        _paintingState.brushSize += 5;
+    }
+    if (ImGui::IsKeyPressed(ImGuiKey_S)) {
+        _paintingState.brushSize -= 5;
+    }
+
+    ImGui::Text("Z : Draw Mode | X : Erase Mode | C: Dropper Mode");
+    ImGui::Text("A: Increase Brush Size | S: Decrease Brush Size");
 }
 
 
