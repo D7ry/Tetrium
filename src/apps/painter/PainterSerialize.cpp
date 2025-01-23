@@ -20,6 +20,7 @@ void AppPainter::saveCanvasToFile(const std::string& filename)
     TIFFSetField(tiff, TIFFTAG_BITSPERSAMPLE, 32);  // 32 bits per sample (float)
     TIFFSetField(tiff, TIFFTAG_SAMPLESPERPIXEL, 4); // 4 channels (RGBA)
     TIFFSetField(tiff, TIFFTAG_ROWSPERSTRIP, _canvasHeight);
+    TIFFSetField(tiff, TIFFTAG_DATATYPE, TIFFDataType::TIFF_FLOAT);
 
     // Set the compression type (no compression here)
     TIFFSetField(tiff, TIFFTAG_COMPRESSION, COMPRESSION_NONE);

@@ -416,7 +416,7 @@ void Tetrium::drawMainMenu(ColorSpace colorSpace)
             }
 
 
-            if (false && ImGui::BeginTabItem("Color Tile")) {
+            if (ImGui::BeginTabItem("Color Tile")) {
                 _widgetColorTile.Draw(this, colorSpace);
                 ImGui::EndTabItem();
             }
@@ -496,7 +496,7 @@ void Tetrium::drawImGui(ColorSpace colorSpace, int currentFrameInFlight)
     }
 
 #if defined(WIN32)
-    footnoteText += "| Dropped Frames: " + std::to_string(_swapChain.chainDXGI->GetNumDroppedFrames());
+    //footnoteText += "| Dropped Frames: " + std::to_string(_swapChain.chainDXGI->GetNumDroppedFrames());
 #endif
     ImGuiU::DrawFootNote(footnoteText.c_str());
 

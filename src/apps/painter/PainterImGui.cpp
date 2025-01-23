@@ -201,7 +201,9 @@ void AppPainter::drawImGuiCanvas(const TetriumApp::TickContextImGui& ctx)
         _paintingState.brushSize += 5;
     }
     if (ImGui::IsKeyPressed(ImGuiKey_S)) {
-        _paintingState.brushSize -= 5;
+        if (_paintingState.brushSize >= 5) {
+            _paintingState.brushSize -= 5;
+        }
     }
 
     ImGui::Text("Z : Draw Mode | X : Erase Mode | C: Dropper Mode");

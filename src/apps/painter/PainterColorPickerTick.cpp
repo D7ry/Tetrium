@@ -387,25 +387,19 @@ void AppPainter::ColorPicker::TickImGui(const TetriumApp::TickContextImGui& ctx)
             hoeveredColorViewSpace[i] = std::clamp(hoeveredColorViewSpace[i], 0.f, 1.f);
         }
 
-        if (ImGui::BeginTooltip()) {
-            ImGui::ColorButton(
-                "hovered color",
-                ImVec4{
-                    hoeveredColorViewSpace.r,
-                    hoeveredColorViewSpace.g,
-                    hoeveredColorViewSpace.b,
-                    1.f
-                }
-            );
-            ImGui::Text(
-                "%.3f %.3f %.3f %.3f",
-                hoveredColorRYGB.r,
-                hoveredColorRYGB.g,
-                hoveredColorRYGB.b,
-                hoveredColorRYGB.a
-            );
-            ImGui::EndTooltip();
-        }
+        ImVec2 rectBegin = {mousePos.x - 30, mousePos.y - 30};
+        ImVec2 rectEnd = mousePos;
+        ImGui::GetWindowDrawList()->AddRectFilled(
+            rectBegin, rectEnd, 
+            ImColor(
+                hoeveredColorViewSpace.r, hoeveredColorViewSpace.g, hoeveredColorViewSpace.b, 1.f
+            )
+        );
+        ImGui::GetWindowDrawList()->AddRect(
+            rectBegin,
+            rectEnd,
+            IM_COL32_WHITE
+        );
 
         // update persistent cursor position on click
         if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {

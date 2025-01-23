@@ -29,7 +29,7 @@ void Tetrium::Run()
 }
 
 // mono color space for testing purposes, this avoids burning the monitor
-#define MONO_COLOR_SPACE 1
+#define MONO_COLOR_SPACE 0
 void Tetrium::Tick()
 {
     if (_paused) {
