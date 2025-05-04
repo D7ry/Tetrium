@@ -14,26 +14,32 @@
     #include <unistd.h>
 #endif
 
+// NOTE: not reentrant
 void PR650::Init() {
     if (!serialConnected_) {
-        serialConnected_ = initConnection();
-        INFO("serial port connected!");
+        if (initConnection()) {
+            serialConnected_ = true;
+        } else {
+            PANIC("Failed to connect to serial port {}", portName_);
+        }
     }
-    ASSERT(serialConnected_)
 
     std::string reply;
-    // sleep for 500ms
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
-    ASSERT(sendMessage("b1", reply));
-        
-    if (reply != "000\r\n") {
-        ERROR("failed to turn on PR650 backlight");
-        connected_ = false;
-    } else {
-        INFO("PR650 connected on {}, backlight on: {}", portName_, reply);
-        sendMessage("s01,,,,,,01,1", reply);
-        INFO("crap: {}", reply);
-        connected_ = true;
+    while (1) {
+        const int sleepTimeMs = 100;
+        // sleep for 500ms
+        std::this_thread::sleep_for(std::chrono::milliseconds(sleepTimeMs));
+        ASSERT(sendMessage("b1", reply));
+            
+        if (reply != "000\r\n") {
+            ERROR("PR650 activation failed, trying again in {} ms", sleepTimeMs);
+            connected_ = false;
+        } else {
+            INFO("PR650 connected on {}, backlight on: {}", portName_, reply);
+            ASSERT(sendMessage("s01,,,,,,01,1", reply));
+            INFO("crap: {}", reply);
+            connected_ = true;
+        }
     }
 }
 PR650::PR650(const std::string& portName)
@@ -126,7 +132,7 @@ void PR650::closeConnection() {
 }
 
 bool PR650::isConnected() const {
-    return connected_;
+    return serialConnected_ && connected_;
 }
 
 bool PR650::sendMessage(const std::string& message, std::string& response, int timeout) {

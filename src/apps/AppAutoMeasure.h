@@ -31,5 +31,9 @@ class AppAutoMeasure: public App
     // Off-screen Tick() function,
     // function runs regardless of the window being visible
     virtual void TickOffScreen(TetriumApp::TickContextOffScreen& ctx) override {}
+  private:
+    struct {
+        bool connecting = false;
+    } pr650States;
 };
 }; // namespace TetriumApp

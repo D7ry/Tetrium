@@ -34,9 +34,14 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx) {
         if (!IPR650->isConnected()) {
             ImGui::Text("PR650 not connected");
             ImGui::SameLine();
-            if (ImGui::Button("connect to PR650")) {
-                std::thread t([] () {IPR650->Init();});
-                t.detach();
+            if (pr650States.connecting == false) {
+                if (ImGui::Button("connect to PR650")) {
+                    std::thread t([] () {IPR650->Init();});
+                    t.detach();
+                    pr650States.connecting = true;
+                }
+            } else {
+                ImGui::Text("Spinning thread to attempt connection...");
             }
         } else {
             ImGui::Text("PR650 connected!");
