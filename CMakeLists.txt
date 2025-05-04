@@ -142,6 +142,8 @@ if(IS_APPLE)
     set(FREETYPE_LIBRARIES "/opt/homebrew/lib/libfreetype.dylib")
     # hard-coded path for openal-soft
     set(OPENAL_ROOT_DIR "/opt/homebrew/opt/openal-soft")
+    # contains OpenALConfig.cmake, stupid mac package management
+    set(OpenAL_DIR "${OPENAL_ROOT_DIR}/lib/cmake/OpenAL")
     set(OPENAL_INCLUDE_DIR "${OPENAL_ROOT_DIR}/include")
     set(OPENAL_LIBRARY "${OPENAL_ROOT_DIR}/lib/libopenal.dylib")
     set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)

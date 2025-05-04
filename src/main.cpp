@@ -34,7 +34,7 @@ int main(int argc, char** argv)
         {new TetriumApp::AppPainter(), "Painter"},
     };
 
-    Tetrium::InitOptions options{.tetraMode = Tetrium::TetraMode::kEvenOddHardwareSync};
+    Tetrium::InitOptions options{.tetraMode = Tetrium::TetraMode::kEvenOddSoftwareSync};
     Tetrium* engine = new Tetrium();
 
     for (auto& [app, appName] : apps) {

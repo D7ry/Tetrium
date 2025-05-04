@@ -147,7 +147,7 @@ void Tetrium::drawFrame(ColorSpace colorSpace, uint8_t frameIdx)
 {
     SyncPrimitives& sync = _syncProjector[frameIdx];
     VkResult result;
-    uint8_t swapchainImageIndex = 0;
+    uint32_t swapchainImageIndex = 0;
     
     { // wait for the rendering resources
 #if defined(WIN32)
