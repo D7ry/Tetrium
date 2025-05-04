@@ -100,6 +100,10 @@ namespace GLOBALS
      * then optically corrects the aspect ratio using its lenses.
      * When rendering in pattern mode, however,, the re-sampling does not happen in DLP. Therefore we we-sample the image ourselves.
      */
+#if !__APPLE__
     const vk::Extent2D DISPLAY_EXTENT{2560, 1600};
+#else
+    const vk::Extent2D DISPLAY_EXTENT{DEFAULTS::WINDOW_WIDTH*2, DEFAULTS::WINDOW_HEIGHT*2}; // stupid MacOS
+#endif // __APPLE__
 
 }
