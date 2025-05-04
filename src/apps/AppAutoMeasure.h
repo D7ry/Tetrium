@@ -32,8 +32,11 @@ class AppAutoMeasure: public App
     // function runs regardless of the window being visible
     virtual void TickOffScreen(TetriumApp::TickContextOffScreen& ctx) override {}
   private:
+
+    void drawColorBlock(const TetriumApp::TickContextImGui& ctx, glm::ivec4 rgbo);
     struct {
         bool connecting = false;
+        bool measuring = false;
     } pr650States;
 };
 }; // namespace TetriumApp

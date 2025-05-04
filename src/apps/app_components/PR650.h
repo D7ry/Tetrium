@@ -18,7 +18,7 @@ public:
     double measureLum();
 
     /// Measures the full spectrum (returns wavelength, power) and luminance
-    void measureSpectrum();
+    void StartMeasuring();
 
     /// Gets the last measured luminance without re-measuring
     double getLum() const;
@@ -42,7 +42,11 @@ private:
     void closeConnection();
 
     std::string portName_;
+#if defined(WIN32)
     void* serialHandle_;
+#else
+    int serialHandle_;
+#endif
     bool serialConnected_ = false;
     bool connected_;
     double lum_;

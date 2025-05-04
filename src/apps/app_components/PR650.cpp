@@ -206,13 +206,15 @@ double PR650::measureLum() {
     return lum_;
 }
 
-void PR650::measureSpectrum() {
+void PR650::StartMeasuring() {
     this->MeasureResult.ready = false;
     measureLum();
+    DEBUG("luminance measuring success");
     std::vector<std::string> raw;
     std::vector<double> nm, power;
     sendMessageMultiLine("d5", raw);
     parseSpectrumOutput(raw, nm, power);
+    DEBUG("specturm measuring success");
     
     this->MeasureResult.wavelength = nm;
     this->MeasureResult.power = power;
