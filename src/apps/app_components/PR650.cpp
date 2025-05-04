@@ -39,6 +39,7 @@ void PR650::Init() {
             ASSERT(sendMessage("s01,,,,,,01,1", reply));
             INFO("crap: {}", reply);
             connected_ = true;
+            break;
         }
     }
 }
