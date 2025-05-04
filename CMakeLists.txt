@@ -51,6 +51,8 @@ set(SOURCES_BUILD
         src/apps/AppTetraHueSphere.cpp
         src/apps/AppImageViewer.cpp
         src/apps/AppPainter.cpp
+        src/apps/AppAutoMeasure.cpp
+        src/apps/app_components/PR650.cpp
         src/apps/painter/PainterImGui.cpp
         src/apps/painter/PainterColorPicker.cpp
         src/apps/painter/PainterColorPickerTick.cpp

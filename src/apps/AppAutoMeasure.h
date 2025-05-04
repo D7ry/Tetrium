@@ -1,0 +1,35 @@
+#pragma once
+
+#include "App.h"
+
+namespace TetriumApp {
+
+class AppAutoMeasure: public App
+{
+  public:
+    virtual void Init(TetriumApp::InitContext& ctx) override;
+    virtual void Cleanup(TetriumApp::CleanupContext& ctx) override;
+
+    // Called when the app is opened i.e. becomes the primary app
+    virtual void OnOpen() override {};
+    // Called when the app is closed i.e. no longer the primary app
+    virtual void OnClose() override {};
+
+    // TickImGui() and TickVulkan() are only called if the app is active
+    // i.e. we expect the app to render to the screen
+    // TickOffScreen() is always called
+
+    // ImGui Tick() function,
+    // the function executes in imgui context
+    virtual void TickImGui(const TetriumApp::TickContextImGui& ctx) override;
+
+    // Vulkan Tick() function,
+    // record all render & compute commands within this pass,
+    // push all semaphores that need to be waited on to r_waitSemaphores
+    virtual void TickVulkan(TetriumApp::TickContextVulkan& ctx) override {}
+
+    // Off-screen Tick() function,
+    // function runs regardless of the window being visible
+    virtual void TickOffScreen(TetriumApp::TickContextOffScreen& ctx) override {}
+};
+}; // namespace TetriumApp

@@ -40,7 +40,7 @@ namespace ImGui
 #if !__APPLE__
 const float DEFAULT_FONT_SIZE = 44;
 #else
-const float DEFAULT_FONT_SIZE = 34;
+const float DEFAULT_FONT_SIZE = 14;
 #endif // __APPLE__
 const int TEXTURE_DESCRIPTOR_POOL_SIZE = 1024;
 } // namespace ImGui
@@ -83,12 +83,6 @@ const char* const BANNER_TEXT = "___  ___ ___  __               \n"
 } // namespace DEFAULTS
 
 using INDEX_BUFFER_INDEX_TYPE = unsigned int;
-
-namespace DIRECTORIES
-{
-const std::string ASSETS = "../assets/";
-const std::string SHADERS = "../shaders/";
-} // namespace DIRECTORIES
 
 namespace GLOBALS
 {
