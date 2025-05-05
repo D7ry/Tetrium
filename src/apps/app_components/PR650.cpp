@@ -25,23 +25,17 @@ void PR650::Init() {
     }
 
     std::string reply;
-    while (1) {
-        const int sleepTimeMs = 100;
-        // sleep for 500ms
-        std::this_thread::sleep_for(std::chrono::milliseconds(sleepTimeMs));
-        ASSERT(sendMessage("b1", reply));
-            
-        if (reply != "000\r\n") {
-            ERROR("PR650 activation failed, trying again in {} ms", sleepTimeMs);
-            connected_ = false;
-        } else {
-            INFO("PR650 connected on {}, backlight on: {}", portName_, reply);
-            ASSERT(sendMessage("s01,,,,,,01,1", reply));
-            INFO("crap: {}", reply);
-            connected_ = true;
-            break;
-        }
+    
+    while (reply != "000\r\n") {
+        ERROR("reply {}, not 000, trying again", reply);
+        ASSERT(sendMessage("b1", reply, 1000));
     }
+
+    INFO("PR650 connected on {}, backlight on: {}", portName_, reply);
+    ASSERT(sendMessage("s01,,,,,,01,1", reply, 1000));
+    INFO("crap: {}", reply);
+    connected_ = true;
+    
 }
 PR650::PR650(const std::string& portName)
     : portName_(portName), lum_(0.0), connected_(false) {
@@ -145,14 +139,34 @@ bool PR650::sendMessage(const std::string& message, std::string& response, int t
         return false;
     }
 
-    Sleep(timeout); // milliseconds
+    //Sleep(timeout); // milliseconds
 
     char buffer[256];
     DWORD bytesRead;
-    if (!ReadFile(serialHandle_, buffer, sizeof(buffer), &bytesRead, NULL)) {
-        std::cerr << "Failed to read from port.\n";
-        return false;
+    std::vector<char> totalData;
+
+    while (true) {
+        if (!ReadFile(serialHandle_, buffer, sizeof(buffer), &bytesRead, NULL)) {
+            DWORD error = GetLastError();
+            if (error == ERROR_HANDLE_EOF) {
+                INFO("End of file reached");
+                break;
+            } else {
+                PANIC("Failed to read from port. Error code: {}", error);
+                return false;
+            }
+        }
+
+        if (bytesRead > 0) {
+            INFO("Read {} bytes", bytesRead);
+            totalData.insert(totalData.end(), buffer, buffer + bytesRead);
+        } else {
+            // No data yet, wait a bit before trying again
+            INFO("0 bytes read, trying again");
+            Sleep(100);
+        }
     }
+
     response = std::string(buffer, bytesRead);
 #else
     std::string msg = message.back() == '\n' ? message : message + "\n";
@@ -182,14 +196,11 @@ bool PR650::sendMessageMultiLine(const std::string& message, std::vector<std::st
 
 double PR650::measureLum() {
     std::string response;
-    if (!sendMessage("m0", response)) {
-        std::cerr << "Measurement failed.\n";
-        lum_ = 0.0;
-        return lum_;
-    }
+    ASSERT(sendMessage("m0", response, 10000))
 
     if (response.find(OK_CODE) != std::string::npos) {
-        if (sendMessage("d2", response)) {
+        INFO("measuring success!");
+        if (sendMessage("d2", response, 30000)) {
             std::istringstream ss(response);
             std::string val;
             int idx = 0;
@@ -202,6 +213,7 @@ double PR650::measureLum() {
             }
         }
     } else {
+        ERROR("response OK code not found: {}. {}", response, response.size());
         lum_ = 0.0;
     }
     return lum_;
@@ -210,12 +222,13 @@ double PR650::measureLum() {
 void PR650::StartMeasuring() {
     this->MeasureResult.ready = false;
     measureLum();
-    DEBUG("luminance measuring success");
+    INFO("luminance measuring success:  {}", lum_);
     std::vector<std::string> raw;
     std::vector<double> nm, power;
     sendMessageMultiLine("d5", raw);
+    INFO("sent spectrum measurement");
     parseSpectrumOutput(raw, nm, power);
-    DEBUG("specturm measuring success");
+    INFO("specturm measuring success");
     
     this->MeasureResult.wavelength = nm;
     this->MeasureResult.power = power;
@@ -226,13 +239,20 @@ void PR650::StartMeasuring() {
 void PR650::parseSpectrumOutput(const std::vector<std::string>& raw,
                                 std::vector<double>& wavelengths,
                                 std::vector<double>& powers) {
+    INFO("all lines:");
+    for (auto& line : raw) {
+        INFO("{}", line);
+    }
     if (lum_ == 0.0) {
         wavelengths.clear();
         powers.assign(raw.size() - 2, 0.0);
         return;
     }
+    INFO("1");
 
     for (size_t i = 2; i < raw.size(); ++i) {
+        INFO("1.1 {}" ,i);
+
         std::istringstream ss(raw[i]);
         std::string nmStr, powStr;
         // using ',' as delimiter to split each line

@@ -63,13 +63,13 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx) {
             if (IPR650->MeasureResult.ready) {
                 pr650States.measuring = false;
                 // read back pr650 states
-                DEBUG("PR650 results:");
+                INFO("PR650 results:");
                 auto& result = IPR650->MeasureResult;
-                DEBUG("luminance: {}", result.luminance);
+                INFO("luminance: {}", result.luminance);
                 for (int i = 0; i < result.power.size(); i++) {
                     double power = result.power[i];
                     double wavelength = result.wavelength[i];
-                    DEBUG("{} : {} {}", i, power, wavelength);
+                    INFO("{} : {} {}", i, power, wavelength);
                 }
             }
             ImGui::Text("PR650 measuring");
