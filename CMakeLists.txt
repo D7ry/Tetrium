@@ -51,6 +51,8 @@ set(SOURCES_BUILD
         src/apps/AppTetraHueSphere.cpp
         src/apps/AppImageViewer.cpp
         src/apps/AppPainter.cpp
+        src/apps/AppAutoMeasure.cpp
+        src/apps/app_components/PR650.cpp
         src/apps/painter/PainterImGui.cpp
         src/apps/painter/PainterColorPicker.cpp
         src/apps/painter/PainterColorPickerTick.cpp
@@ -142,6 +144,8 @@ if(IS_APPLE)
     set(FREETYPE_LIBRARIES "/opt/homebrew/lib/libfreetype.dylib")
     # hard-coded path for openal-soft
     set(OPENAL_ROOT_DIR "/opt/homebrew/opt/openal-soft")
+    # contains OpenALConfig.cmake, stupid mac package management
+    set(OpenAL_DIR "${OPENAL_ROOT_DIR}/lib/cmake/OpenAL")
     set(OPENAL_INCLUDE_DIR "${OPENAL_ROOT_DIR}/include")
     set(OPENAL_LIBRARY "${OPENAL_ROOT_DIR}/lib/libopenal.dylib")
     set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)

@@ -40,7 +40,7 @@ namespace ImGui
 #if !__APPLE__
 const float DEFAULT_FONT_SIZE = 44;
 #else
-const float DEFAULT_FONT_SIZE = 34;
+const float DEFAULT_FONT_SIZE = 14;
 #endif // __APPLE__
 const int TEXTURE_DESCRIPTOR_POOL_SIZE = 1024;
 } // namespace ImGui
@@ -84,12 +84,6 @@ const char* const BANNER_TEXT = "___  ___ ___  __               \n"
 
 using INDEX_BUFFER_INDEX_TYPE = unsigned int;
 
-namespace DIRECTORIES
-{
-const std::string ASSETS = "../assets/";
-const std::string SHADERS = "../shaders/";
-} // namespace DIRECTORIES
-
 namespace GLOBALS
 {
     /**
@@ -100,6 +94,10 @@ namespace GLOBALS
      * then optically corrects the aspect ratio using its lenses.
      * When rendering in pattern mode, however,, the re-sampling does not happen in DLP. Therefore we we-sample the image ourselves.
      */
+#if !__APPLE__
     const vk::Extent2D DISPLAY_EXTENT{2560, 1600};
+#else
+    const vk::Extent2D DISPLAY_EXTENT{DEFAULTS::WINDOW_WIDTH*2, DEFAULTS::WINDOW_HEIGHT*2}; // stupid MacOS
+#endif // __APPLE__
 
 }

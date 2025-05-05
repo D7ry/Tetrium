@@ -1,3 +1,4 @@
+#include <iomanip>
 #include "GlobalStates.h"
 #include "apps/AppPainter.h"
 

@@ -6,6 +6,7 @@
 #include "apps/AppPainter.h"
 #include "apps/AppScreeningTest.h"
 #include "apps/AppTetraHueSphere.h"
+#include "apps/AppAutoMeasure.h"
 
 static void printGreetingBanner()
 {
@@ -32,9 +33,10 @@ int main(int argc, char** argv)
         {new TetriumApp::AppTetraHueSphere(), "Tetra Hue Sphere"},
         {new TetriumApp::AppImageViewer(), "Image Viewer"},
         {new TetriumApp::AppPainter(), "Painter"},
+        {new TetriumApp::AppAutoMeasure(), "Measure"},
     };
 
-    Tetrium::InitOptions options{.tetraMode = Tetrium::TetraMode::kEvenOddHardwareSync};
+    Tetrium::InitOptions options{.tetraMode = Tetrium::TetraMode::kEvenOddSoftwareSync};
     Tetrium* engine = new Tetrium();
 
     for (auto& [app, appName] : apps) {
