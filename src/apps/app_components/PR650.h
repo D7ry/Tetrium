@@ -42,7 +42,8 @@ private:
     void closeConnection();
 
     std::string portName_;
-    int serialHandle_;
+    void* serialHandle_;
+    bool serialConnected_ = false;
     bool connected_;
     double lum_;
 

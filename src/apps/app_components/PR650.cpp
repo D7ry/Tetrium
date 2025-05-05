@@ -15,19 +15,25 @@
 #endif
 
 void PR650::Init() {
-    connected_ = initConnection();
-    DEBUG("serial port connected!");
-    if (connected_) {
-        std::string reply;
-        // sleep for 500ms
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
-        if (!sendMessage("b1", reply)) {
-            ERROR("failed to turn on PR650 backlight");
-            connected_ = false;
-        } else {
-            INFO("PR650 connected on {}, backlight on", portName_);
-            sendMessage("s01,,,,,,01,1", reply);
-        }
+    if (!serialConnected_) {
+        serialConnected_ = initConnection();
+        INFO("serial port connected!");
+    }
+    ASSERT(serialConnected_)
+
+    std::string reply;
+    // sleep for 500ms
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    ASSERT(sendMessage("b1", reply));
+        
+    if (reply != "000\r\n") {
+        ERROR("failed to turn on PR650 backlight");
+        connected_ = false;
+    } else {
+        INFO("PR650 connected on {}, backlight on: {}", portName_, reply);
+        sendMessage("s01,,,,,,01,1", reply);
+        INFO("crap: {}", reply);
+        connected_ = true;
     }
 }
 PR650::PR650(const std::string& portName)

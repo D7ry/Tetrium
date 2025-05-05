@@ -14,7 +14,7 @@ namespace {
 namespace TetriumApp {
 
 void AppAutoMeasure::Init(TetriumApp::InitContext& ctx) {
-    std::string portName = "USB VID:PID=0403:6001 SER=A104D0XSA";
+    std::string portName = "COM3";
     IPR650 = new PR650(portName);
 };
 
