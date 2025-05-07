@@ -216,15 +216,15 @@ void ImGuiWidgetEvenOddCalibration::Draw(Tetrium* engine, ColorSpace colorSpace)
     }
 
     ImGui::SeparatorText("Calibration");
-    const char* colorSpaceStr = colorSpace == RGB ? "RGB" : "OCV";
+    const char* colorSpaceStr = colorSpace == RGB ? "RGO" : "BGO";
     ImGui::Text("Color Space: %s", colorSpaceStr);
     const char* evenOddStr = isEven ? "Even" : "Odd";
     ImGui::Text("Current Frame: %s", evenOddStr);
-    if (ImGui::RadioButton("RGB -> Even | OCV -> Odd", !engine->_flipEvenOdd)) {
+    if (ImGui::RadioButton("RGO -> Even | BGO -> Odd", !engine->_flipEvenOdd)) {
         engine->_flipEvenOdd = false;
     }
     ImGui::SameLine();
-    if (ImGui::RadioButton("RGB -> Odd | OCV -> Even", engine->_flipEvenOdd)) {
+    if (ImGui::RadioButton("RGO -> Odd | BGO -> Even", engine->_flipEvenOdd)) {
         engine->_flipEvenOdd = true;
     }
 
@@ -237,16 +237,16 @@ void ImGuiWidgetEvenOddCalibration::Draw(Tetrium* engine, ColorSpace colorSpace)
             engine->_rocvPresentMode = Tetrium::ROCVPresentMode::kNormal;
         }
         ImGui::SameLine();
-        if (ImGui::RadioButton("Show RGB Only", rgbOnly)) {
+        if (ImGui::RadioButton("Show RGO Only", rgbOnly)) {
             engine->_rocvPresentMode = Tetrium::ROCVPresentMode::kRGBOnly;
         }
         ImGui::SameLine();
-        if (ImGui::RadioButton("Show OCV Only", ocvOnly)) {
+        if (ImGui::RadioButton("Show BGO Only", ocvOnly)) {
             engine->_rocvPresentMode = Tetrium::ROCVPresentMode::kOCVOnly;
         }
     }
 
-    { // draw RGB and OCV gradients
+    if (false) { // draw RGO and BGO gradients
         ImDrawList* dl = ImGui::GetWindowDrawList();
 
         ImVec2 availableSize = ImGui::GetContentRegionAvail();
