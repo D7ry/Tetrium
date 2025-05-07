@@ -31,8 +31,8 @@ public:
     } MeasureResult;
 
 private:
-    bool sendMessage(const std::string& message, std::string& response, int timeout = 5000);
-    bool sendMessageMultiLine(const std::string& message, std::vector<std::string>& responseLines, int timeout = 5000);
+    bool sendMessage(const std::string& message, std::string& response, int timeout);
+    bool sendMessageMultiLine(const std::string& message, std::vector<std::string>& responseLines, int timeout);
 
     void parseSpectrumOutput(const std::vector<std::string>& raw,
                              std::vector<double>& wavelengths,

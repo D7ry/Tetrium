@@ -5,6 +5,7 @@
 #include <cstring>
 #include <utility>
 #include <string>
+#include <chrono>
 
 #if defined(WIN32)
     #include <windows.h>
@@ -144,6 +145,7 @@ bool PR650::sendMessage(const std::string& message, std::string& response, int t
     char buffer[256];
     DWORD bytesRead;
     std::vector<char> totalData;
+    auto start = std::chrono::steady_clock::now();
 
     while (true) {
         if (!ReadFile(serialHandle_, buffer, sizeof(buffer), &bytesRead, NULL)) {
@@ -163,8 +165,18 @@ bool PR650::sendMessage(const std::string& message, std::string& response, int t
         } else {
             // No data yet, wait a bit before trying again
             INFO("0 bytes read, trying again");
-            Sleep(100);
+        
+
+        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                               std::chrono::steady_clock::now() - start
+            )
+                               .count();
+
+        if (elapsed > timeout) {
+            break;
         }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
 
     response = std::string(buffer, bytesRead);
