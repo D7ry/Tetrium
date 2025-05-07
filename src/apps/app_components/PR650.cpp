@@ -34,7 +34,7 @@ void PR650::Init() {
 
     INFO("PR650 connected on {}, backlight on: {}", portName_, reply);
     ASSERT(sendMessage("s01,,,,,,01,1", reply, 1000));
-    INFO("crap: {}", reply);
+    INFO("response to some shit we sent: {}", reply);
     connected_ = true;
     
 }
@@ -140,15 +140,16 @@ bool PR650::sendMessage(const std::string& message, std::string& response, int t
         return false;
     }
 
-    //Sleep(timeout); // milliseconds
+    //const int WAIT_REACT_TIMME = 1000; // wait for 1000 ms for PR650 to clear the IO buffer.
+    //Sleep(WAIT_REACT_TIMME);           // milliseconds
 
-    char buffer[256];
+    char* buf = (char*)malloc(1024);
     DWORD bytesRead;
     std::vector<char> totalData;
     auto start = std::chrono::steady_clock::now();
 
     while (true) {
-        if (!ReadFile(serialHandle_, buffer, sizeof(buffer), &bytesRead, NULL)) {
+        if (!ReadFile(serialHandle_, buf, 1024, &bytesRead, NULL)) {
             DWORD error = GetLastError();
             if (error == ERROR_HANDLE_EOF) {
                 INFO("End of file reached");
@@ -161,11 +162,10 @@ bool PR650::sendMessage(const std::string& message, std::string& response, int t
 
         if (bytesRead > 0) {
             INFO("Read {} bytes", bytesRead);
-            totalData.insert(totalData.end(), buffer, buffer + bytesRead);
+            totalData.insert(totalData.end(), buf, buf + bytesRead);
         } else {
-            // No data yet, wait a bit before trying again
-            INFO("0 bytes read, trying again");
-        
+            INFO("read 0 bytes");
+        }
 
         auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
                                std::chrono::steady_clock::now() - start
@@ -176,10 +176,12 @@ bool PR650::sendMessage(const std::string& message, std::string& response, int t
             break;
         }
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        //std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
+    delete buf;
 
-    response = std::string(buffer, bytesRead);
+    response = std::string(totalData.data(), totalData.size());
+    INFO("response: {}", response);
 #else
     std::string msg = message.back() == '\n' ? message : message + "\n";
     write(serialHandle_, msg.c_str(), msg.length());
@@ -208,11 +210,12 @@ bool PR650::sendMessageMultiLine(const std::string& message, std::vector<std::st
 
 double PR650::measureLum() {
     std::string response;
-    ASSERT(sendMessage("m0", response, 1000))
+    INFO("sending m0");
+    ASSERT(sendMessage("m0", response, 30 * 1000)) // wait 10 seconds
 
     if (response.find(OK_CODE) != std::string::npos) {
         INFO("measuring success!");
-        if (sendMessage("d2", response, 10000)) {// expecting 10 seconds luminance measuring
+        if (sendMessage("d2", response, 30 * 1000)) {// expecting 10 seconds luminance measuring
             std::istringstream ss(response);
             std::string val;
             int idx = 0;
@@ -222,6 +225,9 @@ double PR650::measureLum() {
                     break;
                 }
                 ++idx;
+            }
+            if (idx != 3) {
+                PANIC("less than 3 values returned from luminance measure result! : {}", response);
             }
         }
     } else {
@@ -237,7 +243,7 @@ void PR650::StartMeasuring() {
     INFO("luminance measuring success:  {}", lum_);
     std::vector<std::string> raw;
     std::vector<double> nm, power;
-    sendMessageMultiLine("d5", raw, 30000);
+    sendMessageMultiLine("d5", raw, 30 * 1000);
     INFO("sent spectrum measurement");
     parseSpectrumOutput(raw, nm, power);
     INFO("specturm measuring success");
