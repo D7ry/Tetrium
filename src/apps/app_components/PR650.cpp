@@ -196,11 +196,11 @@ bool PR650::sendMessageMultiLine(const std::string& message, std::vector<std::st
 
 double PR650::measureLum() {
     std::string response;
-    ASSERT(sendMessage("m0", response, 10000))
+    ASSERT(sendMessage("m0", response, 1000))
 
     if (response.find(OK_CODE) != std::string::npos) {
         INFO("measuring success!");
-        if (sendMessage("d2", response, 30000)) {
+        if (sendMessage("d2", response, 10000)) {// expecting 10 seconds luminance measuring
             std::istringstream ss(response);
             std::string val;
             int idx = 0;
@@ -225,7 +225,7 @@ void PR650::StartMeasuring() {
     INFO("luminance measuring success:  {}", lum_);
     std::vector<std::string> raw;
     std::vector<double> nm, power;
-    sendMessageMultiLine("d5", raw);
+    sendMessageMultiLine("d5", raw, 30000);
     INFO("sent spectrum measurement");
     parseSpectrumOutput(raw, nm, power);
     INFO("specturm measuring success");
