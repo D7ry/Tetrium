@@ -158,7 +158,11 @@ class AppPainter : public App
 
         std::array<vk::ClearValue, 2> _clearValues; // [color, depthStencil]
 
+#if __APPLE__
+        static const uint32_t CUBEMAP_CUBE_SIZE = 128;
+#else
         static const uint32_t CUBEMAP_CUBE_SIZE = 256;
+#endif
         static const uint32_t CUBEMAP_WIDTH = 4 * CUBEMAP_CUBE_SIZE;
         static const uint32_t CUBEMAP_HEIGHT = 3 * CUBEMAP_CUBE_SIZE;
 
@@ -278,8 +282,13 @@ class AppPainter : public App
 
     std::array<vk::ClearValue, 2> _clearValues; // [color, depthStencil]
 
+#if __APPLE__
+    uint32_t _canvasWidth = 512;
+    uint32_t _canvasHeight = 512;
+#else
     uint32_t _canvasWidth = 1024;
     uint32_t _canvasHeight = 1024;
+#endif
     const int PAINT_SPACE_PIXEL_SIZE = 4 * sizeof(float); // R32G32B32A32_SFLOAT
 
     // ---------- ImGui Runtime Logic ----------
