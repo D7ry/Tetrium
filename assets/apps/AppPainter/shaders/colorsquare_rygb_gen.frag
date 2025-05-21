@@ -183,20 +183,21 @@ vec3 convertCubemapUVToCartesian(vec2 uv, float radius) {
 }
 
 //https://en.wikipedia.org/wiki/Degenerate_bilinear_form
-vec2 mapUVToTriangle(vec2 uv, vec2 C) {
+// uv in [0,1]
+vec3 mapUVToBarycentric(vec2 uv) {
     float u = uv[0];
     float v = uv[1];
-    //v = pow(v , 1.f/3.f);
-
     vec3 barycentric;
 
     // derive baricentric coords
     barycentric.z = v;
     barycentric.x = (1-v) * (1-u);
     barycentric.y = 1 - barycentric.z - barycentric.x;
-
-    // evaluate cartesian
-    return barycentric.x * vec2(0, 0) + barycentric.y * vec2(C.x, C.y) + barycentric.z * vec2(0, 1);
+    return barycentric;
+}
+vec2 mapUVToTriangle(vec2 uv, vec2 C) {
+    vec3 bary = mapUVToBarycentric(uv);
+    return vec2(0, 0) * bary.z + vec2(0, 2) * bary.x + C * bary.y;
 }
 
 void main() {
@@ -212,7 +213,6 @@ void main() {
     // essentially collapsing the bottom edge
     // the mapped coordinate we use as v and s
     vec2 sv = mapUVToTriangle(fragUV, vec2(saturation, value));
-    sv[1] = 1 - sv[1];
 
     vec3 xyz = convertCubemapUVToCartesian(vec2(ubo.cubemap_u, ubo.cubemap_v), sv[0]);
 
