@@ -186,7 +186,7 @@ vec3 convertCubemapUVToCartesian(vec2 uv, float radius) {
 vec2 mapUVToTriangle(vec2 uv, vec2 C) {
     float u = uv[0];
     float v = uv[1];
-    v = pow(v , 1.f/3.f);
+    //v = pow(v , 1.f/3.f);
 
     vec3 barycentric;
 

@@ -851,6 +851,13 @@ void AppPainter::ColorPicker::Init(TetriumApp::InitContext& ctx, RYGBToViewSpace
         _cubemapRYGBTextureCPU
     );
 
+    ctx.device.CreateBufferInPlace(
+        sizeof(float) * 4 * CUBEMAP_HEIGHT * CUBEMAP_WIDTH,
+        VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        _colorSquareRYGBTextureCPU
+    );
+
     _clearValues
         = {vk::ClearColorValue(std::array<float, 4>{0.0f, 0.0f, 0.0f, 0.0f}),
            vk::ClearDepthStencilValue(1.0f, 0)};
@@ -862,6 +869,7 @@ void AppPainter::ColorPicker::Cleanup(TetriumApp::CleanupContext& ctx)
 {
     _hueSphere.Cleanup(ctx);
     _cubemapRYGBTextureCPU.Cleanup();
+    _colorSquareRYGBTextureCPU.Cleanup();
     cleanupCubemapGenerateContext(ctx);
     _cubemapTextureViewSpace.Cleanup();
     _cubemapTexture.Cleanup();

@@ -326,6 +326,29 @@ void AppPainter::ColorPicker::TickVulkan(TetriumApp::TickContextVulkan& ctx)
         region.imageSubresource.baseArrayLayer = 0;
         region.imageSubresource.layerCount = 1;
         region.imageOffset = {0, 0, 0};
+        region.imageExtent = {COLORSQUARE_SIZE, COLORSQUARE_SIZE, 1};
+
+        vk::BufferImageCopy vkRegion(region);
+
+        cb.copyImageToBuffer(
+            _colorSquareTexture.GetImage(),
+            vk::ImageLayout::eGeneral,
+            _colorSquareRYGBTextureCPU.buffer,
+            1,
+            &vkRegion
+        );
+    }
+
+    {
+        VkBufferImageCopy region = {};
+        region.bufferOffset = 0;
+        region.bufferRowLength = 0;
+        region.bufferImageHeight = 0;
+        region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        region.imageSubresource.mipLevel = 0;
+        region.imageSubresource.baseArrayLayer = 0;
+        region.imageSubresource.layerCount = 1;
+        region.imageOffset = {0, 0, 0};
         region.imageExtent = {CUBEMAP_WIDTH, CUBEMAP_HEIGHT, 1};
 
         vk::BufferImageCopy vkRegion(region);
@@ -380,6 +403,26 @@ glm::vec4 AppPainter::ColorPicker::getColorFromCubemapCoord(int x, int y)
     return color;
 }
 
+glm::vec4 AppPainter::ColorPicker::getColorFromColorSquareCoord(int x, int y)
+{
+    if (x < 0 || y < 0 || x >= COLORSQUARE_SIZE || y >= COLORSQUARE_SIZE) {
+        return {0, 0, 0, 0};
+    }
+
+    glm::vec4 color;
+
+    int rygbColorPixelIndex = x + y * COLORSQUARE_SIZE;
+    constexpr size_t pixelColorSize = sizeof(float) * 4;
+    char* colorBegin = static_cast<char*>(_colorSquareRYGBTextureCPU.bufferAddress);
+
+    float* pColor
+        = reinterpret_cast<float*>(pixelColorSize * rygbColorPixelIndex + colorBegin);
+
+    memcpy(&color.x, pColor, pixelColorSize);
+
+    return color;
+}
+
 
 // update the picked color based on the current cursor position,
 // by sampling the pixel from the cubemap texture.
@@ -392,6 +435,17 @@ void AppPainter::ColorPicker::updatePickedColor()
     }
 
     _selectedColorRYGB = getColorFromCubemapCoord(x, y);
+}
+
+void AppPainter::ColorPicker::updatePickedColorColorSquare()
+{
+    int x = _colorSquareCursorPos.x;
+    int y = _colorSquareCursorPos.y;
+    if (x < 0 || y < 0 || x >= COLORSQUARE_SIZE || y >= COLORSQUARE_SIZE) {
+        return;
+    }
+
+    _selectedColorRYGB = getColorFromColorSquareCoord(x, y);
 }
 
 void AppPainter::ColorPicker::updatePickedColorFromRYGB()
@@ -413,7 +467,6 @@ void AppPainter::ColorPicker::TickImGuiHueSphere(const TetriumApp::TickContextIm
 
 void AppPainter::ColorPicker::TickImGui(const TetriumApp::TickContextImGui& ctx)
 {
-    updatePickedColor();
 
     /// render cubemap
     const uint32_t cubemapImageColumnSize = CUBEMAP_WIDTH + 10;
@@ -458,6 +511,7 @@ void AppPainter::ColorPicker::TickImGui(const TetriumApp::TickContextImGui& ctx)
         // update persistent cursor position on click
         if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
             _colorPickerCursorPos = {x, y};
+            updatePickedColor();
         }
     }
 
@@ -485,10 +539,49 @@ void AppPainter::ColorPicker::TickImGui(const TetriumApp::TickContextImGui& ctx)
         constexpr ImVec2 size{COLORSQUARE_SIZE, COLORSQUARE_SIZE};
         void* textureId = _colorSquareTextureViewSpace.GetImGuiTextureId();
         //textureId = _colorSquareTexture.GetImGuiTextureId();
-        float cubemap_u =(float)_colorPickerCursorPos.x / CUBEMAP_WIDTH;
-        float cubemap_v =(float)_colorPickerCursorPos.y / CUBEMAP_HEIGHT;
-        ImGui::Text("DEBUG: Cubemap UV: %f, %f", cubemap_u, cubemap_v);
+        //float cubemap_u =(float)_colorPickerCursorPos.x / CUBEMAP_WIDTH;
+        //float cubemap_v =(float)_colorPickerCursorPos.y / CUBEMAP_HEIGHT;
+        //ImGui::Text("DEBUG: Cubemap UV: %f, %f", cubemap_u, cubemap_v);
         ImGui::Image(textureId, size);
+
+        if (ImGui::IsItemHovered()){
+            ImVec2 mousePos = ImGui::GetMousePos();
+            imagePos = ImGui::GetItemRectMin();
+            // Calculate the mouse position relative to the cubemap image
+            ImVec2 relativePos = mousePos - imagePos;
+
+            relativePos.x = std::clamp(relativePos.x, 0.0f, cubemapSize.x);
+            relativePos.y = std::clamp(relativePos.y, 0.0f, cubemapSize.y);
+            int x = relativePos.x;
+            int y = relativePos.y;
+
+            // calculated hovered color
+            glm::vec4 hoveredColorRYGB = getColorFromColorSquareCoord(x, y);
+            glm::vec4 hoeveredColorViewSpace = _tranformMatrixFromRygb[ctx.colorSpace] * hoveredColorRYGB;
+            for (int i = 0; i < 4; i++) {
+                hoeveredColorViewSpace[i] = std::clamp(hoeveredColorViewSpace[i], 0.f, 1.f);
+            }
+
+            ImVec2 rectBegin = {mousePos.x - 30, mousePos.y - 30};
+            ImVec2 rectEnd = mousePos;
+            ImGui::GetWindowDrawList()->AddRectFilled(
+                rectBegin, rectEnd, 
+                ImColor(
+                    hoeveredColorViewSpace.r, hoeveredColorViewSpace.g, hoeveredColorViewSpace.b, 1.f
+                )
+            );
+            ImGui::GetWindowDrawList()->AddRect(
+                rectBegin,
+                rectEnd,
+                IM_COL32_WHITE
+            );
+
+            // update persistent cursor position on click
+            if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+                _colorSquareCursorPos = {x, y};
+                updatePickedColorColorSquare();
+            }
+        }
     }
 
     if (ImGui::BeginTable("RYGB Slider + preview", 2)) {

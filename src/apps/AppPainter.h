@@ -260,14 +260,23 @@ class AppPainter : public App
             int y = -1;
         } _colorPickerCursorPos;
 
+        struct 
+        {
+            int x = -1;
+            int y = -1;
+        } _colorSquareCursorPos;
+
         glm::vec4 getColorFromCubemapCoord(int x, int y);
+        glm::vec4 getColorFromColorSquareCoord(int x, int y);
         
 
         void updatePickedColor();
+        void updatePickedColorColorSquare();
         void updatePickedColorFromRYGB();
 
         // CPU-accessible RYGB buffer
         VQBuffer _cubemapRYGBTextureCPU{};
+        VQBuffer _colorSquareRYGBTextureCPU{};
 
         HueSphere _hueSphere;
     };
