@@ -173,17 +173,17 @@ class AppPainter : public App
         std::array<vk::ClearValue, 2> _clearValues; // [color, depthStencil]
 
 #if __APPLE__
-        static const uint32_t CUBEMAP_CUBE_SIZE = 128;
+        static const uint32_t CUBEMAP_CUBE_SIZE = 100;
 #else
-        static const uint32_t CUBEMAP_CUBE_SIZE = 256;
+        static const uint32_t CUBEMAP_CUBE_SIZE = 200;
 #endif
         static const uint32_t CUBEMAP_WIDTH = 4 * CUBEMAP_CUBE_SIZE;
         static const uint32_t CUBEMAP_HEIGHT = 3 * CUBEMAP_CUBE_SIZE;
 
 #if __APPLE__
-        static const uint32_t COLORSQUARE_SIZE = 128;
+        static const uint32_t COLORSQUARE_SIZE = 200;
 #else
-        static const uint32_t COLORSQUARE_SIZE = 256;
+        static const uint32_t COLORSQUARE_SIZE = 400;
 #endif
 
         RYGBToViewSpaceContext* _rygbToViewSpaceCtx; // points to painter's transform context TODO: make it better

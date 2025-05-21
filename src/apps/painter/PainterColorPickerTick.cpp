@@ -535,7 +535,17 @@ void AppPainter::ColorPicker::TickImGui(const TetriumApp::TickContextImGui& ctx)
 
     ImGui::Dummy(ImVec2(0.0f, 20.0f));
 
-    { // draw color square
+    
+
+    if (ImGui::BeginTable("RYGB Slider + preview", 2)) {
+        ImGui::TableSetupColumn(
+            "color preview", ImGuiTableColumnFlags_WidthFixed, COLORSQUARE_SIZE + 10
+        );
+
+        ImGui::TableNextColumn();
+{ // draw color square
+        constexpr ImVec2 colorSquareSize{COLORSQUARE_SIZE, COLORSQUARE_SIZE};
+        imagePos = ImGui::GetItemRectMin();
         constexpr ImVec2 size{COLORSQUARE_SIZE, COLORSQUARE_SIZE};
         void* textureId = _colorSquareTextureViewSpace.GetImGuiTextureId();
         //textureId = _colorSquareTexture.GetImGuiTextureId();
@@ -546,12 +556,11 @@ void AppPainter::ColorPicker::TickImGui(const TetriumApp::TickContextImGui& ctx)
 
         if (ImGui::IsItemHovered()){
             ImVec2 mousePos = ImGui::GetMousePos();
-            imagePos = ImGui::GetItemRectMin();
             // Calculate the mouse position relative to the cubemap image
             ImVec2 relativePos = mousePos - imagePos;
 
-            relativePos.x = std::clamp(relativePos.x, 0.0f, cubemapSize.x);
-            relativePos.y = std::clamp(relativePos.y, 0.0f, cubemapSize.y);
+            relativePos.x = std::clamp(relativePos.x, 0.0f, colorSquareSize.x);
+            relativePos.y = std::clamp(relativePos.y, 0.0f, colorSquareSize.y);
             int x = relativePos.x;
             int y = relativePos.y;
 
@@ -582,26 +591,16 @@ void AppPainter::ColorPicker::TickImGui(const TetriumApp::TickContextImGui& ctx)
                 updatePickedColorColorSquare();
             }
         }
+
+        if (_colorSquareCursorPos.x >= 0 && _colorSquareCursorPos.y >= 0) {
+            ImVec2 cursorPos = imagePos + ImVec2(_colorSquareCursorPos.x, _colorSquareCursorPos.y);
+            float cursorSize = 5;
+            ImGui::GetWindowDrawList()->AddCircle(
+                cursorPos, cursorSize, IM_COL32(255, 255, 255, 255), 0, 3.f
+            );
+        }
     }
 
-    if (ImGui::BeginTable("RYGB Slider + preview", 2)) {
-        const uint32_t colorPreviewSize = 150;
-        ImGui::TableSetupColumn(
-            "color preview", ImGuiTableColumnFlags_WidthFixed, colorPreviewSize + 10
-        );
-
-        ImGui::TableNextColumn();
-
-        glm::vec4 selectedColorViewSpace = _tranformMatrixFromRygb[ctx.colorSpace] * _selectedColorRYGB;
-        for (int i = 0; i < 4; i++) {
-            selectedColorViewSpace[i] = std::clamp(selectedColorViewSpace[i], 0.f, 1.f);
-        }
-
-        ImGui::ColorButton("Selected Color", 
-            ImVec4{selectedColorViewSpace.r, selectedColorViewSpace.g, selectedColorViewSpace.b, 1.f},
-            0,
-            ImVec2(colorPreviewSize, colorPreviewSize)
-        );
 
         // manual rygb control
         glm::vec4 rDisplaySpace = _tranformMatrixFromRygb[ctx.colorSpace] * glm::vec4(1, 0, 0, 0);
@@ -629,6 +628,21 @@ void AppPainter::ColorPicker::TickImGui(const TetriumApp::TickContextImGui& ctx)
             |= ImGuiU::GradientSliderFloat("G", &_selectedColorRYGB.b, 0, 1.0f, black, g);
         manualColorOverride
             |= ImGuiU::GradientSliderFloat("B", &_selectedColorRYGB.a, 0, 1.0f, black, b);
+
+        // picked color widget
+        if (1) {
+            const uint32_t colorPreviewSize = COLORSQUARE_SIZE / 2;
+            glm::vec4 selectedColorViewSpace = _tranformMatrixFromRygb[ctx.colorSpace] * _selectedColorRYGB;
+            for (int i = 0; i < 4; i++) {
+                selectedColorViewSpace[i] = std::clamp(selectedColorViewSpace[i], 0.f, 1.f);
+            }
+
+            ImGui::ColorButton("Selected Color", 
+                ImVec4{selectedColorViewSpace.r, selectedColorViewSpace.g, selectedColorViewSpace.b, 1.f},
+                0,
+                ImVec2(colorPreviewSize, colorPreviewSize)
+            );
+        }
 
 
         if (manualColorOverride) {

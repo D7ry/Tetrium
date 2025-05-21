@@ -196,6 +196,7 @@ vec3 mapUVToBarycentric(vec2 uv) {
     return barycentric;
 }
 vec2 mapUVToTriangle(vec2 uv, vec2 C) {
+    uv[1] = pow(uv[1], 1.f/3.f);
     vec3 bary = mapUVToBarycentric(uv);
     return vec2(0, 0) * bary.z + vec2(0, 2) * bary.x + C * bary.y;
 }
@@ -203,11 +204,11 @@ vec2 mapUVToTriangle(vec2 uv, vec2 C) {
 void main() {
     // sample lut to get bound for value and saturation
     vec2 lutResult = texture(t_vshMaxSaturationLUT, vec2(ubo.cubemap_u, ubo.cubemap_v)).xy;
-    float value = lutResult.x;
-    float saturation = lutResult.y;
+    //float value = lutResult.x;
+    //float saturation = lutResult.y;
 
-    //value = 0.7;
-    //saturation = 0.5;
+    float value = lutResult.x * g_luminanceMin + g_luminanceRange;
+    float saturation = lutResult.y * g_saturationMin + g_saturationRange;
     
     // remap cubemap uv onto bounded color triangle,
     // essentially collapsing the bottom edge

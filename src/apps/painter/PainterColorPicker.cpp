@@ -668,13 +668,13 @@ void AppPainter::ColorPicker::initColorSquareGenerateContext(TetriumApp::InitCon
         );
 
         vk::Viewport viewport(
-            0.f, 0.f, CUBEMAP_WIDTH, CUBEMAP_HEIGHT, 0.f, 1.f
+            0.f, 0.f, COLORSQUARE_SIZE, COLORSQUARE_SIZE, 0.f, 1.f
         );
         vk::Rect2D scissor(
             {0, 0},
             {
-                CUBEMAP_WIDTH,
-                CUBEMAP_HEIGHT,
+                COLORSQUARE_SIZE,
+                COLORSQUARE_SIZE,
             }
         );
         vk::PipelineViewportStateCreateInfo viewportState({}, 1, &viewport, 1, &scissor);
