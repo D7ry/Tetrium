@@ -122,11 +122,11 @@ vec4 convertCartesianToRYGB(vec3 xyz, float luminance, float saturation) {
     
     hering = convertVSHHToHering(vshh); // convert back to hering space
     
-    //vec4 colorRYGB = g_heringToRYGB * hering;
+    vec4 colorRYGB = g_heringToRYGB * hering;
 
-    vec4 vshhRemapped = remapVSHHGamutPoints(vshh);
-    vec4 heringRemapped = convertVSHHToHering(vshhRemapped);
-    vec4 colorRYGB = g_heringToRYGB * heringRemapped;
+    //vec4 vshhRemapped = remapVSHHGamutPoints(vshh);
+    //vec4 heringRemapped = convertVSHHToHering(vshhRemapped);
+    //vec4 colorRYGB = g_heringToRYGB * heringRemapped;
 
     return colorRYGB;
 }
@@ -184,33 +184,40 @@ vec3 convertCubemapUVToCartesian(vec2 uv, float radius) {
 
 //https://en.wikipedia.org/wiki/Degenerate_bilinear_form
 vec2 mapUVToTriangle(vec2 uv, vec2 C) {
-    float u = uv.x;
-    float v = uv.y;
+    float u = uv[0];
+    float v = uv[1];
 
-    // Compute the top edge interpolation between B and C
-    vec2 topLine = mix(vec2(0.0, 0.0), C, u); // mix(B, C, u)
+    vec3 barycentric;
 
-    // Interpolate between A and topLine by v
-    vec2 point = v * topLine; // Since A = (0, 0), this is just v * topLine
+    // derive baricentric coords
+    barycentric.z = v;
+    barycentric.x = (1-v) * (1-u);
+    barycentric.y = 1 - barycentric.z - barycentric.x;
 
-    return point;
+
+    // evaluate cartesian
+    return barycentric.x * vec2(0, 0) + barycentric.y * vec2(C.x, C.y) + barycentric.z * vec2(0, 1);
 }
+
 void main() {
     // sample lut to get bound for value and saturation
     vec2 lutResult = texture(t_vshMaxSaturationLUT, vec2(ubo.cubemap_u, ubo.cubemap_v)).xy;
     float value = lutResult.x;
     float saturation = lutResult.y;
+
+    //value = 0.7;
+    //saturation = 0.5;
     
     // remap cubemap uv onto bounded color triangle,
     // essentially collapsing the bottom edge
     // the mapped coordinate we use as v and s
-    vec2 vs = mapUVToTriangle(fragUV, lutResult);
+    vec2 sv = mapUVToTriangle(fragUV, vec2(saturation, value));
 
+    vec3 xyz = convertCubemapUVToCartesian(vec2(ubo.cubemap_u, ubo.cubemap_v), sv[0]);
 
-    vec3 xyz = convertCubemapUVToCartesian(vec2(ubo.cubemap_u, ubo.cubemap_v), vs[1]);
-
-
-    vec4 rygb = convertCartesianToRYGB(xyz, vs[0], vs[1]);
+    vec4 rygb = convertCartesianToRYGB(xyz, sv[1], sv[0]);
 
     outColor = rygb;
+    //outColor = vec4(saturation, 0, 0, 1);
+    //outColor = vec4(fragUV, 0, 1);
 }
