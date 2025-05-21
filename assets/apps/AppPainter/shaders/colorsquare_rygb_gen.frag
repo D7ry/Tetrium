@@ -186,6 +186,7 @@ vec3 convertCubemapUVToCartesian(vec2 uv, float radius) {
 vec2 mapUVToTriangle(vec2 uv, vec2 C) {
     float u = uv[0];
     float v = uv[1];
+    v = pow(v , 1.f/3.f);
 
     vec3 barycentric;
 
@@ -193,7 +194,6 @@ vec2 mapUVToTriangle(vec2 uv, vec2 C) {
     barycentric.z = v;
     barycentric.x = (1-v) * (1-u);
     barycentric.y = 1 - barycentric.z - barycentric.x;
-
 
     // evaluate cartesian
     return barycentric.x * vec2(0, 0) + barycentric.y * vec2(C.x, C.y) + barycentric.z * vec2(0, 1);
@@ -212,12 +212,15 @@ void main() {
     // essentially collapsing the bottom edge
     // the mapped coordinate we use as v and s
     vec2 sv = mapUVToTriangle(fragUV, vec2(saturation, value));
+    sv[1] = 1 - sv[1];
 
     vec3 xyz = convertCubemapUVToCartesian(vec2(ubo.cubemap_u, ubo.cubemap_v), sv[0]);
 
     vec4 rygb = convertCartesianToRYGB(xyz, sv[1], sv[0]);
 
     outColor = rygb;
+    //outColor = vec4(sv, 0, 1);
+
     //outColor = vec4(saturation, 0, 0, 1);
     //outColor = vec4(fragUV, 0, 1);
 }

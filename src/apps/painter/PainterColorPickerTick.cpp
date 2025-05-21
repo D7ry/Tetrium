@@ -484,6 +484,7 @@ void AppPainter::ColorPicker::TickImGui(const TetriumApp::TickContextImGui& ctx)
     { // draw color square
         constexpr ImVec2 size{COLORSQUARE_SIZE, COLORSQUARE_SIZE};
         void* textureId = _colorSquareTextureViewSpace.GetImGuiTextureId();
+        //textureId = _colorSquareTexture.GetImGuiTextureId();
         float cubemap_u =(float)_colorPickerCursorPos.x / CUBEMAP_WIDTH;
         float cubemap_v =(float)_colorPickerCursorPos.y / CUBEMAP_HEIGHT;
         ImGui::Text("DEBUG: Cubemap UV: %f, %f", cubemap_u, cubemap_v);
