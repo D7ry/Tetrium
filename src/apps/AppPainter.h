@@ -137,6 +137,12 @@ class AppPainter : public App
             vshMaxSaturationLUT = 1
         };
 
+        enum class ColorSquareBindingLocation : uint32_t
+        {
+            ubo = 0,
+            vshMaxSaturationLUT = 1
+        };
+
         // currently we only use a fixed texture -- which kind of works for its dimension
 
         // selected color in RYGB color space
@@ -146,13 +152,21 @@ class AppPainter : public App
         // the texture is used for:
         // 1. RYGB color space texture that is sampled by `RYGBToViewSpaceContext`'s
         // pass to generate view space cubemap texture -- _cubemapTextureViewSpace
-        // 2.[TODO] being copied to CPU-accessible staging buffer for color-picking
+        // 2. being copied to CPU-accessible staging buffer for color-picking
         TextureFrameBuffer _cubemapTexture;
-
         // view space cubemap texture in RGB/OCV color space
         TextureFrameBuffer _cubemapTextureViewSpace;
 
+        // texture for the color square for paint and view space
+        // works similarly to _cubemapTexture and cubemapTextureViewSpace,
+        // where one render pass generates the texture using some color sci magic,
+        // and the RYGB to viewspace transforms it to be sampled by ImGui
+        // TODO: rygbToViewspace seems like an overkill, a compute dispatch would do.
+        TextureFrameBuffer _colorSquareTexture;
+        TextureFrameBuffer _colorSquareTextureViewSpace;
+
         // slider values for luminance and saturation
+        // NOTE: new cubemap we keep them at one.
         float _luminance = 1.f;
         float _saturation = 1.f;
 
@@ -165,6 +179,12 @@ class AppPainter : public App
 #endif
         static const uint32_t CUBEMAP_WIDTH = 4 * CUBEMAP_CUBE_SIZE;
         static const uint32_t CUBEMAP_HEIGHT = 3 * CUBEMAP_CUBE_SIZE;
+
+#if __APPLE__
+        static const uint32_t COLORSQUARE_SIZE = 128;
+#else
+        static const uint32_t COLORSQUARE_SIZE = 256;
+#endif
 
         RYGBToViewSpaceContext* _rygbToViewSpaceCtx; // points to painter's transform context TODO: make it better
 
@@ -189,8 +209,25 @@ class AppPainter : public App
 
         } _cubemapGenerateContext;
 
+        // render context to color square
+        struct {
+            vk::RenderPass renderPass = VK_NULL_HANDLE;
+
+            vk::PipelineLayout pipelineLayout = VK_NULL_HANDLE;
+            vk::Pipeline pipeline = VK_NULL_HANDLE;
+
+            vk::DescriptorPool descriptorPool = VK_NULL_HANDLE;
+            vk::DescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
+
+            vk::DescriptorSet descriptorSet = VK_NULL_HANDLE;
+
+            VQBuffer ubo = {};
+            uint32_t vshMaxSaturationLUTTextureHandle = 0;
+        } _colorSquareContext;
+
         // descriptor sets for transforming from rygb fb to imgui fb
         std::array<vk::DescriptorSet, NUM_FRAME_IN_FLIGHT> _rygbTransformDescriptorSets{};
+        std::array<vk::DescriptorSet, NUM_FRAME_IN_FLIGHT> _rygbTransformDescriptorSetsColorSquare{};
 
         struct CubemapGenerateUBO
         {
@@ -198,8 +235,20 @@ class AppPainter : public App
             float saturation;
         };
 
+        struct ColorSquareGenerationUBO
+        {
+            //(float)_colorPickerCursorPos.x / CUBEMAP_WIDTH,
+            //(float)_colorPickerCursorPos.y / CUBEMAP_HEIGHT
+            // uv picked from cubemap
+            float cubemap_u;
+            float cubemap_v;
+        };
+
         void initCubemapGenerateContext(TetriumApp::InitContext& ctx);
         void cleanupCubemapGenerateContext(TetriumApp::CleanupContext& ctx);
+
+        void initColorSquareGenerateContext(TetriumApp::InitContext& ctx);
+        void cleanupColorSquareGenerateContext(TetriumApp::CleanupContext& ctx);
 
         void initRYGBTransform(TetriumApp::InitContext& ctx);
 

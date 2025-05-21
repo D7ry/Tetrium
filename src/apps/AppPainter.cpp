@@ -174,11 +174,12 @@ void AppPainter::initPaintToViewSpaceContext(TetriumApp::InitContext& ctx)
     /* Descriptors */
     /* create descriptor pool */
     {
+        // here we up allocate, the whole descriptor pool thing is getting deprecated anyways lmao
         vk::DescriptorPoolSize poolSizes[]
-            = {{vk::DescriptorType::eUniformBuffer, NUM_FRAME_IN_FLIGHT * 2},
-               {vk::DescriptorType::eCombinedImageSampler, NUM_FRAME_IN_FLIGHT * 2}};
+            = {{vk::DescriptorType::eUniformBuffer, NUM_FRAME_IN_FLIGHT * 16},
+               {vk::DescriptorType::eCombinedImageSampler, NUM_FRAME_IN_FLIGHT * 16}};
 
-        vk::DescriptorPoolCreateInfo poolCreateInfo({}, NUM_FRAME_IN_FLIGHT * 4, 2, poolSizes);
+        vk::DescriptorPoolCreateInfo poolCreateInfo({}, NUM_FRAME_IN_FLIGHT * 16, 2, poolSizes);
 
         _paintToViewSpaceContext.descriptorPool = device.createDescriptorPool(poolCreateInfo);
     }
