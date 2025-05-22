@@ -852,7 +852,7 @@ void AppPainter::ColorPicker::Init(TetriumApp::InitContext& ctx, RYGBToViewSpace
     );
 
     ctx.device.CreateBufferInPlace(
-        sizeof(float) * 4 * CUBEMAP_HEIGHT * CUBEMAP_WIDTH,
+        sizeof(float) * 4 * COLORSQUARE_SIZE *COLORSQUARE_SIZE,
         VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
         _colorSquareRYGBTextureCPU

@@ -539,28 +539,30 @@ void AppPainter::ColorPicker::TickImGui(const TetriumApp::TickContextImGui& ctx)
 
     if (ImGui::BeginTable("RYGB Slider + preview", 2)) {
         ImGui::TableSetupColumn(
-            "color preview", ImGuiTableColumnFlags_WidthFixed, COLORSQUARE_SIZE + 10
+            "color preview", ImGuiTableColumnFlags_WidthFixed, COLORSQUARE_SIZE
         );
 
         ImGui::TableNextColumn();
 { // draw color square
         constexpr ImVec2 colorSquareSize{COLORSQUARE_SIZE, COLORSQUARE_SIZE};
-        imagePos = ImGui::GetItemRectMin();
-        constexpr ImVec2 size{COLORSQUARE_SIZE, COLORSQUARE_SIZE};
+        ImVec2 size{COLORSQUARE_SIZE, COLORSQUARE_SIZE};
         void* textureId = _colorSquareTextureViewSpace.GetImGuiTextureId();
         //textureId = _colorSquareTexture.GetImGuiTextureId();
         //float cubemap_u =(float)_colorPickerCursorPos.x / CUBEMAP_WIDTH;
         //float cubemap_v =(float)_colorPickerCursorPos.y / CUBEMAP_HEIGHT;
         //ImGui::Text("DEBUG: Cubemap UV: %f, %f", cubemap_u, cubemap_v);
+        //size = ImVec2{50, 50};
         ImGui::Image(textureId, size);
+
+        imagePos = ImGui::GetItemRectMin();
 
         if (ImGui::IsItemHovered()){
             ImVec2 mousePos = ImGui::GetMousePos();
             // Calculate the mouse position relative to the cubemap image
             ImVec2 relativePos = mousePos - imagePos;
 
-            relativePos.x = std::clamp(relativePos.x, 0.0f, colorSquareSize.x);
-            relativePos.y = std::clamp(relativePos.y, 0.0f, colorSquareSize.y);
+            //relativePos.x = std::clamp(relativePos.x, 0.0f, colorSquareSize.x);
+            //relativePos.y = std::clamp(relativePos.y, 0.0f, colorSquareSize.y);
             int x = relativePos.x;
             int y = relativePos.y;
 
@@ -598,6 +600,9 @@ void AppPainter::ColorPicker::TickImGui(const TetriumApp::TickContextImGui& ctx)
             ImGui::GetWindowDrawList()->AddCircle(
                 cursorPos, cursorSize, IM_COL32(255, 255, 255, 255), 0, 3.f
             );
+            ImGui::Text("%i, %i", _colorSquareCursorPos.x, _colorSquareCursorPos.y);
+
+            ImGui::Text("%i, %i", _colorSquareCursorPos.x, _colorSquareCursorPos.y);
         }
     }
 
