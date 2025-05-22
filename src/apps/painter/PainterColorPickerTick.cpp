@@ -592,6 +592,13 @@ void AppPainter::ColorPicker::TickImGui(const TetriumApp::TickContextImGui& ctx)
                 _colorSquareCursorPos = {x, y};
                 updatePickedColorColorSquare();
             }
+
+        }
+
+        bool xChanged = ImGui::SliderInt("Cursor X", &_colorSquareCursorPos.x, 0, COLORSQUARE_SIZE - 1);
+        bool yChanged = ImGui::SliderInt("Cursor Y", &_colorSquareCursorPos.y, 0, COLORSQUARE_SIZE - 1);
+        if (xChanged || yChanged) {
+            updatePickedColorColorSquare();
         }
 
         if (_colorSquareCursorPos.x >= 0 && _colorSquareCursorPos.y >= 0) {
@@ -600,9 +607,6 @@ void AppPainter::ColorPicker::TickImGui(const TetriumApp::TickContextImGui& ctx)
             ImGui::GetWindowDrawList()->AddCircle(
                 cursorPos, cursorSize, IM_COL32(255, 255, 255, 255), 0, 3.f
             );
-            ImGui::Text("%i, %i", _colorSquareCursorPos.x, _colorSquareCursorPos.y);
-
-            ImGui::Text("%i, %i", _colorSquareCursorPos.x, _colorSquareCursorPos.y);
         }
     }
 

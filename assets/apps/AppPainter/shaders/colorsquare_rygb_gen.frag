@@ -196,9 +196,9 @@ vec3 mapUVToBarycentric(vec2 uv) {
     return barycentric;
 }
 vec2 mapUVToTriangle(vec2 uv, vec2 C) {
-    uv[1] = pow(uv[1], 1.f/3.f);
+    //uv[1] = pow(uv[1], 1.f/3.f);
     vec3 bary = mapUVToBarycentric(uv);
-    return vec2(0, 0) * bary.z + vec2(0, 4) * bary.x + C * bary.y;
+    return vec2(0, 0) * bary.z + vec2(0, 2) * bary.x + C * bary.y;
 }
 
 void main() {
