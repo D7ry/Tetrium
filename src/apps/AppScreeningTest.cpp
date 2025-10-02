@@ -6,6 +6,7 @@
 #include "AppScreeningTest.h"
 
 #include <Pathing.h>
+#include <string>
 
 namespace
 {
@@ -30,8 +31,12 @@ namespace TetriumApp
 {
 
 // Ishihara plates numbers -- we pick from these to generate tests
-static const std::vector<int> ISHIHARA_PLATES_NUMBERS
-    = {27, 35, 39, 64, 67, 68, 72, 73, 85, 87, 89, 96};
+static const std::vector<int> ISHIHARA_PLATES_NUMBERS = [] {
+    std::vector<int> v;
+    for (int i = 10; i <= 99; ++i)
+        v.push_back(i);
+    return v;
+}();
 
 // Pick 4 random, non-repeating numbers from the ishihara plates
 static std::array<int, 4> PickRandomFourIshiharaPlates()
@@ -49,7 +54,7 @@ static std::array<int, 4> PickRandomFourIshiharaPlates()
 
 static std::string GetIshiharaPlateAnswerTexturePath(int plateNumber)
 {
-    return ASSETS_PATH + "textures/apps/AppScreeningTest/solutions/" + std::to_string(plateNumber)
+    return TETRIUM_COLOR_PATH + "TetriumColor/Assets/HiddenImages/" + std::to_string(plateNumber)
            + ".png";
 }
 
@@ -59,7 +64,7 @@ void TetriumApp::AppScreeningTest::TickImGui(const TetriumApp::TickContextImGui&
     ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
     auto flags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse
                  | ImGuiWindowFlags_NoResize;
-    ImGui::SetNextWindowBgAlpha(1);
+    ImGui::SetNextWindowBgAlpha(0);
     if (ImGui::Begin("PsydoIsochromatic Test", NULL, flags)) {
         switch (_state) {
         case TestState::kSettings: // draw both settings and idle
