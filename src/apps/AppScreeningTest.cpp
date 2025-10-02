@@ -509,6 +509,9 @@ void AppScreeningTest::populatePromptContext(
         _subject.prompt.currentAnswerTexture[i]
             = _answerPromptImGuiTextures[ishiharaPlateNumbers[i]];
     }
+
+    // Set the correct answer index
+    _subject.prompt.correctAnswerTextureIndex = answerPlateIndex;
 }
 
 void AppScreeningTest::Init(TetriumApp::InitContext& ctx)
