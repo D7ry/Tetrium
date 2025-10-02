@@ -1,6 +1,7 @@
 #pragma once
 
 #include "TetriumColor/PseudoIsochromaticPlateGenerator.h"
+#include "TetriumColor/ColorGenerator.h"
 
 #include "App.h"
 
@@ -117,6 +118,7 @@ class AppScreeningTest : public App
 
     std::string _nameInputBuffer = "tian";
 
+    TetriumColor::ColorGenerator* _colorGenerator = nullptr;
     TetriumColor::PseudoIsochromaticPlateGenerator* _plateGenerator = nullptr;
 
     void populatePromptContext(SubjectContext& subject, const TetriumApp::TickContextImGui& ctx);

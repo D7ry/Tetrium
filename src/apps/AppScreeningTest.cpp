@@ -33,7 +33,7 @@ namespace TetriumApp
 static const std::vector<int> ISHIHARA_PLATES_NUMBERS
     = {27, 35, 39, 64, 67, 68, 72, 73, 85, 87, 89, 96};
 
-// Pick 4 random, non-repeating numbesrs from the ishihara plates
+// Pick 4 random, non-repeating numbers from the ishihara plates
 static std::array<int, 4> PickRandomFourIshiharaPlates()
 {
     std::vector<int> numbers = ISHIHARA_PLATES_NUMBERS;
@@ -300,14 +300,14 @@ void AppScreeningTest::drawAnswerPrompts(
         if (ImGui::ImageButton(
                 buttonLabels[i], (void*)(intptr_t)tex.id, ImVec2(buttonSize, buttonSize)
             )) {
-            DEBUG("{} button clicked!", buttonLabels[i]);
+            printf("%s button clicked!\n", buttonLabels[i]);
             subject.prompt.currentSelectedAnswer = i;
             if (subject.prompt.currentSelectedAnswer == subject.prompt.correctAnswerTextureIndex) {
-                DEBUG("Correct answer!");
-                // NOTE: incrementin numSuccessAttempts is done in transitionSubjectState
+                printf("Correct answer!\n");
+                // NOTE: incrementing numSuccessAttempts is done in transitionSubjectState
                 ctx.apis.PlaySound(Sound::kCorrectAnswer);
             } else {
-                DEBUG("Wrong answer!");
+                printf("Wrong answer!\n");
                 ctx.apis.PlaySound(Sound::kWrongAnswer);
             }
             transitionSubjectState(subject, ctx);
@@ -360,15 +360,37 @@ void AppScreeningTest::transitionSubjectState(
 
 void AppScreeningTest::newGame(const TetriumApp::TickContextImGui& ctx)
 {
+    // Clean up old generators
     if (_plateGenerator) {
         delete _plateGenerator;
     }
-    _plateGenerator = new TetriumColor::PseudoIsochromaticPlateGenerator(
-        {"../extern/TetriumColor/TetriumColor/Assets/ColorSpaceTransforms/Neitz_530_559-RGBO"},
-        {"../extern/TetriumColor/TetriumColor/Assets/PreGeneratedMetamers/"
-         "Neitz_530_559-RGBO.pkl"},
-        8
+    if (_colorGenerator) {
+        delete _colorGenerator;
+    }
+
+    // Create color generator with the new interface
+    // Matching the Python snippet:
+    // primaries = load_primaries_from_csv("./measurements/2025-05-06/primaries")
+    // color_generator = GeneticCDFTestColorGenerator(
+    //     sex='female', percentage_screened=0.99, cst_display_type='led',
+    //     display_primaries=primaries, dimensions=[2])
+
+    std::vector<int> dimensions = {2};
+    _colorGenerator = new TetriumColor::ColorGenerator(
+        "female",   // sex
+        0.99f,      // percentage_screened
+        547.0f,     // peak_to_test (default from Python)
+        dimensions, // dimensions
+        "led",      // cst_display_type
+        "../extern/TetriumColor/measurements/2025-05-06/primaries" // display_primaries_path
     );
+
+    // Create plate generator with color generator
+    _plateGenerator = new TetriumColor::PseudoIsochromaticPlateGenerator(
+        *_colorGenerator,
+        42 // seed
+    );
+
     _subject = SubjectContext{
         .name = _nameInputBuffer,
         .currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.FIXATION,
@@ -384,7 +406,7 @@ void AppScreeningTest::endGame(SubjectContext& subject)
 {
     DEBUG("ending game for subject {}", subject.name);
     _state = TestState::kScreenResult;
-    // TODO: data colletion logic + clean up texture resources?
+    // TODO: data collection logic + clean up texture resources?
 }
 
 void AppScreeningTest::drawFixGazePage()
@@ -422,18 +444,28 @@ void AppScreeningTest::drawFixGazePage()
     ImGui::Text("Fix Gaze Onto Crosshair");
 }
 
-// FIXME: make each ishihara plate unique -- probably using time as filename??
+// Updated to use the new single-filename interface
 std::pair<std::string, std::string> AppScreeningTest::generateIshiharaTestTextures(
     SubjectContext& subject,
     int number
 )
 {
-    std::string rgbTexturePath
-        = "./temp/" + subject.name + "_" + std::to_string(number) + "_RGB.png";
-    std::string ocvTexturePath
-        = "./temp/" + subject.name + "_" + std::to_string(number) + "_OCV.png";
+    // The new interface generates both RGB and OCV versions with a single filename
+    // It will create: filename_0.png through filename_5.png (6P format)
+    // and filename_srgb.png
+    // Ensure the temp directory exists before using it
+    std::filesystem::create_directories("./temp");
+    std::string baseFilename = "./temp/" + subject.name + "_" + std::to_string(number);
 
-    _plateGenerator->NewPlate(rgbTexturePath, ocvTexturePath, number);
+    // Call NewPlate with DISP_6P output space
+    _plateGenerator->NewPlate(baseFilename, number, TetriumColor::ColorSpaceType::DISP_6P);
+
+    // Return paths - the 6P files will be at baseFilename_0.png ... baseFilename_5.png
+    // and sRGB at baseFilename_srgb.png
+    // For compatibility, we'll use the sRGB version for RGB and one of the 6P channels for OCV
+    std::string rgbTexturePath = baseFilename + "_RGB.png";
+    std::string ocvTexturePath = baseFilename + "_OCV.png"; // Use first channel of 6P
+
     return {rgbTexturePath, ocvTexturePath};
 }
 
@@ -489,12 +521,24 @@ void AppScreeningTest::Init(TetriumApp::InitContext& ctx)
     }
     // load bair logo
     // FIXME: free the logo texture when cleaning up
-    _textures.bairLogo = ctx.api.InitImGuiTexture(ctx.api.LoadTexture(ASSETS_PATH + "textures/BAIR_logo.png"));
+    _textures.bairLogo
+        = ctx.api.InitImGuiTexture(ctx.api.LoadTexture(ASSETS_PATH + "textures/BAIR_logo.png"));
 };
 
-void AppScreeningTest::Cleanup(TetriumApp::CleanupContext& ctx){
+void AppScreeningTest::Cleanup(TetriumApp::CleanupContext& ctx)
+{
     for (int ishiharaPlateNumber : ISHIHARA_PLATES_NUMBERS) {
         ctx.api.UnloadTexture(_answerPromptTextureHandles[ishiharaPlateNumber]);
+    }
+
+    // Clean up generators
+    if (_plateGenerator) {
+        delete _plateGenerator;
+        _plateGenerator = nullptr;
+    }
+    if (_colorGenerator) {
+        delete _colorGenerator;
+        _colorGenerator = nullptr;
     }
 };
 } // namespace TetriumApp
