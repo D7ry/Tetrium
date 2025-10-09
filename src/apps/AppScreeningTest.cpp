@@ -382,7 +382,7 @@ void AppScreeningTest::newGame(const TetriumApp::TickContextImGui& ctx)
         547.0f,     // peak_to_test (default from Python)
         dimensions, // dimensions
         "led",      // cst_display_type
-        "../extern/TetriumColor/measurements/2025-05-06/primaries" // display_primaries_path
+        "../../extern/TetriumColor/measurements/2025-05-06/primaries" // display_primaries_path
     );
 
     // Create plate generator with color generator
