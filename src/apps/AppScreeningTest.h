@@ -1,7 +1,7 @@
 #pragma once
 
-#include "TetriumColor/PseudoIsochromaticPlateGenerator.h"
 #include "TetriumColor/ColorGenerator.h"
+#include "TetriumColor/PseudoIsochromaticPlateGenerator.h"
 
 #include "App.h"
 
@@ -16,9 +16,17 @@ class AppScreeningTest : public App
     virtual void TickImGui(const TetriumApp::TickContextImGui& ctx) override;
 
   private:
+    enum class MusicSetting
+    {
+        ALL,
+        CORRECT_WRONG,
+        OFF
+    };
+
     struct
     {
         int NUM_ATTEMPTS = 3; // number of attempts one could try in a screening
+        MusicSetting MUSIC_SETTING = MusicSetting::CORRECT_WRONG;
 
         struct
         {

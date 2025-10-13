@@ -94,6 +94,14 @@ void TetriumApp::AppScreeningTest::drawSettingsWindow(const TetriumApp::TickCont
         ImGui::InputFloat("##Identification", &SETTINGS.STATE_DURATIONS_SECONDS.IDENTIFICATION);
         ImGui::Text("Duration of Answering (seconds)");
         ImGui::InputFloat("##Answering", &SETTINGS.STATE_DURATIONS_SECONDS.ANSWERING);
+
+        // Music setting dropdown
+        ImGui::Text("Music Setting");
+        const char* musicOptions[] = {"ALL", "CORRECT_WRONG", "OFF"};
+        int currentMusicSetting = static_cast<int>(SETTINGS.MUSIC_SETTING);
+        if (ImGui::Combo("##Music", &currentMusicSetting, musicOptions, 3)) {
+            SETTINGS.MUSIC_SETTING = static_cast<MusicSetting>(currentMusicSetting);
+        }
         if (ImGui::Button("Close")) {
             ImGui::CloseCurrentPopup();
             _state = TestState::kIdle;
@@ -104,7 +112,11 @@ void TetriumApp::AppScreeningTest::drawSettingsWindow(const TetriumApp::TickCont
 
 void TetriumApp::AppScreeningTest::drawIdle(const TetriumApp::TickContextImGui& ctx)
 {
-    ctx.controls.musicOverride = Sound::kMusicGameMenu;
+    if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL) {
+        ctx.controls.musicOverride = Sound::kMusicGameMenu;
+    } else {
+        ctx.controls.musicOverride = std::nullopt;
+    }
     const float buttonSpacing = 20.0f;
 
     // Set the button size
@@ -169,7 +181,9 @@ void TetriumApp::AppScreeningTest::drawIdle(const TetriumApp::TickContextImGui& 
     elemPos = elemPos + ImVec2(0, buttonSize.y + buttonSpacing);
     ImGui::SetCursorPos(elemPos);
     if (ImGui::Button("Exit", buttonSize)) {
-        ctx.apis.PlaySound(Sound::kVineBoom);
+        if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL) {
+            ctx.apis.PlaySound(Sound::kVineBoom);
+        }
         ctx.controls.wantExit = true;
     }
 
@@ -185,7 +199,9 @@ void AppScreeningTest::drawIshihara(
         = subject.prompt.currentIshiharaPlateTexture[ctx.colorSpace]; // RGB is the default
 
     ImVec2 availSize = ImGui::GetContentRegionAvail();
-    ImVec2 textureFullscreenSize = calculateFitSize(tex.width, tex.height, availSize);
+    // ImVec2 textureFullscreenSize = calculateFitSize(tex.width, tex.height, availSize);
+    // need to scale this such that the stimuli is 2 degrees when we look at in on windows
+    ImVec2 textureFullscreenSize = ImVec2(tex.width * 0.25f, tex.height * 0.25f);
 
     // center the texture onto the screen
     ImVec2 centerPos = ImVec2(availSize.x * 0.5f, availSize.y * 0.5f);
@@ -199,7 +215,11 @@ void AppScreeningTest::drawTestForSubject(
     const TetriumApp::TickContextImGui& ctx
 )
 {
-    ctx.controls.musicOverride = Sound::kMusicGamePlay;
+    if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL) {
+        ctx.controls.musicOverride = Sound::kMusicGamePlay;
+    } else {
+        ctx.controls.musicOverride = std::nullopt;
+    }
     // handle state transition
     subject.currStateRemainderTime -= ImGui::GetIO().DeltaTime;
     if (subject.currStateRemainderTime <= 0) {
@@ -266,7 +286,9 @@ void AppScreeningTest::drawSubjectResult(
     ImVec2 buttonPos = ImVec2((boxSize.x - buttonSize.x) * 0.5f, textPos.y + 20);
     ImGui::SetCursorPos(buttonPos);
     if (ImGui::Button("Okay", buttonSize)) {
-        ctx.apis.PlaySound(Sound::kVineBoom);
+        if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL) {
+            ctx.apis.PlaySound(Sound::kVineBoom);
+        }
         _state = TestState::kIdle;
     }
 
@@ -302,6 +324,12 @@ void AppScreeningTest::drawAnswerPrompts(
 
         ImGui::SetCursorPos(ImVec2(positions[i].x - buttonSize / 2, positions[i].y - buttonSize / 2)
         );
+
+        // Set button background to black to match the overall background
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.0f, 0.0f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
+
         if (ImGui::ImageButton(
                 buttonLabels[i], (void*)(intptr_t)tex.id, ImVec2(buttonSize, buttonSize)
             )) {
@@ -310,16 +338,27 @@ void AppScreeningTest::drawAnswerPrompts(
             if (subject.prompt.currentSelectedAnswer == subject.prompt.correctAnswerTextureIndex) {
                 printf("Correct answer!\n");
                 // NOTE: incrementing numSuccessAttempts is done in transitionSubjectState
-                ctx.apis.PlaySound(Sound::kCorrectAnswer);
+                if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL
+                    || SETTINGS.MUSIC_SETTING == MusicSetting::CORRECT_WRONG) {
+                    ctx.apis.PlaySound(Sound::kCorrectAnswer);
+                }
             } else {
                 printf("Wrong answer!\n");
-                ctx.apis.PlaySound(Sound::kWrongAnswer);
+                if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL
+                    || SETTINGS.MUSIC_SETTING == MusicSetting::CORRECT_WRONG) {
+                    ctx.apis.PlaySound(Sound::kWrongAnswer);
+                }
             }
             transitionSubjectState(subject, ctx);
         }
 
+        // Pop the button style colors
+        ImGui::PopStyleColor(3);
+
         // Add button label
-        ImVec2 textPos = ImVec2(positions[i].x - 10, positions[i].y + buttonSize / 2 + 5);
+        ImVec2 textSize = ImGui::CalcTextSize(buttonLabels[i]);
+        ImVec2 textPos
+            = ImVec2(positions[i].x - textSize.x * 0.5f + 3, positions[i].y + buttonSize / 2 + 10);
         ImGui::SetCursorPos(textPos);
         ImGui::Text("%s", buttonLabels[i]);
     }
@@ -383,7 +422,7 @@ void AppScreeningTest::newGame(const TetriumApp::TickContextImGui& ctx)
     std::vector<int> dimensions = {2};
     _colorGenerator = new TetriumColor::ColorGenerator(
         "female",   // sex
-        0.99f,      // percentage_screened
+        0.999f,     // percentage_screened
         547.0f,     // peak_to_test (default from Python)
         dimensions, // dimensions
         "led",      // cst_display_type
@@ -548,5 +587,5 @@ void AppScreeningTest::Cleanup(TetriumApp::CleanupContext& ctx)
         delete _colorGenerator;
         _colorGenerator = nullptr;
     }
-};
+}
 } // namespace TetriumApp
