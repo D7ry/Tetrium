@@ -148,8 +148,8 @@ void TetriumApp::AppScreeningTest::drawIdle(const TetriumApp::TickContextImGui& 
 
     // Set the cursor position for the button
     ImGui::SetCursorPos(elemPos);
-    ImGui::Text("Name:");
-    elemPos = elemPos + ImVec2(0, 40);
+    ImGui::Text("Subject ID:");
+    elemPos = elemPos + ImVec2(10, 50);
     ImGui::SetCursorPos(elemPos);
 
     // Set the width of the input text box to be the same as the button
