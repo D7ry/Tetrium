@@ -422,11 +422,11 @@ void AppScreeningTest::newGame(const TetriumApp::TickContextImGui& ctx)
     std::vector<int> dimensions = {2};
     _colorGenerator = new TetriumColor::ColorGenerator(
         "female",   // sex
-        0.999f,     // percentage_screened
+        0.999f,      // percentage_screened
         547.0f,     // peak_to_test (default from Python)
         dimensions, // dimensions
         "led",      // cst_display_type
-        "../extern/TetriumColor/measurements/2025-05-06/primaries" // display_primaries_path
+        "../../extern/TetriumColor/measurements/2025-10-12/primaries" // display_primaries_path
     );
 
     // Create plate generator with color generator
@@ -502,7 +502,7 @@ std::pair<std::string, std::string> AppScreeningTest::generateIshiharaTestTextur
     std::string baseFilename = "./temp/" + subject.name + "_" + std::to_string(number);
 
     // Call NewPlate with DISP_6P output space
-    _plateGenerator->NewPlate(baseFilename, number, TetriumColor::ColorSpaceType::DISP_6P);
+    _plateGenerator->NewPlate(baseFilename, number, TetriumColor::ColorSpaceType::DISP_6P, 0.005, 0.01);
 
     // Return paths - the 6P files will be at baseFilename_0.png ... baseFilename_5.png
     // and sRGB at baseFilename_srgb.png
