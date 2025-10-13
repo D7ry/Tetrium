@@ -36,7 +36,7 @@ int main(int argc, char** argv)
         {new TetriumApp::AppAutoMeasure(), "Measure"},
     };
 
-    Tetrium::InitOptions options{.tetraMode = Tetrium::TetraMode::kEvenOddSoftwareSync};
+    Tetrium::InitOptions options{.tetraMode = Tetrium::TetraMode::kEvenOddHardwareSync};
     Tetrium* engine = new Tetrium();
 
     for (auto& [app, appName] : apps) {
