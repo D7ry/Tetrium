@@ -1,6 +1,8 @@
+
 build/
 release/
 .cache/
 .DS_Store
 .vs/
 vcpkg_installed/
+assets/apps/AppImageViewer/tetra_images/*
