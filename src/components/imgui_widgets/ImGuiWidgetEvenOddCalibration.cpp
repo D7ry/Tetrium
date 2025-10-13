@@ -246,7 +246,7 @@ void ImGuiWidgetEvenOddCalibration::Draw(Tetrium* engine, ColorSpace colorSpace)
         }
     }
 
-    if (false) { // draw RGO and BGO gradients
+    if (true) { // draw RGO and BGO gradients
         ImDrawList* dl = ImGui::GetWindowDrawList();
 
         ImVec2 availableSize = ImGui::GetContentRegionAvail();
