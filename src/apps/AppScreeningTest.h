@@ -25,14 +25,14 @@ class AppScreeningTest : public App
 
     struct
     {
-        int NUM_ATTEMPTS = 3; // number of attempts one could try in a screening
+        int NUM_ATTEMPTS = 8; // number of attempts one could try in a screening
         MusicSetting MUSIC_SETTING = MusicSetting::CORRECT_WRONG;
 
         struct
         {
-            float FIXATION = 1;
+            float FIXATION = 3;
             float IDENTIFICATION = 1;
-            float ANSWERING = 5;
+            float ANSWERING = 3;
         } STATE_DURATIONS_SECONDS;
     } SETTINGS;
 

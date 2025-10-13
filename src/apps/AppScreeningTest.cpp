@@ -135,7 +135,7 @@ void TetriumApp::AppScreeningTest::drawIdle(const TetriumApp::TickContextImGui& 
     ImVec2 logoSize = calculateFitSize(tex.width, tex.height, availSize);
     logoSize = logoSize * 0.75f;
 
-    ImVec2 elemPos((availSize.x - logoSize.x) * 0.5f + 25, -25);
+    ImVec2 elemPos((availSize.x - logoSize.x) * 0.5f + 25, logoSize.y/2 - 50);
     // draw the title logo
     ImGui::SetCursorPos(elemPos);
     ImGui::Image(tex.id, logoSize);
