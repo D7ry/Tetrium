@@ -27,6 +27,49 @@ std::string getCurrentTimeForFileName()
     return ss.str();
 }
 
+static struct
+{
+    // jessica, shove in the stuff here, in {r, y, g, b} format
+    const std::vector<glm::ivec4>
+        PRIMARIES{
+        // PRIMARIES
+         {{255, 0, 0, 0}, 
+         {0, 255, 0, 0},
+        {0, 0, 255, 0},
+        {0, 0, 0, 255}}
+        // TEST VALUES
+        //{{38, 78, 45, 255}, {152, 116, 42, 103}}
+        // CUBEMAP
+      /*  {{54, 91, 89, 255},  {255, 129, 85, 109}, {41, 109, 84, 255}, {255, 150, 80, 100},
+         {18, 129, 83, 255}, {255, 174, 78, 83},  {0, 148, 86, 247},  {255, 196, 81, 63},
+         {0, 164, 92, 228},  {255, 212, 86, 43},  {44, 79, 110, 255}, {255, 119, 106, 102},
+         {30, 98, 108, 255}, {255, 141, 103, 92}, {3, 121, 108, 255}, {255, 169, 102, 73},
+         {0, 147, 110, 233}, {255, 195, 104, 48}, {0, 164, 113, 212}, {255, 212, 108, 28},
+         {25, 66, 137, 255}, {255, 109, 132, 89}, {8, 84, 139, 255},  {255, 130, 134, 76},
+         {0, 112, 141, 238}, {255, 160, 136, 54}, {0, 140, 141, 214}, {255, 188, 135, 29},
+         {0, 159, 139, 195}, {255, 207, 134, 10}, {0, 55, 163, 255},  {255, 104, 158, 70},
+         {0, 75, 169, 239},  {255, 123, 164, 54}, {0, 102, 173, 217}, {255, 150, 167, 32},
+         {0, 129, 171, 195}, {255, 177, 165, 11}, {0, 149, 165, 180}, {249, 196, 160, 0},
+         {0, 54, 183, 236},  {255, 102, 177, 52}, {0, 71, 190, 220},  {255, 119, 184, 35},
+         {0, 94, 193, 200},  {255, 142, 188, 16}, {0, 118, 191, 183}, {252, 165, 186, 0},
+         {0, 137, 184, 170}, {235, 181, 179, 0}}*/
+       /* {{0, 148, 86, 247},
+         {255, 196, 81, 63},
+         {255, 212, 86, 43},
+         {255, 130, 134, 76},
+         {0, 54, 183, 236},
+         {0, 102, 173, 217},
+         {255, 150, 167, 32},
+         {0, 129, 171, 195},
+         {0, 54, 183, 236}}*/
+             };
+    int currPrimaryIndex = 0;
+
+    std::string rgboValuesString;
+    std::string measuringString;
+} measureContext;
+
+
 void appendToFile(const std::string file_path, const std::string text_to_append)
 {
     std::thread([file_path, text_to_append]() {
@@ -62,7 +105,6 @@ void AppAutoMeasure::Cleanup(TetriumApp::CleanupContext& ctx) {
 };
 
 void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx) {
-    static glm::ivec4 rgbo = {255, 0, 0, 255};
 
     ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0, 0, 0, 1));
     ImGuiWindowFlags flags = 0;
@@ -89,6 +131,7 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx) {
         }
     }
 
+    glm::ivec4 RGBO = measureContext.PRIMARIES[measureContext.currPrimaryIndex];
     if (IPR650->isConnected()) {
         if (!pr650States.measuring) {
             // if not measuring, prompt user to start measuring
@@ -100,9 +143,11 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx) {
                 pr650States.measuring = true;
             }
         } else {
+            measureContext.measuringString = "Measuring" + std::to_string(measureContext.currPrimaryIndex + 1)
+                              + '/' + std::to_string(measureContext.PRIMARIES.size());
+            ImGui::Button(measureContext.measuringString.data());
             // query pr650 to see if data is ready
             if (IPR650->MeasureResult.ready) {
-                pr650States.measuring = false;
                 // read back pr650 states
                 INFO("PR650 results:");
                 auto& result = IPR650->MeasureResult;
@@ -122,26 +167,43 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx) {
                 // write results to ffile
                 std::stringstream fileName;
                 fileName << 
-                    'r' << rgbo.x << 
-                    'g' << rgbo.y << 
-                    'b' << rgbo.z <<
-                    'o' << rgbo.w << 
+                    'r' << RGBO.x << 
+                    'g' << RGBO.y << 
+                    'b' << RGBO.z <<
+                    'o' << RGBO.w << 
                     ".csv";
                 appendToFile(fileName.str(), resultStr.str());
+                
+                // measure next primary
+                measureContext.currPrimaryIndex++;
+                // done measuring
+                if (measureContext.currPrimaryIndex == measureContext.PRIMARIES.size()) {
+                    pr650States.measuring = false;
+                    measureContext.currPrimaryIndex = 0;
+                } else {
+                    // update internal states to proceed to measure next
+                    std::thread t([]() { IPR650->StartMeasuring(); });
+                    t.detach();
+                }
             }
-            ImGui::Text("PR650 measuring");
         }
     }
     constexpr std::array<const char*, 4> labels = {
         "r", "g", "b", "o"
     };
-
+    measureContext.rgboValuesString = "RGBO: ";
     for (int i = 0; i < 4; i++) {
-        const char* label = labels.at(i);
-        ImGui::SliderInt(label, &rgbo[i], 0, 255);
+        measureContext.rgboValuesString += std::to_string(RGBO[i]);
+        measureContext.rgboValuesString += ' ';
     }
+    ImGui::Text(measureContext.rgboValuesString.data());
+
+    //for (int i = 0; i < 4; i++) {
+    //    const char* label = labels.at(i);
+    //    ImGui::SliderInt(label, &RGBO[i], 0, 255);
+    //}
     
-    drawColorBlock(ctx, rgbo);
+    drawColorBlock(ctx, RGBO);
     ImGui::End();
     ImGui::PopStyleColor();
 }

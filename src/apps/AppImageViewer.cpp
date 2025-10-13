@@ -47,8 +47,12 @@ void AppImageViewer::TickImGui(const TetriumApp::TickContextImGui& ctx)
 {
     ColorSpace colorSpace = ctx.colorSpace;
     pollControls();
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0, 0, 0, 1));
-    ImGuiWindowFlags flags = 0;
+    ImVec4 background = ImVec4(0, 0, 0, 1);
+    //ImVec4 background = colorSpace == RGB ? ImVec4(114.0f/255.0f, 169.0f/255.0f, 191.0f/255.0f, 1) 
+      //                      : ImVec4(96.0f/255.0f, 169.0f/255.0f, 191.0f/255.0f, 1);
+    //INFO("background: {}, {}, {}, {}", background.x, background.y, background.z, background.w);
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, background);
+    ImGuiWindowFlags flags = 0; 
     ImGui::SetNextWindowPos(ImVec2(0, 0));
     ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
     flags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse
