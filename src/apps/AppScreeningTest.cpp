@@ -130,10 +130,12 @@ void TetriumApp::AppScreeningTest::drawIdle(const TetriumApp::TickContextImGui& 
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(10, 5));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(10, 10));
 
-    ImGuiTexture& tex = _textures.bairLogo;
-    ImVec2 logoSize = ImVec2{(float)tex.width, (float)tex.height};
+    ImVec2 availSize = ImGui::GetContentRegionAvail();
+    ImGuiTexture& tex = _textures.chromalabLogo;
+    ImVec2 logoSize = calculateFitSize(tex.width, tex.height, availSize);
+    logoSize = logoSize * 0.75f;
 
-    ImVec2 elemPos((screenSize.x - logoSize.x) * 0.5f, (screenSize.y - logoSize.y) * 0.5f - 300);
+    ImVec2 elemPos((availSize.x - logoSize.x) * 0.5f + 25, -25);
     // draw the title logo
     ImGui::SetCursorPos(elemPos);
     ImGui::Image(tex.id, logoSize);
@@ -422,7 +424,7 @@ void AppScreeningTest::newGame(const TetriumApp::TickContextImGui& ctx)
     std::vector<int> dimensions = {2};
     _colorGenerator = new TetriumColor::ColorGenerator(
         "female",   // sex
-        0.999f,      // percentage_screened
+        0.999f,     // percentage_screened
         547.0f,     // peak_to_test (default from Python)
         dimensions, // dimensions
         "led",      // cst_display_type
@@ -502,7 +504,9 @@ std::pair<std::string, std::string> AppScreeningTest::generateIshiharaTestTextur
     std::string baseFilename = "./temp/" + subject.name + "_" + std::to_string(number);
 
     // Call NewPlate with DISP_6P output space
-    _plateGenerator->NewPlate(baseFilename, number, TetriumColor::ColorSpaceType::DISP_6P, 0.005, 0.01);
+    _plateGenerator->NewPlate(
+        baseFilename, number, TetriumColor::ColorSpaceType::DISP_6P, 0.005, 0.01
+    );
 
     // Return paths - the 6P files will be at baseFilename_0.png ... baseFilename_5.png
     // and sRGB at baseFilename_srgb.png
@@ -568,8 +572,9 @@ void AppScreeningTest::Init(TetriumApp::InitContext& ctx)
     }
     // load bair logo
     // FIXME: free the logo texture when cleaning up
-    _textures.bairLogo
-        = ctx.api.InitImGuiTexture(ctx.api.LoadTexture(ASSETS_PATH + "textures/BAIR_logo.png"));
+    _textures.chromalabLogo
+        = ctx.api.InitImGuiTexture(ctx.api.LoadTexture(ASSETS_PATH + "textures/chromalab-logo.png")
+        );
 };
 
 void AppScreeningTest::Cleanup(TetriumApp::CleanupContext& ctx)

@@ -88,7 +88,7 @@ class AppScreeningTest : public App
   private:
     struct
     {
-        ImGuiTexture bairLogo;
+        ImGuiTexture chromalabLogo;
 
     } _textures;
 
@@ -124,7 +124,7 @@ class AppScreeningTest : public App
         int number
     );
 
-    std::string _nameInputBuffer = "tian";
+    std::string _nameInputBuffer = "guest";
 
     TetriumColor::ColorGenerator* _colorGenerator = nullptr;
     TetriumColor::PseudoIsochromaticPlateGenerator* _plateGenerator = nullptr;
