@@ -826,7 +826,7 @@ void AppPainter::ColorPicker::Init(TetriumApp::InitContext& ctx, RYGBToViewSpace
         _rygbToViewSpaceCtx->renderPass, // TODO: put RYGBTOviewspaceContext to a separate file
         CUBEMAP_WIDTH,
         CUBEMAP_HEIGHT,
-        VK_FORMAT_R8G8B8A8_SRGB, // RGB / OCV color space
+        VK_FORMAT_R8G8B8A8_UNORM, // RGB / OCV color space
         ctx.device.depthFormat,
         true
     );
@@ -837,7 +837,7 @@ void AppPainter::ColorPicker::Init(TetriumApp::InitContext& ctx, RYGBToViewSpace
         _rygbToViewSpaceCtx->renderPass, // TODO: put RYGBTOviewspaceContext to a separate file
         COLORSQUARE_SIZE,
         COLORSQUARE_SIZE,
-        VK_FORMAT_R8G8B8A8_SRGB, // RGB / OCV color space
+        VK_FORMAT_R8G8B8A8_UNORM, // RGB / OCV color space
         ctx.device.depthFormat,
         true
     );

@@ -505,7 +505,7 @@ std::pair<std::string, std::string> AppScreeningTest::generateIshiharaTestTextur
 
     // Call NewPlate with DISP_6P output space
     _plateGenerator->NewPlate(
-        baseFilename, number, TetriumColor::ColorSpaceType::DISP_6P, 0.005, 0.01
+        baseFilename, number, TetriumColor::ColorSpaceType::DISP_6P, 0.00, 0.1
     );
 
     // Return paths - the 6P files will be at baseFilename_0.png ... baseFilename_5.png
