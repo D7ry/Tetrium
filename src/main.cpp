@@ -2,11 +2,11 @@
 
 #include "Tetrium.h"
 
+#include "apps/AppAutoMeasure.h"
 #include "apps/AppImageViewer.h"
 #include "apps/AppPainter.h"
 #include "apps/AppScreeningTest.h"
 #include "apps/AppTetraHueSphere.h"
-#include "apps/AppAutoMeasure.h"
 
 static void printGreetingBanner()
 {
@@ -36,7 +36,14 @@ int main(int argc, char** argv)
         {new TetriumApp::AppAutoMeasure(), "Measure"},
     };
 
-    Tetrium::InitOptions options{.tetraMode = Tetrium::TetraMode::kEvenOddHardwareSync};
+#if defined(__APPLE__)
+    Tetrium::InitOptions options{.tetraMode = Tetrium::TetraMode::kEvenOddSoftwareSync};
+#elif defined(_WIN32)
+    Tetrium::InitOptions options{.tetraMode = Tetrium::TetraMode::kHardwareSync};
+#else
+    Tetrium::InitOptions options{
+        .tetraMode = Tetrium::TetraMode::kEvenOddHardwareSync}; // default or fallback
+#endif
     Tetrium* engine = new Tetrium();
 
     for (auto& [app, appName] : apps) {

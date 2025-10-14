@@ -29,7 +29,12 @@ void Tetrium::Run()
 }
 
 // mono color space for testing purposes, this avoids burning the monitor
+#if defined(__APPLE__)
+#define MONO_COLOR_SPACE 1
+#else
 #define MONO_COLOR_SPACE 0
+#endif
+
 void Tetrium::Tick()
 {
     if (_paused) {
@@ -105,7 +110,7 @@ void Tetrium::pollInputs()
         _rocvPresentMode = (ROCVPresentMode)(((int)_rocvPresentMode + 1) % 3);
     }
     if (ImGui::IsKeyPressed(ImGuiKey_Comma)) {
-        _flipEvenOdd = !_flipEvenOdd; 
+        _flipEvenOdd = !_flipEvenOdd;
     }
 }
 
@@ -148,18 +153,18 @@ void Tetrium::drawFrame(ColorSpace colorSpace, uint8_t frameIdx)
     SyncPrimitives& sync = _syncProjector[frameIdx];
     VkResult result;
     uint32_t swapchainImageIndex = 0;
-    
+
     { // wait for the rendering resources
 #if defined(WIN32)
-        // when using DXGI swapchain, backbuffer rendering resources are always ready at this point;
-        // because we block on them right before presenting
+      // when using DXGI swapchain, backbuffer rendering resources are always ready at this point;
+      // because we block on them right before presenting
 #else
-        // when using Vulkan swapchain, we can be simultaneously rendering to multiple backbuffers.
+      // when using Vulkan swapchain, we can be simultaneously rendering to multiple backbuffers.
         blockOnBackbufferRenderingFence(frameIdx);
         resetBackbufferRenderingFence(frameIdx);
 #endif
     }
-    
+
     { // acquire image from swap chain
 #if defined(WIN32)
         swapchainImageIndex = _swapChain.chainDXGI->m_pSwapChain->GetCurrentBackBufferIndex();
@@ -230,15 +235,18 @@ void Tetrium::drawFrame(ColorSpace colorSpace, uint8_t frameIdx)
                 blitRegion.srcSubresource.layerCount = 1;
 
                 blitRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-                blitRegion.dstSubresource.mipLevel = 0; // Use the base level of the destination image
+                blitRegion.dstSubresource.mipLevel
+                    = 0; // Use the base level of the destination image
                 blitRegion.dstSubresource.baseArrayLayer = 0;
                 blitRegion.dstSubresource.layerCount = 1;
 
-                blitRegion.srcOffsets[0] = { 0, 0, 0 }; // Top-left corner of the source image
-                blitRegion.srcOffsets[1] = { srcWidth, srcHeight, 1 }; // Bottom-right corner of the source image
+                blitRegion.srcOffsets[0] = {0, 0, 0}; // Top-left corner of the source image
+                blitRegion.srcOffsets[1]
+                    = {srcWidth, srcHeight, 1}; // Bottom-right corner of the source image
 
-                blitRegion.dstOffsets[0] = { 0, 0, 0 }; // Top-left corner of the destination image
-                blitRegion.dstOffsets[1] = { dstWidth, dstHeight, 1 }; // Bottom-right corner of the destination image
+                blitRegion.dstOffsets[0] = {0, 0, 0}; // Top-left corner of the destination image
+                blitRegion.dstOffsets[1]
+                    = {dstWidth, dstHeight, 1}; // Bottom-right corner of the destination image
 
                 vkCmdBlitImage(
                     engineCB,
