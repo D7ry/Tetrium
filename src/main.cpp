@@ -5,6 +5,7 @@
 #include "apps/AppAutoMeasure.h"
 #include "apps/AppImageViewer.h"
 #include "apps/AppPainter.h"
+#include "apps/AppScrambledFaceTest.h"
 #include "apps/AppScreeningTest.h"
 #include "apps/AppTetraHueSphere.h"
 
@@ -30,6 +31,7 @@ int main(int argc, char** argv)
 
     std::vector<std::pair<TetriumApp::App*, const char*>> apps = {
         {new TetriumApp::AppScreeningTest(), "Screening Test"},
+        {new TetriumApp::AppScrambledFaceTest(), "Scrambled Face Test"},
         {new TetriumApp::AppTetraHueSphere(), "Tetra Hue Sphere"},
         {new TetriumApp::AppImageViewer(), "Image Viewer"},
         {new TetriumApp::AppPainter(), "Painter"},

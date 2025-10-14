@@ -48,6 +48,7 @@ set(SOURCES_BUILD
 
         # Apps
         src/apps/AppScreeningTest.cpp
+        src/apps/AppScrambledFaceTest.cpp
         src/apps/AppTetraHueSphere.cpp
         src/apps/AppImageViewer.cpp
         src/apps/AppPainter.cpp
