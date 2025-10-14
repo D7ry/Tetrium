@@ -194,7 +194,6 @@ uint32_t TextureManager::LoadCubemapTexture(const std::string& imagePath)
     vkAllocateMemory(_device->logicalDevice, &allocInfo, nullptr, &cubemapImageMemory);
     vkBindImageMemory(_device->logicalDevice, cubemapImage, cubemapImageMemory, 0);
 
-
     // Transition image layout and copy data
     for (int i = 0; i < 6; i++) {
         transitionImageLayout(
@@ -332,7 +331,7 @@ uint32_t TextureManager::LoadTexture(const std::string& texturePath)
     VulkanUtils::createImage(
         width,
         height,
-        VK_FORMAT_B8G8R8A8_UNORM,
+        VK_FORMAT_R8G8B8A8_UNORM,
         VK_IMAGE_TILING_OPTIMAL,
         VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
@@ -344,7 +343,7 @@ uint32_t TextureManager::LoadTexture(const std::string& texturePath)
 
     transitionImageLayout(
         textureImage,
-        VK_FORMAT_B8G8R8A8_UNORM,
+        VK_FORMAT_R8G8B8A8_UNORM,
         VK_IMAGE_LAYOUT_UNDEFINED,
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
     );
@@ -356,12 +355,14 @@ uint32_t TextureManager::LoadTexture(const std::string& texturePath)
     );
     transitionImageLayout(
         textureImage,
-        VK_FORMAT_B8G8R8A8_UNORM,
+        VK_FORMAT_R8G8B8A8_UNORM,
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
     );
 
-    textureImageView = VulkanUtils::createImageView(textureImage, _device->logicalDevice);
+    textureImageView = VulkanUtils::createImageView(
+        textureImage, _device->logicalDevice, VK_FORMAT_R8G8B8A8_UNORM
+    );
 
     VkSamplerCreateInfo samplerInfo{};
     samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
