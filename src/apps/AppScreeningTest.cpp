@@ -65,7 +65,7 @@ void TetriumApp::AppScreeningTest::TickImGui(const TetriumApp::TickContextImGui&
     auto flags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse
                  | ImGuiWindowFlags_NoResize;
     ImGui::SetNextWindowBgAlpha(0);
-    if (ImGui::Begin("PsydoIsochromatic Test", NULL, flags)) {
+    if (ImGui::Begin("PsuedoIsochromatic Test", NULL, flags)) {
         switch (_state) {
         case TestState::kSettings: // draw both settings and idle
             drawSettingsWindow(ctx);
@@ -135,7 +135,7 @@ void TetriumApp::AppScreeningTest::drawIdle(const TetriumApp::TickContextImGui& 
     ImVec2 logoSize = calculateFitSize(tex.width, tex.height, availSize);
     logoSize = logoSize * 0.75f;
 
-    ImVec2 elemPos((availSize.x - logoSize.x) * 0.5f + 25, logoSize.y/2 - 50);
+    ImVec2 elemPos((availSize.x - logoSize.x) * 0.5f + 25, logoSize.y / 2 - 50);
     // draw the title logo
     ImGui::SetCursorPos(elemPos);
     ImGui::Image(tex.id, logoSize);
@@ -226,6 +226,10 @@ void AppScreeningTest::drawTestForSubject(
     subject.currStateRemainderTime -= ImGui::GetIO().DeltaTime;
     if (subject.currStateRemainderTime <= 0) {
         transitionSubjectState(subject, ctx);
+        // If the game just ended, we switched out of screening; stop drawing this frame
+        if (_state != TestState::kScreening) {
+            return;
+        }
     }
     ASSERT(subject.currStateRemainderTime > 0);
 
@@ -392,11 +396,13 @@ void AppScreeningTest::transitionSubjectState(
         if (subject.prompt.currentSelectedAnswer == subject.prompt.correctAnswerTextureIndex) {
             subject.numSuccessAttempts += 1;
         }
-        // end subject
-        if (subject.currentAttempt == SETTINGS.NUM_ATTEMPTS - 1) {
+        // If we've reached the last attempt, end game and stop further transitions/prompts
+        if (subject.currentAttempt >= (SETTINGS.NUM_ATTEMPTS - 1)) {
             endGame(subject);
+            return;
         }
-        subject.currentAttempt += 1; // to next attempt
+        // Otherwise advance to next attempt
+        subject.currentAttempt += 1;
         subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.FIXATION;
         subject.state = SubjectState::kFixation;
         populatePromptContext(subject, ctx);
@@ -428,7 +434,7 @@ void AppScreeningTest::newGame(const TetriumApp::TickContextImGui& ctx)
         547.0f,     // peak_to_test (default from Python)
         dimensions, // dimensions
         "led",      // cst_display_type
-        "../../extern/TetriumColor/measurements/2025-10-12/primaries" // display_primaries_path
+        TETRIUM_COLOR_PATH + "measurements/2025-10-12/primaries" // display_primaries_path
     );
 
     // Create plate generator with color generator
@@ -436,6 +442,10 @@ void AppScreeningTest::newGame(const TetriumApp::TickContextImGui& ctx)
         *_colorGenerator,
         42 // seed
     );
+    SETTINGS.NUM_ATTEMPTS = _colorGenerator->GetNumSamples();
+
+    INFO("Number of attempts: {}", SETTINGS.NUM_ATTEMPTS);
+    INFO("Number of samples: {}", _colorGenerator->GetNumSamples());
 
     _subject = SubjectContext{
         .name = _nameInputBuffer,
@@ -443,6 +453,8 @@ void AppScreeningTest::newGame(const TetriumApp::TickContextImGui& ctx)
         .state = SubjectState::kFixation,
         .currentAttempt = 0,
         .numSuccessAttempts = 0,
+        .pyObject
+        = nullptr, // Explicitly initialize to null to prevent carrying over old Python data
     };
     populatePromptContext(_subject, ctx);
     _state = TestState::kScreening;
