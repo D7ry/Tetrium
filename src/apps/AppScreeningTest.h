@@ -27,11 +27,15 @@ class AppScreeningTest : public App
     {
         int NUM_ATTEMPTS = 8; // number of attempts one could try in a screening
         MusicSetting MUSIC_SETTING = MusicSetting::CORRECT_WRONG;
+        float LUM_NOISE = 0.0f;      // luminance noise [0.0, 1.0]
+        float S_CONE_NOISE = 0.1f;   // s-cone noise [0.0, 1.0]
+        float STIMULUS_SIZE = 0.25f; // stimulus texture size multiplier [0.0, 1.0]
 
         struct
         {
+            float BLANK = 1;
             float FIXATION = 3;
-            float IDENTIFICATION = 1;
+            float IDENTIFICATION = 2;
             float ANSWERING = 3;
         } STATE_DURATIONS_SECONDS;
     } SETTINGS;
@@ -46,6 +50,7 @@ class AppScreeningTest : public App
 
     enum class SubjectState
     {
+        kBlank,
         kFixation,
         kIdentification,
         kAnswer,

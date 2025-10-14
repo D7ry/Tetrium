@@ -88,12 +88,23 @@ void TetriumApp::AppScreeningTest::drawSettingsWindow(const TetriumApp::TickCont
     // draw a settings pop-up window
     if (ImGui::BeginPopup("Settings", ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::SliderInt("Num Attempts", &SETTINGS.NUM_ATTEMPTS, 1, 10);
+        ImGui::Text("Duration of Blank Period (seconds)");
+        ImGui::InputFloat("##Blank", &SETTINGS.STATE_DURATIONS_SECONDS.BLANK);
         ImGui::Text("Duration of Fixation (seconds)");
         ImGui::InputFloat("##Fixation", &SETTINGS.STATE_DURATIONS_SECONDS.FIXATION);
         ImGui::Text("Duration of Identification (seconds)");
         ImGui::InputFloat("##Identification", &SETTINGS.STATE_DURATIONS_SECONDS.IDENTIFICATION);
         ImGui::Text("Duration of Answering (seconds)");
         ImGui::InputFloat("##Answering", &SETTINGS.STATE_DURATIONS_SECONDS.ANSWERING);
+
+        // Lum noise slider
+        ImGui::SliderFloat("Lum Noise", &SETTINGS.LUM_NOISE, 0.0f, 1.0f);
+
+        // S-cone noise slider
+        ImGui::SliderFloat("S-Cone Noise", &SETTINGS.S_CONE_NOISE, 0.0f, 1.0f);
+
+        // Stimulus size slider
+        ImGui::SliderFloat("Stimulus Size", &SETTINGS.STIMULUS_SIZE, 0.0f, 1.0f);
 
         // Music setting dropdown
         ImGui::Text("Music Setting");
@@ -203,7 +214,8 @@ void AppScreeningTest::drawIshihara(
     ImVec2 availSize = ImGui::GetContentRegionAvail();
     // ImVec2 textureFullscreenSize = calculateFitSize(tex.width, tex.height, availSize);
     // need to scale this such that the stimuli is 2 degrees when we look at in on windows
-    ImVec2 textureFullscreenSize = ImVec2(tex.width * 0.25f, tex.height * 0.25f);
+    ImVec2 textureFullscreenSize
+        = ImVec2(tex.width * SETTINGS.STIMULUS_SIZE, tex.height * SETTINGS.STIMULUS_SIZE);
 
     // center the texture onto the screen
     ImVec2 centerPos = ImVec2(availSize.x * 0.5f, availSize.y * 0.5f);
@@ -234,6 +246,9 @@ void AppScreeningTest::drawTestForSubject(
     ASSERT(subject.currStateRemainderTime > 0);
 
     switch (subject.state) {
+    case SubjectState::kBlank:
+        // Blank state - draw nothing (entirely black)
+        break;
     case SubjectState::kFixation:
         drawFixGazePage();
         break;
@@ -324,6 +339,23 @@ void AppScreeningTest::drawAnswerPrompts(
     ImVec2 positions[4] = {bottomPos, leftPos, rightPos, topPos}; // A, X, B, Y order
     const char* buttonLabels[4] = {"A", "X", "B", "Y"};
 
+    // Gamepad button keys corresponding to each answer button
+    ImGuiKey gamepadKeys[4] = {
+        ImGuiKey_GamepadFaceDown,  // A button
+        ImGuiKey_GamepadFaceLeft,  // X button
+        ImGuiKey_GamepadFaceRight, // B button
+        ImGuiKey_GamepadFaceUp     // Y button
+    };
+
+    // Check for gamepad input first
+    int pressedButton = -1;
+    for (int i = 0; i < 4; i++) {
+        if (ImGui::IsKeyPressed(gamepadKeys[i])) {
+            pressedButton = i;
+            break;
+        }
+    }
+
     // Draw the four buttons
     for (int i = 0; i < 4; i++) {
         ImGuiTexture tex = subject.prompt.currentAnswerTexture[i];
@@ -336,9 +368,22 @@ void AppScreeningTest::drawAnswerPrompts(
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
 
-        if (ImGui::ImageButton(
-                buttonLabels[i], (void*)(intptr_t)tex.id, ImVec2(buttonSize, buttonSize)
-            )) {
+        bool buttonClicked = ImGui::ImageButton(
+            buttonLabels[i], (void*)(intptr_t)tex.id, ImVec2(buttonSize, buttonSize)
+        );
+
+        // Pop the button style colors
+        ImGui::PopStyleColor(3);
+
+        // Add button label
+        ImVec2 textSize = ImGui::CalcTextSize(buttonLabels[i]);
+        ImVec2 textPos
+            = ImVec2(positions[i].x - textSize.x * 0.5f + 3, positions[i].y + buttonSize / 2 + 10);
+        ImGui::SetCursorPos(textPos);
+        ImGui::Text("%s", buttonLabels[i]);
+
+        // Check if this button was activated (either by click or gamepad)
+        if (buttonClicked || pressedButton == i) {
             printf("%s button clicked!\n", buttonLabels[i]);
             subject.prompt.currentSelectedAnswer = i;
             if (subject.prompt.currentSelectedAnswer == subject.prompt.correctAnswerTextureIndex) {
@@ -356,17 +401,9 @@ void AppScreeningTest::drawAnswerPrompts(
                 }
             }
             transitionSubjectState(subject, ctx);
+            // Only process one button press per frame
+            break;
         }
-
-        // Pop the button style colors
-        ImGui::PopStyleColor(3);
-
-        // Add button label
-        ImVec2 textSize = ImGui::CalcTextSize(buttonLabels[i]);
-        ImVec2 textPos
-            = ImVec2(positions[i].x - textSize.x * 0.5f + 3, positions[i].y + buttonSize / 2 + 10);
-        ImGui::SetCursorPos(textPos);
-        ImGui::Text("%s", buttonLabels[i]);
     }
 
     // draw progress bar showing time left
@@ -384,6 +421,10 @@ void AppScreeningTest::transitionSubjectState(
 )
 {
     switch (subject.state) {
+    case SubjectState::kBlank:
+        subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.FIXATION;
+        subject.state = SubjectState::kFixation;
+        break;
     case SubjectState::kFixation:
         subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.IDENTIFICATION;
         subject.state = SubjectState::kIdentification;
@@ -401,10 +442,10 @@ void AppScreeningTest::transitionSubjectState(
             endGame(subject);
             return;
         }
-        // Otherwise advance to next attempt
+        // Otherwise advance to next attempt and show blank screen
         subject.currentAttempt += 1;
-        subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.FIXATION;
-        subject.state = SubjectState::kFixation;
+        subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.BLANK;
+        subject.state = SubjectState::kBlank;
         populatePromptContext(subject, ctx);
         break;
     }
@@ -449,8 +490,8 @@ void AppScreeningTest::newGame(const TetriumApp::TickContextImGui& ctx)
 
     _subject = SubjectContext{
         .name = _nameInputBuffer,
-        .currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.FIXATION,
-        .state = SubjectState::kFixation,
+        .currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.BLANK,
+        .state = SubjectState::kBlank,
         .currentAttempt = 0,
         .numSuccessAttempts = 0,
         .pyObject
@@ -517,7 +558,11 @@ std::pair<std::string, std::string> AppScreeningTest::generateIshiharaTestTextur
 
     // Call NewPlate with DISP_6P output space
     _plateGenerator->NewPlate(
-        baseFilename, number, TetriumColor::ColorSpaceType::DISP_6P, 0.00, 0.1
+        baseFilename,
+        number,
+        TetriumColor::ColorSpaceType::DISP_6P,
+        SETTINGS.LUM_NOISE,
+        SETTINGS.S_CONE_NOISE
     );
 
     // Return paths - the 6P files will be at baseFilename_0.png ... baseFilename_5.png
