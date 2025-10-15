@@ -585,7 +585,7 @@ void AppPainter::TickVulkan(TetriumApp::TickContextVulkan& ctx)
         &_canvasToViewSpaceDescriptorSets[ctx.currentFrameInFlight],
         0,
         nullptr,
-        vk::getDispatchLoaderStatic()
+        vk::detail::getDispatchLoaderStatic()
     );
     // draw a full-screen quad
     cb.draw(3, 1, 0, 0);

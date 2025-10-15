@@ -125,11 +125,11 @@ set(TINY_OBJ_LOADER_INCLUDE extern/tinyobjloader)
 add_subdirectory(extern/TetriumColor)
 
 # ---------- Vulkan ---------- #
-if (DEFINED ENV{VULKAN_SDK})
-    set(VULKAN_SDK_PATH $ENV{VULKAN_SDK})
-else()
-    message(FATAL_ERROR "VULKAN_SDK is not set, please configure this environment variable to point to the Vulkan SDK")
-endif()
+# if (DEFINED ENV{VULKAN_SDK})
+#  set(VULKAN_SDK_PATH $ENV{VULKAN_SDK})
+#else()
+#    message(FATAL_ERROR "VULKAN_SDK is not set, please configure this environment variable to point to the Vulkan SDK")
+#endif()
 
 target_sources(${PROJECT_NAME} 
     PRIVATE ${IMGUI_SRC}
@@ -158,12 +158,13 @@ if(IS_APPLE)
 endif() # IS_APPLE
 
 if(IS_LINUX)
+    find_package(Vulkan REQUIRED)
     find_package(PkgConfig REQUIRED)
     find_package(X11 REQUIRED)
     pkg_check_modules(DRM REQUIRED libdrm)
     pkg_check_modules(SNDFILE REQUIRED sndfile)
     include_directories(${DRM_INCLUDE_DIRS})
-    target_link_libraries(${PROJECT_NAME}
+    target_link_libraries(${PROJECT_NAME} Vulkan::Vulkan
         ${X11_LIBRARIES}
         ${DRM_LIBRARIES}
         Xrandr

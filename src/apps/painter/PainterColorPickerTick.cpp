@@ -194,7 +194,7 @@ void AppPainter::ColorPicker::TickVulkan(TetriumApp::TickContextVulkan& ctx)
             &_cubemapGenerateContext.descriptorSet,
             0,
             nullptr,
-            vk::getDispatchLoaderStatic()
+            vk::detail::getDispatchLoaderStatic()
         );
         cb.draw(3, 1, 0, 0);
         cb.endRenderPass();
@@ -224,7 +224,7 @@ void AppPainter::ColorPicker::TickVulkan(TetriumApp::TickContextVulkan& ctx)
             &_rygbTransformDescriptorSets[ctx.currentFrameInFlight],
             0,
             nullptr,
-            vk::getDispatchLoaderStatic()
+            vk::detail::getDispatchLoaderStatic()
         );
 
 
@@ -279,7 +279,7 @@ void AppPainter::ColorPicker::TickVulkan(TetriumApp::TickContextVulkan& ctx)
             &_colorSquareContext.descriptorSet,
             0,
             nullptr,
-            vk::getDispatchLoaderStatic()
+            vk::detail::getDispatchLoaderStatic()
         );
         cb.draw(3, 1, 0, 0);
         cb.endRenderPass();
@@ -309,7 +309,7 @@ void AppPainter::ColorPicker::TickVulkan(TetriumApp::TickContextVulkan& ctx)
             &_rygbTransformDescriptorSetsColorSquare[ctx.currentFrameInFlight],
             0,
             nullptr,
-            vk::getDispatchLoaderStatic()
+            vk::detail::getDispatchLoaderStatic()
         );
 
         cb.draw(3, 1, 0, 0);
