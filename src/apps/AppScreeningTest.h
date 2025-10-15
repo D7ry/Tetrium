@@ -29,7 +29,7 @@ class AppScreeningTest : public App
         MusicSetting MUSIC_SETTING = MusicSetting::CORRECT_WRONG;
         float LUM_NOISE = 0.0f;      // luminance noise [0.0, 1.0]
         float S_CONE_NOISE = 0.1f;   // s-cone noise [0.0, 1.0]
-        float STIMULUS_SIZE = 0.25f; // stimulus texture size multiplier [0.0, 1.0]
+        float STIMULUS_SIZE = 0.5f; // stimulus texture size multiplier [0.0, 1.0]
 
         struct
         {
