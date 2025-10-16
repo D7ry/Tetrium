@@ -278,14 +278,17 @@ void AppScreeningTest::drawSubjectResult(
 
     // Draw centered box
     ImGui::SetCursorPos(boxPos);
-    ImGui::BeginChild("CenteredBox", boxSize, true, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
+    ImGui::BeginChild(
+        "CenteredBox", boxSize, true, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize
+    );
 
     // --- NEW CONTENT BELOW ---
     int numMisses = SETTINGS.NUM_ATTEMPTS - subject.numSuccessAttempts;
     bool perfect = numMisses < 1;
 
-    const char* mainMsg   = perfect ? "Congratulations!" : "Tough luck!";
-    const char* followMsg = perfect ? "You're a Tetrachromat!" : "You probably won't do better next time.";
+    const char* mainMsg = perfect ? "Congratulations!" : "Tough luck!";
+    const char* followMsg
+        = perfect ? "You're a Tetrachromat!" : "You probably won't do better next time.";
 
     // Vertically center text block
     float lineSpacing = ImGui::GetTextLineHeightWithSpacing();
@@ -299,7 +302,9 @@ void AppScreeningTest::drawSubjectResult(
     // 2. Large "Congratulations" or "Tough luck!"
     ImGui::SetWindowFontScale(2.0f);
     ImVec2 textSize2 = ImGui::CalcTextSize(mainMsg);
-    ImGui::SetCursorPos(ImVec2((boxSize.x - textSize2.x * 2.0f * 0.5f) * 0.5f, yStart + lineSpacing * 2.0f));
+    ImGui::SetCursorPos(
+        ImVec2((boxSize.x - textSize2.x * 2.0f * 0.5f) * 0.5f, yStart + lineSpacing * 2.0f)
+    );
     ImGui::Text("%s", mainMsg);
     ImGui::SetWindowFontScale(1.0f);
 
@@ -538,10 +543,12 @@ void AppScreeningTest::newGame(const TetriumApp::TickContextImGui& ctx)
         *_colorGenerator,
         42 // seed
     );
-    SETTINGS.NUM_ATTEMPTS = _colorGenerator->GetNumSamples();
-
-    INFO("Number of attempts: {}", SETTINGS.NUM_ATTEMPTS);
-    INFO("Number of samples: {}", _colorGenerator->GetNumSamples());
+    if (SETTINGS.NUM_ATTEMPTS > static_cast<int>(_colorGenerator->GetNumSamples())) {
+        INFO(
+            "Number of attempts is greater than the number of samples, setting to number of samples"
+        );
+        SETTINGS.NUM_ATTEMPTS = _colorGenerator->GetNumSamples();
+    }
 
     _subject = SubjectContext{
         .name = _nameInputBuffer,
