@@ -245,6 +245,11 @@ void AppScreeningTest::drawTestForSubject(
     }
     ASSERT(subject.currStateRemainderTime > 0);
 
+    if (ImGui::IsKeyPressed(ImGuiKey_GamepadBack)) {
+        ctx.apis.PlaySound(Sound::kVineBoom);
+        _state = TestState::kIdle;
+    }
+
     switch (subject.state) {
     case SubjectState::kBlank:
         // Blank state - draw nothing (entirely black)
@@ -266,7 +271,57 @@ void AppScreeningTest::drawSubjectResult(
     const TetriumApp::TickContextImGui& ctx
 )
 {
-    // Calculate the size of the box
+    // Calculate the size and position of the box
+    ImVec2 boxSize(1200, 900);
+    ImVec2 windowSize = ImGui::GetWindowSize();
+    ImVec2 boxPos((windowSize.x - boxSize.x) * 0.5f, (windowSize.y - boxSize.y) * 0.5f);
+
+    // Draw centered box
+    ImGui::SetCursorPos(boxPos);
+    ImGui::BeginChild("CenteredBox", boxSize, true, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
+
+    // --- NEW CONTENT BELOW ---
+    int numMisses = SETTINGS.NUM_ATTEMPTS - subject.numSuccessAttempts;
+    bool perfect = numMisses < 1;
+
+    const char* mainMsg   = perfect ? "Congratulations!" : "Tough luck!";
+    const char* followMsg = perfect ? "You're a Tetrachromat!" : "You probably won't do better next time.";
+
+    // Vertically center text block
+    float lineSpacing = ImGui::GetTextLineHeightWithSpacing();
+    float yStart = (boxSize.y - (lineSpacing * 5.0f)) * 0.5f;
+
+    // 1. "You scored x/x"
+    ImVec2 textSize1 = ImGui::CalcTextSize("You scored 00/00");
+    ImGui::SetCursorPos(ImVec2((boxSize.x - textSize1.x) * 0.5f, yStart));
+    ImGui::Text("You scored %d/%d", subject.numSuccessAttempts, SETTINGS.NUM_ATTEMPTS);
+
+    // 2. Large "Congratulations" or "Tough luck!"
+    ImGui::SetWindowFontScale(2.0f);
+    ImVec2 textSize2 = ImGui::CalcTextSize(mainMsg);
+    ImGui::SetCursorPos(ImVec2((boxSize.x - textSize2.x * 2.0f * 0.5f) * 0.5f, yStart + lineSpacing * 2.0f));
+    ImGui::Text("%s", mainMsg);
+    ImGui::SetWindowFontScale(1.0f);
+
+    // 3. Normal text follow-up line
+    ImVec2 textSize3 = ImGui::CalcTextSize(followMsg);
+    ImGui::SetCursorPos(ImVec2((boxSize.x - textSize3.x) * 0.5f, yStart + lineSpacing * 4.0f));
+    ImGui::Text("%s", followMsg);
+
+    // 4. "Okay" button centered below text
+    ImVec2 buttonSize(150, 60);
+    ImVec2 buttonPos((boxSize.x - buttonSize.x) * 0.5f, yStart + lineSpacing * 6.0f);
+    ImGui::SetCursorPos(buttonPos);
+    if (ImGui::Button("Okay", buttonSize)) {
+        if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL) {
+            ctx.apis.PlaySound(Sound::kVineBoom);
+        }
+        _state = TestState::kIdle;
+    }
+
+    ImGui::EndChild();
+    return;
+    /* // Calculate the size of the box
     ImVec2 boxSize(1200, 900); // Width and height of the box
     ImVec2 windowSize = ImGui::GetWindowSize();
     ImVec2 boxPos = ImVec2((windowSize.x - boxSize.x) * 0.5f, (windowSize.y - boxSize.y) * 0.5f);
@@ -313,7 +368,7 @@ void AppScreeningTest::drawSubjectResult(
         _state = TestState::kIdle;
     }
 
-    ImGui::EndChild();
+    ImGui::EndChild(); */
 }
 
 void AppScreeningTest::drawAnswerPrompts(
