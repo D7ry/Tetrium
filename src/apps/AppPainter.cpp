@@ -14,8 +14,7 @@ namespace TetriumApp
 
 void AppPainter::initPaintSpaceBuffer(TetriumApp::InitContext& ctx)
 {
-    VkDeviceSize bufferSize
-        = _canvasWidth * _canvasHeight * PAINT_SPACE_PIXEL_SIZE;
+    VkDeviceSize bufferSize = _canvasWidth * _canvasHeight * PAINT_SPACE_PIXEL_SIZE;
     DEBUG("Paint space buffer size: {}", bufferSize);
     _paintSpaceBuffer = ctx.device.CreateBuffer(
         bufferSize,
@@ -214,7 +213,6 @@ void AppPainter::initPaintToViewSpaceContext(TetriumApp::InitContext& ctx)
         ASSERT(res == vk::Result::eSuccess);
     }
 
-
     /* create renderpass */
     {
         vk::AttachmentReference colorAttachmentRef(0, vk::ImageLayout::eColorAttachmentOptimal);
@@ -269,10 +267,12 @@ void AppPainter::initPaintToViewSpaceContext(TetriumApp::InitContext& ctx)
             = std::string(ASSETS_PATH + "apps/AppPainter/shaders/paint_to_view_space.frag.spv");
 
         // shader modules
-        vk::ShaderModule vertShaderModule
-            = ShaderCreation::createShaderModule(ctx.device.logicalDevice, VERTEX_SHADER_PATH.c_str());
-        vk::ShaderModule fragShaderModule
-            = ShaderCreation::createShaderModule(ctx.device.logicalDevice, FRAGMENT_SHADER_PATH.c_str());
+        vk::ShaderModule vertShaderModule = ShaderCreation::createShaderModule(
+            ctx.device.logicalDevice, VERTEX_SHADER_PATH.c_str()
+        );
+        vk::ShaderModule fragShaderModule = ShaderCreation::createShaderModule(
+            ctx.device.logicalDevice, FRAGMENT_SHADER_PATH.c_str()
+        );
 
         std::array<vk::PipelineShaderStageCreateInfo, 2> shaderStages
             = {vk::PipelineShaderStageCreateInfo(
@@ -301,9 +301,7 @@ void AppPainter::initPaintToViewSpaceContext(TetriumApp::InitContext& ctx)
             {}, dynamicStates.size(), dynamicStates.data()
         );
 
-        vk::Viewport viewport(
-            0.f, 0.f, _canvasWidth, _canvasHeight, 0.f, 1.f
-        );
+        vk::Viewport viewport(0.f, 0.f, _canvasWidth, _canvasHeight, 0.f, 1.f);
         vk::Rect2D scissor(
             {0, 0},
             {
@@ -585,7 +583,11 @@ void AppPainter::TickVulkan(TetriumApp::TickContextVulkan& ctx)
         &_canvasToViewSpaceDescriptorSets[ctx.currentFrameInFlight],
         0,
         nullptr,
+#ifdef __linux__
         vk::detail::getDispatchLoaderStatic()
+#else
+        vk::getDispatchLoaderStatic()
+#endif
     );
     // draw a full-screen quad
     cb.draw(3, 1, 0, 0);
