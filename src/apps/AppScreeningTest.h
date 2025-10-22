@@ -10,6 +10,15 @@ namespace TetriumApp
 class AppScreeningTest : public App
 {
   public:
+    enum class AnswerKind
+    {
+        kUp,
+        kDown,
+        kLeft,
+        kRight,
+        kDontKnow
+    };
+
     virtual void Init(TetriumApp::InitContext& ctx) override;
     virtual void Cleanup(TetriumApp::CleanupContext& ctx) override;
 
@@ -27,8 +36,8 @@ class AppScreeningTest : public App
     {
         int NUM_ATTEMPTS = 8; // number of attempts one could try in a screening
         MusicSetting MUSIC_SETTING = MusicSetting::CORRECT_WRONG;
-        float LUM_NOISE = 0.0f;      // luminance noise [0.0, 1.0]
-        float S_CONE_NOISE = 0.1f;   // s-cone noise [0.0, 1.0]
+        float LUM_NOISE = 0.0f;     // luminance noise [0.0, 1.0]
+        float S_CONE_NOISE = 0.1f;  // s-cone noise [0.0, 1.0]
         float STIMULUS_SIZE = 0.5f; // stimulus texture size multiplier [0.0, 1.0]
 
         struct
@@ -56,19 +65,10 @@ class AppScreeningTest : public App
         kAnswer,
     };
 
-    enum class AnswerKind
-    {
-        kUp,
-        kDown,
-        kLeft,
-        kRight,
-        kDontKnow
-    };
-
     struct SubjectPromptContext
     {
-        uint32_t currentIshiharaPlateTextureHandle[ColorSpace::ColorSpaceSize] = {};
-        ImGuiTexture currentIshiharaPlateTexture[ColorSpace::ColorSpaceSize];
+        uint32_t currentLandoltCTextureHandle[ColorSpace::ColorSpaceSize] = {};
+        ImGuiTexture currentLandoltCTexture[ColorSpace::ColorSpaceSize];
         uint32_t currentAnswerTextureHandle[4];
         ImGuiTexture currentAnswerTexture[4];
         int correctAnswerTextureIndex;
@@ -106,13 +106,11 @@ class AppScreeningTest : public App
 
     void drawSubjectResult(SubjectContext& subject, const TetriumApp::TickContextImGui& ctx);
 
-    void drawIshihara(SubjectContext& subject, const TetriumApp::TickContextImGui& ctx);
+    void drawLandoltC(SubjectContext& subject, const TetriumApp::TickContextImGui& ctx);
 
     void drawAnswerPrompts(SubjectContext& subject, const TetriumApp::TickContextImGui& ctx);
 
     void drawFixGazePage();
-
-    ImGuiTexture GetAnswerPromptTextureDigit(uint32_t digit);
 
     // game logic
     void newGame(const TetriumApp::TickContextImGui& ctx);
@@ -121,12 +119,12 @@ class AppScreeningTest : public App
 
     void endGame(SubjectContext& subject);
 
-    // generate a pair of ishihara textures and store them in a subject folder, returns
+    // generate a pair of Landolt C textures and store them in a subject folder, returns
     // path to generated textures(RGB, OCV) -- the textures are already loaded into GPU memory.
     // the caller is responsible for freeing generated resources.
-    std::pair<std::string, std::string> generateIshiharaTestTextures(
+    std::pair<std::string, std::string> generateLandoltCTextures(
         SubjectContext& subject,
-        int number
+        AnswerKind orientation
     );
 
     std::string _nameInputBuffer = "guest";
@@ -136,7 +134,14 @@ class AppScreeningTest : public App
 
     void populatePromptContext(SubjectContext& subject, const TetriumApp::TickContextImGui& ctx);
 
-    std::unordered_map<int, uint32_t> _answerPromptTextureHandles = {};
-    std::unordered_map<int, ImGuiTexture> _answerPromptImGuiTextures = {};
+    // Static helper functions for Landolt C orientations
+    static std::string GetLandoltCAnswerTexturePath(AnswerKind orientation);
+    static std::string OrientationToString(AnswerKind orientation);
+
+    std::unordered_map<AnswerKind, uint32_t> _answerPromptTextureHandles = {};
+    std::unordered_map<AnswerKind, ImGuiTexture> _answerPromptImGuiTextures = {};
+
+    // Static map for orientation to string conversion
+    static const std::unordered_map<AnswerKind, std::string> _orientationToStringMap;
 };
 } // namespace TetriumApp

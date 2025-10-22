@@ -30,32 +30,32 @@ ImVec2 calculateFitSize(float width, float height, const ImVec2& availableSize)
 namespace TetriumApp
 {
 
-// Ishihara plates numbers -- we pick from these to generate tests
-static const std::vector<int> ISHIHARA_PLATES_NUMBERS = [] {
-    std::vector<int> v;
-    for (int i = 10; i <= 99; ++i)
-        v.push_back(i);
-    return v;
-}();
+// Landolt C orientations -- we pick from these to generate tests
+static const std::vector<AppScreeningTest::AnswerKind> LANDOLT_C_ORIENTATIONS
+    = {AppScreeningTest::AnswerKind::kUp,
+       AppScreeningTest::AnswerKind::kDown,
+       AppScreeningTest::AnswerKind::kLeft,
+       AppScreeningTest::AnswerKind::kRight};
 
-// Pick 4 random, non-repeating numbers from the ishihara plates
-static std::array<int, 4> PickRandomFourIshiharaPlates()
+// Define the static map for orientation to string conversion
+// Note: This maps AnswerKind enum values to their corresponding arrow directions
+const std::unordered_map<AppScreeningTest::AnswerKind, std::string>
+    AppScreeningTest::_orientationToStringMap
+    = {{AppScreeningTest::AnswerKind::kUp, "up"},
+       {AppScreeningTest::AnswerKind::kDown, "down"},
+       {AppScreeningTest::AnswerKind::kLeft, "left"},
+       {AppScreeningTest::AnswerKind::kRight, "right"}};
+
+std::string AppScreeningTest::OrientationToString(AppScreeningTest::AnswerKind orientation)
 {
-    std::vector<int> numbers = ISHIHARA_PLATES_NUMBERS;
-    std::array<int, 4> pickedPlates;
-    for (int i = 0; i < 4; i++) {
-        int index = rand() % numbers.size();
-        pickedPlates[i] = numbers[index];
-        numbers.erase(numbers.begin() + index);
-    }
-
-    return pickedPlates;
+    auto it = _orientationToStringMap.find(orientation);
+    return (it != _orientationToStringMap.end()) ? it->second : "unknown";
 }
 
-static std::string GetIshiharaPlateAnswerTexturePath(int plateNumber)
+std::string AppScreeningTest::GetLandoltCAnswerTexturePath(AppScreeningTest::AnswerKind orientation)
 {
-    return TETRIUM_COLOR_PATH + "TetriumColor/Assets/HiddenImages/" + std::to_string(plateNumber)
-           + ".png";
+    return TETRIUM_COLOR_PATH + "TetriumColor/Assets/HiddenImages/landolt_"
+           + OrientationToString(orientation) + ".png";
 }
 
 void TetriumApp::AppScreeningTest::TickImGui(const TetriumApp::TickContextImGui& ctx)
@@ -203,13 +203,12 @@ void TetriumApp::AppScreeningTest::drawIdle(const TetriumApp::TickContextImGui& 
     ImGui::PopStyleVar(4);
 }
 
-void AppScreeningTest::drawIshihara(
+void AppScreeningTest::drawLandoltC(
     SubjectContext& subject,
     const TetriumApp::TickContextImGui& ctx
 )
 {
-    ImGuiTexture tex
-        = subject.prompt.currentIshiharaPlateTexture[ctx.colorSpace]; // RGB is the default
+    ImGuiTexture tex = subject.prompt.currentLandoltCTexture[ctx.colorSpace]; // RGB is the default
 
     ImVec2 availSize = ImGui::GetContentRegionAvail();
     // ImVec2 textureFullscreenSize = calculateFitSize(tex.width, tex.height, availSize);
@@ -258,7 +257,7 @@ void AppScreeningTest::drawTestForSubject(
         drawFixGazePage();
         break;
     case SubjectState::kIdentification:
-        drawIshihara(subject, ctx);
+        drawLandoltC(subject, ctx);
         break;
     case SubjectState::kAnswer:
         drawAnswerPrompts(subject, ctx);
@@ -287,8 +286,8 @@ void AppScreeningTest::drawSubjectResult(
     bool perfect = numMisses < 1;
 
     const char* mainMsg = perfect ? "Congratulations!" : "Tough luck!";
-    const char* followMsg
-        = perfect ? "You're a Tetrachromat!" : "You probably won't do better next time.";
+    const char* followMsg = perfect ? "You're likely a Tetrachromat, or very anomalous!"
+                                    : "You probably won't do better next time.";
 
     // Vertically center text block
     float lineSpacing = ImGui::GetTextLineHeightWithSpacing();
@@ -396,8 +395,8 @@ void AppScreeningTest::drawAnswerPrompts(
     ImVec2 rightPos = ImVec2(centerPos.x + horizontalSpacing, centerPos.y); // B
     ImVec2 bottomPos = ImVec2(centerPos.x, centerPos.y + verticalSpacing);  // A
 
-    ImVec2 positions[4] = {bottomPos, leftPos, rightPos, topPos}; // A, X, B, Y order
-    const char* buttonLabels[4] = {"A", "X", "B", "Y"};
+    ImVec2 positions[4] = {bottomPos, leftPos, rightPos, topPos}; // Down, Left, Right, Up order
+    const char* buttonLabels[4] = {"↓", "←", "→", "↑"};
 
     // Gamepad button keys corresponding to each answer button
     ImGuiKey gamepadKeys[4] = {
@@ -605,10 +604,10 @@ void AppScreeningTest::drawFixGazePage()
     ImGui::Text("Fix Gaze Onto Crosshair");
 }
 
-// Updated to use the new single-filename interface
-std::pair<std::string, std::string> AppScreeningTest::generateIshiharaTestTextures(
+// Updated to generate Landolt C symbols instead of Ishihara plates
+std::pair<std::string, std::string> AppScreeningTest::generateLandoltCTextures(
     SubjectContext& subject,
-    int number
+    AnswerKind orientation
 )
 {
     // The new interface generates both RGB and OCV versions with a single filename
@@ -616,12 +615,15 @@ std::pair<std::string, std::string> AppScreeningTest::generateIshiharaTestTextur
     // and filename_srgb.png
     // Ensure the temp directory exists before using it
     std::filesystem::create_directories("./temp");
-    std::string baseFilename = "./temp/" + subject.name + "_" + std::to_string(number);
+
+    const std::string orientationStr = OrientationToString(orientation);
+
+    std::string baseFilename = "./temp/" + subject.name + "_" + orientationStr;
 
     // Call NewPlate with DISP_6P output space
     _plateGenerator->NewPlate(
         baseFilename,
-        number,
+        "landolt_" + orientationStr, // Use orientation string for Landolt C
         TetriumColor::ColorSpaceType::DISP_6P,
         SETTINGS.LUM_NOISE,
         SETTINGS.S_CONE_NOISE
@@ -641,53 +643,68 @@ void AppScreeningTest::populatePromptContext(
     const TetriumApp::TickContextImGui& ctx
 )
 {
-    // stall and generate ishihara textures
-    std::array<int, 4> ishiharaPlateNumbers = PickRandomFourIshiharaPlates();
-    int answerPlateIndex = rand() % ishiharaPlateNumbers.size();
-    int answerPlateNumber = ishiharaPlateNumbers[answerPlateIndex];
+    // stall and generate Landolt C textures
+    // Pick one random orientation for the correct answer
+    AnswerKind answerOrientation = LANDOLT_C_ORIENTATIONS[rand() % LANDOLT_C_ORIENTATIONS.size()];
 
-    auto [rgbTexturePath, ocvTexturePath]
-        = generateIshiharaTestTextures(_subject, answerPlateNumber);
+    auto [rgbTexturePath, ocvTexturePath] = generateLandoltCTextures(_subject, answerOrientation);
 
     // unload previous textures
-    if (_subject.prompt.currentIshiharaPlateTextureHandle[ColorSpace::RGB] != 0) {
-        ctx.apis.UnloadTexture(_subject.prompt.currentIshiharaPlateTextureHandle[ColorSpace::RGB]);
+    if (_subject.prompt.currentLandoltCTextureHandle[ColorSpace::RGB] != 0) {
+        ctx.apis.UnloadTexture(_subject.prompt.currentLandoltCTextureHandle[ColorSpace::RGB]);
     }
-    if (_subject.prompt.currentIshiharaPlateTextureHandle[ColorSpace::OCV] != 0) {
-        ctx.apis.UnloadTexture(_subject.prompt.currentIshiharaPlateTextureHandle[ColorSpace::OCV]);
+    if (_subject.prompt.currentLandoltCTextureHandle[ColorSpace::OCV] != 0) {
+        ctx.apis.UnloadTexture(_subject.prompt.currentLandoltCTextureHandle[ColorSpace::OCV]);
     }
 
-    _subject.prompt.currentIshiharaPlateTextureHandle[ColorSpace::RGB]
+    _subject.prompt.currentLandoltCTextureHandle[ColorSpace::RGB]
         = ctx.apis.LoadTexture(rgbTexturePath);
-    _subject.prompt.currentIshiharaPlateTextureHandle[ColorSpace::OCV]
+    _subject.prompt.currentLandoltCTextureHandle[ColorSpace::OCV]
         = ctx.apis.LoadTexture(ocvTexturePath);
 
-    _subject.prompt.currentIshiharaPlateTexture[ColorSpace::RGB] = ctx.apis.InitImGuiTexture(
-        _subject.prompt.currentIshiharaPlateTextureHandle[ColorSpace::RGB]
-    );
-    _subject.prompt.currentIshiharaPlateTexture[ColorSpace::OCV] = ctx.apis.InitImGuiTexture(
-        _subject.prompt.currentIshiharaPlateTextureHandle[ColorSpace::OCV]
-    );
+    _subject.prompt.currentLandoltCTexture[ColorSpace::RGB]
+        = ctx.apis.InitImGuiTexture(_subject.prompt.currentLandoltCTextureHandle[ColorSpace::RGB]);
+    _subject.prompt.currentLandoltCTexture[ColorSpace::OCV]
+        = ctx.apis.InitImGuiTexture(_subject.prompt.currentLandoltCTextureHandle[ColorSpace::OCV]);
+
+    // Create a fixed mapping between button positions and orientations
+    // Button positions: {bottomPos, leftPos, rightPos, topPos} = {"↓", "←", "→", "↑"}
+    // Map to orientations: {kDown, kLeft, kRight, kUp}
+    std::array<AnswerKind, 4> buttonOrientationMap = {
+        AnswerKind::kDown,  // Index 0: bottomPos → "↓"
+        AnswerKind::kLeft,  // Index 1: leftPos → "←"
+        AnswerKind::kRight, // Index 2: rightPos → "→"
+        AnswerKind::kUp     // Index 3: topPos → "↑"
+    };
 
     // populate answer textures -- they're pre-generated
     for (int i = 0; i < 4; i++) {
         _subject.prompt.currentAnswerTextureHandle[i]
-            = _answerPromptTextureHandles[ishiharaPlateNumbers[i]];
+            = _answerPromptTextureHandles[buttonOrientationMap[i]];
         _subject.prompt.currentAnswerTexture[i]
-            = _answerPromptImGuiTextures[ishiharaPlateNumbers[i]];
+            = _answerPromptImGuiTextures[buttonOrientationMap[i]];
+    }
+
+    // Find which button index corresponds to the correct answer
+    int correctButtonIndex = -1;
+    for (int i = 0; i < 4; i++) {
+        if (buttonOrientationMap[i] == answerOrientation) {
+            correctButtonIndex = i;
+            break;
+        }
     }
 
     // Set the correct answer index
-    _subject.prompt.correctAnswerTextureIndex = answerPlateIndex;
+    _subject.prompt.correctAnswerTextureIndex = correctButtonIndex;
 }
 
 void AppScreeningTest::Init(TetriumApp::InitContext& ctx)
 {
-    for (int ishiharaPlateNumber : ISHIHARA_PLATES_NUMBERS) {
-        std::string path = GetIshiharaPlateAnswerTexturePath(ishiharaPlateNumber);
+    for (AnswerKind orientation : LANDOLT_C_ORIENTATIONS) {
+        std::string path = AppScreeningTest::GetLandoltCAnswerTexturePath(orientation);
         uint32_t textureHandle = ctx.api.LoadTexture(path);
-        _answerPromptTextureHandles[ishiharaPlateNumber] = textureHandle;
-        _answerPromptImGuiTextures[ishiharaPlateNumber] = ctx.api.InitImGuiTexture(textureHandle);
+        _answerPromptTextureHandles[orientation] = textureHandle;
+        _answerPromptImGuiTextures[orientation] = ctx.api.InitImGuiTexture(textureHandle);
     }
     // load bair logo
     // FIXME: free the logo texture when cleaning up
@@ -698,8 +715,8 @@ void AppScreeningTest::Init(TetriumApp::InitContext& ctx)
 
 void AppScreeningTest::Cleanup(TetriumApp::CleanupContext& ctx)
 {
-    for (int ishiharaPlateNumber : ISHIHARA_PLATES_NUMBERS) {
-        ctx.api.UnloadTexture(_answerPromptTextureHandles[ishiharaPlateNumber]);
+    for (AnswerKind orientation : LANDOLT_C_ORIENTATIONS) {
+        ctx.api.UnloadTexture(_answerPromptTextureHandles[orientation]);
     }
 
     // Clean up generators
