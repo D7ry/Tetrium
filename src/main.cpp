@@ -41,7 +41,7 @@ int main(int argc, char** argv)
 #if defined(__APPLE__)
     Tetrium::InitOptions options{.tetraMode = Tetrium::TetraMode::kEvenOddSoftwareSync};
 #elif defined(_WIN32)
-    Tetrium::InitOptions options{.tetraMode = Tetrium::TetraMode::kHardwareSync};
+    Tetrium::InitOptions options{.tetraMode = Tetrium::TetraMode::kEvenOddHardwareSync};
 #else
     Tetrium::InitOptions options{
         .tetraMode = Tetrium::TetraMode::kEvenOddHardwareSync}; // default or fallback

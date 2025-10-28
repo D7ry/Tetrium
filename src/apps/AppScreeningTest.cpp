@@ -30,32 +30,32 @@ ImVec2 calculateFitSize(float width, float height, const ImVec2& availableSize)
 namespace TetriumApp
 {
 
-// Ishihara plates numbers -- we pick from these to generate tests
-static const std::vector<int> ISHIHARA_PLATES_NUMBERS = [] {
-    std::vector<int> v;
-    for (int i = 10; i <= 99; ++i)
-        v.push_back(i);
-    return v;
-}();
+// Landolt C orientations -- we pick from these to generate tests
+static const std::vector<AppScreeningTest::AnswerKind> LANDOLT_C_ORIENTATIONS
+    = {AppScreeningTest::AnswerKind::kUp,
+       AppScreeningTest::AnswerKind::kDown,
+       AppScreeningTest::AnswerKind::kLeft,
+       AppScreeningTest::AnswerKind::kRight};
 
-// Pick 4 random, non-repeating numbers from the ishihara plates
-static std::array<int, 4> PickRandomFourIshiharaPlates()
+// Define the static map for orientation to string conversion
+// Note: This maps AnswerKind enum values to their corresponding arrow directions
+const std::unordered_map<AppScreeningTest::AnswerKind, std::string>
+    AppScreeningTest::_orientationToStringMap
+    = {{AppScreeningTest::AnswerKind::kUp, "up"},
+       {AppScreeningTest::AnswerKind::kDown, "down"},
+       {AppScreeningTest::AnswerKind::kLeft, "left"},
+       {AppScreeningTest::AnswerKind::kRight, "right"}};
+
+std::string AppScreeningTest::OrientationToString(AppScreeningTest::AnswerKind orientation)
 {
-    std::vector<int> numbers = ISHIHARA_PLATES_NUMBERS;
-    std::array<int, 4> pickedPlates;
-    for (int i = 0; i < 4; i++) {
-        int index = rand() % numbers.size();
-        pickedPlates[i] = numbers[index];
-        numbers.erase(numbers.begin() + index);
-    }
-
-    return pickedPlates;
+    auto it = _orientationToStringMap.find(orientation);
+    return (it != _orientationToStringMap.end()) ? it->second : "unknown";
 }
 
-static std::string GetIshiharaPlateAnswerTexturePath(int plateNumber)
+std::string AppScreeningTest::GetLandoltCAnswerTexturePath(AppScreeningTest::AnswerKind orientation)
 {
-    return TETRIUM_COLOR_PATH + "TetriumColor/Assets/HiddenImages/" + std::to_string(plateNumber)
-           + ".png";
+    return TETRIUM_COLOR_PATH + "TetriumColor/Assets/HiddenImages/landolt_"
+           + OrientationToString(orientation) + ".png";
 }
 
 void TetriumApp::AppScreeningTest::TickImGui(const TetriumApp::TickContextImGui& ctx)
@@ -88,12 +88,23 @@ void TetriumApp::AppScreeningTest::drawSettingsWindow(const TetriumApp::TickCont
     // draw a settings pop-up window
     if (ImGui::BeginPopup("Settings", ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::SliderInt("Num Attempts", &SETTINGS.NUM_ATTEMPTS, 1, 10);
+        ImGui::Text("Duration of Blank Period (seconds)");
+        ImGui::InputFloat("##Blank", &SETTINGS.STATE_DURATIONS_SECONDS.BLANK);
         ImGui::Text("Duration of Fixation (seconds)");
         ImGui::InputFloat("##Fixation", &SETTINGS.STATE_DURATIONS_SECONDS.FIXATION);
         ImGui::Text("Duration of Identification (seconds)");
         ImGui::InputFloat("##Identification", &SETTINGS.STATE_DURATIONS_SECONDS.IDENTIFICATION);
         ImGui::Text("Duration of Answering (seconds)");
         ImGui::InputFloat("##Answering", &SETTINGS.STATE_DURATIONS_SECONDS.ANSWERING);
+
+        // Lum noise slider
+        ImGui::SliderFloat("Lum Noise", &SETTINGS.LUM_NOISE, 0.0f, 1.0f);
+
+        // S-cone noise slider
+        ImGui::SliderFloat("S-Cone Noise", &SETTINGS.S_CONE_NOISE, 0.0f, 1.0f);
+
+        // Stimulus size slider
+        ImGui::SliderFloat("Stimulus Size", &SETTINGS.STIMULUS_SIZE, 0.0f, 1.0f);
 
         // Music setting dropdown
         ImGui::Text("Music Setting");
@@ -192,18 +203,18 @@ void TetriumApp::AppScreeningTest::drawIdle(const TetriumApp::TickContextImGui& 
     ImGui::PopStyleVar(4);
 }
 
-void AppScreeningTest::drawIshihara(
+void AppScreeningTest::drawLandoltC(
     SubjectContext& subject,
     const TetriumApp::TickContextImGui& ctx
 )
 {
-    ImGuiTexture tex
-        = subject.prompt.currentIshiharaPlateTexture[ctx.colorSpace]; // RGB is the default
+    ImGuiTexture tex = subject.prompt.currentLandoltCTexture[ctx.colorSpace]; // RGB is the default
 
     ImVec2 availSize = ImGui::GetContentRegionAvail();
     // ImVec2 textureFullscreenSize = calculateFitSize(tex.width, tex.height, availSize);
     // need to scale this such that the stimuli is 2 degrees when we look at in on windows
-    ImVec2 textureFullscreenSize = ImVec2(tex.width * 0.25f, tex.height * 0.25f);
+    ImVec2 textureFullscreenSize
+        = ImVec2(tex.width * SETTINGS.STIMULUS_SIZE, tex.height * SETTINGS.STIMULUS_SIZE);
 
     // center the texture onto the screen
     ImVec2 centerPos = ImVec2(availSize.x * 0.5f, availSize.y * 0.5f);
@@ -233,12 +244,20 @@ void AppScreeningTest::drawTestForSubject(
     }
     ASSERT(subject.currStateRemainderTime > 0);
 
+    if (ImGui::IsKeyPressed(ImGuiKey_GamepadBack)) {
+        ctx.apis.PlaySound(Sound::kVineBoom);
+        _state = TestState::kIdle;
+    }
+
     switch (subject.state) {
+    case SubjectState::kBlank:
+        // Blank state - draw nothing (entirely black)
+        break;
     case SubjectState::kFixation:
         drawFixGazePage();
         break;
     case SubjectState::kIdentification:
-        drawIshihara(subject, ctx);
+        drawLandoltC(subject, ctx);
         break;
     case SubjectState::kAnswer:
         drawAnswerPrompts(subject, ctx);
@@ -251,7 +270,62 @@ void AppScreeningTest::drawSubjectResult(
     const TetriumApp::TickContextImGui& ctx
 )
 {
-    // Calculate the size of the box
+    // Calculate the size and position of the box
+    ImVec2 boxSize(1200, 900);
+    ImVec2 windowSize = ImGui::GetWindowSize();
+    ImVec2 boxPos((windowSize.x - boxSize.x) * 0.5f, (windowSize.y - boxSize.y) * 0.5f);
+
+    // Draw centered box
+    ImGui::SetCursorPos(boxPos);
+    ImGui::BeginChild(
+        "CenteredBox", boxSize, true, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize
+    );
+
+    // --- NEW CONTENT BELOW ---
+    int numMisses = SETTINGS.NUM_ATTEMPTS - subject.numSuccessAttempts;
+    bool perfect = numMisses < 1;
+
+    const char* mainMsg = perfect ? "Congratulations!" : "Tough luck!";
+    const char* followMsg = perfect ? "You're likely a Tetrachromat, or very anomalous!"
+                                    : "You probably won't do better next time.";
+
+    // Vertically center text block
+    float lineSpacing = ImGui::GetTextLineHeightWithSpacing();
+    float yStart = (boxSize.y - (lineSpacing * 5.0f)) * 0.5f;
+
+    // 1. "You scored x/x"
+    ImVec2 textSize1 = ImGui::CalcTextSize("You scored 00/00");
+    ImGui::SetCursorPos(ImVec2((boxSize.x - textSize1.x) * 0.5f, yStart));
+    ImGui::Text("You scored %d/%d", subject.numSuccessAttempts, SETTINGS.NUM_ATTEMPTS);
+
+    // 2. Large "Congratulations" or "Tough luck!"
+    ImGui::SetWindowFontScale(2.0f);
+    ImVec2 textSize2 = ImGui::CalcTextSize(mainMsg);
+    ImGui::SetCursorPos(
+        ImVec2((boxSize.x - textSize2.x * 2.0f * 0.5f) * 0.5f, yStart + lineSpacing * 2.0f)
+    );
+    ImGui::Text("%s", mainMsg);
+    ImGui::SetWindowFontScale(1.0f);
+
+    // 3. Normal text follow-up line
+    ImVec2 textSize3 = ImGui::CalcTextSize(followMsg);
+    ImGui::SetCursorPos(ImVec2((boxSize.x - textSize3.x) * 0.5f, yStart + lineSpacing * 4.0f));
+    ImGui::Text("%s", followMsg);
+
+    // 4. "Okay" button centered below text
+    ImVec2 buttonSize(150, 60);
+    ImVec2 buttonPos((boxSize.x - buttonSize.x) * 0.5f, yStart + lineSpacing * 6.0f);
+    ImGui::SetCursorPos(buttonPos);
+    if (ImGui::Button("Okay", buttonSize)) {
+        if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL) {
+            ctx.apis.PlaySound(Sound::kVineBoom);
+        }
+        _state = TestState::kIdle;
+    }
+
+    ImGui::EndChild();
+    return;
+    /* // Calculate the size of the box
     ImVec2 boxSize(1200, 900); // Width and height of the box
     ImVec2 windowSize = ImGui::GetWindowSize();
     ImVec2 boxPos = ImVec2((windowSize.x - boxSize.x) * 0.5f, (windowSize.y - boxSize.y) * 0.5f);
@@ -298,7 +372,7 @@ void AppScreeningTest::drawSubjectResult(
         _state = TestState::kIdle;
     }
 
-    ImGui::EndChild();
+    ImGui::EndChild(); */
 }
 
 void AppScreeningTest::drawAnswerPrompts(
@@ -321,8 +395,25 @@ void AppScreeningTest::drawAnswerPrompts(
     ImVec2 rightPos = ImVec2(centerPos.x + horizontalSpacing, centerPos.y); // B
     ImVec2 bottomPos = ImVec2(centerPos.x, centerPos.y + verticalSpacing);  // A
 
-    ImVec2 positions[4] = {bottomPos, leftPos, rightPos, topPos}; // A, X, B, Y order
-    const char* buttonLabels[4] = {"A", "X", "B", "Y"};
+    ImVec2 positions[4] = {bottomPos, leftPos, rightPos, topPos}; // Down, Left, Right, Up order
+    const char* buttonLabels[4] = {"↓", "←", "→", "↑"};
+
+    // Gamepad button keys corresponding to each answer button
+    ImGuiKey gamepadKeys[4] = {
+        ImGuiKey_GamepadFaceDown,  // A button
+        ImGuiKey_GamepadFaceLeft,  // X button
+        ImGuiKey_GamepadFaceRight, // B button
+        ImGuiKey_GamepadFaceUp     // Y button
+    };
+
+    // Check for gamepad input first
+    int pressedButton = -1;
+    for (int i = 0; i < 4; i++) {
+        if (ImGui::IsKeyPressed(gamepadKeys[i])) {
+            pressedButton = i;
+            break;
+        }
+    }
 
     // Draw the four buttons
     for (int i = 0; i < 4; i++) {
@@ -336,9 +427,22 @@ void AppScreeningTest::drawAnswerPrompts(
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
 
-        if (ImGui::ImageButton(
-                buttonLabels[i], (void*)(intptr_t)tex.id, ImVec2(buttonSize, buttonSize)
-            )) {
+        bool buttonClicked = ImGui::ImageButton(
+            buttonLabels[i], (void*)(intptr_t)tex.id, ImVec2(buttonSize, buttonSize)
+        );
+
+        // Pop the button style colors
+        ImGui::PopStyleColor(3);
+
+        // Add button label
+        ImVec2 textSize = ImGui::CalcTextSize(buttonLabels[i]);
+        ImVec2 textPos
+            = ImVec2(positions[i].x - textSize.x * 0.5f + 3, positions[i].y + buttonSize / 2 + 10);
+        ImGui::SetCursorPos(textPos);
+        ImGui::Text("%s", buttonLabels[i]);
+
+        // Check if this button was activated (either by click or gamepad)
+        if (buttonClicked || pressedButton == i) {
             printf("%s button clicked!\n", buttonLabels[i]);
             subject.prompt.currentSelectedAnswer = i;
             if (subject.prompt.currentSelectedAnswer == subject.prompt.correctAnswerTextureIndex) {
@@ -356,17 +460,9 @@ void AppScreeningTest::drawAnswerPrompts(
                 }
             }
             transitionSubjectState(subject, ctx);
+            // Only process one button press per frame
+            break;
         }
-
-        // Pop the button style colors
-        ImGui::PopStyleColor(3);
-
-        // Add button label
-        ImVec2 textSize = ImGui::CalcTextSize(buttonLabels[i]);
-        ImVec2 textPos
-            = ImVec2(positions[i].x - textSize.x * 0.5f + 3, positions[i].y + buttonSize / 2 + 10);
-        ImGui::SetCursorPos(textPos);
-        ImGui::Text("%s", buttonLabels[i]);
     }
 
     // draw progress bar showing time left
@@ -384,6 +480,10 @@ void AppScreeningTest::transitionSubjectState(
 )
 {
     switch (subject.state) {
+    case SubjectState::kBlank:
+        subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.FIXATION;
+        subject.state = SubjectState::kFixation;
+        break;
     case SubjectState::kFixation:
         subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.IDENTIFICATION;
         subject.state = SubjectState::kIdentification;
@@ -401,10 +501,10 @@ void AppScreeningTest::transitionSubjectState(
             endGame(subject);
             return;
         }
-        // Otherwise advance to next attempt
+        // Otherwise advance to next attempt and show blank screen
         subject.currentAttempt += 1;
-        subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.FIXATION;
-        subject.state = SubjectState::kFixation;
+        subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.BLANK;
+        subject.state = SubjectState::kBlank;
         populatePromptContext(subject, ctx);
         break;
     }
@@ -442,15 +542,17 @@ void AppScreeningTest::newGame(const TetriumApp::TickContextImGui& ctx)
         *_colorGenerator,
         42 // seed
     );
-    SETTINGS.NUM_ATTEMPTS = _colorGenerator->GetNumSamples();
-
-    INFO("Number of attempts: {}", SETTINGS.NUM_ATTEMPTS);
-    INFO("Number of samples: {}", _colorGenerator->GetNumSamples());
+    if (SETTINGS.NUM_ATTEMPTS > static_cast<int>(_colorGenerator->GetNumSamples())) {
+        INFO(
+            "Number of attempts is greater than the number of samples, setting to number of samples"
+        );
+        SETTINGS.NUM_ATTEMPTS = _colorGenerator->GetNumSamples();
+    }
 
     _subject = SubjectContext{
         .name = _nameInputBuffer,
-        .currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.FIXATION,
-        .state = SubjectState::kFixation,
+        .currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.BLANK,
+        .state = SubjectState::kBlank,
         .currentAttempt = 0,
         .numSuccessAttempts = 0,
         .pyObject
@@ -502,10 +604,10 @@ void AppScreeningTest::drawFixGazePage()
     ImGui::Text("Fix Gaze Onto Crosshair");
 }
 
-// Updated to use the new single-filename interface
-std::pair<std::string, std::string> AppScreeningTest::generateIshiharaTestTextures(
+// Updated to generate Landolt C symbols instead of Ishihara plates
+std::pair<std::string, std::string> AppScreeningTest::generateLandoltCTextures(
     SubjectContext& subject,
-    int number
+    AnswerKind orientation
 )
 {
     // The new interface generates both RGB and OCV versions with a single filename
@@ -513,11 +615,18 @@ std::pair<std::string, std::string> AppScreeningTest::generateIshiharaTestTextur
     // and filename_srgb.png
     // Ensure the temp directory exists before using it
     std::filesystem::create_directories("./temp");
-    std::string baseFilename = "./temp/" + subject.name + "_" + std::to_string(number);
+
+    const std::string orientationStr = OrientationToString(orientation);
+
+    std::string baseFilename = "./temp/" + subject.name + "_" + orientationStr;
 
     // Call NewPlate with DISP_6P output space
     _plateGenerator->NewPlate(
-        baseFilename, number, TetriumColor::ColorSpaceType::DISP_6P, 0.00, 0.1
+        baseFilename,
+        "landolt_" + orientationStr, // Use orientation string for Landolt C
+        TetriumColor::ColorSpaceType::DISP_6P,
+        SETTINGS.LUM_NOISE,
+        SETTINGS.S_CONE_NOISE
     );
 
     // Return paths - the 6P files will be at baseFilename_0.png ... baseFilename_5.png
@@ -534,53 +643,68 @@ void AppScreeningTest::populatePromptContext(
     const TetriumApp::TickContextImGui& ctx
 )
 {
-    // stall and generate ishihara textures
-    std::array<int, 4> ishiharaPlateNumbers = PickRandomFourIshiharaPlates();
-    int answerPlateIndex = rand() % ishiharaPlateNumbers.size();
-    int answerPlateNumber = ishiharaPlateNumbers[answerPlateIndex];
+    // stall and generate Landolt C textures
+    // Pick one random orientation for the correct answer
+    AnswerKind answerOrientation = LANDOLT_C_ORIENTATIONS[rand() % LANDOLT_C_ORIENTATIONS.size()];
 
-    auto [rgbTexturePath, ocvTexturePath]
-        = generateIshiharaTestTextures(_subject, answerPlateNumber);
+    auto [rgbTexturePath, ocvTexturePath] = generateLandoltCTextures(_subject, answerOrientation);
 
     // unload previous textures
-    if (_subject.prompt.currentIshiharaPlateTextureHandle[ColorSpace::RGB] != 0) {
-        ctx.apis.UnloadTexture(_subject.prompt.currentIshiharaPlateTextureHandle[ColorSpace::RGB]);
+    if (_subject.prompt.currentLandoltCTextureHandle[ColorSpace::RGB] != 0) {
+        ctx.apis.UnloadTexture(_subject.prompt.currentLandoltCTextureHandle[ColorSpace::RGB]);
     }
-    if (_subject.prompt.currentIshiharaPlateTextureHandle[ColorSpace::OCV] != 0) {
-        ctx.apis.UnloadTexture(_subject.prompt.currentIshiharaPlateTextureHandle[ColorSpace::OCV]);
+    if (_subject.prompt.currentLandoltCTextureHandle[ColorSpace::OCV] != 0) {
+        ctx.apis.UnloadTexture(_subject.prompt.currentLandoltCTextureHandle[ColorSpace::OCV]);
     }
 
-    _subject.prompt.currentIshiharaPlateTextureHandle[ColorSpace::RGB]
+    _subject.prompt.currentLandoltCTextureHandle[ColorSpace::RGB]
         = ctx.apis.LoadTexture(rgbTexturePath);
-    _subject.prompt.currentIshiharaPlateTextureHandle[ColorSpace::OCV]
+    _subject.prompt.currentLandoltCTextureHandle[ColorSpace::OCV]
         = ctx.apis.LoadTexture(ocvTexturePath);
 
-    _subject.prompt.currentIshiharaPlateTexture[ColorSpace::RGB] = ctx.apis.InitImGuiTexture(
-        _subject.prompt.currentIshiharaPlateTextureHandle[ColorSpace::RGB]
-    );
-    _subject.prompt.currentIshiharaPlateTexture[ColorSpace::OCV] = ctx.apis.InitImGuiTexture(
-        _subject.prompt.currentIshiharaPlateTextureHandle[ColorSpace::OCV]
-    );
+    _subject.prompt.currentLandoltCTexture[ColorSpace::RGB]
+        = ctx.apis.InitImGuiTexture(_subject.prompt.currentLandoltCTextureHandle[ColorSpace::RGB]);
+    _subject.prompt.currentLandoltCTexture[ColorSpace::OCV]
+        = ctx.apis.InitImGuiTexture(_subject.prompt.currentLandoltCTextureHandle[ColorSpace::OCV]);
+
+    // Create a fixed mapping between button positions and orientations
+    // Button positions: {bottomPos, leftPos, rightPos, topPos} = {"↓", "←", "→", "↑"}
+    // Map to orientations: {kDown, kLeft, kRight, kUp}
+    std::array<AnswerKind, 4> buttonOrientationMap = {
+        AnswerKind::kDown,  // Index 0: bottomPos → "↓"
+        AnswerKind::kLeft,  // Index 1: leftPos → "←"
+        AnswerKind::kRight, // Index 2: rightPos → "→"
+        AnswerKind::kUp     // Index 3: topPos → "↑"
+    };
 
     // populate answer textures -- they're pre-generated
     for (int i = 0; i < 4; i++) {
         _subject.prompt.currentAnswerTextureHandle[i]
-            = _answerPromptTextureHandles[ishiharaPlateNumbers[i]];
+            = _answerPromptTextureHandles[buttonOrientationMap[i]];
         _subject.prompt.currentAnswerTexture[i]
-            = _answerPromptImGuiTextures[ishiharaPlateNumbers[i]];
+            = _answerPromptImGuiTextures[buttonOrientationMap[i]];
+    }
+
+    // Find which button index corresponds to the correct answer
+    int correctButtonIndex = -1;
+    for (int i = 0; i < 4; i++) {
+        if (buttonOrientationMap[i] == answerOrientation) {
+            correctButtonIndex = i;
+            break;
+        }
     }
 
     // Set the correct answer index
-    _subject.prompt.correctAnswerTextureIndex = answerPlateIndex;
+    _subject.prompt.correctAnswerTextureIndex = correctButtonIndex;
 }
 
 void AppScreeningTest::Init(TetriumApp::InitContext& ctx)
 {
-    for (int ishiharaPlateNumber : ISHIHARA_PLATES_NUMBERS) {
-        std::string path = GetIshiharaPlateAnswerTexturePath(ishiharaPlateNumber);
+    for (AnswerKind orientation : LANDOLT_C_ORIENTATIONS) {
+        std::string path = AppScreeningTest::GetLandoltCAnswerTexturePath(orientation);
         uint32_t textureHandle = ctx.api.LoadTexture(path);
-        _answerPromptTextureHandles[ishiharaPlateNumber] = textureHandle;
-        _answerPromptImGuiTextures[ishiharaPlateNumber] = ctx.api.InitImGuiTexture(textureHandle);
+        _answerPromptTextureHandles[orientation] = textureHandle;
+        _answerPromptImGuiTextures[orientation] = ctx.api.InitImGuiTexture(textureHandle);
     }
     // load bair logo
     // FIXME: free the logo texture when cleaning up
@@ -591,8 +715,8 @@ void AppScreeningTest::Init(TetriumApp::InitContext& ctx)
 
 void AppScreeningTest::Cleanup(TetriumApp::CleanupContext& ctx)
 {
-    for (int ishiharaPlateNumber : ISHIHARA_PLATES_NUMBERS) {
-        ctx.api.UnloadTexture(_answerPromptTextureHandles[ishiharaPlateNumber]);
+    for (AnswerKind orientation : LANDOLT_C_ORIENTATIONS) {
+        ctx.api.UnloadTexture(_answerPromptTextureHandles[orientation]);
     }
 
     // Clean up generators
