@@ -55,7 +55,7 @@ class AppTemporalAFC : public App
         int isiDurationMs = 350;
         float circleRadius = 0.3f; // screen proportion
         bool hasNoisyBoundary = false;
-        OddType oddType = OddType::RANDOMIZE;
+        OddType oddType = OddType::R_PLUS_G;
     } settings;
 
     struct StimulusTextures

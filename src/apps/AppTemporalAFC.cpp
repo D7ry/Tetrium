@@ -487,9 +487,13 @@ void AppTemporalAFC::handleResponse(int choice, const TetriumApp::TickContextImG
     if (correct)
         numCorrect++;
 
-    // Play sound feedback for response submission
+    // Play sound feedback based on correctness
     if (choice >= 0) { // Only play sound if user actually responded (not timeout)
-        ctx.apis.PlaySound(Sound::kCorrectAnswer);
+        if (correct) {
+            ctx.apis.PlaySound(Sound::kCorrectAnswer);
+        } else {
+            ctx.apis.PlaySound(Sound::kWrongAnswer);
+        }
     }
 
     // Log trial data
