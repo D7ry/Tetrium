@@ -48,9 +48,9 @@ class AppTemporalAFC : public App
     struct Settings
     {
         int numSamplesPerRatio = 10;
-        float orangeLevel = 63.0f; // 0-255
-        float redLevel = 65.0f;    // 0-255
-        float greenLevel = 34.0f;  // 0-255
+        float orangeLevel = 133.0f; // 0-255
+        float redLevel = 147.0f;    // 0-255
+        float greenLevel = 30.0f;   // 0-255
         int stimulusDurationMs = 150;
         int isiDurationMs = 350;
         float circleRadius = 0.3f; // screen proportion

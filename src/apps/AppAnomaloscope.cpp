@@ -183,7 +183,7 @@ void AppAnomaloscope::drawRunning(const TetriumApp::TickContextImGui& ctx)
     ImVec2 centerPos(screenSize.x * 0.5f, screenSize.y * 0.5f);
 
     // Left side: Control panel (wider to accommodate all controls)
-    float controlPanelWidth = 1000.0f;  // 2.5x wider (was 400)
+    float controlPanelWidth = 1000.0f; // 2.5x wider (was 400)
     ImGui::SetNextWindowPos(ImVec2(20, 20));
     ImGui::SetNextWindowSize(ImVec2(controlPanelWidth, screenSize.y - 40));
     ImGui::Begin("Controls", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
