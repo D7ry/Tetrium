@@ -182,9 +182,10 @@ void AppAnomaloscope::drawRunning(const TetriumApp::TickContextImGui& ctx)
     ImVec2 screenSize = ImGui::GetIO().DisplaySize;
     ImVec2 centerPos(screenSize.x * 0.5f, screenSize.y * 0.5f);
 
-    // Left side: Control panel
+    // Left side: Control panel (wider to accommodate all controls)
+    float controlPanelWidth = 1000.0f;  // 2.5x wider (was 400)
     ImGui::SetNextWindowPos(ImVec2(20, 20));
-    ImGui::SetNextWindowSize(ImVec2(400, screenSize.y - 40));
+    ImGui::SetNextWindowSize(ImVec2(controlPanelWidth, screenSize.y - 40));
     ImGui::Begin("Controls", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
 
     ImGui::SeparatorText("Top Half: R+G Mixture");
@@ -382,7 +383,7 @@ void AppAnomaloscope::drawRunning(const TetriumApp::TickContextImGui& ctx)
 
     // Right side: Display bipartite stimulus
     // Calculate the display area (right half of screen, minus control panel)
-    float displayLeft = 440; // Control panel width + margin
+    float displayLeft = controlPanelWidth + 40; // Control panel width + margin
     float displayWidth = screenSize.x - displayLeft - 20;
     float displayHeight = screenSize.y;
 
