@@ -39,11 +39,11 @@ class AppAnomaloscope : public App
         bool hasNoisyBoundary = false;
 
         // Joystick adjustment speeds
-        float rgRatioSpeed = 10.0f;     // Units per second for R/G ratio
+        float rgRatioSpeed = 10.0f;      // Units per second for R/G ratio
         float rgTotalLevelSpeed = 50.0f; // Units per second for R+G total level
-        float redLevelSpeed = 50.0f;    // Units per second for red level
-        float greenLevelSpeed = 50.0f;  // Units per second for green level
-        float orangeLevelSpeed = 50.0f; // Units per second for orange level
+        float redLevelSpeed = 50.0f;     // Units per second for red level
+        float greenLevelSpeed = 50.0f;   // Units per second for green level
+        float orangeLevelSpeed = 50.0f;  // Units per second for orange level
     } settings;
 
     struct BipartiteStimulus

@@ -158,13 +158,15 @@ void AppAnomaloscope::drawRunning(const TetriumApp::TickContextImGui& ctx)
     }
 
     // D-pad Y-axis controls green level when combined with shoulder button, otherwise orange
-    bool shoulderPressed = (io.NavInputs[ImGuiNavInput_TweakSlow] != 0.0f || io.NavInputs[ImGuiNavInput_TweakFast] != 0.0f);
-    
+    bool shoulderPressed
+        = (io.NavInputs[ImGuiNavInput_TweakSlow] != 0.0f
+           || io.NavInputs[ImGuiNavInput_TweakFast] != 0.0f);
+
     if (io.NavInputs[ImGuiNavInput_DpadUp] != 0.0f
         || io.NavInputs[ImGuiNavInput_DpadDown] != 0.0f) {
         float adjust = (io.NavInputs[ImGuiNavInput_DpadUp] - io.NavInputs[ImGuiNavInput_DpadDown])
                        * deltaTime;
-        
+
         if (shoulderPressed) {
             // With shoulder button: adjust green level
             adjust *= settings.greenLevelSpeed;
@@ -235,7 +237,7 @@ void AppAnomaloscope::drawRunning(const TetriumApp::TickContextImGui& ctx)
     if (ImGui::SliderFloat("Red Level", &settings.redLevel, 0.0f, 255.0f, "%.1f")) {
         stimulusNeedsUpdate = true;
     }
-    
+
     // Fine adjustment buttons for red
     ImGui::Text("Fine Adjust:");
     ImGui::SameLine();
@@ -265,7 +267,7 @@ void AppAnomaloscope::drawRunning(const TetriumApp::TickContextImGui& ctx)
     if (ImGui::SliderFloat("Green Level", &settings.greenLevel, 0.0f, 255.0f, "%.1f")) {
         stimulusNeedsUpdate = true;
     }
-    
+
     // Fine adjustment buttons for green
     ImGui::Text("Fine Adjust:");
     ImGui::SameLine();
@@ -500,20 +502,20 @@ std::tuple<float, float, float, float> AppAnomaloscope::computeRGSide()
     // Top half: R+G mixture
     // Use ratio/total OR independent levels depending on which has been adjusted
     // For now, we'll use independent levels if they differ from the ratio-based values
-    
+
     // Compute ratio-based values
     float ratio = settings.rgRatio / 100.0f;
     float r_ratio = settings.rgTotalLevel * ratio;
     float g_ratio = settings.rgTotalLevel * (1.0f - ratio);
-    
+
     // Check if independent levels have been modified
     // (We'll use independent levels if they're significantly different from ratio-based)
-    float expected_red = 128.0f;  // default red level
+    float expected_red = 128.0f;   // default red level
     float expected_green = 128.0f; // default green level
-    
-    bool using_independent = (std::abs(settings.redLevel - expected_red) > 1.0f) 
-                          || (std::abs(settings.greenLevel - expected_green) > 1.0f);
-    
+
+    bool using_independent = (std::abs(settings.redLevel - expected_red) > 1.0f)
+                             || (std::abs(settings.greenLevel - expected_green) > 1.0f);
+
     float r, g;
     if (using_independent) {
         // Use independent levels directly
@@ -524,7 +526,7 @@ std::tuple<float, float, float, float> AppAnomaloscope::computeRGSide()
         r = r_ratio;
         g = g_ratio;
     }
-    
+
     float b = 0.0f;
     float o = 0.0f;
 
