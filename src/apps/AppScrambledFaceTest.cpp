@@ -25,6 +25,10 @@ void AppScrambledFaceTest::Cleanup(TetriumApp::CleanupContext& ctx)
         delete generator;
         generator = nullptr;
     }
+    if (logger) {
+        delete logger;
+        logger = nullptr;
+    }
 }
 
 void AppScrambledFaceTest::TickImGui(const TetriumApp::TickContextImGui& ctx)
@@ -107,12 +111,31 @@ void AppScrambledFaceTest::startTest(const TetriumApp::TickContextImGui& ctx)
         delete generator;
         generator = nullptr;
     }
+    if (logger) {
+        delete logger;
+        logger = nullptr;
+    }
+
     std::filesystem::create_directories("./temp");
     generator = new TetriumColor::CircleGridGenerator(
         std::string(TETRIUM_COLOR_PATH) + "measurements/2025-10-12/primaries",
         settings.numTrials,
         settings.scrambleProb
     );
+
+    // Initialize logger
+    std::vector<std::string> headers
+        = {"subject_id",
+           "session_timestamp",
+           "trial_idx",
+           "scrambled_original_idx",
+           "user_choice",
+           "correct",
+           "luminance",
+           "saturation",
+           "scramble_prob"};
+    logger = new TestDataLogger("AppScrambledFaceTest", subjectName, headers);
+
     trials.clear();
     trials.resize(settings.numTrials);
     currentTrial = 0;
@@ -204,14 +227,24 @@ void AppScrambledFaceTest::drawRunning(const TetriumApp::TickContextImGui& ctx)
         if (clicked) {
             t.userChoice = i;
             // correctness: original scrambled is last in original (index 2)
-            if (t.displayToOriginal[t.userChoice] == t.scrambledOriginalIndex)
+            bool correct = (t.displayToOriginal[t.userChoice] == t.scrambledOriginalIndex);
+            if (correct)
                 ++numCorrect;
-            // for (auto& c : t.choices) {
-            //     if (c.handleRGB)
-            //         ctx.apis.UnloadTexture(c.handleRGB);
-            //     if (c.handleOCV)
-            //         ctx.apis.UnloadTexture(c.handleOCV);
-            // }
+
+            // Log trial data
+            if (logger) {
+                std::map<std::string, std::string> data;
+                data["subject_id"] = subjectName;
+                data["trial_idx"] = std::to_string(currentTrial);
+                data["scrambled_original_idx"] = std::to_string(t.scrambledOriginalIndex);
+                data["user_choice"] = std::to_string(t.userChoice);
+                data["correct"] = correct ? "1" : "0";
+                data["luminance"] = std::to_string(settings.luminance);
+                data["saturation"] = std::to_string(settings.saturation);
+                data["scramble_prob"] = std::to_string(settings.scrambleProb);
+                logger->LogRow(data);
+            }
+
             if (currentTrial + 1 >= settings.numTrials) {
                 state = TestState::kResult;
             } else {

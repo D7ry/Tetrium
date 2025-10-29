@@ -7,6 +7,7 @@
 #include "apps/AppPainter.h"
 #include "apps/AppScrambledFaceTest.h"
 #include "apps/AppScreeningTest.h"
+#include "apps/AppTemporalAFC.h"
 #include "apps/AppTetraHueSphere.h"
 
 static void printGreetingBanner()
@@ -32,6 +33,7 @@ int main(int argc, char** argv)
     std::vector<std::pair<TetriumApp::App*, const char*>> apps = {
         {new TetriumApp::AppScreeningTest(), "Screening Test"},
         {new TetriumApp::AppScrambledFaceTest(), "Scrambled Face Test"},
+        {new TetriumApp::AppTemporalAFC(), "Temporal 3AFC"},
         {new TetriumApp::AppTetraHueSphere(), "Tetra Hue Sphere"},
         {new TetriumApp::AppImageViewer(), "Image Viewer"},
         {new TetriumApp::AppPainter(), "Painter"},

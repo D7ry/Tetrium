@@ -2,6 +2,7 @@
 
 #include "TetriumColor/ColorGenerator.h"
 #include "TetriumColor/PseudoIsochromaticPlateGenerator.h"
+#include "lib/TestDataLogger.h"
 
 #include "App.h"
 #include <optional>
@@ -74,6 +75,7 @@ class AppScreeningTest : public App
         ImGuiTexture currentAnswerTexture[4];
         int correctAnswerTextureIndex;
         int currentSelectedAnswer = -1;
+        AnswerKind currentOrientation; // Track current trial orientation for logging
     };
 
     struct SubjectContext
@@ -139,8 +141,15 @@ class AppScreeningTest : public App
 
     TetriumColor::ColorGenerator* _colorGenerator = nullptr;
     TetriumColor::PseudoIsochromaticPlateGenerator* _plateGenerator = nullptr;
+    TestDataLogger* _logger = nullptr;
 
     void populatePromptContext(SubjectContext& subject, const TetriumApp::TickContextImGui& ctx);
+    void logTrialData(
+        const SubjectContext& subject,
+        AnswerKind orientation,
+        int userChoice,
+        bool correct
+    );
 
     // Static helper functions for Landolt C orientations
     static std::string GetLandoltCAnswerTexturePath(AnswerKind orientation);

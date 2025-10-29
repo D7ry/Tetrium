@@ -49,10 +49,14 @@ set(SOURCES_BUILD
         # Apps
         src/apps/AppScreeningTest.cpp
         src/apps/AppScrambledFaceTest.cpp
+        src/apps/AppTemporalAFC.cpp
         src/apps/AppTetraHueSphere.cpp
         src/apps/AppImageViewer.cpp
         src/apps/AppPainter.cpp
         src/apps/AppAutoMeasure.cpp
+        
+        # Test data logging
+        src/lib/TestDataLogger.cpp
         src/apps/app_components/PR650.cpp
         src/apps/painter/PainterImGui.cpp
         src/apps/painter/PainterColorPicker.cpp

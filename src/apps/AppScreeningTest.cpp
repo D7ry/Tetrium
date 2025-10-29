@@ -452,7 +452,11 @@ void AppScreeningTest::drawAnswerPrompts(
         if (buttonClicked || pressedButton == i) {
             printf("%s button clicked!\n", buttonLabels[i]);
             subject.prompt.currentSelectedAnswer = i;
-            if (subject.prompt.currentSelectedAnswer == subject.prompt.correctAnswerTextureIndex) {
+            bool correct
+                = (subject.prompt.currentSelectedAnswer == subject.prompt.correctAnswerTextureIndex
+                );
+
+            if (correct) {
                 printf("Correct answer!\n");
                 // NOTE: incrementing numSuccessAttempts is done in transitionSubjectState
                 if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL
@@ -466,6 +470,10 @@ void AppScreeningTest::drawAnswerPrompts(
                     ctx.apis.PlaySound(Sound::kWrongAnswer);
                 }
             }
+
+            // Log trial data
+            logTrialData(subject, subject.prompt.currentOrientation, i, correct);
+
             transitionSubjectState(subject, ctx);
             // Only process one button press per frame
             break;
@@ -529,6 +537,9 @@ void AppScreeningTest::newGame(const TetriumApp::TickContextImGui& ctx)
     if (_colorGenerator) {
         delete _colorGenerator;
     }
+    if (_logger) {
+        delete _logger;
+    }
 
     // Create color generator with the new interface
     // Matching the Python snippet:
@@ -558,6 +569,19 @@ void AppScreeningTest::newGame(const TetriumApp::TickContextImGui& ctx)
         );
         SETTINGS.NUM_ATTEMPTS = _colorGenerator->GetNumSamples();
     }
+
+    // Initialize logger
+    std::vector<std::string> headers
+        = {"subject_id",
+           "session_timestamp",
+           "trial_idx",
+           "orientation",
+           "user_choice",
+           "correct",
+           "lum_noise",
+           "s_cone_noise",
+           "stimulus_size"};
+    _logger = new TestDataLogger("AppScreeningTest", _nameInputBuffer, headers);
 
     _subject = SubjectContext{
         .name = _nameInputBuffer,
@@ -744,6 +768,32 @@ void AppScreeningTest::populatePromptContext(
 
     // Set the correct answer index
     _subject.prompt.correctAnswerTextureIndex = correctButtonIndex;
+
+    // Store current orientation for logging
+    _subject.prompt.currentOrientation = answerOrientation;
+}
+
+void AppScreeningTest::logTrialData(
+    const SubjectContext& subject,
+    AnswerKind orientation,
+    int userChoice,
+    bool correct
+)
+{
+    if (!_logger)
+        return;
+
+    std::map<std::string, std::string> data;
+    data["subject_id"] = subject.name;
+    data["trial_idx"] = std::to_string(subject.currentAttempt);
+    data["orientation"] = OrientationToString(orientation);
+    data["user_choice"] = std::to_string(userChoice);
+    data["correct"] = correct ? "1" : "0";
+    data["lum_noise"] = std::to_string(SETTINGS.LUM_NOISE);
+    data["s_cone_noise"] = std::to_string(SETTINGS.S_CONE_NOISE);
+    data["stimulus_size"] = std::to_string(SETTINGS.STIMULUS_SIZE);
+
+    _logger->LogRow(data);
 }
 
 void AppScreeningTest::Init(TetriumApp::InitContext& ctx)
@@ -775,6 +825,10 @@ void AppScreeningTest::Cleanup(TetriumApp::CleanupContext& ctx)
     if (_colorGenerator) {
         delete _colorGenerator;
         _colorGenerator = nullptr;
+    }
+    if (_logger) {
+        delete _logger;
+        _logger = nullptr;
     }
 }
 } // namespace TetriumApp

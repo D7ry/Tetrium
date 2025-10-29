@@ -6,3 +6,5 @@ release/
 .vs/
 vcpkg_installed/
 assets/apps/AppImageViewer/tetra_images/*
+data/
+temp/

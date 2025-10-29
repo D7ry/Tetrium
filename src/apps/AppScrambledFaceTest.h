@@ -2,6 +2,7 @@
 
 #include "App.h"
 #include "TetriumColor/TetriumColor.h"
+#include "lib/TestDataLogger.h"
 
 namespace TetriumApp
 {
@@ -64,5 +65,6 @@ class AppScrambledFaceTest : public App
     void drawResult(const TetriumApp::TickContextImGui& ctx);
 
     TetriumColor::CircleGridGenerator* generator = nullptr;
+    TestDataLogger* logger = nullptr;
 };
 } // namespace TetriumApp
