@@ -225,13 +225,14 @@ void AppTemporalAFC::drawRunning(const TetriumApp::TickContextImGui& ctx)
     }
 
     case TrialState::kResponse: {
-        // Show 3 buttons for response
-        ImVec2 buttonSize(150, 60);
-        float spacing = 40.0f;
-        float totalWidth = 3 * buttonSize.x + 2 * spacing;
-        ImVec2 startPos(centerPos.x - totalWidth * 0.5f, centerPos.y + 100);
-
-        const char* labels[] = {"1st", "2nd", "3rd"};
+        // Show fixation cross
+        ImGui::SetWindowFontScale(4.0f);
+        const char* crossText = "+";
+        ImVec2 textSize = ImGui::CalcTextSize(crossText);
+        ImVec2 crossPos(centerPos.x - textSize.x * 0.5f, centerPos.y - textSize.y * 0.5f);
+        ImGui::SetCursorPos(crossPos);
+        ImGui::Text("%s", crossText);
+        ImGui::SetWindowFontScale(1.0f);
 
         // Gamepad button keys (X, Y, B for 1st, 2nd, 3rd)
         ImGuiKey gamepadKeys[3] = {
@@ -240,23 +241,10 @@ void AppTemporalAFC::drawRunning(const TetriumApp::TickContextImGui& ctx)
             ImGuiKey_GamepadFaceRight // B button -> 3rd
         };
 
-        // Check for gamepad input first
-        int pressedButton = -1;
+        // Check for gamepad input only
         for (int i = 0; i < 3; i++) {
             if (ImGui::IsKeyPressed(gamepadKeys[i])) {
-                pressedButton = i;
-                break;
-            }
-        }
-
-        for (int i = 0; i < 3; ++i) {
-            ImGui::SetCursorPos(ImVec2(startPos.x + i * (buttonSize.x + spacing), startPos.y));
-            bool buttonClicked = ImGui::Button(labels[i], buttonSize);
-
-            // Check if this button was activated (either by click or gamepad)
-            if (buttonClicked || pressedButton == i) {
                 handleResponse(i, ctx);
-                // Only process one button press per frame
                 break;
             }
         }
