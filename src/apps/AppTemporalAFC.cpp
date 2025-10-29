@@ -140,6 +140,7 @@ void AppTemporalAFC::drawSettings(const TetriumApp::TickContextImGui& ctx)
         ImGui::SliderInt("ISI Duration (ms)", &settings.isiDurationMs, 100, 2000);
         ImGui::SliderFloat("Circle Radius", &settings.circleRadius, 0.1f, 0.8f);
         ImGui::Checkbox("Noisy Boundary", &settings.hasNoisyBoundary);
+        ImGui::Checkbox("Use RGO for OCV channel", &settings.useRGOForOCV);
 
         ImGui::Text("Odd Stimulus Type");
         const char* oddTypeOptions[] = {"Orange", "R+G", "Randomize"};
@@ -340,7 +341,8 @@ void AppTemporalAFC::startTest(const TetriumApp::TickContextImGui& ctx)
            "orange_level",
            "red_level",
            "green_level",
-           "has_noisy_boundary"};
+           "has_noisy_boundary",
+           "use_rgo_for_ocv"};
 
     if (logger) {
         delete logger;
@@ -420,7 +422,9 @@ void AppTemporalAFC::generateStimulusTextures(Trial& trial, const TetriumApp::Ti
 
         // Load textures
         trial.stimuli[i].handleRGB = ctx.apis.LoadTexture(rgbPath);
-        trial.stimuli[i].handleOCV = ctx.apis.LoadTexture(ocvPath);
+        // If useRGOForOCV is enabled, use RGB path for OCV channel as well
+        std::string ocvTexturePath = settings.useRGOForOCV ? rgbPath : ocvPath;
+        trial.stimuli[i].handleOCV = ctx.apis.LoadTexture(ocvTexturePath);
         trial.stimuli[i].texRGB = ctx.apis.InitImGuiTexture(trial.stimuli[i].handleRGB);
         trial.stimuli[i].texOCV = ctx.apis.InitImGuiTexture(trial.stimuli[i].handleOCV);
     }
@@ -516,6 +520,7 @@ void AppTemporalAFC::logTrialData(const Trial& trial)
     data["red_level"] = std::to_string(settings.redLevel);
     data["green_level"] = std::to_string(settings.greenLevel);
     data["has_noisy_boundary"] = settings.hasNoisyBoundary ? "1" : "0";
+    data["use_rgo_for_ocv"] = settings.useRGOForOCV ? "1" : "0";
 
     logger->LogRow(data);
 }

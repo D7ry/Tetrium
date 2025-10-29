@@ -55,6 +55,7 @@ class AppTemporalAFC : public App
         int isiDurationMs = 350;
         float circleRadius = 0.375f; // screen proportion
         bool hasNoisyBoundary = false;
+        bool useRGOForOCV = false; // If true, show RGO image in OCV channel
         OddType oddType = OddType::R_PLUS_G;
     } settings;
 
