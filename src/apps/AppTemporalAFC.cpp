@@ -573,11 +573,10 @@ std::tuple<float, float, float, float> AppTemporalAFC::computeRGBO(
         // Standards should be the OPPOSITE type of the odd stimulus
         if (oddType == OddType::ORANGE) {
             // Odd is orange, so standards are R+G mixtures at varying ratios
-            // RGBO = (ratio*total, (1-ratio)*total, 0, 0)
+            // RGBO = (ratio*redLevel, (1-ratio)*greenLevel, 0, 0)
             float ratio = rgRatio / 100.0f;
-            float totalRG = settings.redLevel + settings.greenLevel;
-            r = totalRG * ratio;
-            g = totalRG * (1.0f - ratio);
+            r = ratio * settings.redLevel;
+            g = (1.0f - ratio) * settings.greenLevel;
             b = 0.0f;
             o = 0.0f;
         } else {
