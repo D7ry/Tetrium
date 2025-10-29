@@ -27,16 +27,17 @@ class AppAnomaloscope : public App
         // R+G side parameters (top half)
         float rgRatio = 50.0f;       // R/(R+G) ratio as percentage (0-100)
         float rgTotalLevel = 255.0f; // Total luminance of R+G mixture (0-255)
-        float redLevel = 128.0f;     // Red primary level (0-255)
-        float greenLevel = 128.0f;   // Green primary level (0-255)
+        float redLevel = 74.0f;      // Red primary level (0-255)
+        float greenLevel = 30.0f;    // Green primary level (0-255)
 
         // Orange side parameters (bottom half)
-        float orangeLevel = 128.0f; // Orange primary level (0-255)
+        float orangeLevel = 130.0f; // Orange primary level (0-255)
 
         // Display parameters
-        float splitRatio = 0.5f;   // Vertical split position (0-1, 0.5=center)
-        float circleRadius = 0.4f; // Circle size as screen proportion
+        float splitRatio = 0.5f;     // Vertical split position (0-1, 0.5=center)
+        float circleRadius = 0.375f; // Circle size as screen proportion
         bool hasNoisyBoundary = false;
+        bool useRGOForOCV = true; // If true, show RGO image in OCV channel
 
         // Joystick adjustment speeds
         float rgRatioSpeed = 10.0f;      // Units per second for R/G ratio

@@ -134,6 +134,12 @@ void AppAnomaloscope::drawRunning(const TetriumApp::TickContextImGui& ctx)
             = (io.NavInputs[ImGuiNavInput_LStickUp] - io.NavInputs[ImGuiNavInput_LStickDown])
               * settings.rgRatioSpeed * deltaTime;
         settings.rgRatio = std::clamp(settings.rgRatio + adjust, 0.0f, 100.0f);
+
+        // Sync independent levels to match ratio
+        float ratio = settings.rgRatio / 100.0f;
+        settings.redLevel = settings.rgTotalLevel * ratio;
+        settings.greenLevel = settings.rgTotalLevel * (1.0f - ratio);
+
         stimulusNeedsUpdate = true;
     }
 
@@ -144,6 +150,12 @@ void AppAnomaloscope::drawRunning(const TetriumApp::TickContextImGui& ctx)
             = (io.NavInputs[ImGuiNavInput_LStickRight] - io.NavInputs[ImGuiNavInput_LStickLeft])
               * settings.rgTotalLevelSpeed * deltaTime;
         settings.rgTotalLevel = std::clamp(settings.rgTotalLevel + adjust, 0.0f, 255.0f);
+
+        // Sync independent levels to match ratio
+        float ratio = settings.rgRatio / 100.0f;
+        settings.redLevel = settings.rgTotalLevel * ratio;
+        settings.greenLevel = settings.rgTotalLevel * (1.0f - ratio);
+
         stimulusNeedsUpdate = true;
     }
 
@@ -194,6 +206,10 @@ void AppAnomaloscope::drawRunning(const TetriumApp::TickContextImGui& ctx)
 
     // R/G Ratio slider
     if (ImGui::SliderFloat("R/G Ratio (%)", &settings.rgRatio, 0.0f, 100.0f, "%.1f")) {
+        // Sync independent levels to match ratio
+        float ratio = settings.rgRatio / 100.0f;
+        settings.redLevel = settings.rgTotalLevel * ratio;
+        settings.greenLevel = settings.rgTotalLevel * (1.0f - ratio);
         stimulusNeedsUpdate = true;
     }
     ImGui::Text("  Red: %.1f%%", settings.rgRatio);
@@ -204,21 +220,33 @@ void AppAnomaloscope::drawRunning(const TetriumApp::TickContextImGui& ctx)
     ImGui::SameLine();
     if (ImGui::Button("-1##rg")) {
         settings.rgRatio = std::max(0.0f, settings.rgRatio - 1.0f);
+        float ratio = settings.rgRatio / 100.0f;
+        settings.redLevel = settings.rgTotalLevel * ratio;
+        settings.greenLevel = settings.rgTotalLevel * (1.0f - ratio);
         stimulusNeedsUpdate = true;
     }
     ImGui::SameLine();
     if (ImGui::Button("-0.1##rg")) {
         settings.rgRatio = std::max(0.0f, settings.rgRatio - 0.1f);
+        float ratio = settings.rgRatio / 100.0f;
+        settings.redLevel = settings.rgTotalLevel * ratio;
+        settings.greenLevel = settings.rgTotalLevel * (1.0f - ratio);
         stimulusNeedsUpdate = true;
     }
     ImGui::SameLine();
     if (ImGui::Button("+0.1##rg")) {
         settings.rgRatio = std::min(100.0f, settings.rgRatio + 0.1f);
+        float ratio = settings.rgRatio / 100.0f;
+        settings.redLevel = settings.rgTotalLevel * ratio;
+        settings.greenLevel = settings.rgTotalLevel * (1.0f - ratio);
         stimulusNeedsUpdate = true;
     }
     ImGui::SameLine();
     if (ImGui::Button("+1##rg")) {
         settings.rgRatio = std::min(100.0f, settings.rgRatio + 1.0f);
+        float ratio = settings.rgRatio / 100.0f;
+        settings.redLevel = settings.rgTotalLevel * ratio;
+        settings.greenLevel = settings.rgTotalLevel * (1.0f - ratio);
         stimulusNeedsUpdate = true;
     }
 
@@ -226,6 +254,10 @@ void AppAnomaloscope::drawRunning(const TetriumApp::TickContextImGui& ctx)
 
     // Total luminance slider
     if (ImGui::SliderFloat("Total R+G Level", &settings.rgTotalLevel, 0.0f, 255.0f, "%.1f")) {
+        // Sync independent levels to match ratio
+        float ratio = settings.rgRatio / 100.0f;
+        settings.redLevel = settings.rgTotalLevel * ratio;
+        settings.greenLevel = settings.rgTotalLevel * (1.0f - ratio);
         stimulusNeedsUpdate = true;
     }
 
@@ -339,6 +371,10 @@ void AppAnomaloscope::drawRunning(const TetriumApp::TickContextImGui& ctx)
     }
 
     if (ImGui::Checkbox("Noisy Boundary", &settings.hasNoisyBoundary)) {
+        stimulusNeedsUpdate = true;
+    }
+
+    if (ImGui::Checkbox("Use RGO for OCV channel", &settings.useRGOForOCV)) {
         stimulusNeedsUpdate = true;
     }
 
@@ -472,7 +508,9 @@ void AppAnomaloscope::updateStimulus(const TetriumApp::TickContextImGui& ctx)
     );
 
     stimulus.topHandleRGB = ctx.apis.LoadTexture(topRGBPath);
-    stimulus.topHandleOCV = ctx.apis.LoadTexture(topOCVPath);
+    // If useRGOForOCV is enabled, use RGB path for OCV channel as well
+    std::string topOCVTexturePath = settings.useRGOForOCV ? topRGBPath : topOCVPath;
+    stimulus.topHandleOCV = ctx.apis.LoadTexture(topOCVTexturePath);
     stimulus.topTexRGB = ctx.apis.InitImGuiTexture(stimulus.topHandleRGB);
     stimulus.topTexOCV = ctx.apis.InitImGuiTexture(stimulus.topHandleOCV);
 
@@ -493,7 +531,9 @@ void AppAnomaloscope::updateStimulus(const TetriumApp::TickContextImGui& ctx)
     );
 
     stimulus.bottomHandleRGB = ctx.apis.LoadTexture(bottomRGBPath);
-    stimulus.bottomHandleOCV = ctx.apis.LoadTexture(bottomOCVPath);
+    // If useRGOForOCV is enabled, use RGB path for OCV channel as well
+    std::string bottomOCVTexturePath = settings.useRGOForOCV ? bottomRGBPath : bottomOCVPath;
+    stimulus.bottomHandleOCV = ctx.apis.LoadTexture(bottomOCVTexturePath);
     stimulus.bottomTexRGB = ctx.apis.InitImGuiTexture(stimulus.bottomHandleRGB);
     stimulus.bottomTexOCV = ctx.apis.InitImGuiTexture(stimulus.bottomHandleOCV);
 }
@@ -501,31 +541,28 @@ void AppAnomaloscope::updateStimulus(const TetriumApp::TickContextImGui& ctx)
 std::tuple<float, float, float, float> AppAnomaloscope::computeRGSide()
 {
     // Top half: R+G mixture
-    // Use ratio/total OR independent levels depending on which has been adjusted
-    // For now, we'll use independent levels if they differ from the ratio-based values
+    // Always use the ratio-based calculation as the base, but allow
+    // independent level adjustments to override if they've been modified
 
     // Compute ratio-based values
     float ratio = settings.rgRatio / 100.0f;
     float r_ratio = settings.rgTotalLevel * ratio;
     float g_ratio = settings.rgTotalLevel * (1.0f - ratio);
 
-    // Check if independent levels have been modified
-    // (We'll use independent levels if they're significantly different from ratio-based)
-    float expected_red = 128.0f;   // default red level
-    float expected_green = 128.0f; // default green level
-
-    bool using_independent = (std::abs(settings.redLevel - expected_red) > 1.0f)
-                             || (std::abs(settings.greenLevel - expected_green) > 1.0f);
-
+    // Check if independent levels match the ratio-based values
+    // If they're close, use ratio-based. If they differ significantly, use independent.
     float r, g;
-    if (using_independent) {
-        // Use independent levels directly
-        r = settings.redLevel;
-        g = settings.greenLevel;
-    } else {
-        // Use ratio-based calculation
+    bool red_matches_ratio = std::abs(settings.redLevel - r_ratio) < 2.0f;
+    bool green_matches_ratio = std::abs(settings.greenLevel - g_ratio) < 2.0f;
+
+    if (red_matches_ratio && green_matches_ratio) {
+        // Use ratio-based calculation (allows ratio adjustments to work)
         r = r_ratio;
         g = g_ratio;
+    } else {
+        // Independent levels have diverged from ratio, use them directly
+        r = settings.redLevel;
+        g = settings.greenLevel;
     }
 
     float b = 0.0f;
