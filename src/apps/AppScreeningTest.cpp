@@ -185,6 +185,13 @@ void TetriumApp::AppScreeningTest::drawIdle(const TetriumApp::TickContextImGui& 
     // settings button
     elemPos = elemPos + ImVec2(0, buttonSize.y + buttonSpacing);
     ImGui::SetCursorPos(elemPos);
+    // Tutorial button
+    if (ImGui::Button("Tutorial", buttonSize)) {
+        newTutorialGame(ctx);
+    }
+
+    elemPos = elemPos + ImVec2(0, buttonSize.y + buttonSpacing);
+    ImGui::SetCursorPos(elemPos);
     if (ImGui::Button("Settings", buttonSize)) {
         ImGui::OpenPopup("Settings");
         _state = TestState::kSettings;
@@ -496,8 +503,11 @@ void AppScreeningTest::transitionSubjectState(
         if (subject.prompt.currentSelectedAnswer == subject.prompt.correctAnswerTextureIndex) {
             subject.numSuccessAttempts += 1;
         }
+        // Determine the maximum attempts for this run (tutorial overrides to 3)
+        int maxAttempts = _overrideNumAttempts.has_value() ? _overrideNumAttempts.value()
+                                                           : SETTINGS.NUM_ATTEMPTS;
         // If we've reached the last attempt, end game and stop further transitions/prompts
-        if (subject.currentAttempt >= (SETTINGS.NUM_ATTEMPTS - 1)) {
+        if (subject.currentAttempt >= (maxAttempts - 1)) {
             endGame(subject);
             return;
         }
@@ -562,11 +572,21 @@ void AppScreeningTest::newGame(const TetriumApp::TickContextImGui& ctx)
     _state = TestState::kScreening;
 }
 
+void AppScreeningTest::newTutorialGame(const TetriumApp::TickContextImGui& ctx)
+{
+    _isTutorial = true;
+    _overrideNumAttempts = 3;
+    newGame(ctx);
+}
+
 void AppScreeningTest::endGame(SubjectContext& subject)
 {
     DEBUG("ending game for subject {}", subject.name);
     _state = TestState::kScreenResult;
     // TODO: data collection logic + clean up texture resources?
+    // Reset tutorial overrides
+    _isTutorial = false;
+    _overrideNumAttempts = std::nullopt;
 }
 
 void AppScreeningTest::drawFixGazePage()
@@ -638,6 +658,28 @@ std::pair<std::string, std::string> AppScreeningTest::generateLandoltCTextures(
     return {rgbTexturePath, ocvTexturePath};
 }
 
+std::pair<std::string, std::string> AppScreeningTest::generateLuminanceLandoltTextures(
+    SubjectContext& subject,
+    AnswerKind orientation
+)
+{
+    std::filesystem::create_directories("./temp");
+    const std::string orientationStr = OrientationToString(orientation);
+    std::string baseFilename = "./temp/" + subject.name + "_tutorial_" + orientationStr;
+
+    _plateGenerator->GetLuminancePlate(
+        baseFilename,
+        "landolt_" + orientationStr,
+        TetriumColor::ColorSpaceType::DISP_6P,
+        SETTINGS.LUM_NOISE,
+        SETTINGS.S_CONE_NOISE
+    );
+
+    std::string rgbTexturePath = baseFilename + "_RGB.png";
+    std::string ocvTexturePath = baseFilename + "_OCV.png";
+    return {rgbTexturePath, ocvTexturePath};
+}
+
 void AppScreeningTest::populatePromptContext(
     SubjectContext& subject,
     const TetriumApp::TickContextImGui& ctx
@@ -647,7 +689,13 @@ void AppScreeningTest::populatePromptContext(
     // Pick one random orientation for the correct answer
     AnswerKind answerOrientation = LANDOLT_C_ORIENTATIONS[rand() % LANDOLT_C_ORIENTATIONS.size()];
 
-    auto [rgbTexturePath, ocvTexturePath] = generateLandoltCTextures(_subject, answerOrientation);
+    std::pair<std::string, std::string> paths;
+    if (_isTutorial) {
+        paths = generateLuminanceLandoltTextures(_subject, answerOrientation);
+    } else {
+        paths = generateLandoltCTextures(_subject, answerOrientation);
+    }
+    auto [rgbTexturePath, ocvTexturePath] = paths;
 
     // unload previous textures
     if (_subject.prompt.currentLandoltCTextureHandle[ColorSpace::RGB] != 0) {

@@ -4,6 +4,7 @@
 #include "TetriumColor/PseudoIsochromaticPlateGenerator.h"
 
 #include "App.h"
+#include <optional>
 
 namespace TetriumApp
 {
@@ -127,6 +128,13 @@ class AppScreeningTest : public App
         AnswerKind orientation
     );
 
+    // Tutorial mode helpers
+    void newTutorialGame(const TetriumApp::TickContextImGui& ctx);
+    std::pair<std::string, std::string> generateLuminanceLandoltTextures(
+        SubjectContext& subject,
+        AnswerKind orientation
+    );
+
     std::string _nameInputBuffer = "guest";
 
     TetriumColor::ColorGenerator* _colorGenerator = nullptr;
@@ -143,5 +151,9 @@ class AppScreeningTest : public App
 
     // Static map for orientation to string conversion
     static const std::unordered_map<AnswerKind, std::string> _orientationToStringMap;
+
+    // Run-time flags
+    bool _isTutorial = false;
+    std::optional<int> _overrideNumAttempts = std::nullopt;
 };
 } // namespace TetriumApp

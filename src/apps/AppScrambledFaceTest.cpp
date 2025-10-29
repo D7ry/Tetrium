@@ -137,7 +137,7 @@ void AppScrambledFaceTest::generateTrial(
         );
     }
     auto idxs = generator->GetImages(
-        settings.luminance, settings.saturation, names, TetriumColor::ColorSpaceType::DISP_6P
+        0, settings.luminance, settings.saturation, names, TetriumColor::ColorSpaceType::DISP_6P
     );
     (void)idxs;
 
