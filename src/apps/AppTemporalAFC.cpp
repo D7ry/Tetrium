@@ -514,23 +514,56 @@ std::tuple<float, float, float, float> AppTemporalAFC::computeRGBO(
     bool isOdd
 )
 {
+    // TASK DESIGN:
+    // - Each trial has 3 stimuli
+    // - 1 stimulus is the "odd one out"
+    // - 2 stimuli are the "standard" (should look similar to each other)
+    //
+    // Two conditions:
+    // 1. If oddType == ORANGE: odd=pure orange (O), standards=R+G mixtures
+    // 2. If oddType == R_PLUS_G: odd=R+G mixture, standards=pure orange (O)
+    //
+    // This way we always have 2 of one type and 1 of the other type
+
     float r = 0.0f, g = 0.0f, b = 0.0f, o = 0.0f;
 
     if (isOdd) {
+        // This is the ODD stimulus
         if (oddType == OddType::ORANGE) {
-            // Odd is orange
+            // Odd = pure orange primary
+            // RGBO = (0, 0, 0, orangeLevel)
             o = settings.orangeLevel;
+            r = 0.0f;
+            g = 0.0f;
+            b = 0.0f;
         } else {
-            // Odd is R+G
+            // Odd = R+G mixture
+            // RGBO = (redLevel, greenLevel, 0, 0)
             r = settings.redLevel;
             g = settings.greenLevel;
+            b = 0.0f;
+            o = 0.0f;
         }
     } else {
-        // Standard stimulus based on R/G ratio
-        float ratio = rgRatio / 100.0f;
-        float totalRG = settings.redLevel + settings.greenLevel;
-        r = totalRG * ratio;
-        g = totalRG * (1.0f - ratio);
+        // This is a STANDARD stimulus (not odd)
+        // Standards should be the OPPOSITE type of the odd stimulus
+        if (oddType == OddType::ORANGE) {
+            // Odd is orange, so standards are R+G mixtures at varying ratios
+            // RGBO = (ratio*total, (1-ratio)*total, 0, 0)
+            float ratio = rgRatio / 100.0f;
+            float totalRG = settings.redLevel + settings.greenLevel;
+            r = totalRG * ratio;
+            g = totalRG * (1.0f - ratio);
+            b = 0.0f;
+            o = 0.0f;
+        } else {
+            // Odd is R+G, so standards are pure orange
+            // RGBO = (0, 0, 0, orangeLevel)
+            r = 0.0f;
+            g = 0.0f;
+            b = 0.0f;
+            o = settings.orangeLevel;
+        }
     }
 
     return {r, g, b, o};
