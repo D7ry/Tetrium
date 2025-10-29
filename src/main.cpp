@@ -2,6 +2,7 @@
 
 #include "Tetrium.h"
 
+#include "apps/AppAnomaloscope.h"
 #include "apps/AppAutoMeasure.h"
 #include "apps/AppImageViewer.h"
 #include "apps/AppPainter.h"
@@ -34,6 +35,7 @@ int main(int argc, char** argv)
         {new TetriumApp::AppScreeningTest(), "Screening Test"},
         {new TetriumApp::AppScrambledFaceTest(), "Scrambled Face Test"},
         {new TetriumApp::AppTemporalAFC(), "Temporal 3AFC"},
+        {new TetriumApp::AppAnomaloscope(), "Anomaloscope"},
         {new TetriumApp::AppTetraHueSphere(), "Tetra Hue Sphere"},
         {new TetriumApp::AppImageViewer(), "Image Viewer"},
         {new TetriumApp::AppPainter(), "Painter"},

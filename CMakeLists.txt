@@ -50,6 +50,7 @@ set(SOURCES_BUILD
         src/apps/AppScreeningTest.cpp
         src/apps/AppScrambledFaceTest.cpp
         src/apps/AppTemporalAFC.cpp
+        src/apps/AppAnomaloscope.cpp
         src/apps/AppTetraHueSphere.cpp
         src/apps/AppImageViewer.cpp
         src/apps/AppPainter.cpp
