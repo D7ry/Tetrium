@@ -161,7 +161,7 @@ void AppTemporalAFC::drawRunning(const TetriumApp::TickContextImGui& ctx)
     // Check for gamepad back button to exit test and return to menu
     if (ImGui::IsKeyPressed(ImGuiKey_GamepadBack)) {
         INFO("Test cancelled by user via gamepad back button");
-        
+
         // Clean up trial textures
         for (auto& trial : trials) {
             for (int i = 0; i < 3; ++i) {
@@ -172,7 +172,7 @@ void AppTemporalAFC::drawRunning(const TetriumApp::TickContextImGui& ctx)
             }
         }
         trials.clear();
-        
+
         // Return to idle state
         state = TestState::kIdle;
         return;

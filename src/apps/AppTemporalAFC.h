@@ -53,7 +53,7 @@ class AppTemporalAFC : public App
         float greenLevel = 30.0f;   // 0-255
         int stimulusDurationMs = 150;
         int isiDurationMs = 350;
-        float circleRadius = 0.3f; // screen proportion
+        float circleRadius = 0.375f; // screen proportion
         bool hasNoisyBoundary = false;
         OddType oddType = OddType::R_PLUS_G;
     } settings;
