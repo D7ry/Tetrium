@@ -26,20 +26,22 @@ class AppScrambledFaceTest : public App
 
     enum class TrialState
     {
-        kViewing, // Show stimuli
-        kResponse // Blank screen, wait for response
+        kViewing,  // Show stimuli
+        kResponse, // Blank screen, wait for response
+        kITI       // Inter-trial interval, fixation cross after response
     };
 
     struct Settings
     {
         int numMetamericAxes = 4; // 0-3 for tetrachromats
-        int repetitionsPerAxis = 3;
+        int repetitionsPerAxis = 5;
         int imagesPerTrial = 3; // layout width (fixed at 3 for triangle)
         float luminance = 1.0f;
         float saturation = 0.4f;
         float scrambleProb = 0.5f;
-        float viewingDuration = 2.0f;  // seconds to view stimuli
+        float viewingDuration = 1.0f;  // seconds to view stimuli
         float responseDuration = 3.0f; // seconds to respond
+        float itiDuration = 1.0f;      // inter-trial interval (seconds)
     } settings;
 
     struct Trial

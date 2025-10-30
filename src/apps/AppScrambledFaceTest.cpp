@@ -117,6 +117,7 @@ void AppScrambledFaceTest::drawSettings(const TetriumApp::TickContextImGui& ctx)
         ImGui::SliderFloat(
             "Response Duration (s)", &settings.responseDuration, 1.0f, 10.0f, "%.1f"
         );
+        ImGui::SliderFloat("Inter-Trial Interval (s)", &settings.itiDuration, 0.0f, 5.0f, "%.1f");
         ImGui::Separator();
 
         ImGui::Text("Stimulus Settings");
@@ -189,9 +190,11 @@ void AppScrambledFaceTest::startTest(const TetriumApp::TickContextImGui& ctx)
 
     currentTrial = 0;
     numCorrect = 0;
+    generateTrial(trials[currentTrial], ctx, currentTrial, trials[currentTrial].metamericAxis);
+    
+    // Reset timer AFTER generating trial to avoid counting generation time
     trialState = TrialState::kViewing;
     trialStateTimer = 0.0f;
-    generateTrial(trials[currentTrial], ctx, currentTrial, trials[currentTrial].metamericAxis);
 }
 
 void AppScrambledFaceTest::generateTrial(
@@ -247,18 +250,22 @@ void AppScrambledFaceTest::generateTrial(
 
 void AppScrambledFaceTest::drawRunning(const TetriumApp::TickContextImGui& ctx)
 {
+    // Disable ImGui gamepad navigation to prevent it from capturing our input
+    ImGuiIO& io = ImGui::GetIO();
+    io.ConfigFlags &= ~ImGuiConfigFlags_NavEnableGamepad;
+    io.BackendFlags &= ~ImGuiBackendFlags_HasGamepad;
+    
     // Check for gamepad back button to return to menu
     if (ImGui::IsKeyPressed(ImGuiKey_GamepadBack)) {
         state = TestState::kResult;
         return;
     }
-
+    
     Trial& t = trials[currentTrial];
     ImVec2 avail = ImGui::GetContentRegionAvail();
     ImVec2 center(avail.x * 0.5f, avail.y * 0.5f);
-
+    
     // Update timer
-    ImGuiIO& io = ImGui::GetIO();
     trialStateTimer += io.DeltaTime;
 
     // State machine for trial phases
@@ -271,25 +278,25 @@ void AppScrambledFaceTest::drawRunning(const TetriumApp::TickContextImGui& ctx)
         }
         drawStimuli(t, ctx, avail, center);
         break;
-
-    case TrialState::kResponse:
+        
+    case TrialState::kResponse: {
         // Show blank screen with fixation cross, accept responses
         drawFixationCross(center);
-
+        
         // Check for timeout
         if (trialStateTimer >= settings.responseDuration) {
             // Timeout - no response, mark as incorrect
             handleTrialResponse(t, ctx, -1);
             return;
         }
-
+        
         // Gamepad button mapping: Y (top), B (bottom-right), X (bottom-left)
         ImGuiKey gamepadKeys[3] = {
             ImGuiKey_GamepadFaceUp,    // Y button -> top stimulus (index 0)
             ImGuiKey_GamepadFaceRight, // B button -> bottom-right stimulus (index 1)
             ImGuiKey_GamepadFaceLeft   // X button -> bottom-left stimulus (index 2)
         };
-
+        
         // Check for gamepad input
         for (int i = 0; i < 3; i++) {
             if (ImGui::IsKeyPressed(gamepadKeys[i])) {
@@ -298,6 +305,29 @@ void AppScrambledFaceTest::drawRunning(const TetriumApp::TickContextImGui& ctx)
             }
         }
         break;
+    }
+        
+    case TrialState::kITI: {
+        // Inter-trial interval: show fixation cross, no input
+        drawFixationCross(center);
+        
+        // Check if ITI is complete
+        if (trialStateTimer >= settings.itiDuration) {
+            // Start next trial
+            int totalTrials = settings.numMetamericAxes * settings.repetitionsPerAxis;
+            if (currentTrial + 1 >= totalTrials) {
+                state = TestState::kResult;
+            } else {
+                currentTrial++;
+                generateTrial(trials[currentTrial], ctx, currentTrial, trials[currentTrial].metamericAxis);
+                
+                // Reset timer AFTER generating trial
+                trialState = TrialState::kViewing;
+                trialStateTimer = 0.0f;
+            }
+        }
+        break;
+    }
     }
 }
 
@@ -338,15 +368,9 @@ void AppScrambledFaceTest::handleTrialResponse(
         logger->LogRow(data);
     }
 
-    int totalTrials = settings.numMetamericAxes * settings.repetitionsPerAxis;
-    if (currentTrial + 1 >= totalTrials) {
-        state = TestState::kResult;
-    } else {
-        currentTrial++;
-        trialState = TrialState::kViewing;
-        trialStateTimer = 0.0f;
-        generateTrial(trials[currentTrial], ctx, currentTrial, trials[currentTrial].metamericAxis);
-    }
+    // Transition to inter-trial interval
+    trialState = TrialState::kITI;
+    trialStateTimer = 0.0f;
 }
 
 void AppScrambledFaceTest::drawFixationCross(ImVec2 center)
