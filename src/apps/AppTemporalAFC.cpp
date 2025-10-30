@@ -640,8 +640,8 @@ std::tuple<float, float, float, float> AppTemporalAFC::computeRGBO(
     } else {
         // R+G mixture at varying ratio
         float ratio = rgRatio / 100.0f;
-        r = ratio * settings.redLevel * luminanceScale;
-        g = (1.0f - ratio) * settings.greenLevel * luminanceScale;
+        r = ratio * settings.redLevel;
+        g = (1.0f - ratio) * settings.greenLevel;
         b = 0.0f;
         o = 0.0f;
     }
