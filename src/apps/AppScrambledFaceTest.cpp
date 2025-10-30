@@ -38,7 +38,8 @@ void AppScrambledFaceTest::TickImGui(const TetriumApp::TickContextImGui& ctx)
     ImGui::SetNextWindowPos(ImVec2(0, 0));
     ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
     auto flags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse
-                 | ImGuiWindowFlags_NoResize;
+                 | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoNavInputs
+                 | ImGuiWindowFlags_NoNavFocus;
     ImGui::SetNextWindowBgAlpha(0);
     if (ImGui::Begin("Scrambled Face Test", NULL, flags)) {
         switch (state) {
@@ -191,7 +192,7 @@ void AppScrambledFaceTest::startTest(const TetriumApp::TickContextImGui& ctx)
     currentTrial = 0;
     numCorrect = 0;
     generateTrial(trials[currentTrial], ctx, currentTrial, trials[currentTrial].metamericAxis);
-    
+
     // Reset timer AFTER generating trial to avoid counting generation time
     trialState = TrialState::kViewing;
     trialStateTimer = 0.0f;
@@ -250,22 +251,18 @@ void AppScrambledFaceTest::generateTrial(
 
 void AppScrambledFaceTest::drawRunning(const TetriumApp::TickContextImGui& ctx)
 {
-    // Disable ImGui gamepad navigation to prevent it from capturing our input
-    // But keep the backend flag so gamepad input is still read
-    ImGuiIO& io = ImGui::GetIO();
-    io.ConfigFlags &= ~ImGuiConfigFlags_NavEnableGamepad;
-    
     // Check for gamepad back button to return to menu
     if (ImGui::IsKeyPressed(ImGuiKey_GamepadBack)) {
         state = TestState::kResult;
         return;
     }
-    
+
     Trial& t = trials[currentTrial];
     ImVec2 avail = ImGui::GetContentRegionAvail();
     ImVec2 center(avail.x * 0.5f, avail.y * 0.5f);
-    
+
     // Update timer
+    ImGuiIO& io = ImGui::GetIO();
     trialStateTimer += io.DeltaTime;
 
     // State machine for trial phases
@@ -278,25 +275,25 @@ void AppScrambledFaceTest::drawRunning(const TetriumApp::TickContextImGui& ctx)
         }
         drawStimuli(t, ctx, avail, center);
         break;
-        
+
     case TrialState::kResponse: {
         // Show blank screen with fixation cross, accept responses
         drawFixationCross(center);
-        
+
         // Check for timeout
         if (trialStateTimer >= settings.responseDuration) {
             // Timeout - no response, mark as incorrect
             handleTrialResponse(t, ctx, -1);
             return;
         }
-        
+
         // Gamepad button mapping: Y (top), B (bottom-right), X (bottom-left)
         ImGuiKey gamepadKeys[3] = {
             ImGuiKey_GamepadFaceUp,    // Y button -> top stimulus (index 0)
             ImGuiKey_GamepadFaceRight, // B button -> bottom-right stimulus (index 1)
             ImGuiKey_GamepadFaceLeft   // X button -> bottom-left stimulus (index 2)
         };
-        
+
         // Check for gamepad input
         for (int i = 0; i < 3; i++) {
             if (ImGui::IsKeyPressed(gamepadKeys[i])) {
@@ -306,11 +303,11 @@ void AppScrambledFaceTest::drawRunning(const TetriumApp::TickContextImGui& ctx)
         }
         break;
     }
-        
+
     case TrialState::kITI: {
         // Inter-trial interval: show fixation cross, no input
         drawFixationCross(center);
-        
+
         // Check if ITI is complete
         if (trialStateTimer >= settings.itiDuration) {
             // Start next trial
@@ -319,8 +316,10 @@ void AppScrambledFaceTest::drawRunning(const TetriumApp::TickContextImGui& ctx)
                 state = TestState::kResult;
             } else {
                 currentTrial++;
-                generateTrial(trials[currentTrial], ctx, currentTrial, trials[currentTrial].metamericAxis);
-                
+                generateTrial(
+                    trials[currentTrial], ctx, currentTrial, trials[currentTrial].metamericAxis
+                );
+
                 // Reset timer AFTER generating trial
                 trialState = TrialState::kViewing;
                 trialStateTimer = 0.0f;

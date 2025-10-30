@@ -59,7 +59,7 @@ void AppTemporalAFC::TickImGui(const TetriumApp::TickContextImGui& ctx)
     ImGui::SetNextWindowPos(ImVec2(0, 0));
     ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
     auto flags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse
-                 | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoNavInputs 
+                 | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoNavInputs
                  | ImGuiWindowFlags_NoNavFocus;
     ImGui::SetNextWindowBgAlpha(0);
 
