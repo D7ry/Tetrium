@@ -24,6 +24,7 @@ class AppTemporalAFC : public App
         kIdle,
         kSettings,
         kRunning,
+        kBreak,
         kResult
     };
 
@@ -47,10 +48,13 @@ class AppTemporalAFC : public App
 
     struct Settings
     {
-        int numSamplesPerRatio = 10;
-        float orangeLevel = 114.0f; // 0-255
-        float redLevel = 127.0f;    // 0-255
-        float greenLevel = 65.0f;   // 0-255
+        int numSamplesPerPoint = 3; // Samples per grid point
+        float orangeLevel = 255.0f; // 0-255 (base level)
+        float redLevel = 127.0f;    // 0-255 (base level)
+        float greenLevel = 65.0f;   // 0-255 (base level)
+        int minLuminance = 9;       // Minimum luminance level (0-100)
+        int maxLuminance = 95;      // Maximum luminance level (0-100)
+        int numLuminanceLevels = 10;
         int stimulusDurationMs = 150;
         int isiDurationMs = 350;
         float circleRadius = 0.375f; // screen proportion
@@ -70,6 +74,7 @@ class AppTemporalAFC : public App
     struct Trial
     {
         int rgRatio;         // R/(R+G) ratio: 40-80
+        int luminance;       // Luminance level (0-100)
         int oddPosition;     // 0, 1, or 2
         OddType oddType;     // ORANGE or R_PLUS_G
         int userChoice = -1; // User's answer (0, 1, or 2)
@@ -95,6 +100,7 @@ class AppTemporalAFC : public App
     void drawIdle(const TetriumApp::TickContextImGui& ctx);
     void drawSettings(const TetriumApp::TickContextImGui& ctx);
     void drawRunning(const TetriumApp::TickContextImGui& ctx);
+    void drawBreak(const TetriumApp::TickContextImGui& ctx);
     void drawResult(const TetriumApp::TickContextImGui& ctx);
 
     // Game logic
@@ -110,7 +116,12 @@ class AppTemporalAFC : public App
     void logTrialData(const Trial& trial);
 
     // Helper to compute RGBO values for a stimulus
-    std::tuple<float, float, float, float> computeRGBO(int rgRatio, OddType oddType, bool isOdd);
+    std::tuple<float, float, float, float> computeRGBO(
+        int rgRatio,
+        int luminance,
+        OddType oddType,
+        bool isOdd
+    );
 };
 
 } // namespace TetriumApp

@@ -72,6 +72,9 @@ void AppTemporalAFC::TickImGui(const TetriumApp::TickContextImGui& ctx)
         case TestState::kRunning:
             drawRunning(ctx);
             break;
+        case TestState::kBreak:
+            drawBreak(ctx);
+            break;
         case TestState::kResult:
             drawResult(ctx);
             break;
@@ -132,12 +135,27 @@ void AppTemporalAFC::drawSettings(const TetriumApp::TickContextImGui& ctx)
 {
     (void)ctx;
     if (ImGui::BeginPopupModal("Settings", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::SliderInt("Samples per R/G ratio", &settings.numSamplesPerRatio, 1, 50);
+        ImGui::Text("Experimental Design");
+        ImGui::SliderInt("Samples per grid point", &settings.numSamplesPerPoint, 1, 10);
+        ImGui::SliderInt("Luminance Levels", &settings.numLuminanceLevels, 1, 20);
+        ImGui::SliderInt("Min Luminance", &settings.minLuminance, 1, 50);
+        ImGui::SliderInt("Max Luminance", &settings.maxLuminance, 50, 100);
+        int totalTrials = 9 * settings.numLuminanceLevels * settings.numSamplesPerPoint;
+        ImGui::Text("Total trials: %d", totalTrials);
+
+        ImGui::Separator();
+        ImGui::Text("Stimulus Levels (Base)");
         ImGui::SliderFloat("Orange Level", &settings.orangeLevel, 0.0f, 255.0f);
         ImGui::SliderFloat("Red Level", &settings.redLevel, 0.0f, 255.0f);
         ImGui::SliderFloat("Green Level", &settings.greenLevel, 0.0f, 255.0f);
+
+        ImGui::Separator();
+        ImGui::Text("Timing");
         ImGui::SliderInt("Stimulus Duration (ms)", &settings.stimulusDurationMs, 50, 1000);
         ImGui::SliderInt("ISI Duration (ms)", &settings.isiDurationMs, 100, 2000);
+
+        ImGui::Separator();
+        ImGui::Text("Display");
         ImGui::SliderFloat("Circle Radius", &settings.circleRadius, 0.1f, 0.8f);
         ImGui::Checkbox("Noisy Boundary", &settings.hasNoisyBoundary);
         ImGui::Checkbox("Use RGO for OCV channel", &settings.useRGOForOCV);
@@ -255,6 +273,40 @@ void AppTemporalAFC::drawRunning(const TetriumApp::TickContextImGui& ctx)
     }
 }
 
+void AppTemporalAFC::drawBreak(const TetriumApp::TickContextImGui& ctx)
+{
+    (void)ctx;
+    
+    ImVec2 screenSize = ImGui::GetIO().DisplaySize;
+    ImVec2 centerPos(screenSize.x * 0.5f, screenSize.y * 0.5f);
+    
+    // Show break message
+    ImGui::SetWindowFontScale(2.0f);
+    const char* breakText = "Take a Break!";
+    ImVec2 textSize = ImGui::CalcTextSize(breakText);
+    ImGui::SetCursorPos(ImVec2(centerPos.x - textSize.x * 0.5f, centerPos.y - 150));
+    ImGui::Text("%s", breakText);
+    ImGui::SetWindowFontScale(1.0f);
+    
+    // Show progress
+    ImGui::SetCursorPos(ImVec2(centerPos.x - 150, centerPos.y - 50));
+    ImGui::Text("Completed: %d / %d trials", currentTrialIdx, static_cast<int>(trials.size()));
+    
+    int remaining = static_cast<int>(trials.size()) - currentTrialIdx;
+    ImGui::SetCursorPos(ImVec2(centerPos.x - 150, centerPos.y - 20));
+    ImGui::Text("Remaining: %d trials", remaining);
+    
+    // Continue button
+    ImVec2 buttonSize(200, 60);
+    ImGui::SetCursorPos(ImVec2(centerPos.x - buttonSize.x * 0.5f, centerPos.y + 50));
+    if (ImGui::Button("Continue", buttonSize)) {
+        // Resume test
+        trialState = TrialState::kBlank;
+        stateTimeRemaining = 500.0f;
+        state = TestState::kRunning;
+    }
+}
+
 void AppTemporalAFC::drawResult(const TetriumApp::TickContextImGui& ctx)
 {
     (void)ctx;
@@ -333,6 +385,7 @@ void AppTemporalAFC::startTest(const TetriumApp::TickContextImGui& ctx)
            "session_timestamp",
            "trial_idx",
            "rg_ratio",
+           "luminance",
            "odd_type",
            "odd_position",
            "user_choice",
@@ -364,28 +417,40 @@ void AppTemporalAFC::generateAllTrials(const TetriumApp::TickContextImGui& ctx)
 {
     trials.clear();
 
-    // Generate trials for each R/G ratio
+    // Generate luminance levels
+    std::vector<int> luminanceLevels;
+    for (int i = 0; i < settings.numLuminanceLevels; ++i) {
+        int luminance = settings.minLuminance
+                        + i * (settings.maxLuminance - settings.minLuminance)
+                              / (settings.numLuminanceLevels - 1);
+        luminanceLevels.push_back(luminance);
+    }
+
+    // Generate trials for each grid point (ratio × luminance)
     int trialIdx = 0;
     for (int ratio : RG_RATIOS) {
-        for (int sample = 0; sample < settings.numSamplesPerRatio; ++sample) {
-            Trial trial;
-            trial.rgRatio = ratio;
+        for (int luminance : luminanceLevels) {
+            for (int sample = 0; sample < settings.numSamplesPerPoint; ++sample) {
+                Trial trial;
+                trial.rgRatio = ratio;
+                trial.luminance = luminance;
 
-            // Determine odd type
-            if (settings.oddType == OddType::RANDOMIZE) {
-                trial.oddType = (rand() % 2 == 0) ? OddType::ORANGE : OddType::R_PLUS_G;
-            } else {
-                trial.oddType = settings.oddType;
+                // Determine odd type
+                if (settings.oddType == OddType::RANDOMIZE) {
+                    trial.oddType = (rand() % 2 == 0) ? OddType::ORANGE : OddType::R_PLUS_G;
+                } else {
+                    trial.oddType = settings.oddType;
+                }
+
+                // Randomize odd position
+                trial.oddPosition = rand() % 3;
+
+                // Generate stimulus textures for this trial
+                generateStimulusTextures(trial, trialIdx, ctx);
+
+                trials.push_back(trial);
+                trialIdx++;
             }
-
-            // Randomize odd position
-            trial.oddPosition = rand() % 3;
-
-            // Generate stimulus textures for this trial
-            generateStimulusTextures(trial, trialIdx, ctx);
-
-            trials.push_back(trial);
-            trialIdx++;
         }
     }
 
@@ -409,7 +474,7 @@ void AppTemporalAFC::generateStimulusTextures(
     // Generate 3 stimuli for this trial
     for (int i = 0; i < 3; ++i) {
         bool isOdd = (i == trial.oddPosition);
-        auto [r, g, b, o] = computeRGBO(trial.rgRatio, trial.oddType, isOdd);
+        auto [r, g, b, o] = computeRGBO(trial.rgRatio, trial.luminance, trial.oddType, isOdd);
 
         std::string baseFilename = "./temp/" + subjectName + "_trial" + std::to_string(trialIdx)
                                    + "_stim" + std::to_string(i);
@@ -501,6 +566,9 @@ void AppTemporalAFC::handleResponse(int choice, const TetriumApp::TickContextImG
     currentTrialIdx++;
     if (currentTrialIdx >= static_cast<int>(trials.size())) {
         state = TestState::kResult;
+    } else if (currentTrialIdx % 90 == 0) {
+        // Take a break every 90 trials
+        state = TestState::kBreak;
     } else {
         trialState = TrialState::kBlank;
         stateTimeRemaining = 500.0f;
@@ -517,6 +585,7 @@ void AppTemporalAFC::logTrialData(const Trial& trial)
     data["session_timestamp"] = ""; // Will be auto-filled by logger
     data["trial_idx"] = std::to_string(currentTrialIdx);
     data["rg_ratio"] = std::to_string(trial.rgRatio);
+    data["luminance"] = std::to_string(trial.luminance);
     data["odd_type"] = (trial.oddType == OddType::ORANGE) ? "orange" : "r_plus_g";
     data["odd_position"] = std::to_string(trial.oddPosition);
     data["user_choice"] = std::to_string(trial.userChoice);
@@ -533,6 +602,7 @@ void AppTemporalAFC::logTrialData(const Trial& trial)
 
 std::tuple<float, float, float, float> AppTemporalAFC::computeRGBO(
     int rgRatio,
+    int luminance,
     OddType oddType,
     bool isOdd
 )
@@ -549,6 +619,7 @@ std::tuple<float, float, float, float> AppTemporalAFC::computeRGBO(
     // This way we always have 2 of one type and 1 of the other type
 
     float r = 0.0f, g = 0.0f, b = 0.0f, o = 0.0f;
+    float luminanceScale = luminance / 100.0f;
 
     // Determine whether this stimulus should be orange or R+G
     // If oddType == ORANGE: odd=orange, standards=R+G
@@ -558,15 +629,15 @@ std::tuple<float, float, float, float> AppTemporalAFC::computeRGBO(
 
     if (isOrangeStimulus) {
         // Pure orange primary
-        o = settings.orangeLevel;
+        o = settings.orangeLevel * luminanceScale;
         r = 0.0f;
         g = 0.0f;
         b = 0.0f;
     } else {
         // R+G mixture at varying ratio
         float ratio = rgRatio / 100.0f;
-        r = ratio * settings.redLevel;
-        g = (1.0f - ratio) * settings.greenLevel;
+        r = ratio * settings.redLevel * luminanceScale;
+        g = (1.0f - ratio) * settings.greenLevel * luminanceScale;
         b = 0.0f;
         o = 0.0f;
     }
