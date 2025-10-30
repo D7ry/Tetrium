@@ -100,7 +100,11 @@ class AppTemporalAFC : public App
     // Game logic
     void startTest(const TetriumApp::TickContextImGui& ctx);
     void generateAllTrials(const TetriumApp::TickContextImGui& ctx);
-    void generateStimulusTextures(Trial& trial, const TetriumApp::TickContextImGui& ctx);
+    void generateStimulusTextures(
+        Trial& trial,
+        int trialIdx,
+        const TetriumApp::TickContextImGui& ctx
+    );
     void transitionTrialState(const TetriumApp::TickContextImGui& ctx);
     void handleResponse(int choice, const TetriumApp::TickContextImGui& ctx);
     void logTrialData(const Trial& trial);

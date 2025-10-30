@@ -365,6 +365,7 @@ void AppTemporalAFC::generateAllTrials(const TetriumApp::TickContextImGui& ctx)
     trials.clear();
 
     // Generate trials for each R/G ratio
+    int trialIdx = 0;
     for (int ratio : RG_RATIOS) {
         for (int sample = 0; sample < settings.numSamplesPerRatio; ++sample) {
             Trial trial;
@@ -381,9 +382,10 @@ void AppTemporalAFC::generateAllTrials(const TetriumApp::TickContextImGui& ctx)
             trial.oddPosition = rand() % 3;
 
             // Generate stimulus textures for this trial
-            generateStimulusTextures(trial, ctx);
+            generateStimulusTextures(trial, trialIdx, ctx);
 
             trials.push_back(trial);
+            trialIdx++;
         }
     }
 
@@ -395,7 +397,7 @@ void AppTemporalAFC::generateAllTrials(const TetriumApp::TickContextImGui& ctx)
     INFO("Generated {} trials", trials.size());
 }
 
-void AppTemporalAFC::generateStimulusTextures(Trial& trial, const TetriumApp::TickContextImGui& ctx)
+void AppTemporalAFC::generateStimulusTextures(Trial& trial, int trialIdx, const TetriumApp::TickContextImGui& ctx)
 {
     // Create temp directory
     std::filesystem::create_directories("./temp");
@@ -406,7 +408,7 @@ void AppTemporalAFC::generateStimulusTextures(Trial& trial, const TetriumApp::Ti
         auto [r, g, b, o] = computeRGBO(trial.rgRatio, trial.oddType, isOdd);
 
         std::string baseFilename = "./temp/" + subjectName + "_trial"
-                                   + std::to_string(currentTrialIdx) + "_stim" + std::to_string(i);
+                                   + std::to_string(trialIdx) + "_stim" + std::to_string(i);
 
         auto [rgbPath, ocvPath] = colorGenerator->GenerateCircle(
             baseFilename,
