@@ -106,13 +106,24 @@ void AppScrambledFaceTest::drawSettings(const TetriumApp::TickContextImGui& ctx)
 {
     (void)ctx;
     if (ImGui::BeginPopupModal("Settings", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::Text("Trial Settings");
         ImGui::SliderInt("Metameric Axes", &settings.numMetamericAxes, 1, 4);
         ImGui::SliderInt("Repetitions per axis", &settings.repetitionsPerAxis, 1, 10);
         ImGui::Text("Total trials: %d", settings.numMetamericAxes * settings.repetitionsPerAxis);
         ImGui::Separator();
+
+        ImGui::Text("Timing Settings");
+        ImGui::SliderFloat("Viewing Duration (s)", &settings.viewingDuration, 0.5f, 10.0f, "%.1f");
+        ImGui::SliderFloat(
+            "Response Duration (s)", &settings.responseDuration, 1.0f, 10.0f, "%.1f"
+        );
+        ImGui::Separator();
+
+        ImGui::Text("Stimulus Settings");
         ImGui::SliderFloat("Luminance", &settings.luminance, 0.1f, 2.0f);
         ImGui::SliderFloat("Saturation", &settings.saturation, 0.0f, 1.0f);
         ImGui::SliderFloat("Scramble prob", &settings.scrambleProb, 0.0f, 1.0f);
+
         if (ImGui::Button("Close")) {
             ImGui::CloseCurrentPopup();
             state = TestState::kIdle;
@@ -152,6 +163,8 @@ void AppScrambledFaceTest::startTest(const TetriumApp::TickContextImGui& ctx)
            "scrambled_original_idx",
            "user_choice",
            "correct",
+           "response_time",
+           "timeout",
            "luminance",
            "saturation",
            "scramble_prob"};
@@ -176,6 +189,8 @@ void AppScrambledFaceTest::startTest(const TetriumApp::TickContextImGui& ctx)
 
     currentTrial = 0;
     numCorrect = 0;
+    trialState = TrialState::kViewing;
+    trialStateTimer = 0.0f;
     generateTrial(trials[currentTrial], ctx, currentTrial, trials[currentTrial].metamericAxis);
 }
 
@@ -242,50 +257,100 @@ void AppScrambledFaceTest::drawRunning(const TetriumApp::TickContextImGui& ctx)
     ImVec2 avail = ImGui::GetContentRegionAvail();
     ImVec2 center(avail.x * 0.5f, avail.y * 0.5f);
 
-    // Gamepad button mapping: Y (top), B (bottom-right), X (bottom-left)
-    ImGuiKey gamepadKeys[3] = {
-        ImGuiKey_GamepadFaceUp,    // Y button -> top stimulus (index 0)
-        ImGuiKey_GamepadFaceRight, // B button -> bottom-right stimulus (index 1)
-        ImGuiKey_GamepadFaceLeft   // X button -> bottom-left stimulus (index 2)
-    };
+    // Update timer
+    ImGuiIO& io = ImGui::GetIO();
+    trialStateTimer += io.DeltaTime;
 
-    // Check for gamepad input first
-    for (int i = 0; i < 3; i++) {
-        if (ImGui::IsKeyPressed(gamepadKeys[i])) {
-            t.userChoice = i;
-            bool correct = (t.displayToOriginal[t.userChoice] == t.scrambledOriginalIndex);
-            if (correct)
-                ++numCorrect;
+    // State machine for trial phases
+    switch (trialState) {
+    case TrialState::kViewing:
+        // Show stimuli for viewing duration
+        if (trialStateTimer >= settings.viewingDuration) {
+            trialState = TrialState::kResponse;
+            trialStateTimer = 0.0f;
+        }
+        drawStimuli(t, ctx, avail, center);
+        break;
 
-            // Log trial data
-            if (logger) {
-                std::map<std::string, std::string> data;
-                data["subject_id"] = subjectName;
-                data["trial_idx"] = std::to_string(currentTrial);
-                data["metameric_axis"] = std::to_string(t.metamericAxis);
-                data["scrambled_original_idx"] = std::to_string(t.scrambledOriginalIndex);
-                data["user_choice"] = std::to_string(t.userChoice);
-                data["correct"] = correct ? "1" : "0";
-                data["luminance"] = std::to_string(settings.luminance);
-                data["saturation"] = std::to_string(settings.saturation);
-                data["scramble_prob"] = std::to_string(settings.scrambleProb);
-                logger->LogRow(data);
-            }
+    case TrialState::kResponse:
+        // Show blank screen with fixation cross, accept responses
+        drawFixationCross(center);
 
-            int totalTrials = settings.numMetamericAxes * settings.repetitionsPerAxis;
-            if (currentTrial + 1 >= totalTrials) {
-                state = TestState::kResult;
-            } else {
-                currentTrial++;
-                generateTrial(
-                    trials[currentTrial], ctx, currentTrial, trials[currentTrial].metamericAxis
-                );
-            }
+        // Check for timeout
+        if (trialStateTimer >= settings.responseDuration) {
+            // Timeout - no response, mark as incorrect
+            handleTrialResponse(t, ctx, -1);
             return;
+        }
+
+        // Gamepad button mapping: Y (top), B (bottom-right), X (bottom-left)
+        ImGuiKey gamepadKeys[3] = {
+            ImGuiKey_GamepadFaceUp,    // Y button -> top stimulus (index 0)
+            ImGuiKey_GamepadFaceRight, // B button -> bottom-right stimulus (index 1)
+            ImGuiKey_GamepadFaceLeft   // X button -> bottom-left stimulus (index 2)
+        };
+
+        // Check for gamepad input
+        for (int i = 0; i < 3; i++) {
+            if (ImGui::IsKeyPressed(gamepadKeys[i])) {
+                handleTrialResponse(t, ctx, i);
+                return;
+            }
+        }
+        break;
+    }
+}
+
+void AppScrambledFaceTest::handleTrialResponse(
+    Trial& t,
+    const TetriumApp::TickContextImGui& ctx,
+    int choice
+)
+{
+    t.userChoice = choice;
+    bool correct = (choice >= 0) && (t.displayToOriginal[t.userChoice] == t.scrambledOriginalIndex);
+    if (correct)
+        ++numCorrect;
+
+    // Play sound feedback (only if user actually responded, not timeout)
+    if (choice >= 0) {
+        if (correct) {
+            ctx.apis.PlaySound(Sound::kCorrectAnswer);
+        } else {
+            ctx.apis.PlaySound(Sound::kWrongAnswer);
         }
     }
 
-    // Draw fixation cross in center
+    // Log trial data
+    if (logger) {
+        std::map<std::string, std::string> data;
+        data["subject_id"] = subjectName;
+        data["trial_idx"] = std::to_string(currentTrial);
+        data["metameric_axis"] = std::to_string(t.metamericAxis);
+        data["scrambled_original_idx"] = std::to_string(t.scrambledOriginalIndex);
+        data["user_choice"] = std::to_string(t.userChoice);
+        data["correct"] = correct ? "1" : "0";
+        data["response_time"] = std::to_string(trialStateTimer);
+        data["timeout"] = (choice < 0) ? "1" : "0";
+        data["luminance"] = std::to_string(settings.luminance);
+        data["saturation"] = std::to_string(settings.saturation);
+        data["scramble_prob"] = std::to_string(settings.scrambleProb);
+        logger->LogRow(data);
+    }
+
+    int totalTrials = settings.numMetamericAxes * settings.repetitionsPerAxis;
+    if (currentTrial + 1 >= totalTrials) {
+        state = TestState::kResult;
+    } else {
+        currentTrial++;
+        trialState = TrialState::kViewing;
+        trialStateTimer = 0.0f;
+        generateTrial(trials[currentTrial], ctx, currentTrial, trials[currentTrial].metamericAxis);
+    }
+}
+
+void AppScrambledFaceTest::drawFixationCross(ImVec2 center)
+{
     float crossSize = 20.0f;
     float crossThickness = 3.0f;
     ImDrawList* drawList = ImGui::GetWindowDrawList();
@@ -304,6 +369,17 @@ void AppScrambledFaceTest::drawRunning(const TetriumApp::TickContextImGui& ctx)
         crossColor,
         crossThickness
     );
+}
+
+void AppScrambledFaceTest::drawStimuli(
+    Trial& t,
+    const TetriumApp::TickContextImGui& ctx,
+    ImVec2 avail,
+    ImVec2 center
+)
+{
+    // Draw fixation cross in center
+    drawFixationCross(center);
 
     // Arrange 3 stimuli in equidistant triangle around center
     float radius = avail.y * 0.30f;            // distance from center to each stimulus
@@ -330,53 +406,8 @@ void AppScrambledFaceTest::drawRunning(const TetriumApp::TickContextImGui& ctx)
         ImVec2 imagePos(stimX - fitted.x * 0.5f, stimY - fitted.y * 0.5f);
         ImGui::SetCursorPos(imagePos);
 
-        // Borderless button
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1, 1, 1, 0.06f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(1, 1, 1, 0.10f));
-        ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
-        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
-
-        std::string btnId
-            = std::string("##img_") + std::to_string(currentTrial) + "_" + std::to_string(i);
-        bool clicked = ImGui::ImageButton(btnId.c_str(), (void*)(intptr_t)shown.id, fitted);
-
-        ImGui::PopStyleVar(2);
-        ImGui::PopStyleColor(3);
-
-        if (clicked) {
-            t.userChoice = i;
-            // correctness: original scrambled is last in original (index 2)
-            bool correct = (t.displayToOriginal[t.userChoice] == t.scrambledOriginalIndex);
-            if (correct)
-                ++numCorrect;
-
-            // Log trial data
-            if (logger) {
-                std::map<std::string, std::string> data;
-                data["subject_id"] = subjectName;
-                data["trial_idx"] = std::to_string(currentTrial);
-                data["metameric_axis"] = std::to_string(t.metamericAxis);
-                data["scrambled_original_idx"] = std::to_string(t.scrambledOriginalIndex);
-                data["user_choice"] = std::to_string(t.userChoice);
-                data["correct"] = correct ? "1" : "0";
-                data["luminance"] = std::to_string(settings.luminance);
-                data["saturation"] = std::to_string(settings.saturation);
-                data["scramble_prob"] = std::to_string(settings.scrambleProb);
-                logger->LogRow(data);
-            }
-
-            int totalTrials = settings.numMetamericAxes * settings.repetitionsPerAxis;
-            if (currentTrial + 1 >= totalTrials) {
-                state = TestState::kResult;
-            } else {
-                currentTrial++;
-                generateTrial(
-                    trials[currentTrial], ctx, currentTrial, trials[currentTrial].metamericAxis
-                );
-            }
-            return;
-        }
+        // Just display the image, no interaction during viewing phase
+        ImGui::Image((void*)(intptr_t)shown.id, fitted);
     }
 }
 

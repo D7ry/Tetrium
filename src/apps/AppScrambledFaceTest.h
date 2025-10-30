@@ -4,6 +4,8 @@
 #include "TetriumColor/TetriumColor.h"
 #include "lib/TestDataLogger.h"
 
+struct ImVec2;
+
 namespace TetriumApp
 {
 class AppScrambledFaceTest : public App
@@ -22,6 +24,12 @@ class AppScrambledFaceTest : public App
         kResult
     };
 
+    enum class TrialState
+    {
+        kViewing, // Show stimuli
+        kResponse // Blank screen, wait for response
+    };
+
     struct Settings
     {
         int numMetamericAxes = 4; // 0-3 for tetrachromats
@@ -30,6 +38,8 @@ class AppScrambledFaceTest : public App
         float luminance = 1.0f;
         float saturation = 0.4f;
         float scrambleProb = 0.5f;
+        float viewingDuration = 2.0f;  // seconds to view stimuli
+        float responseDuration = 3.0f; // seconds to respond
     } settings;
 
     struct Trial
@@ -54,17 +64,32 @@ class AppScrambledFaceTest : public App
     };
 
     TestState state = TestState::kIdle;
+    TrialState trialState = TrialState::kViewing;
     std::string subjectName = "guest";
     int currentTrial = 0;
     int numCorrect = 0;
     std::vector<Trial> trials;
+    float trialStateTimer = 0.0f;
 
     void startTest(const TetriumApp::TickContextImGui& ctx);
-    void generateTrial(Trial& t, const TetriumApp::TickContextImGui& ctx, int trialIdx, int metamericAxis);
+    void generateTrial(
+        Trial& t,
+        const TetriumApp::TickContextImGui& ctx,
+        int trialIdx,
+        int metamericAxis
+    );
     void drawIdle(const TetriumApp::TickContextImGui& ctx);
     void drawSettings(const TetriumApp::TickContextImGui& ctx);
     void drawRunning(const TetriumApp::TickContextImGui& ctx);
     void drawResult(const TetriumApp::TickContextImGui& ctx);
+    void drawStimuli(
+        Trial& t,
+        const TetriumApp::TickContextImGui& ctx,
+        ImVec2 avail,
+        ImVec2 center
+    );
+    void drawFixationCross(ImVec2 center);
+    void handleTrialResponse(Trial& t, const TetriumApp::TickContextImGui& ctx, int choice);
 
     TetriumColor::CircleGridGenerator* generator = nullptr;
     TestDataLogger* logger = nullptr;
