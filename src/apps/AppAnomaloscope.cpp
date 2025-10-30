@@ -78,10 +78,10 @@ void AppAnomaloscope::drawIdle(const TetriumApp::TickContextImGui& ctx)
     ImGui::Text("Controls:");
 
     ImGui::SetCursorPos(pos + ImVec2(0, 140));
-    ImGui::Text("  Left Stick: R/G Ratio & Total Level");
+    ImGui::Text("  Left Stick Y: R/G Ratio");
 
     ImGui::SetCursorPos(pos + ImVec2(0, 160));
-    ImGui::Text("  D-Pad: Red, Green (indep.) & Orange");
+    ImGui::Text("  D-Pad: Red, Green & Orange Levels");
 
     ImGui::SetCursorPos(pos + ImVec2(0, 180));
     ImGui::Text("  Shoulder + D-Pad Y: Green Level");
@@ -138,25 +138,8 @@ void AppAnomaloscope::drawRunning(const TetriumApp::TickContextImGui& ctx)
         stimulusNeedsUpdate = true;
     }
 
-    // Left joystick X-axis controls total R+G level (right = brighter, left = darker)
-    // This scales both red and green levels proportionally
-    if (io.NavInputs[ImGuiNavInput_LStickRight] != 0.0f
-        || io.NavInputs[ImGuiNavInput_LStickLeft] != 0.0f) {
-        float adjust
-            = (io.NavInputs[ImGuiNavInput_LStickRight] - io.NavInputs[ImGuiNavInput_LStickLeft])
-              * settings.rgTotalLevelSpeed * deltaTime;
-        settings.rgTotalLevel = std::clamp(settings.rgTotalLevel + adjust, 0.0f, 255.0f);
-
-        // Scale both red and green levels proportionally
-        float currentTotal = settings.redLevel + settings.greenLevel;
-        if (currentTotal > 0.0f) {
-            float scale = settings.rgTotalLevel / currentTotal;
-            settings.redLevel = std::clamp(settings.redLevel * scale, 0.0f, 255.0f);
-            settings.greenLevel = std::clamp(settings.greenLevel * scale, 0.0f, 255.0f);
-        }
-
-        stimulusNeedsUpdate = true;
-    }
+    // Note: Total R+G level is now read-only and computed from red/green levels
+    // Use D-pad to adjust red and green levels independently
 
     // D-pad X-axis controls red level (right = more red, left = less red)
     if (io.NavInputs[ImGuiNavInput_DpadRight] != 0.0f
@@ -200,7 +183,8 @@ void AppAnomaloscope::drawRunning(const TetriumApp::TickContextImGui& ctx)
     ImGui::Begin("Controls", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
 
     ImGui::SeparatorText("Top Half: R+G Mixture");
-    ImGui::Text("Ratio Control (Left Stick):");
+    ImGui::Text("Ratio Control (Left Stick Y):");
+    ImGui::Text("  Output = ratio * redLevel + (1-ratio) * greenLevel");
     ImGui::Spacing();
 
     // R/G Ratio slider
@@ -235,21 +219,14 @@ void AppAnomaloscope::drawRunning(const TetriumApp::TickContextImGui& ctx)
 
     ImGui::Spacing();
 
-    // Total luminance slider
-    if (ImGui::SliderFloat("Total R+G Level", &settings.rgTotalLevel, 0.0f, 255.0f, "%.1f")) {
-        // Scale both red and green levels proportionally
-        float currentTotal = settings.redLevel + settings.greenLevel;
-        if (currentTotal > 0.0f) {
-            float scale = settings.rgTotalLevel / currentTotal;
-            settings.redLevel = std::clamp(settings.redLevel * scale, 0.0f, 255.0f);
-            settings.greenLevel = std::clamp(settings.greenLevel * scale, 0.0f, 255.0f);
-        }
-        stimulusNeedsUpdate = true;
-    }
+    // Total luminance (read-only display)
+    settings.rgTotalLevel = settings.redLevel + settings.greenLevel;
+    ImGui::Text("Total R+G Level: %.1f", settings.rgTotalLevel);
 
     ImGui::Spacing();
     ImGui::Separator();
-    ImGui::Text("Independent Level Control (D-Pad):");
+    ImGui::Text("Red & Green Level Control (D-Pad):");
+    ImGui::Text("  These set the base levels used in the ratio formula");
     ImGui::Spacing();
 
     // Red level slider
