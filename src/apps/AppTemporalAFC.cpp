@@ -550,42 +550,25 @@ std::tuple<float, float, float, float> AppTemporalAFC::computeRGBO(
 
     float r = 0.0f, g = 0.0f, b = 0.0f, o = 0.0f;
 
-    if (isOdd) {
-        // This is the ODD stimulus
-        if (oddType == OddType::ORANGE) {
-            // Odd = pure orange primary
-            // RGBO = (0, 0, 0, orangeLevel)
-            o = settings.orangeLevel;
-            r = 0.0f;
-            g = 0.0f;
-            b = 0.0f;
-        } else {
-            // Odd = R+G mixture
-            // RGBO = (redLevel, greenLevel, 0, 0)
-            r = settings.redLevel;
-            g = settings.greenLevel;
-            b = 0.0f;
-            o = 0.0f;
-        }
+    // Determine whether this stimulus should be orange or R+G
+    // If oddType == ORANGE: odd=orange, standards=R+G
+    // If oddType == R_PLUS_G: odd=R+G, standards=orange
+    bool isOrangeStimulus
+        = (oddType == OddType::ORANGE && isOdd) || (oddType == OddType::R_PLUS_G && !isOdd);
+
+    if (isOrangeStimulus) {
+        // Pure orange primary
+        o = settings.orangeLevel;
+        r = 0.0f;
+        g = 0.0f;
+        b = 0.0f;
     } else {
-        // This is a STANDARD stimulus (not odd)
-        // Standards should be the OPPOSITE type of the odd stimulus
-        if (oddType == OddType::ORANGE) {
-            // Odd is orange, so standards are R+G mixtures at varying ratios
-            // RGBO = (ratio*redLevel, (1-ratio)*greenLevel, 0, 0)
-            float ratio = rgRatio / 100.0f;
-            r = ratio * settings.redLevel;
-            g = (1.0f - ratio) * settings.greenLevel;
-            b = 0.0f;
-            o = 0.0f;
-        } else {
-            // Odd is R+G, so standards are pure orange
-            // RGBO = (0, 0, 0, orangeLevel)
-            r = 0.0f;
-            g = 0.0f;
-            b = 0.0f;
-            o = settings.orangeLevel;
-        }
+        // R+G mixture at varying ratio
+        float ratio = rgRatio / 100.0f;
+        r = ratio * settings.redLevel;
+        g = (1.0f - ratio) * settings.greenLevel;
+        b = 0.0f;
+        o = 0.0f;
     }
 
     return {r, g, b, o};
