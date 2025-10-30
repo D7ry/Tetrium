@@ -24,8 +24,9 @@ class AppScrambledFaceTest : public App
 
     struct Settings
     {
-        int numTrials = 5;
-        int imagesPerTrial = 3; // layout width
+        int numMetamericAxes = 4; // 0-3 for tetrachromats
+        int repetitionsPerAxis = 3;
+        int imagesPerTrial = 3; // layout width (fixed at 3 for triangle)
         float luminance = 1.0f;
         float saturation = 0.4f;
         float scrambleProb = 0.5f;
@@ -49,6 +50,7 @@ class AppScrambledFaceTest : public App
         std::vector<int> displayToOriginal;
         int scrambledOriginalIndex = 2; // last in original list
         int userChoice = -1;
+        int metamericAxis = 0; // which metameric axis this trial uses
     };
 
     TestState state = TestState::kIdle;
@@ -58,7 +60,7 @@ class AppScrambledFaceTest : public App
     std::vector<Trial> trials;
 
     void startTest(const TetriumApp::TickContextImGui& ctx);
-    void generateTrial(Trial& t, const TetriumApp::TickContextImGui& ctx, int trialIdx);
+    void generateTrial(Trial& t, const TetriumApp::TickContextImGui& ctx, int trialIdx, int metamericAxis);
     void drawIdle(const TetriumApp::TickContextImGui& ctx);
     void drawSettings(const TetriumApp::TickContextImGui& ctx);
     void drawRunning(const TetriumApp::TickContextImGui& ctx);
