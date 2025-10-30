@@ -56,15 +56,10 @@ void AppTemporalAFC::Cleanup(TetriumApp::CleanupContext& ctx)
 
 void AppTemporalAFC::TickImGui(const TetriumApp::TickContextImGui& ctx)
 {
-    // Disable ImGui's gamepad navigation to prevent interference with test
-    ImGuiIO& io = ImGui::GetIO();
-    io.ConfigFlags &= ~ImGuiConfigFlags_NavEnableGamepad;
-    io.BackendFlags &= ~ImGuiBackendFlags_HasGamepad;
-
     ImGui::SetNextWindowPos(ImVec2(0, 0));
     ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
     auto flags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse
-                 | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoNavInputs
+                 | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoNavInputs 
                  | ImGuiWindowFlags_NoNavFocus;
     ImGui::SetNextWindowBgAlpha(0);
 

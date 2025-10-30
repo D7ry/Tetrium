@@ -251,9 +251,9 @@ void AppScrambledFaceTest::generateTrial(
 void AppScrambledFaceTest::drawRunning(const TetriumApp::TickContextImGui& ctx)
 {
     // Disable ImGui gamepad navigation to prevent it from capturing our input
+    // But keep the backend flag so gamepad input is still read
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags &= ~ImGuiConfigFlags_NavEnableGamepad;
-    io.BackendFlags &= ~ImGuiBackendFlags_HasGamepad;
     
     // Check for gamepad back button to return to menu
     if (ImGui::IsKeyPressed(ImGuiKey_GamepadBack)) {
