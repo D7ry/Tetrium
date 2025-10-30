@@ -80,8 +80,7 @@ class AppTemporalAFC : public App
         int userChoice = -1; // User's answer (0, 1, or 2)
         float reactionTimeMs = 0.0f;
 
-        // Pre-rendered stimuli (3 stimuli per trial)
-        StimulusTextures stimuli[3];
+        // Textures are generated on-demand, not pre-rendered
     };
 
     TestState state = TestState::kIdle;
@@ -92,6 +91,9 @@ class AppTemporalAFC : public App
     std::vector<Trial> trials;
     float stateTimeRemaining = 0.0f;
     std::chrono::steady_clock::time_point responseStartTime;
+
+    // Current trial textures (only for active trial)
+    StimulusTextures currentStimuli[3];
 
     TestDataLogger* logger = nullptr;
     TetriumColor::SolidColorGenerator* colorGenerator = nullptr;
@@ -106,11 +108,8 @@ class AppTemporalAFC : public App
     // Game logic
     void startTest(const TetriumApp::TickContextImGui& ctx);
     void generateAllTrials(const TetriumApp::TickContextImGui& ctx);
-    void generateStimulusTextures(
-        Trial& trial,
-        int trialIdx,
-        const TetriumApp::TickContextImGui& ctx
-    );
+    void loadCurrentTrialTextures(const TetriumApp::TickContextImGui& ctx);
+    void unloadCurrentTrialTextures(const TetriumApp::TickContextImGui& ctx);
     void transitionTrialState(const TetriumApp::TickContextImGui& ctx);
     void handleResponse(int choice, const TetriumApp::TickContextImGui& ctx);
     void logTrialData(const Trial& trial);

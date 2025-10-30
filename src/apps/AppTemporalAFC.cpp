@@ -30,15 +30,14 @@ void AppTemporalAFC::Cleanup(TetriumApp::CleanupContext& ctx)
 {
     DEBUG("Cleaning up AppTemporalAFC...");
 
-    // Clean up all trial textures
-    for (auto& trial : trials) {
-        for (int i = 0; i < 3; ++i) {
-            if (trial.stimuli[i].handleRGB)
-                ctx.api.UnloadTexture(trial.stimuli[i].handleRGB);
-            if (trial.stimuli[i].handleOCV)
-                ctx.api.UnloadTexture(trial.stimuli[i].handleOCV);
-        }
+    // Clean up current trial textures
+    for (int i = 0; i < 3; ++i) {
+        if (currentStimuli[i].handleRGB)
+            ctx.api.UnloadTexture(currentStimuli[i].handleRGB);
+        if (currentStimuli[i].handleOCV)
+            ctx.api.UnloadTexture(currentStimuli[i].handleOCV);
     }
+    
     trials.clear();
 
     if (logger) {
@@ -181,15 +180,8 @@ void AppTemporalAFC::drawRunning(const TetriumApp::TickContextImGui& ctx)
     if (ImGui::IsKeyPressed(ImGuiKey_GamepadBack)) {
         INFO("Test cancelled by user via gamepad back button");
 
-        // Clean up trial textures
-        for (auto& trial : trials) {
-            for (int i = 0; i < 3; ++i) {
-                if (trial.stimuli[i].handleRGB)
-                    ctx.apis.UnloadTexture(trial.stimuli[i].handleRGB);
-                if (trial.stimuli[i].handleOCV)
-                    ctx.apis.UnloadTexture(trial.stimuli[i].handleOCV);
-            }
-        }
+        // Clean up current trial textures
+        unloadCurrentTrialTextures(ctx);
         trials.clear();
 
         // Return to idle state
@@ -231,8 +223,8 @@ void AppTemporalAFC::drawRunning(const TetriumApp::TickContextImGui& ctx)
                                                                    : 2;
 
         // Select appropriate texture based on color space
-        ImGuiTexture& tex = (ctx.colorSpace == ColorSpace::OCV) ? trial.stimuli[stimulusIdx].texOCV
-                                                                : trial.stimuli[stimulusIdx].texRGB;
+        ImGuiTexture& tex = (ctx.colorSpace == ColorSpace::OCV) ? currentStimuli[stimulusIdx].texOCV
+                                                                : currentStimuli[stimulusIdx].texRGB;
 
         float size = screenSize.y * settings.circleRadius;
         ImVec2 imageSize(size, size);
@@ -300,6 +292,8 @@ void AppTemporalAFC::drawBreak(const TetriumApp::TickContextImGui& ctx)
     ImVec2 buttonSize(200, 60);
     ImGui::SetCursorPos(ImVec2(centerPos.x - buttonSize.x * 0.5f, centerPos.y + 50));
     if (ImGui::Button("Continue", buttonSize)) {
+        // Load next trial's textures
+        loadCurrentTrialTextures(ctx);
         // Resume test
         trialState = TrialState::kBlank;
         stateTimeRemaining = 500.0f;
@@ -352,15 +346,8 @@ void AppTemporalAFC::drawResult(const TetriumApp::TickContextImGui& ctx)
     if (ImGui::Button("Back to Menu", ImVec2(200, 60))) {
         state = TestState::kIdle;
 
-        // Clean up trial textures
-        for (auto& trial : trials) {
-            for (int i = 0; i < 3; ++i) {
-                if (trial.stimuli[i].handleRGB)
-                    ctx.apis.UnloadTexture(trial.stimuli[i].handleRGB);
-                if (trial.stimuli[i].handleOCV)
-                    ctx.apis.UnloadTexture(trial.stimuli[i].handleOCV);
-            }
-        }
+        // Clean up current trial textures
+        unloadCurrentTrialTextures(ctx);
         trials.clear();
     }
 
@@ -408,6 +395,7 @@ void AppTemporalAFC::startTest(const TetriumApp::TickContextImGui& ctx)
     // Start first trial
     currentTrialIdx = 0;
     numCorrect = 0;
+    loadCurrentTrialTextures(ctx);
     trialState = TrialState::kBlank;
     stateTimeRemaining = 500.0f; // Initial blank
     state = TestState::kRunning;
@@ -445,9 +433,6 @@ void AppTemporalAFC::generateAllTrials(const TetriumApp::TickContextImGui& ctx)
                 // Randomize odd position
                 trial.oddPosition = rand() % 3;
 
-                // Generate stimulus textures for this trial
-                generateStimulusTextures(trial, trialIdx, ctx);
-
                 trials.push_back(trial);
                 trialIdx++;
             }
@@ -462,12 +447,10 @@ void AppTemporalAFC::generateAllTrials(const TetriumApp::TickContextImGui& ctx)
     INFO("Generated {} trials", trials.size());
 }
 
-void AppTemporalAFC::generateStimulusTextures(
-    Trial& trial,
-    int trialIdx,
-    const TetriumApp::TickContextImGui& ctx
-)
+void AppTemporalAFC::loadCurrentTrialTextures(const TetriumApp::TickContextImGui& ctx)
 {
+    Trial& trial = trials[currentTrialIdx];
+    
     // Create temp directory
     std::filesystem::create_directories("./temp");
 
@@ -476,7 +459,7 @@ void AppTemporalAFC::generateStimulusTextures(
         bool isOdd = (i == trial.oddPosition);
         auto [r, g, b, o] = computeRGBO(trial.rgRatio, trial.luminance, trial.oddType, isOdd);
 
-        std::string baseFilename = "./temp/" + subjectName + "_trial" + std::to_string(trialIdx)
+        std::string baseFilename = "./temp/" + subjectName + "_trial" + std::to_string(currentTrialIdx)
                                    + "_stim" + std::to_string(i);
 
         auto [rgbPath, ocvPath] = colorGenerator->GenerateCircle(
@@ -492,12 +475,26 @@ void AppTemporalAFC::generateStimulusTextures(
         );
 
         // Load textures
-        trial.stimuli[i].handleRGB = ctx.apis.LoadTexture(rgbPath);
+        currentStimuli[i].handleRGB = ctx.apis.LoadTexture(rgbPath);
         // If useRGOForOCV is enabled, use RGB path for OCV channel as well
         std::string ocvTexturePath = settings.useRGOForOCV ? rgbPath : ocvPath;
-        trial.stimuli[i].handleOCV = ctx.apis.LoadTexture(ocvTexturePath);
-        trial.stimuli[i].texRGB = ctx.apis.InitImGuiTexture(trial.stimuli[i].handleRGB);
-        trial.stimuli[i].texOCV = ctx.apis.InitImGuiTexture(trial.stimuli[i].handleOCV);
+        currentStimuli[i].handleOCV = ctx.apis.LoadTexture(ocvTexturePath);
+        currentStimuli[i].texRGB = ctx.apis.InitImGuiTexture(currentStimuli[i].handleRGB);
+        currentStimuli[i].texOCV = ctx.apis.InitImGuiTexture(currentStimuli[i].handleOCV);
+    }
+}
+
+void AppTemporalAFC::unloadCurrentTrialTextures(const TetriumApp::TickContextImGui& ctx)
+{
+    for (int i = 0; i < 3; ++i) {
+        if (currentStimuli[i].handleRGB) {
+            ctx.apis.UnloadTexture(currentStimuli[i].handleRGB);
+            currentStimuli[i].handleRGB = 0;
+        }
+        if (currentStimuli[i].handleOCV) {
+            ctx.apis.UnloadTexture(currentStimuli[i].handleOCV);
+            currentStimuli[i].handleOCV = 0;
+        }
     }
 }
 
@@ -564,12 +561,18 @@ void AppTemporalAFC::handleResponse(int choice, const TetriumApp::TickContextImG
 
     // Move to next trial or finish
     currentTrialIdx++;
+    
+    // Unload previous trial's textures
+    unloadCurrentTrialTextures(ctx);
+    
     if (currentTrialIdx >= static_cast<int>(trials.size())) {
         state = TestState::kResult;
     } else if (currentTrialIdx % 90 == 0) {
         // Take a break every 90 trials
         state = TestState::kBreak;
     } else {
+        // Load next trial's textures
+        loadCurrentTrialTextures(ctx);
         trialState = TrialState::kBlank;
         stateTimeRemaining = 500.0f;
     }
