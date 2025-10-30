@@ -22,7 +22,6 @@ class AppTemporalAFC : public App
     enum class TestState
     {
         kIdle,
-        kSettings,
         kRunning,
         kBreak,
         kResult
@@ -52,7 +51,7 @@ class AppTemporalAFC : public App
         float orangeLevel = 255.0f; // 0-255 (base level)
         float redLevel = 127.0f;    // 0-255 (base level)
         float greenLevel = 65.0f;   // 0-255 (base level)
-        int minLuminance = 9;       // Minimum luminance level (0-100)
+        int minLuminance = 5;       // Minimum luminance level (0-100)
         int maxLuminance = 95;      // Maximum luminance level (0-100)
         int numLuminanceLevels = 10;
         int stimulusDurationMs = 150;

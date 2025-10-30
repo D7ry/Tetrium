@@ -5,6 +5,7 @@
 #include "Pathing.h"
 
 #include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <iomanip>
 #include <random>
@@ -37,7 +38,7 @@ void AppTemporalAFC::Cleanup(TetriumApp::CleanupContext& ctx)
         if (currentStimuli[i].handleOCV)
             ctx.api.UnloadTexture(currentStimuli[i].handleOCV);
     }
-    
+
     trials.clear();
 
     if (logger) {
@@ -63,8 +64,6 @@ void AppTemporalAFC::TickImGui(const TetriumApp::TickContextImGui& ctx)
 
     if (ImGui::Begin("Temporal 3AFC Test", NULL, flags)) {
         switch (state) {
-        case TestState::kSettings:
-            drawSettings(ctx);
         case TestState::kIdle:
             drawIdle(ctx);
             break;
@@ -121,13 +120,15 @@ void AppTemporalAFC::drawIdle(const TetriumApp::TickContextImGui& ctx)
     ImGui::SetCursorPos(pos + ImVec2(0, 100 + buttonSize.y + spacing));
     if (ImGui::Button("Settings", buttonSize)) {
         ImGui::OpenPopup("Settings");
-        state = TestState::kSettings;
     }
 
     ImGui::SetCursorPos(pos + ImVec2(0, 100 + (buttonSize.y + spacing) * 2));
     if (ImGui::Button("Exit", buttonSize)) {
         ctx.controls.wantExit = true;
     }
+
+    // Draw settings popup if open
+    drawSettings(ctx);
 }
 
 void AppTemporalAFC::drawSettings(const TetriumApp::TickContextImGui& ctx)
@@ -168,7 +169,6 @@ void AppTemporalAFC::drawSettings(const TetriumApp::TickContextImGui& ctx)
 
         if (ImGui::Button("Close")) {
             ImGui::CloseCurrentPopup();
-            state = TestState::kIdle;
         }
         ImGui::EndPopup();
     }
@@ -223,8 +223,9 @@ void AppTemporalAFC::drawRunning(const TetriumApp::TickContextImGui& ctx)
                                                                    : 2;
 
         // Select appropriate texture based on color space
-        ImGuiTexture& tex = (ctx.colorSpace == ColorSpace::OCV) ? currentStimuli[stimulusIdx].texOCV
-                                                                : currentStimuli[stimulusIdx].texRGB;
+        ImGuiTexture& tex = (ctx.colorSpace == ColorSpace::OCV)
+                                ? currentStimuli[stimulusIdx].texOCV
+                                : currentStimuli[stimulusIdx].texRGB;
 
         float size = screenSize.y * settings.circleRadius;
         ImVec2 imageSize(size, size);
@@ -268,10 +269,10 @@ void AppTemporalAFC::drawRunning(const TetriumApp::TickContextImGui& ctx)
 void AppTemporalAFC::drawBreak(const TetriumApp::TickContextImGui& ctx)
 {
     (void)ctx;
-    
+
     ImVec2 screenSize = ImGui::GetIO().DisplaySize;
     ImVec2 centerPos(screenSize.x * 0.5f, screenSize.y * 0.5f);
-    
+
     // Show break message
     ImGui::SetWindowFontScale(2.0f);
     const char* breakText = "Take a Break!";
@@ -279,15 +280,15 @@ void AppTemporalAFC::drawBreak(const TetriumApp::TickContextImGui& ctx)
     ImGui::SetCursorPos(ImVec2(centerPos.x - textSize.x * 0.5f, centerPos.y - 150));
     ImGui::Text("%s", breakText);
     ImGui::SetWindowFontScale(1.0f);
-    
+
     // Show progress
     ImGui::SetCursorPos(ImVec2(centerPos.x - 150, centerPos.y - 50));
     ImGui::Text("Completed: %d / %d trials", currentTrialIdx, static_cast<int>(trials.size()));
-    
+
     int remaining = static_cast<int>(trials.size()) - currentTrialIdx;
     ImGui::SetCursorPos(ImVec2(centerPos.x - 150, centerPos.y - 20));
     ImGui::Text("Remaining: %d trials", remaining);
-    
+
     // Continue button
     ImVec2 buttonSize(200, 60);
     ImGui::SetCursorPos(ImVec2(centerPos.x - buttonSize.x * 0.5f, centerPos.y + 50));
@@ -405,13 +406,13 @@ void AppTemporalAFC::generateAllTrials(const TetriumApp::TickContextImGui& ctx)
 {
     trials.clear();
 
-    // Generate luminance levels
+    // Generate luminance levels (evenly spaced with proper rounding)
     std::vector<int> luminanceLevels;
     for (int i = 0; i < settings.numLuminanceLevels; ++i) {
-        int luminance = settings.minLuminance
-                        + i * (settings.maxLuminance - settings.minLuminance)
-                              / (settings.numLuminanceLevels - 1);
-        luminanceLevels.push_back(luminance);
+        float luminance = settings.minLuminance
+                          + i * (settings.maxLuminance - settings.minLuminance)
+                                / static_cast<float>(settings.numLuminanceLevels - 1);
+        luminanceLevels.push_back(static_cast<int>(std::round(luminance)));
     }
 
     // Generate trials for each grid point (ratio × luminance)
@@ -450,7 +451,7 @@ void AppTemporalAFC::generateAllTrials(const TetriumApp::TickContextImGui& ctx)
 void AppTemporalAFC::loadCurrentTrialTextures(const TetriumApp::TickContextImGui& ctx)
 {
     Trial& trial = trials[currentTrialIdx];
-    
+
     // Create temp directory
     std::filesystem::create_directories("./temp");
 
@@ -459,8 +460,8 @@ void AppTemporalAFC::loadCurrentTrialTextures(const TetriumApp::TickContextImGui
         bool isOdd = (i == trial.oddPosition);
         auto [r, g, b, o] = computeRGBO(trial.rgRatio, trial.luminance, trial.oddType, isOdd);
 
-        std::string baseFilename = "./temp/" + subjectName + "_trial" + std::to_string(currentTrialIdx)
-                                   + "_stim" + std::to_string(i);
+        std::string baseFilename = "./temp/" + subjectName + "_trial"
+                                   + std::to_string(currentTrialIdx) + "_stim" + std::to_string(i);
 
         auto [rgbPath, ocvPath] = colorGenerator->GenerateCircle(
             baseFilename,
@@ -561,10 +562,10 @@ void AppTemporalAFC::handleResponse(int choice, const TetriumApp::TickContextImG
 
     // Move to next trial or finish
     currentTrialIdx++;
-    
+
     // Unload previous trial's textures
     unloadCurrentTrialTextures(ctx);
-    
+
     if (currentTrialIdx >= static_cast<int>(trials.size())) {
         state = TestState::kResult;
     } else if (currentTrialIdx % 90 == 0) {
