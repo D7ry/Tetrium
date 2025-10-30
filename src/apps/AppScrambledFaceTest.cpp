@@ -1,6 +1,7 @@
 #include "imgui.h"
 #include "misc/cpp/imgui_stdlib.h"
 #include <cmath>
+#include <ctime>
 #include <filesystem>
 
 #include "AppScrambledFaceTest.h"
@@ -78,12 +79,12 @@ void AppScrambledFaceTest::drawIdle(const TetriumApp::TickContextImGui& ctx)
     bool playClicked = ImGui::Button("Play", buttonSize) && !disabled;
     if (disabled)
         ImGui::PopStyleColor(3);
-    
+
     // Gamepad: A button to play
     if (ImGui::IsKeyPressed(ImGuiKey_GamepadFaceDown) && !disabled) {
         playClicked = true;
     }
-    
+
     if (playClicked) {
         startTest(ctx);
         state = TestState::kRunning;
@@ -91,12 +92,12 @@ void AppScrambledFaceTest::drawIdle(const TetriumApp::TickContextImGui& ctx)
 
     ImGui::SetCursorPos(pos + ImVec2(0, 200));
     bool settingsClicked = ImGui::Button("Settings", buttonSize);
-    
+
     // Gamepad: Y button for settings
     if (ImGui::IsKeyPressed(ImGuiKey_GamepadFaceUp)) {
         settingsClicked = true;
     }
-    
+
     if (settingsClicked)
         state = TestState::kSettings;
 }
@@ -196,12 +197,15 @@ void AppScrambledFaceTest::generateTrial(
             + std::to_string(metamericAxis) + "_" + std::to_string(i)
         );
     }
+    // Generate a unique seed for each trial to randomize the pattern
+    int seed = static_cast<int>(time(nullptr)) + trialIdx + (rand() % 10000);
     auto idxs = generator->GetImages(
         metamericAxis,
         settings.luminance,
         settings.saturation,
         names,
-        TetriumColor::ColorSpaceType::DISP_6P
+        TetriumColor::ColorSpaceType::DISP_6P,
+        seed
     );
     (void)idxs;
 
@@ -233,18 +237,18 @@ void AppScrambledFaceTest::drawRunning(const TetriumApp::TickContextImGui& ctx)
         state = TestState::kResult;
         return;
     }
-    
+
     Trial& t = trials[currentTrial];
     ImVec2 avail = ImGui::GetContentRegionAvail();
     ImVec2 center(avail.x * 0.5f, avail.y * 0.5f);
- 
+
     // Gamepad button mapping: Y (top), B (bottom-right), X (bottom-left)
     ImGuiKey gamepadKeys[3] = {
         ImGuiKey_GamepadFaceUp,    // Y button -> top stimulus (index 0)
         ImGuiKey_GamepadFaceRight, // B button -> bottom-right stimulus (index 1)
         ImGuiKey_GamepadFaceLeft   // X button -> bottom-left stimulus (index 2)
     };
-    
+
     // Check for gamepad input first
     for (int i = 0; i < 3; i++) {
         if (ImGui::IsKeyPressed(gamepadKeys[i])) {
@@ -280,7 +284,7 @@ void AppScrambledFaceTest::drawRunning(const TetriumApp::TickContextImGui& ctx)
             return;
         }
     }
- 
+
     // Draw fixation cross in center
     float crossSize = 20.0f;
     float crossThickness = 3.0f;
@@ -392,12 +396,13 @@ void AppScrambledFaceTest::drawResult(const TetriumApp::TickContextImGui& ctx)
         "Accuracy: %.2f%%", totalTrials ? (100.f * (float)numCorrect / (float)totalTrials) : 0.f
     );
     bool backClicked = ImGui::Button("Back to Menu", ImVec2(200, 60));
-    
+
     // Gamepad: A or Back button to return to menu
-    if (ImGui::IsKeyPressed(ImGuiKey_GamepadFaceDown) || ImGui::IsKeyPressed(ImGuiKey_GamepadBack)) {
+    if (ImGui::IsKeyPressed(ImGuiKey_GamepadFaceDown)
+        || ImGui::IsKeyPressed(ImGuiKey_GamepadBack)) {
         backClicked = true;
     }
-    
+
     if (backClicked) {
         state = TestState::kIdle;
         for (auto& t : trials) {
