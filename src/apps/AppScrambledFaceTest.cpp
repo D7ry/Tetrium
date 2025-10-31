@@ -127,6 +127,22 @@ void AppScrambledFaceTest::drawSettings(const TetriumApp::TickContextImGui& ctx)
         ImGui::SliderFloat("Saturation", &settings.saturation, 0.0f, 1.0f);
         ImGui::SliderFloat("Scramble prob", &settings.scrambleProb, 0.0f, 1.0f);
 
+        // Normal face mode selector
+        ImGui::Text("Normal Face Mode");
+        const char* faceModeName
+            = (settings.normalFaceMode == NormalFaceMode::kSame) ? "SAME" : "DIFF";
+        if (ImGui::BeginCombo("##NormalFaceMode", faceModeName)) {
+            if (ImGui::Selectable("SAME", settings.normalFaceMode == NormalFaceMode::kSame)) {
+                settings.normalFaceMode = NormalFaceMode::kSame;
+            }
+            if (ImGui::Selectable("DIFF", settings.normalFaceMode == NormalFaceMode::kDiff)) {
+                settings.normalFaceMode = NormalFaceMode::kDiff;
+            }
+            ImGui::EndCombo();
+        }
+        ImGui::Text("(SAME: two copies of one face, DIFF: two different faces)");
+        ImGui::Separator();
+
         if (ImGui::Button("Close")) {
             ImGui::CloseCurrentPopup();
             state = TestState::kIdle;
@@ -205,7 +221,8 @@ void AppScrambledFaceTest::startTest(const TetriumApp::TickContextImGui& ctx)
            "timeout",
            "luminance",
            "saturation",
-           "scramble_prob"};
+           "scramble_prob",
+           "normal_face_mode"};
     logger = new TestDataLogger("AppScrambledFaceTest", subjectName, headers);
 
     currentTrial = 0;
@@ -236,9 +253,10 @@ void AppScrambledFaceTest::generateTrial(
     t.choices.clear();
     t.choices.resize(settings.imagesPerTrial);
 
+    // GetImages returns 3 images - generate names for all 3
     std::vector<std::string> names;
-    names.reserve(settings.imagesPerTrial);
-    for (int i = 0; i < settings.imagesPerTrial; ++i) {
+    names.reserve(3);
+    for (int i = 0; i < 3; ++i) {
         names.emplace_back(
             "./temp/" + subjectName + "_trial" + std::to_string(trialIdx) + "_genotype" + genotype
             + "_axis" + std::to_string(metamericAxis) + "_" + std::to_string(i)
@@ -250,15 +268,42 @@ void AppScrambledFaceTest::generateTrial(
     );
     (void)idxs;
 
-    // Load both RGB and OCV variants saved by Python: _RGB.png and _OCV.png
-    for (int i = 0; i < settings.imagesPerTrial; ++i) {
-        std::string rgbPath = names[i] + "_RGB.png";
-        std::string ocvPath = names[i] + "_OCV.png";
-        t.choices[i].handleRGB = ctx.apis.LoadTexture(rgbPath);
-        t.choices[i].handleOCV = ctx.apis.LoadTexture(ocvPath);
-        t.choices[i].texRGB = ctx.apis.InitImGuiTexture(t.choices[i].handleRGB);
-        t.choices[i].texOCV = ctx.apis.InitImGuiTexture(t.choices[i].handleOCV);
+    if (settings.normalFaceMode == NormalFaceMode::kSame) {
+        // SAME mode: Randomly pick one of the first two images as the "normal" face
+        int pickedIdx = rand() % 2;
+
+        // Load the picked image for positions 0 and 1 (two copies of the normal face)
+        std::string normalRgbPath = names[pickedIdx] + "_RGB.png";
+        std::string normalOcvPath = names[pickedIdx] + "_OCV.png";
+
+        for (int i = 0; i < 2; ++i) {
+            t.choices[i].handleRGB = ctx.apis.LoadTexture(normalRgbPath);
+            t.choices[i].handleOCV = ctx.apis.LoadTexture(normalOcvPath);
+            t.choices[i].texRGB = ctx.apis.InitImGuiTexture(t.choices[i].handleRGB);
+            t.choices[i].texOCV = ctx.apis.InitImGuiTexture(t.choices[i].handleOCV);
+        }
+    } else {
+        // DIFF mode: Load both of the first two images as different normal faces
+        for (int i = 0; i < 2; ++i) {
+            std::string normalRgbPath = names[i] + "_RGB.png";
+            std::string normalOcvPath = names[i] + "_OCV.png";
+            t.choices[i].handleRGB = ctx.apis.LoadTexture(normalRgbPath);
+            t.choices[i].handleOCV = ctx.apis.LoadTexture(normalOcvPath);
+            t.choices[i].texRGB = ctx.apis.InitImGuiTexture(t.choices[i].handleRGB);
+            t.choices[i].texOCV = ctx.apis.InitImGuiTexture(t.choices[i].handleOCV);
+        }
     }
+
+    // Load the third image (index 2) as the scrambled/odd one out
+    std::string scrambledRgbPath = names[2] + "_RGB.png";
+    std::string scrambledOcvPath = names[2] + "_OCV.png";
+    t.choices[2].handleRGB = ctx.apis.LoadTexture(scrambledRgbPath);
+    t.choices[2].handleOCV = ctx.apis.LoadTexture(scrambledOcvPath);
+    t.choices[2].texRGB = ctx.apis.InitImGuiTexture(t.choices[2].handleRGB);
+    t.choices[2].texOCV = ctx.apis.InitImGuiTexture(t.choices[2].handleOCV);
+
+    // Mark that the scrambled image is at original index 2
+    t.scrambledOriginalIndex = 2;
 
     // Build display shuffle mapping 0..N-1 and randomize
     t.displayToOriginal.resize(settings.imagesPerTrial);
@@ -431,6 +476,8 @@ void AppScrambledFaceTest::handleTrialResponse(
         data["luminance"] = std::to_string(settings.luminance);
         data["saturation"] = std::to_string(settings.saturation);
         data["scramble_prob"] = std::to_string(settings.scrambleProb);
+        data["normal_face_mode"]
+            = (settings.normalFaceMode == NormalFaceMode::kSame) ? "SAME" : "DIFF";
         logger->LogRow(data);
     }
 

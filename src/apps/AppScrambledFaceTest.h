@@ -32,6 +32,12 @@ class AppScrambledFaceTest : public App
         kBreak     // Break screen with continue button
     };
 
+    enum class NormalFaceMode
+    {
+        kSame, // Two copies of the same normal face
+        kDiff  // Two different normal faces
+    };
+
     struct Settings
     {
         int repetitionsPerAxis = 5;
@@ -43,6 +49,8 @@ class AppScrambledFaceTest : public App
         float viewingDuration = 1.0f;  // seconds to view stimuli
         float responseDuration = 3.0f; // seconds to respond
         float itiDuration = 1.0f;      // inter-trial interval (seconds)
+        NormalFaceMode normalFaceMode
+            = NormalFaceMode::kSame; // SAME vs DIFF for non-scrambled faces
     } settings;
 
     struct Trial
