@@ -239,20 +239,23 @@ void AppPseudoIsochromaticTest::drawTestForSubject(
     } else {
         ctx.controls.musicOverride = std::nullopt;
     }
-    // handle state transition
-    subject.currStateRemainderTime -= ImGui::GetIO().DeltaTime;
-    if (subject.currStateRemainderTime <= 0) {
-        transitionSubjectState(subject, ctx);
-        // If the game just ended, we switched out of testing; stop drawing this frame
-        if (_state != TestState::kTesting) {
-            return;
-        }
-    }
-    ASSERT(subject.currStateRemainderTime > 0);
 
     if (ImGui::IsKeyPressed(ImGuiKey_GamepadBack)) {
         ctx.apis.PlaySound(Sound::kVineBoom);
         _state = TestState::kIdle;
+    }
+
+    // Handle state transition (only for timer-based states, not break)
+    if (subject.state != SubjectState::kBreak) {
+        subject.currStateRemainderTime -= ImGui::GetIO().DeltaTime;
+        if (subject.currStateRemainderTime <= 0) {
+            transitionSubjectState(subject, ctx);
+            // If the game just ended, we switched out of testing; stop drawing this frame
+            if (_state != TestState::kTesting) {
+                return;
+            }
+        }
+        ASSERT(subject.currStateRemainderTime > 0);
     }
 
     // Draw progress indicator in upper left corner
