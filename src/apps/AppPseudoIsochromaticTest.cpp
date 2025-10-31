@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <random>
+#include <sstream>
 
 #include "imgui.h"
 #include "misc/cpp/imgui_stdlib.h" // for string input text
@@ -582,7 +583,8 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
         = {"subject_id",
            "session_timestamp",
            "trial_idx",
-           "genotype",
+           "genotype_1",
+           "genotype_2",
            "metameric_axis",
            "repetition_idx",
            "orientation",
@@ -827,10 +829,34 @@ void AppPseudoIsochromaticTest::logTrialData(
 
     const Trial& trial = getCurrentTrial();
 
+    // Parse genotype into separate components
+    std::string genotypeCleaned = genotype;
+    // Remove parentheses
+    genotypeCleaned.erase(
+        std::remove(genotypeCleaned.begin(), genotypeCleaned.end(), '('), genotypeCleaned.end()
+    );
+    genotypeCleaned.erase(
+        std::remove(genotypeCleaned.begin(), genotypeCleaned.end(), ')'), genotypeCleaned.end()
+    );
+
+    // Split by comma
+    std::vector<std::string> genotypeComponents;
+    std::stringstream ss(genotypeCleaned);
+    std::string component;
+    while (std::getline(ss, component, ',')) {
+        genotypeComponents.push_back(component);
+    }
+
     std::map<std::string, std::string> data;
     data["subject_id"] = subject.name;
+    data["session_timestamp"] = ""; // Empty for now, could add session start time if needed
     data["trial_idx"] = std::to_string(subject.currentTrialIndex);
-    data["genotype"] = genotype;
+
+    // Save genotype components as separate columns (up to 4)
+    for (int i = 0; i < 2; i++) {
+        data["genotype_" + std::to_string(i + 1)]
+            = (i < (int)genotypeComponents.size()) ? genotypeComponents[i] : "";
+    }
     data["metameric_axis"] = std::to_string(metameric_axis);
     data["repetition_idx"] = std::to_string(trial.repetition_idx);
     data["orientation"] = OrientationToString(orientation);

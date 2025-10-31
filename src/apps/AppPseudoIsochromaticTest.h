@@ -37,7 +37,7 @@ class AppPseudoIsochromaticTest : public App
 
     struct
     {
-        int REPETITIONS_PER_AXIS = 3; // number of repetitions for each genotype × metameric axis
+        int REPETITIONS_PER_AXIS = 4; // number of repetitions for each genotype × metameric axis
         int BREAK_INTERVAL = 50;      // number of trials between breaks (0 = no breaks)
         MusicSetting MUSIC_SETTING = MusicSetting::CORRECT_WRONG;
         float LUM_NOISE = 0.0f;     // luminance noise [0.0, 1.0]

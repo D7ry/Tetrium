@@ -1,8 +1,10 @@
 #include "imgui.h"
 #include "misc/cpp/imgui_stdlib.h"
+#include <algorithm>
 #include <cmath>
 #include <ctime>
 #include <filesystem>
+#include <sstream>
 
 #include "AppScrambledFaceTest.h"
 #include "Pathing.h"
@@ -211,7 +213,8 @@ void AppScrambledFaceTest::startTest(const TetriumApp::TickContextImGui& ctx)
         = {"subject_id",
            "session_timestamp",
            "trial_idx",
-           "genotype",
+           "genotype_1",
+           "genotype_2",
            "metameric_axis",
            "repetition_idx",
            "scrambled_original_idx",
@@ -462,10 +465,34 @@ void AppScrambledFaceTest::handleTrialResponse(
 
     // Log trial data
     if (logger) {
+        // Parse genotype into separate components
+        std::string genotypeCleaned = t.genotype;
+        // Remove parentheses
+        genotypeCleaned.erase(
+            std::remove(genotypeCleaned.begin(), genotypeCleaned.end(), '('), genotypeCleaned.end()
+        );
+        genotypeCleaned.erase(
+            std::remove(genotypeCleaned.begin(), genotypeCleaned.end(), ')'), genotypeCleaned.end()
+        );
+
+        // Split by comma
+        std::vector<std::string> genotypeComponents;
+        std::stringstream ss(genotypeCleaned);
+        std::string component;
+        while (std::getline(ss, component, ',')) {
+            genotypeComponents.push_back(component);
+        }
+
         std::map<std::string, std::string> data;
         data["subject_id"] = subjectName;
+        data["session_timestamp"] = ""; // Empty for now, could add session start time if needed
         data["trial_idx"] = std::to_string(currentTrial);
-        data["genotype"] = t.genotype;
+
+        // Save genotype components as separate columns (up to 4)
+        for (int i = 0; i < 2; i++) {
+            data["genotype_" + std::to_string(i + 1)]
+                = (i < (int)genotypeComponents.size()) ? genotypeComponents[i] : "";
+        }
         data["metameric_axis"] = std::to_string(t.metamericAxis);
         data["repetition_idx"] = std::to_string(t.repetitionIdx);
         data["scrambled_original_idx"] = std::to_string(t.scrambledOriginalIndex);
