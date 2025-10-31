@@ -95,6 +95,7 @@ void TetriumApp::AppPseudoIsochromaticTest::drawSettingsWindow(
     // draw a settings pop-up window
     if (ImGui::BeginPopup("Settings", ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::SliderInt("Repetitions Per Axis", &SETTINGS.REPETITIONS_PER_AXIS, 1, 10);
+        ImGui::SliderInt("Break Interval (0 = no breaks)", &SETTINGS.BREAK_INTERVAL, 0, 100);
         ImGui::Text("Duration of Blank Period (seconds)");
         ImGui::InputFloat("##Blank", &SETTINGS.STATE_DURATIONS_SECONDS.BLANK);
         ImGui::Text("Duration of Fixation (seconds)");
@@ -254,6 +255,19 @@ void AppPseudoIsochromaticTest::drawTestForSubject(
         _state = TestState::kIdle;
     }
 
+    // Draw progress indicator in upper left corner
+    int totalTrials = _trials.size();
+    int currentTrial = subject.currentTrialIndex + 1; // +1 to show 1-based indexing
+    char progressText[64];
+    snprintf(progressText, sizeof(progressText), "%d / %d", currentTrial, totalTrials);
+
+    ImGui::SetCursorPos(ImVec2(20, 20));
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 0.8f)); // Semi-transparent white
+    ImGui::SetWindowFontScale(1.5f);
+    ImGui::Text("%s", progressText);
+    ImGui::SetWindowFontScale(1.0f);
+    ImGui::PopStyleColor();
+
     switch (subject.state) {
     case SubjectState::kBlank:
         // Blank state - draw nothing (entirely black)
@@ -266,6 +280,9 @@ void AppPseudoIsochromaticTest::drawTestForSubject(
         break;
     case SubjectState::kAnswer:
         drawAnswerPrompts(subject, ctx);
+        break;
+    case SubjectState::kBreak:
+        drawBreakWindow(subject, ctx);
         break;
     }
 }
@@ -472,11 +489,24 @@ void AppPseudoIsochromaticTest::transitionSubjectState(
             endGame(subject);
             return;
         }
-        // Otherwise advance to next trial and show blank screen
+        // Otherwise advance to next trial
         subject.currentTrialIndex += 1;
-        subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.BLANK;
-        subject.state = SubjectState::kBlank;
-        populatePromptContext(subject, ctx);
+        subject.trialsSinceLastBreak += 1;
+
+        // Check if we should take a break
+        if (SETTINGS.BREAK_INTERVAL > 0
+            && subject.trialsSinceLastBreak >= SETTINGS.BREAK_INTERVAL) {
+            subject.state = SubjectState::kBreak;
+            subject.trialsSinceLastBreak = 0;
+        } else {
+            subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.BLANK;
+            subject.state = SubjectState::kBlank;
+            populatePromptContext(subject, ctx);
+        }
+        break;
+    case SubjectState::kBreak:
+        // Break state is handled by button press in drawBreakWindow
+        // This case shouldn't be reached by timer, but included for completeness
         break;
     }
 }
@@ -566,6 +596,7 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
         .state = SubjectState::kBlank,
         .currentTrialIndex = 0,
         .numSuccessAttempts = 0,
+        .trialsSinceLastBreak = 0,
     };
     populatePromptContext(_subject, ctx);
     _state = TestState::kTesting;
@@ -609,6 +640,76 @@ void AppPseudoIsochromaticTest::drawFixGazePage()
     );
     ImGui::SetCursorPos(textPos);
     ImGui::Text("Fix Gaze Onto Crosshair");
+}
+
+void AppPseudoIsochromaticTest::drawBreakWindow(
+    SubjectContext& subject,
+    const TetriumApp::TickContextImGui& ctx
+)
+{
+    // Calculate the size and position of the box
+    ImVec2 boxSize(800, 400);
+    ImVec2 windowSize = ImGui::GetWindowSize();
+    ImVec2 boxPos((windowSize.x - boxSize.x) * 0.5f, (windowSize.y - boxSize.y) * 0.5f);
+
+    // Draw centered box
+    ImGui::SetCursorPos(boxPos);
+    ImGui::BeginChild(
+        "BreakBox", boxSize, true, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize
+    );
+
+    // Calculate progress
+    int totalTrials = _trials.size();
+    int completedTrials = subject.currentTrialIndex;
+    int remainingTrials = totalTrials - completedTrials;
+
+    // Vertically center content
+    float lineSpacing = ImGui::GetTextLineHeightWithSpacing();
+    float yStart = (boxSize.y - (lineSpacing * 6.0f)) * 0.5f;
+
+    // Title
+    ImGui::SetWindowFontScale(2.0f);
+    const char* titleText = "Take a Break";
+    ImVec2 titleSize = ImGui::CalcTextSize(titleText);
+    ImGui::SetCursorPos(ImVec2((boxSize.x - titleSize.x * 2.0f * 0.5f) * 0.5f, yStart));
+    ImGui::Text("%s", titleText);
+    ImGui::SetWindowFontScale(1.0f);
+
+    // Progress info
+    char progressText[128];
+    snprintf(
+        progressText,
+        sizeof(progressText),
+        "Completed: %d / %d trials",
+        completedTrials,
+        totalTrials
+    );
+    ImVec2 progressSize = ImGui::CalcTextSize(progressText);
+    ImGui::SetCursorPos(ImVec2((boxSize.x - progressSize.x) * 0.5f, yStart + lineSpacing * 3.0f));
+    ImGui::Text("%s", progressText);
+
+    char remainingText[128];
+    snprintf(remainingText, sizeof(remainingText), "Remaining: %d trials", remainingTrials);
+    ImVec2 remainingSize = ImGui::CalcTextSize(remainingText);
+    ImGui::SetCursorPos(ImVec2((boxSize.x - remainingSize.x) * 0.5f, yStart + lineSpacing * 4.0f));
+    ImGui::Text("%s", remainingText);
+
+    // Continue button
+    ImVec2 buttonSize(200, 60);
+    ImVec2 buttonPos((boxSize.x - buttonSize.x) * 0.5f, yStart + lineSpacing * 6.5f);
+    ImGui::SetCursorPos(buttonPos);
+
+    bool continuePressed = ImGui::Button("Continue (A)", buttonSize)
+                           || ImGui::IsKeyPressed(ImGuiKey_GamepadFaceDown);
+
+    if (continuePressed) {
+        // Continue to next trial
+        subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.BLANK;
+        subject.state = SubjectState::kBlank;
+        populatePromptContext(subject, ctx);
+    }
+
+    ImGui::EndChild();
 }
 
 std::pair<std::string, std::string> AppPseudoIsochromaticTest::generateLandoltCTextures(

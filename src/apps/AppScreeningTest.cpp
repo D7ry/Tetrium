@@ -86,7 +86,9 @@ void TetriumApp::AppScreeningTest::TickImGui(const TetriumApp::TickContextImGui&
 void TetriumApp::AppScreeningTest::drawSettingsWindow(const TetriumApp::TickContextImGui& ctx)
 {
     // draw a settings pop-up window
-    if (ImGui::BeginPopup("Settings", ImGuiWindowFlags_AlwaysAutoResize)) {
+    ImGui::SetNextWindowSize(ImVec2(400, 600), ImGuiCond_FirstUseEver);
+    if (ImGui::BeginPopup("Settings")) {
+        ImGui::BeginChild("SettingsScrollRegion", ImVec2(0, 500), false);
         ImGui::SliderInt("Num Attempts", &SETTINGS.NUM_ATTEMPTS, 1, 10);
         ImGui::Text("Duration of Blank Period (seconds)");
         ImGui::InputFloat("##Blank", &SETTINGS.STATE_DURATIONS_SECONDS.BLANK);
@@ -106,6 +108,9 @@ void TetriumApp::AppScreeningTest::drawSettingsWindow(const TetriumApp::TickCont
         // Stimulus size slider
         ImGui::SliderFloat("Stimulus Size", &SETTINGS.STIMULUS_SIZE, 0.0f, 1.0f);
 
+        // Break every N trials setting
+        ImGui::SliderInt("Break Every N Trials", &SETTINGS.BREAK_EVERY_N_TRIALS, 10, 200);
+
         // Music setting dropdown
         ImGui::Text("Music Setting");
         const char* musicOptions[] = {"ALL", "CORRECT_WRONG", "OFF"};
@@ -113,6 +118,8 @@ void TetriumApp::AppScreeningTest::drawSettingsWindow(const TetriumApp::TickCont
         if (ImGui::Combo("##Music", &currentMusicSetting, musicOptions, 3)) {
             SETTINGS.MUSIC_SETTING = static_cast<MusicSetting>(currentMusicSetting);
         }
+        ImGui::EndChild();
+
         if (ImGui::Button("Close")) {
             ImGui::CloseCurrentPopup();
             _state = TestState::kIdle;
@@ -256,6 +263,24 @@ void AppScreeningTest::drawTestForSubject(
         _state = TestState::kIdle;
     }
 
+    // Display trial counter in top-right corner (except during break)
+    if (subject.state != SubjectState::kBreak) {
+        ImVec2 screenSize = ImGui::GetIO().DisplaySize;
+        char counterText[64];
+        int maxAttempts = _overrideNumAttempts.has_value() ? _overrideNumAttempts.value()
+                                                           : SETTINGS.NUM_ATTEMPTS;
+        snprintf(
+            counterText,
+            sizeof(counterText),
+            "Trial: %d / %d",
+            subject.currentAttempt + 1,
+            maxAttempts
+        );
+        ImVec2 textSize = ImGui::CalcTextSize(counterText);
+        ImGui::SetCursorPos(ImVec2(screenSize.x - textSize.x - 20, 20));
+        ImGui::Text("%s", counterText);
+    }
+
     switch (subject.state) {
     case SubjectState::kBlank:
         // Blank state - draw nothing (entirely black)
@@ -268,6 +293,9 @@ void AppScreeningTest::drawTestForSubject(
         break;
     case SubjectState::kAnswer:
         drawAnswerPrompts(subject, ctx);
+        break;
+    case SubjectState::kBreak:
+        drawBreakScreen(subject, ctx);
         break;
     }
 }
@@ -508,7 +536,7 @@ void AppScreeningTest::transitionSubjectState(
         subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.ANSWERING;
         subject.state = SubjectState::kAnswer;
         break;
-    case SubjectState::kAnswer:
+    case SubjectState::kAnswer: {
         if (subject.prompt.currentSelectedAnswer == subject.prompt.correctAnswerTextureIndex) {
             subject.numSuccessAttempts += 1;
         }
@@ -520,8 +548,24 @@ void AppScreeningTest::transitionSubjectState(
             endGame(subject);
             return;
         }
-        // Otherwise advance to next attempt and show blank screen
+        // Otherwise advance to next attempt
         subject.currentAttempt += 1;
+
+        // Check if we should take a break (skip breaks in tutorial mode)
+        if (!_isTutorial && SETTINGS.BREAK_EVERY_N_TRIALS > 0
+            && (subject.currentAttempt % SETTINGS.BREAK_EVERY_N_TRIALS) == 0) {
+            subject.state = SubjectState::kBreak;
+            subject.currStateRemainderTime = 0; // No auto-transition, wait for user
+        } else {
+            // Continue to next trial
+            subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.BLANK;
+            subject.state = SubjectState::kBlank;
+            populatePromptContext(subject, ctx);
+        }
+        break;
+    }
+    case SubjectState::kBreak:
+        // Manual transition from break - should be triggered by button press in drawBreakScreen
         subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.BLANK;
         subject.state = SubjectState::kBlank;
         populatePromptContext(subject, ctx);
@@ -647,6 +691,67 @@ void AppScreeningTest::drawFixGazePage()
     ); // 20 pixels below crosshair
     ImGui::SetCursorPos(textPos);
     ImGui::Text("Fix Gaze Onto Crosshair");
+}
+
+void AppScreeningTest::drawBreakScreen(
+    SubjectContext& subject,
+    const TetriumApp::TickContextImGui& ctx
+)
+{
+    // Calculate the size and position of the box
+    ImVec2 boxSize(800, 400);
+    ImVec2 windowSize = ImGui::GetWindowSize();
+    ImVec2 boxPos((windowSize.x - boxSize.x) * 0.5f, (windowSize.y - boxSize.y) * 0.5f);
+
+    // Draw centered box
+    ImGui::SetCursorPos(boxPos);
+    ImGui::BeginChild(
+        "BreakBox", boxSize, true, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize
+    );
+
+    // Calculate vertical centering
+    float lineSpacing = ImGui::GetTextLineHeightWithSpacing();
+    float yStart = (boxSize.y - (lineSpacing * 6.0f)) * 0.5f;
+
+    // Display break message
+    const char* breakTitle = "Time for a Break!";
+    ImGui::SetWindowFontScale(2.0f);
+    ImVec2 titleSize = ImGui::CalcTextSize(breakTitle);
+    ImGui::SetCursorPos(ImVec2((boxSize.x - titleSize.x * 2.0f * 0.5f) * 0.5f, yStart));
+    ImGui::Text("%s", breakTitle);
+    ImGui::SetWindowFontScale(1.0f);
+
+    // Display progress information
+    int maxAttempts
+        = _overrideNumAttempts.has_value() ? _overrideNumAttempts.value() : SETTINGS.NUM_ATTEMPTS;
+    char progressText[128];
+    snprintf(
+        progressText,
+        sizeof(progressText),
+        "You've completed %d out of %d trials",
+        subject.currentAttempt,
+        maxAttempts
+    );
+
+    ImVec2 progressSize = ImGui::CalcTextSize(progressText);
+    ImGui::SetCursorPos(ImVec2((boxSize.x - progressSize.x) * 0.5f, yStart + lineSpacing * 3.0f));
+    ImGui::Text("%s", progressText);
+
+    // Informational message
+    const char* infoMsg = "Take a moment to rest your eyes";
+    ImVec2 infoSize = ImGui::CalcTextSize(infoMsg);
+    ImGui::SetCursorPos(ImVec2((boxSize.x - infoSize.x) * 0.5f, yStart + lineSpacing * 4.5f));
+    ImGui::Text("%s", infoMsg);
+
+    // Continue button
+    ImVec2 buttonSize(200, 60);
+    ImVec2 buttonPos((boxSize.x - buttonSize.x) * 0.5f, yStart + lineSpacing * 7.0f);
+    ImGui::SetCursorPos(buttonPos);
+    if (ImGui::Button("Continue", buttonSize)) {
+        transitionSubjectState(subject, ctx);
+    }
+
+    ImGui::EndChild();
 }
 
 // Updated to generate Landolt C symbols instead of Ishihara plates

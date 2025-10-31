@@ -38,9 +38,10 @@ class AppScreeningTest : public App
     {
         int NUM_ATTEMPTS = 8; // number of attempts one could try in a screening
         MusicSetting MUSIC_SETTING = MusicSetting::CORRECT_WRONG;
-        float LUM_NOISE = 0.0f;     // luminance noise [0.0, 1.0]
-        float S_CONE_NOISE = 0.1f;  // s-cone noise [0.0, 1.0]
-        float STIMULUS_SIZE = 0.5f; // stimulus texture size multiplier [0.0, 1.0]
+        float LUM_NOISE = 0.0f;        // luminance noise [0.0, 1.0]
+        float S_CONE_NOISE = 0.1f;     // s-cone noise [0.0, 1.0]
+        float STIMULUS_SIZE = 0.5f;    // stimulus texture size multiplier [0.0, 1.0]
+        int BREAK_EVERY_N_TRIALS = 60; // take a break every N trials
 
         struct
         {
@@ -65,6 +66,7 @@ class AppScreeningTest : public App
         kFixation,
         kIdentification,
         kAnswer,
+        kBreak,
     };
 
     struct SubjectPromptContext
@@ -114,6 +116,8 @@ class AppScreeningTest : public App
     void drawAnswerPrompts(SubjectContext& subject, const TetriumApp::TickContextImGui& ctx);
 
     void drawFixGazePage();
+
+    void drawBreakScreen(SubjectContext& subject, const TetriumApp::TickContextImGui& ctx);
 
     // game logic
     void newGame(const TetriumApp::TickContextImGui& ctx);

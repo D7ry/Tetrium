@@ -38,6 +38,7 @@ class AppPseudoIsochromaticTest : public App
     struct
     {
         int REPETITIONS_PER_AXIS = 3; // number of repetitions for each genotype × metameric axis
+        int BREAK_INTERVAL = 50;      // number of trials between breaks (0 = no breaks)
         MusicSetting MUSIC_SETTING = MusicSetting::CORRECT_WRONG;
         float LUM_NOISE = 0.0f;     // luminance noise [0.0, 1.0]
         float S_CONE_NOISE = 0.1f;  // s-cone noise [0.0, 1.0]
@@ -66,6 +67,7 @@ class AppPseudoIsochromaticTest : public App
         kFixation,
         kIdentification,
         kAnswer,
+        kBreak,
     };
 
     // Structure to represent a single trial
@@ -94,6 +96,7 @@ class AppPseudoIsochromaticTest : public App
         SubjectState state;
         uint32_t currentTrialIndex;  // index to the current trial in the trial list
         uint32_t numSuccessAttempts; // # of attempts where the tester identified the right pattern
+        uint32_t trialsSinceLastBreak; // # of trials since last break
         SubjectPromptContext prompt;
     };
 
@@ -125,6 +128,8 @@ class AppPseudoIsochromaticTest : public App
     void drawAnswerPrompts(SubjectContext& subject, const TetriumApp::TickContextImGui& ctx);
 
     void drawFixGazePage();
+
+    void drawBreakWindow(SubjectContext& subject, const TetriumApp::TickContextImGui& ctx);
 
     // game logic
     void newGame(const TetriumApp::TickContextImGui& ctx);
