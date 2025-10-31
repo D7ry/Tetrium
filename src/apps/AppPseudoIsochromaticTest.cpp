@@ -290,9 +290,9 @@ void AppPseudoIsochromaticTest::drawSubjectResult(
     int numMisses = totalTrials - subject.numSuccessAttempts;
     bool perfect = numMisses < 1;
 
-    const char* mainMsg = perfect ? "Congratulations!" : "Tough luck!";
-    const char* followMsg = perfect ? "You're likely a Tetrachromat, or very anomalous!"
-                                    : "You probably won't do better next time.";
+    const char* mainMsg = perfect ? "You've finished the test" : "You've finished the test";
+    const char* followMsg = perfect ? "Your results will be sent to the research team"
+                                    : "Your results will be sent to the research team";
 
     // Vertically center text block
     float lineSpacing = ImGui::GetTextLineHeightWithSpacing();
