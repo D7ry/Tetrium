@@ -229,69 +229,72 @@ void AppPseudoIsochromaticTest::drawLandoltC(
 
     ImGui::Image(tex.id, textureFullscreenSize);
 
-    // Allow answering during stimulus presentation
-    // Gamepad button keys corresponding to each answer direction
-    ImGuiKey gamepadKeys[4] = {
-        ImGuiKey_GamepadFaceDown,  // A button -> Down
-        ImGuiKey_GamepadFaceLeft,  // X button -> Left
-        ImGuiKey_GamepadFaceRight, // B button -> Right
-        ImGuiKey_GamepadFaceUp     // Y button -> Up
-    };
+    // Allow answering during stimulus presentation (only if response not already given)
+    if (!subject.prompt.responseGiven) {
+        // Gamepad button keys corresponding to each answer direction
+        ImGuiKey gamepadKeys[4] = {
+            ImGuiKey_GamepadFaceDown,  // A button -> Down
+            ImGuiKey_GamepadFaceLeft,  // X button -> Left
+            ImGuiKey_GamepadFaceRight, // B button -> Right
+            ImGuiKey_GamepadFaceUp     // Y button -> Up
+        };
 
-    // Check for gamepad input
-    for (int i = 0; i < 4; i++) {
-        if (ImGui::IsKeyPressed(gamepadKeys[i])) {
-            subject.prompt.currentSelectedAnswer = i;
-            bool correct
-                = (subject.prompt.currentSelectedAnswer == subject.prompt.correctAnswerTextureIndex
+        // Check for gamepad input
+        for (int i = 0; i < 4; i++) {
+            if (ImGui::IsKeyPressed(gamepadKeys[i])) {
+                subject.prompt.responseGiven = true; // Mark response as given
+                subject.prompt.currentSelectedAnswer = i;
+                bool correct
+                    = (subject.prompt.currentSelectedAnswer
+                       == subject.prompt.correctAnswerTextureIndex);
+
+                if (correct) {
+                    subject.numSuccessAttempts += 1;
+                    if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL
+                        || SETTINGS.MUSIC_SETTING == MusicSetting::CORRECT_WRONG) {
+                        ctx.apis.PlaySound(Sound::kCorrectAnswer);
+                    }
+                } else {
+                    if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL
+                        || SETTINGS.MUSIC_SETTING == MusicSetting::CORRECT_WRONG) {
+                        ctx.apis.PlaySound(Sound::kWrongAnswer);
+                    }
+                }
+
+                // Log trial data
+                const Trial& trial = getCurrentTrial();
+                logTrialData(
+                    subject,
+                    trial.genotype,
+                    trial.metameric_axis,
+                    subject.prompt.currentOrientation,
+                    i,
+                    correct
                 );
 
-            if (correct) {
-                subject.numSuccessAttempts += 1;
-                if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL
-                    || SETTINGS.MUSIC_SETTING == MusicSetting::CORRECT_WRONG) {
-                    ctx.apis.PlaySound(Sound::kCorrectAnswer);
+                // Immediately move to next trial or end game
+                if (subject.currentTrialIndex >= (_trials.size() - 1)) {
+                    endGame(subject);
+                    return;
                 }
-            } else {
-                if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL
-                    || SETTINGS.MUSIC_SETTING == MusicSetting::CORRECT_WRONG) {
-                    ctx.apis.PlaySound(Sound::kWrongAnswer);
+
+                // Advance to next trial
+                subject.currentTrialIndex += 1;
+                subject.trialsSinceLastBreak += 1;
+
+                // Check if we should take a break
+                if (SETTINGS.BREAK_INTERVAL > 0
+                    && subject.trialsSinceLastBreak >= SETTINGS.BREAK_INTERVAL) {
+                    subject.state = SubjectState::kBreak;
+                    subject.trialsSinceLastBreak = 0;
+                } else {
+                    // Go directly to blank/fixation for next trial
+                    subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.BLANK;
+                    subject.state = SubjectState::kBlank;
+                    populatePromptContext(subject, ctx);
                 }
+                break;
             }
-
-            // Log trial data
-            const Trial& trial = getCurrentTrial();
-            logTrialData(
-                subject,
-                trial.genotype,
-                trial.metameric_axis,
-                subject.prompt.currentOrientation,
-                i,
-                correct
-            );
-
-            // Immediately move to next trial or end game
-            if (subject.currentTrialIndex >= (_trials.size() - 1)) {
-                endGame(subject);
-                return;
-            }
-
-            // Advance to next trial
-            subject.currentTrialIndex += 1;
-            subject.trialsSinceLastBreak += 1;
-
-            // Check if we should take a break
-            if (SETTINGS.BREAK_INTERVAL > 0
-                && subject.trialsSinceLastBreak >= SETTINGS.BREAK_INTERVAL) {
-                subject.state = SubjectState::kBreak;
-                subject.trialsSinceLastBreak = 0;
-            } else {
-                // Go directly to blank/fixation for next trial
-                subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.BLANK;
-                subject.state = SubjectState::kBlank;
-                populatePromptContext(subject, ctx);
-            }
-            break;
         }
     }
 }
@@ -424,70 +427,73 @@ void AppPseudoIsochromaticTest::drawAnswerPrompts(
 )
 {
     // Just show a black screen with no visual prompts
-    // Still accept gamepad input
+    // Still accept gamepad input (only if response not already given)
 
-    // Gamepad button keys corresponding to each answer direction
-    ImGuiKey gamepadKeys[4] = {
-        ImGuiKey_GamepadFaceDown,  // A button -> Down
-        ImGuiKey_GamepadFaceLeft,  // X button -> Left
-        ImGuiKey_GamepadFaceRight, // B button -> Right
-        ImGuiKey_GamepadFaceUp     // Y button -> Up
-    };
+    if (!subject.prompt.responseGiven) {
+        // Gamepad button keys corresponding to each answer direction
+        ImGuiKey gamepadKeys[4] = {
+            ImGuiKey_GamepadFaceDown,  // A button -> Down
+            ImGuiKey_GamepadFaceLeft,  // X button -> Left
+            ImGuiKey_GamepadFaceRight, // B button -> Right
+            ImGuiKey_GamepadFaceUp     // Y button -> Up
+        };
 
-    // Check for gamepad input
-    for (int i = 0; i < 4; i++) {
-        if (ImGui::IsKeyPressed(gamepadKeys[i])) {
-            subject.prompt.currentSelectedAnswer = i;
-            bool correct
-                = (subject.prompt.currentSelectedAnswer == subject.prompt.correctAnswerTextureIndex
+        // Check for gamepad input
+        for (int i = 0; i < 4; i++) {
+            if (ImGui::IsKeyPressed(gamepadKeys[i])) {
+                subject.prompt.responseGiven = true; // Mark response as given
+                subject.prompt.currentSelectedAnswer = i;
+                bool correct
+                    = (subject.prompt.currentSelectedAnswer
+                       == subject.prompt.correctAnswerTextureIndex);
+
+                if (correct) {
+                    subject.numSuccessAttempts += 1;
+                    if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL
+                        || SETTINGS.MUSIC_SETTING == MusicSetting::CORRECT_WRONG) {
+                        ctx.apis.PlaySound(Sound::kCorrectAnswer);
+                    }
+                } else {
+                    if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL
+                        || SETTINGS.MUSIC_SETTING == MusicSetting::CORRECT_WRONG) {
+                        ctx.apis.PlaySound(Sound::kWrongAnswer);
+                    }
+                }
+
+                // Log trial data
+                const Trial& trial = getCurrentTrial();
+                logTrialData(
+                    subject,
+                    trial.genotype,
+                    trial.metameric_axis,
+                    subject.prompt.currentOrientation,
+                    i,
+                    correct
                 );
 
-            if (correct) {
-                subject.numSuccessAttempts += 1;
-                if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL
-                    || SETTINGS.MUSIC_SETTING == MusicSetting::CORRECT_WRONG) {
-                    ctx.apis.PlaySound(Sound::kCorrectAnswer);
+                // Immediately move to next trial or end game
+                if (subject.currentTrialIndex >= (_trials.size() - 1)) {
+                    endGame(subject);
+                    return;
                 }
-            } else {
-                if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL
-                    || SETTINGS.MUSIC_SETTING == MusicSetting::CORRECT_WRONG) {
-                    ctx.apis.PlaySound(Sound::kWrongAnswer);
+
+                // Advance to next trial
+                subject.currentTrialIndex += 1;
+                subject.trialsSinceLastBreak += 1;
+
+                // Check if we should take a break
+                if (SETTINGS.BREAK_INTERVAL > 0
+                    && subject.trialsSinceLastBreak >= SETTINGS.BREAK_INTERVAL) {
+                    subject.state = SubjectState::kBreak;
+                    subject.trialsSinceLastBreak = 0;
+                } else {
+                    // Go directly to blank/fixation for next trial
+                    subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.BLANK;
+                    subject.state = SubjectState::kBlank;
+                    populatePromptContext(subject, ctx);
                 }
+                break;
             }
-
-            // Log trial data
-            const Trial& trial = getCurrentTrial();
-            logTrialData(
-                subject,
-                trial.genotype,
-                trial.metameric_axis,
-                subject.prompt.currentOrientation,
-                i,
-                correct
-            );
-
-            // Immediately move to next trial or end game
-            if (subject.currentTrialIndex >= (_trials.size() - 1)) {
-                endGame(subject);
-                return;
-            }
-
-            // Advance to next trial
-            subject.currentTrialIndex += 1;
-            subject.trialsSinceLastBreak += 1;
-
-            // Check if we should take a break
-            if (SETTINGS.BREAK_INTERVAL > 0
-                && subject.trialsSinceLastBreak >= SETTINGS.BREAK_INTERVAL) {
-                subject.state = SubjectState::kBreak;
-                subject.trialsSinceLastBreak = 0;
-            } else {
-                // Go directly to blank/fixation for next trial
-                subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.BLANK;
-                subject.state = SubjectState::kBlank;
-                populatePromptContext(subject, ctx);
-            }
-            break;
         }
     }
 }
@@ -830,6 +836,9 @@ void AppPseudoIsochromaticTest::populatePromptContext(
 
     // Store current orientation for logging
     _subject.prompt.currentOrientation = answerOrientation;
+
+    // Reset response flag for new trial
+    _subject.prompt.responseGiven = false;
 }
 
 void AppPseudoIsochromaticTest::logTrialData(

@@ -87,6 +87,7 @@ class AppPseudoIsochromaticTest : public App
         int correctAnswerTextureIndex;
         int currentSelectedAnswer = -1;
         AnswerKind currentOrientation; // Track current trial orientation for logging
+        bool responseGiven = false;    // Flag to prevent multiple responses per trial
     };
 
     struct SubjectContext
