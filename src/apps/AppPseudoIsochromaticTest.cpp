@@ -272,27 +272,9 @@ void AppPseudoIsochromaticTest::drawLandoltC(
                     correct
                 );
 
-                // Immediately move to next trial or end game
-                if (subject.currentTrialIndex >= (_trials.size() - 1)) {
-                    endGame(subject);
-                    return;
-                }
-
-                // Advance to next trial
-                subject.currentTrialIndex += 1;
-                subject.trialsSinceLastBreak += 1;
-
-                // Check if we should take a break
-                if (SETTINGS.BREAK_INTERVAL > 0
-                    && subject.trialsSinceLastBreak >= SETTINGS.BREAK_INTERVAL) {
-                    subject.state = SubjectState::kBreak;
-                    subject.trialsSinceLastBreak = 0;
-                } else {
-                    // Go directly to blank/fixation for next trial
-                    subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.BLANK;
-                    subject.state = SubjectState::kBlank;
-                    populatePromptContext(subject, ctx);
-                }
+                // Set timer to 0 to trigger state transition on next frame (without disrupting
+                // display)
+                subject.currStateRemainderTime = 0.0f;
                 break;
             }
         }
@@ -471,27 +453,9 @@ void AppPseudoIsochromaticTest::drawAnswerPrompts(
                     correct
                 );
 
-                // Immediately move to next trial or end game
-                if (subject.currentTrialIndex >= (_trials.size() - 1)) {
-                    endGame(subject);
-                    return;
-                }
-
-                // Advance to next trial
-                subject.currentTrialIndex += 1;
-                subject.trialsSinceLastBreak += 1;
-
-                // Check if we should take a break
-                if (SETTINGS.BREAK_INTERVAL > 0
-                    && subject.trialsSinceLastBreak >= SETTINGS.BREAK_INTERVAL) {
-                    subject.state = SubjectState::kBreak;
-                    subject.trialsSinceLastBreak = 0;
-                } else {
-                    // Go directly to blank/fixation for next trial
-                    subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.BLANK;
-                    subject.state = SubjectState::kBlank;
-                    populatePromptContext(subject, ctx);
-                }
+                // Set timer to 0 to trigger state transition on next frame (without disrupting
+                // display)
+                subject.currStateRemainderTime = 0.0f;
                 break;
             }
         }
@@ -513,13 +477,34 @@ void AppPseudoIsochromaticTest::transitionSubjectState(
         subject.state = SubjectState::kIdentification;
         break;
     case SubjectState::kIdentification:
-        subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.ANSWERING;
-        subject.state = SubjectState::kAnswer;
+        // If response was already given during identification phase, advance to next trial
+        if (subject.prompt.responseGiven) {
+            // Response was already scored and logged in the draw function
+            if (subject.currentTrialIndex >= (_trials.size() - 1)) {
+                endGame(subject);
+                return;
+            }
+            subject.currentTrialIndex += 1;
+            subject.trialsSinceLastBreak += 1;
+
+            // Check if we should take a break
+            if (SETTINGS.BREAK_INTERVAL > 0
+                && subject.trialsSinceLastBreak >= SETTINGS.BREAK_INTERVAL) {
+                subject.state = SubjectState::kBreak;
+                subject.trialsSinceLastBreak = 0;
+            } else {
+                subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.BLANK;
+                subject.state = SubjectState::kBlank;
+                populatePromptContext(subject, ctx);
+            }
+        } else {
+            // No response yet, transition to answer phase
+            subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.ANSWERING;
+            subject.state = SubjectState::kAnswer;
+        }
         break;
     case SubjectState::kAnswer:
-        if (subject.prompt.currentSelectedAnswer == subject.prompt.correctAnswerTextureIndex) {
-            subject.numSuccessAttempts += 1;
-        }
+        // Response was given during answer phase
         // If we've reached the last trial, end game and stop further transitions/prompts
         if (subject.currentTrialIndex >= (_trials.size() - 1)) {
             endGame(subject);
