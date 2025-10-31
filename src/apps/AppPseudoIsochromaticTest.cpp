@@ -228,6 +228,72 @@ void AppPseudoIsochromaticTest::drawLandoltC(
     ImGui::SetCursorPos(centerPos - textureFullscreenSize * 0.5f);
 
     ImGui::Image(tex.id, textureFullscreenSize);
+
+    // Allow answering during stimulus presentation
+    // Gamepad button keys corresponding to each answer direction
+    ImGuiKey gamepadKeys[4] = {
+        ImGuiKey_GamepadFaceDown,  // A button -> Down
+        ImGuiKey_GamepadFaceLeft,  // X button -> Left
+        ImGuiKey_GamepadFaceRight, // B button -> Right
+        ImGuiKey_GamepadFaceUp     // Y button -> Up
+    };
+
+    // Check for gamepad input
+    for (int i = 0; i < 4; i++) {
+        if (ImGui::IsKeyPressed(gamepadKeys[i])) {
+            subject.prompt.currentSelectedAnswer = i;
+            bool correct
+                = (subject.prompt.currentSelectedAnswer == subject.prompt.correctAnswerTextureIndex
+                );
+
+            if (correct) {
+                subject.numSuccessAttempts += 1;
+                if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL
+                    || SETTINGS.MUSIC_SETTING == MusicSetting::CORRECT_WRONG) {
+                    ctx.apis.PlaySound(Sound::kCorrectAnswer);
+                }
+            } else {
+                if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL
+                    || SETTINGS.MUSIC_SETTING == MusicSetting::CORRECT_WRONG) {
+                    ctx.apis.PlaySound(Sound::kWrongAnswer);
+                }
+            }
+
+            // Log trial data
+            const Trial& trial = getCurrentTrial();
+            logTrialData(
+                subject,
+                trial.genotype,
+                trial.metameric_axis,
+                subject.prompt.currentOrientation,
+                i,
+                correct
+            );
+
+            // Immediately move to next trial or end game
+            if (subject.currentTrialIndex >= (_trials.size() - 1)) {
+                endGame(subject);
+                return;
+            }
+
+            // Advance to next trial
+            subject.currentTrialIndex += 1;
+            subject.trialsSinceLastBreak += 1;
+
+            // Check if we should take a break
+            if (SETTINGS.BREAK_INTERVAL > 0
+                && subject.trialsSinceLastBreak >= SETTINGS.BREAK_INTERVAL) {
+                subject.state = SubjectState::kBreak;
+                subject.trialsSinceLastBreak = 0;
+            } else {
+                // Go directly to blank/fixation for next trial
+                subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.BLANK;
+                subject.state = SubjectState::kBlank;
+                populatePromptContext(subject, ctx);
+            }
+            break;
+        }
+    }
 }
 
 void AppPseudoIsochromaticTest::drawTestForSubject(
@@ -357,83 +423,32 @@ void AppPseudoIsochromaticTest::drawAnswerPrompts(
     const TetriumApp::TickContextImGui& ctx
 )
 {
-    ImGuiIO& io = ImGui::GetIO();
-    ImVec2 screenSize = io.DisplaySize;
-    ImVec2 centerPos = ImVec2(screenSize.x * 0.5f, screenSize.y * 0.5f);
+    // Just show a black screen with no visual prompts
+    // Still accept gamepad input
 
-    // Adjust these values to fine-tune the layout
-    float buttonSize = 200.0f;
-    float horizontalSpacing = 250.0f;
-    float verticalSpacing = 200.0f;
-
-    // Calculate positions for the four buttons in AXBY layout
-    ImVec2 topPos = ImVec2(centerPos.x, centerPos.y - verticalSpacing);     // Y
-    ImVec2 leftPos = ImVec2(centerPos.x - horizontalSpacing, centerPos.y);  // X
-    ImVec2 rightPos = ImVec2(centerPos.x + horizontalSpacing, centerPos.y); // B
-    ImVec2 bottomPos = ImVec2(centerPos.x, centerPos.y + verticalSpacing);  // A
-
-    ImVec2 positions[4] = {bottomPos, leftPos, rightPos, topPos}; // Down, Left, Right, Up order
-    const char* buttonLabels[4] = {"↓", "←", "→", "↑"};
-
-    // Gamepad button keys corresponding to each answer button
+    // Gamepad button keys corresponding to each answer direction
     ImGuiKey gamepadKeys[4] = {
-        ImGuiKey_GamepadFaceDown,  // A button
-        ImGuiKey_GamepadFaceLeft,  // X button
-        ImGuiKey_GamepadFaceRight, // B button
-        ImGuiKey_GamepadFaceUp     // Y button
+        ImGuiKey_GamepadFaceDown,  // A button -> Down
+        ImGuiKey_GamepadFaceLeft,  // X button -> Left
+        ImGuiKey_GamepadFaceRight, // B button -> Right
+        ImGuiKey_GamepadFaceUp     // Y button -> Up
     };
 
-    // Check for gamepad input first
-    int pressedButton = -1;
+    // Check for gamepad input
     for (int i = 0; i < 4; i++) {
         if (ImGui::IsKeyPressed(gamepadKeys[i])) {
-            pressedButton = i;
-            break;
-        }
-    }
-
-    // Draw the four buttons
-    for (int i = 0; i < 4; i++) {
-        ImGuiTexture tex = subject.prompt.currentAnswerTexture[i];
-
-        ImGui::SetCursorPos(ImVec2(positions[i].x - buttonSize / 2, positions[i].y - buttonSize / 2)
-        );
-
-        // Set button background to black to match the overall background
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.0f, 0.0f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
-
-        bool buttonClicked = ImGui::ImageButton(
-            buttonLabels[i], (void*)(intptr_t)tex.id, ImVec2(buttonSize, buttonSize)
-        );
-
-        // Pop the button style colors
-        ImGui::PopStyleColor(3);
-
-        // Add button label
-        ImVec2 textSize = ImGui::CalcTextSize(buttonLabels[i]);
-        ImVec2 textPos
-            = ImVec2(positions[i].x - textSize.x * 0.5f + 3, positions[i].y + buttonSize / 2 + 10);
-        ImGui::SetCursorPos(textPos);
-        ImGui::Text("%s", buttonLabels[i]);
-
-        // Check if this button was activated (either by click or gamepad)
-        if (buttonClicked || pressedButton == i) {
-            printf("%s button clicked!\n", buttonLabels[i]);
             subject.prompt.currentSelectedAnswer = i;
             bool correct
                 = (subject.prompt.currentSelectedAnswer == subject.prompt.correctAnswerTextureIndex
                 );
 
             if (correct) {
-                printf("Correct answer!\n");
+                subject.numSuccessAttempts += 1;
                 if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL
                     || SETTINGS.MUSIC_SETTING == MusicSetting::CORRECT_WRONG) {
                     ctx.apis.PlaySound(Sound::kCorrectAnswer);
                 }
             } else {
-                printf("Wrong answer!\n");
                 if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL
                     || SETTINGS.MUSIC_SETTING == MusicSetting::CORRECT_WRONG) {
                     ctx.apis.PlaySound(Sound::kWrongAnswer);
@@ -451,19 +466,30 @@ void AppPseudoIsochromaticTest::drawAnswerPrompts(
                 correct
             );
 
-            transitionSubjectState(subject, ctx);
-            // Only process one button press per frame
+            // Immediately move to next trial or end game
+            if (subject.currentTrialIndex >= (_trials.size() - 1)) {
+                endGame(subject);
+                return;
+            }
+
+            // Advance to next trial
+            subject.currentTrialIndex += 1;
+            subject.trialsSinceLastBreak += 1;
+
+            // Check if we should take a break
+            if (SETTINGS.BREAK_INTERVAL > 0
+                && subject.trialsSinceLastBreak >= SETTINGS.BREAK_INTERVAL) {
+                subject.state = SubjectState::kBreak;
+                subject.trialsSinceLastBreak = 0;
+            } else {
+                // Go directly to blank/fixation for next trial
+                subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.BLANK;
+                subject.state = SubjectState::kBlank;
+                populatePromptContext(subject, ctx);
+            }
             break;
         }
     }
-
-    // draw progress bar showing time left
-    float totalTime = SETTINGS.STATE_DURATIONS_SECONDS.ANSWERING;
-    float progress = subject.currStateRemainderTime / totalTime;
-    ImVec2 progressBarSize = ImVec2(800, 40);
-    ImVec2 progressBarPos = ImVec2(centerPos.x - progressBarSize.x * 0.5f, topPos.y - 300);
-    ImGui::SetCursorPos(progressBarPos);
-    ImGui::ProgressBar(progress, progressBarSize);
 }
 
 void AppPseudoIsochromaticTest::transitionSubjectState(
@@ -636,15 +662,6 @@ void AppPseudoIsochromaticTest::drawFixGazePage()
         crossHairColor,
         crossHairThickness
     );
-
-    // Add text below crosshair
-    ImVec2 textSize = ImGui::CalcTextSize("Fix Gaze Onto Crosshair");
-    float spacing = 20;
-    ImVec2 textPos(
-        screenCenter.x - textSize.x * 0.5f, screenCenter.y + textSize.y + spacing + crossHairSize
-    );
-    ImGui::SetCursorPos(textPos);
-    ImGui::Text("Fix Gaze Onto Crosshair");
 }
 
 void AppPseudoIsochromaticTest::drawBreakWindow(
