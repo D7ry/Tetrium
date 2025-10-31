@@ -48,6 +48,7 @@ set(SOURCES_BUILD
 
         # Apps
         src/apps/AppScreeningTest.cpp
+        src/apps/AppPseudoIsochromaticTest.cpp
         src/apps/AppScrambledFaceTest.cpp
         src/apps/AppTemporalAFC.cpp
         src/apps/AppAnomaloscope.cpp

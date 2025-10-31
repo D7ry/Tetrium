@@ -6,6 +6,7 @@
 #include "apps/AppAutoMeasure.h"
 #include "apps/AppImageViewer.h"
 #include "apps/AppPainter.h"
+#include "apps/AppPseudoIsochromaticTest.h"
 #include "apps/AppScrambledFaceTest.h"
 #include "apps/AppScreeningTest.h"
 #include "apps/AppTemporalAFC.h"
@@ -33,6 +34,7 @@ int main(int argc, char** argv)
 
     std::vector<std::pair<TetriumApp::App*, const char*>> apps = {
         {new TetriumApp::AppScreeningTest(), "Screening Test"},
+        {new TetriumApp::AppPseudoIsochromaticTest(), "Pseudoisochromatic Test"},
         {new TetriumApp::AppScrambledFaceTest(), "Scrambled Face Test"},
         {new TetriumApp::AppTemporalAFC(), "Temporal 3AFC"},
         {new TetriumApp::AppAnomaloscope(), "Anomaloscope"},

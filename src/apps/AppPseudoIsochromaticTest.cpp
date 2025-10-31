@@ -1,0 +1,776 @@
+#include <algorithm>
+#include <filesystem>
+#include <random>
+
+#include "imgui.h"
+#include "misc/cpp/imgui_stdlib.h" // for string input text
+
+#include "AppPseudoIsochromaticTest.h"
+
+#include <Pathing.h>
+#include <string>
+
+namespace
+{
+ImVec2 calculateFitSize(float width, float height, const ImVec2& availableSize)
+{
+    float aspectRatio = (float)width / (float)height;
+
+    float scaleWidth = availableSize.x / (float)width;
+    float scaleHeight = availableSize.y / (float)height;
+
+    float scale = std::min(scaleWidth, scaleHeight);
+
+    ImVec2 fitSize;
+    fitSize.x = (float)width * scale;
+    fitSize.y = (float)height * scale;
+
+    return fitSize;
+}
+} // namespace
+
+namespace TetriumApp
+{
+
+// Landolt C orientations -- we pick from these to generate tests
+static const std::vector<AppPseudoIsochromaticTest::AnswerKind> LANDOLT_C_ORIENTATIONS
+    = {AppPseudoIsochromaticTest::AnswerKind::kUp,
+       AppPseudoIsochromaticTest::AnswerKind::kDown,
+       AppPseudoIsochromaticTest::AnswerKind::kLeft,
+       AppPseudoIsochromaticTest::AnswerKind::kRight};
+
+// Define the static map for orientation to string conversion
+const std::unordered_map<AppPseudoIsochromaticTest::AnswerKind, std::string>
+    AppPseudoIsochromaticTest::_orientationToStringMap
+    = {{AppPseudoIsochromaticTest::AnswerKind::kUp, "up"},
+       {AppPseudoIsochromaticTest::AnswerKind::kDown, "down"},
+       {AppPseudoIsochromaticTest::AnswerKind::kLeft, "left"},
+       {AppPseudoIsochromaticTest::AnswerKind::kRight, "right"}};
+
+std::string AppPseudoIsochromaticTest::OrientationToString(
+    AppPseudoIsochromaticTest::AnswerKind orientation
+)
+{
+    auto it = _orientationToStringMap.find(orientation);
+    return (it != _orientationToStringMap.end()) ? it->second : "unknown";
+}
+
+std::string AppPseudoIsochromaticTest::GetLandoltCAnswerTexturePath(
+    AppPseudoIsochromaticTest::AnswerKind orientation
+)
+{
+    return TETRIUM_COLOR_PATH + "TetriumColor/Assets/HiddenImages/landolt_"
+           + OrientationToString(orientation) + ".png";
+}
+
+void TetriumApp::AppPseudoIsochromaticTest::TickImGui(const TetriumApp::TickContextImGui& ctx)
+{
+    ImGui::SetNextWindowPos(ImVec2(0, 0));
+    ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
+    auto flags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse
+                 | ImGuiWindowFlags_NoResize;
+    ImGui::SetNextWindowBgAlpha(0);
+    if (ImGui::Begin("PsuedoIsochromatic Test", NULL, flags)) {
+        switch (_state) {
+        case TestState::kSettings: // draw both settings and idle
+            drawSettingsWindow(ctx);
+        case TestState::kIdle:
+            drawIdle(ctx);
+            break;
+        case TestState::kTesting:
+            drawTestForSubject(_subject, ctx);
+            break;
+        case TestState::kTestResult:
+            drawSubjectResult(_subject, ctx);
+            break;
+        }
+    }
+    ImGui::End();
+}
+
+void TetriumApp::AppPseudoIsochromaticTest::drawSettingsWindow(
+    const TetriumApp::TickContextImGui& ctx
+)
+{
+    // draw a settings pop-up window
+    if (ImGui::BeginPopup("Settings", ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::SliderInt("Repetitions Per Axis", &SETTINGS.REPETITIONS_PER_AXIS, 1, 10);
+        ImGui::Text("Duration of Blank Period (seconds)");
+        ImGui::InputFloat("##Blank", &SETTINGS.STATE_DURATIONS_SECONDS.BLANK);
+        ImGui::Text("Duration of Fixation (seconds)");
+        ImGui::InputFloat("##Fixation", &SETTINGS.STATE_DURATIONS_SECONDS.FIXATION);
+        ImGui::Text("Duration of Identification (seconds)");
+        ImGui::InputFloat("##Identification", &SETTINGS.STATE_DURATIONS_SECONDS.IDENTIFICATION);
+        ImGui::Text("Duration of Answering (seconds)");
+        ImGui::InputFloat("##Answering", &SETTINGS.STATE_DURATIONS_SECONDS.ANSWERING);
+
+        // Lum noise slider
+        ImGui::SliderFloat("Lum Noise", &SETTINGS.LUM_NOISE, 0.0f, 1.0f);
+
+        // S-cone noise slider
+        ImGui::SliderFloat("S-Cone Noise", &SETTINGS.S_CONE_NOISE, 0.0f, 1.0f);
+
+        // Stimulus size slider
+        ImGui::SliderFloat("Stimulus Size", &SETTINGS.STIMULUS_SIZE, 0.0f, 1.0f);
+
+        // Music setting dropdown
+        ImGui::Text("Music Setting");
+        const char* musicOptions[] = {"ALL", "CORRECT_WRONG", "OFF"};
+        int currentMusicSetting = static_cast<int>(SETTINGS.MUSIC_SETTING);
+        if (ImGui::Combo("##Music", &currentMusicSetting, musicOptions, 3)) {
+            SETTINGS.MUSIC_SETTING = static_cast<MusicSetting>(currentMusicSetting);
+        }
+        if (ImGui::Button("Close")) {
+            ImGui::CloseCurrentPopup();
+            _state = TestState::kIdle;
+        }
+        ImGui::EndPopup();
+    }
+}
+
+void TetriumApp::AppPseudoIsochromaticTest::drawIdle(const TetriumApp::TickContextImGui& ctx)
+{
+    if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL) {
+        ctx.controls.musicOverride = Sound::kMusicGameMenu;
+    } else {
+        ctx.controls.musicOverride = std::nullopt;
+    }
+    const float buttonSpacing = 20.0f;
+
+    // Set the button size
+    ImVec2 buttonSize(200, 100);
+
+    // Center the button on the screen
+    ImVec2 screenSize = ImGui::GetIO().DisplaySize;
+
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 12.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 5));
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(10, 5));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(10, 10));
+
+    ImVec2 availSize = ImGui::GetContentRegionAvail();
+    ImGuiTexture& tex = _textures.chromalabLogo;
+    ImVec2 logoSize = calculateFitSize(tex.width, tex.height, availSize);
+    logoSize = logoSize * 0.75f;
+
+    ImVec2 elemPos((availSize.x - logoSize.x) * 0.5f + 25, logoSize.y / 2 - 50);
+    // draw the title logo
+    ImGui::SetCursorPos(elemPos);
+    ImGui::Image(tex.id, logoSize);
+
+    // now for the button
+    elemPos = ImVec2(
+        (screenSize.x - buttonSize.x) * 0.5f,
+        (screenSize.y - logoSize.y) * 0.5f - 300 + logoSize.y + 50
+    );
+
+    // Set the cursor position for the button
+    ImGui::SetCursorPos(elemPos);
+    ImGui::Text("Subject ID:");
+    elemPos = elemPos + ImVec2(10, 50);
+    ImGui::SetCursorPos(elemPos);
+
+    // Set the width of the input text box to be the same as the button
+    ImGui::SetNextItemWidth(buttonSize.x);
+    ImGui::InputText("##Input Name", &_nameInputBuffer);
+
+    elemPos = elemPos + ImVec2(0, buttonSize.y + buttonSpacing);
+    ImGui::SetCursorPos(elemPos);
+    bool isNameEmpty = _nameInputBuffer.empty();
+    if (isNameEmpty) {
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+    }
+    if (ImGui::Button("Play", buttonSize) && !isNameEmpty) {
+        newGame(ctx);
+    }
+    if (isNameEmpty) {
+        ImGui::PopStyleColor(3);
+    }
+
+    // settings button
+    elemPos = elemPos + ImVec2(0, buttonSize.y + buttonSpacing);
+    ImGui::SetCursorPos(elemPos);
+    if (ImGui::Button("Settings", buttonSize)) {
+        ImGui::OpenPopup("Settings");
+        _state = TestState::kSettings;
+    }
+
+    // exit button
+    elemPos = elemPos + ImVec2(0, buttonSize.y + buttonSpacing);
+    ImGui::SetCursorPos(elemPos);
+    if (ImGui::Button("Exit", buttonSize)) {
+        if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL) {
+            ctx.apis.PlaySound(Sound::kVineBoom);
+        }
+        ctx.controls.wantExit = true;
+    }
+
+    ImGui::PopStyleVar(4);
+}
+
+void AppPseudoIsochromaticTest::drawLandoltC(
+    SubjectContext& subject,
+    const TetriumApp::TickContextImGui& ctx
+)
+{
+    ImGuiTexture tex = subject.prompt.currentLandoltCTexture[ctx.colorSpace]; // RGB is the default
+
+    ImVec2 availSize = ImGui::GetContentRegionAvail();
+    ImVec2 textureFullscreenSize
+        = ImVec2(tex.width * SETTINGS.STIMULUS_SIZE, tex.height * SETTINGS.STIMULUS_SIZE);
+
+    // center the texture onto the screen
+    ImVec2 centerPos = ImVec2(availSize.x * 0.5f, availSize.y * 0.5f);
+    ImGui::SetCursorPos(centerPos - textureFullscreenSize * 0.5f);
+
+    ImGui::Image(tex.id, textureFullscreenSize);
+}
+
+void AppPseudoIsochromaticTest::drawTestForSubject(
+    SubjectContext& subject,
+    const TetriumApp::TickContextImGui& ctx
+)
+{
+    if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL) {
+        ctx.controls.musicOverride = Sound::kMusicGamePlay;
+    } else {
+        ctx.controls.musicOverride = std::nullopt;
+    }
+    // handle state transition
+    subject.currStateRemainderTime -= ImGui::GetIO().DeltaTime;
+    if (subject.currStateRemainderTime <= 0) {
+        transitionSubjectState(subject, ctx);
+        // If the game just ended, we switched out of testing; stop drawing this frame
+        if (_state != TestState::kTesting) {
+            return;
+        }
+    }
+    ASSERT(subject.currStateRemainderTime > 0);
+
+    if (ImGui::IsKeyPressed(ImGuiKey_GamepadBack)) {
+        ctx.apis.PlaySound(Sound::kVineBoom);
+        _state = TestState::kIdle;
+    }
+
+    switch (subject.state) {
+    case SubjectState::kBlank:
+        // Blank state - draw nothing (entirely black)
+        break;
+    case SubjectState::kFixation:
+        drawFixGazePage();
+        break;
+    case SubjectState::kIdentification:
+        drawLandoltC(subject, ctx);
+        break;
+    case SubjectState::kAnswer:
+        drawAnswerPrompts(subject, ctx);
+        break;
+    }
+}
+
+void AppPseudoIsochromaticTest::drawSubjectResult(
+    SubjectContext& subject,
+    const TetriumApp::TickContextImGui& ctx
+)
+{
+    // Calculate the size and position of the box
+    ImVec2 boxSize(1200, 900);
+    ImVec2 windowSize = ImGui::GetWindowSize();
+    ImVec2 boxPos((windowSize.x - boxSize.x) * 0.5f, (windowSize.y - boxSize.y) * 0.5f);
+
+    // Draw centered box
+    ImGui::SetCursorPos(boxPos);
+    ImGui::BeginChild(
+        "CenteredBox", boxSize, true, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize
+    );
+
+    int totalTrials = _trials.size();
+    int numMisses = totalTrials - subject.numSuccessAttempts;
+    bool perfect = numMisses < 1;
+
+    const char* mainMsg = perfect ? "Congratulations!" : "Tough luck!";
+    const char* followMsg = perfect ? "You're likely a Tetrachromat, or very anomalous!"
+                                    : "You probably won't do better next time.";
+
+    // Vertically center text block
+    float lineSpacing = ImGui::GetTextLineHeightWithSpacing();
+    float yStart = (boxSize.y - (lineSpacing * 5.0f)) * 0.5f;
+
+    // 1. "You scored x/x"
+    ImVec2 textSize1 = ImGui::CalcTextSize("You scored 000/000");
+    ImGui::SetCursorPos(ImVec2((boxSize.x - textSize1.x) * 0.5f, yStart));
+    ImGui::Text("You scored %d/%d", subject.numSuccessAttempts, totalTrials);
+
+    // 2. Large "Congratulations" or "Tough luck!"
+    ImGui::SetWindowFontScale(2.0f);
+    ImVec2 textSize2 = ImGui::CalcTextSize(mainMsg);
+    ImGui::SetCursorPos(
+        ImVec2((boxSize.x - textSize2.x * 2.0f * 0.5f) * 0.5f, yStart + lineSpacing * 2.0f)
+    );
+    ImGui::Text("%s", mainMsg);
+    ImGui::SetWindowFontScale(1.0f);
+
+    // 3. Normal text follow-up line
+    ImVec2 textSize3 = ImGui::CalcTextSize(followMsg);
+    ImGui::SetCursorPos(ImVec2((boxSize.x - textSize3.x) * 0.5f, yStart + lineSpacing * 4.0f));
+    ImGui::Text("%s", followMsg);
+
+    // 4. "Okay" button centered below text
+    ImVec2 buttonSize(150, 60);
+    ImVec2 buttonPos((boxSize.x - buttonSize.x) * 0.5f, yStart + lineSpacing * 6.0f);
+    ImGui::SetCursorPos(buttonPos);
+    if (ImGui::Button("Okay", buttonSize)) {
+        if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL) {
+            ctx.apis.PlaySound(Sound::kVineBoom);
+        }
+        _state = TestState::kIdle;
+    }
+
+    ImGui::EndChild();
+}
+
+void AppPseudoIsochromaticTest::drawAnswerPrompts(
+    SubjectContext& subject,
+    const TetriumApp::TickContextImGui& ctx
+)
+{
+    ImGuiIO& io = ImGui::GetIO();
+    ImVec2 screenSize = io.DisplaySize;
+    ImVec2 centerPos = ImVec2(screenSize.x * 0.5f, screenSize.y * 0.5f);
+
+    // Adjust these values to fine-tune the layout
+    float buttonSize = 200.0f;
+    float horizontalSpacing = 250.0f;
+    float verticalSpacing = 200.0f;
+
+    // Calculate positions for the four buttons in AXBY layout
+    ImVec2 topPos = ImVec2(centerPos.x, centerPos.y - verticalSpacing);     // Y
+    ImVec2 leftPos = ImVec2(centerPos.x - horizontalSpacing, centerPos.y);  // X
+    ImVec2 rightPos = ImVec2(centerPos.x + horizontalSpacing, centerPos.y); // B
+    ImVec2 bottomPos = ImVec2(centerPos.x, centerPos.y + verticalSpacing);  // A
+
+    ImVec2 positions[4] = {bottomPos, leftPos, rightPos, topPos}; // Down, Left, Right, Up order
+    const char* buttonLabels[4] = {"↓", "←", "→", "↑"};
+
+    // Gamepad button keys corresponding to each answer button
+    ImGuiKey gamepadKeys[4] = {
+        ImGuiKey_GamepadFaceDown,  // A button
+        ImGuiKey_GamepadFaceLeft,  // X button
+        ImGuiKey_GamepadFaceRight, // B button
+        ImGuiKey_GamepadFaceUp     // Y button
+    };
+
+    // Check for gamepad input first
+    int pressedButton = -1;
+    for (int i = 0; i < 4; i++) {
+        if (ImGui::IsKeyPressed(gamepadKeys[i])) {
+            pressedButton = i;
+            break;
+        }
+    }
+
+    // Draw the four buttons
+    for (int i = 0; i < 4; i++) {
+        ImGuiTexture tex = subject.prompt.currentAnswerTexture[i];
+
+        ImGui::SetCursorPos(ImVec2(positions[i].x - buttonSize / 2, positions[i].y - buttonSize / 2)
+        );
+
+        // Set button background to black to match the overall background
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.0f, 0.0f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
+
+        bool buttonClicked = ImGui::ImageButton(
+            buttonLabels[i], (void*)(intptr_t)tex.id, ImVec2(buttonSize, buttonSize)
+        );
+
+        // Pop the button style colors
+        ImGui::PopStyleColor(3);
+
+        // Add button label
+        ImVec2 textSize = ImGui::CalcTextSize(buttonLabels[i]);
+        ImVec2 textPos
+            = ImVec2(positions[i].x - textSize.x * 0.5f + 3, positions[i].y + buttonSize / 2 + 10);
+        ImGui::SetCursorPos(textPos);
+        ImGui::Text("%s", buttonLabels[i]);
+
+        // Check if this button was activated (either by click or gamepad)
+        if (buttonClicked || pressedButton == i) {
+            printf("%s button clicked!\n", buttonLabels[i]);
+            subject.prompt.currentSelectedAnswer = i;
+            bool correct
+                = (subject.prompt.currentSelectedAnswer == subject.prompt.correctAnswerTextureIndex
+                );
+
+            if (correct) {
+                printf("Correct answer!\n");
+                if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL
+                    || SETTINGS.MUSIC_SETTING == MusicSetting::CORRECT_WRONG) {
+                    ctx.apis.PlaySound(Sound::kCorrectAnswer);
+                }
+            } else {
+                printf("Wrong answer!\n");
+                if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL
+                    || SETTINGS.MUSIC_SETTING == MusicSetting::CORRECT_WRONG) {
+                    ctx.apis.PlaySound(Sound::kWrongAnswer);
+                }
+            }
+
+            // Log trial data
+            const Trial& trial = getCurrentTrial();
+            logTrialData(
+                subject,
+                trial.genotype,
+                trial.metameric_axis,
+                subject.prompt.currentOrientation,
+                i,
+                correct
+            );
+
+            transitionSubjectState(subject, ctx);
+            // Only process one button press per frame
+            break;
+        }
+    }
+
+    // draw progress bar showing time left
+    float totalTime = SETTINGS.STATE_DURATIONS_SECONDS.ANSWERING;
+    float progress = subject.currStateRemainderTime / totalTime;
+    ImVec2 progressBarSize = ImVec2(800, 40);
+    ImVec2 progressBarPos = ImVec2(centerPos.x - progressBarSize.x * 0.5f, topPos.y - 300);
+    ImGui::SetCursorPos(progressBarPos);
+    ImGui::ProgressBar(progress, progressBarSize);
+}
+
+void AppPseudoIsochromaticTest::transitionSubjectState(
+    SubjectContext& subject,
+    const TetriumApp::TickContextImGui& ctx
+)
+{
+    switch (subject.state) {
+    case SubjectState::kBlank:
+        subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.FIXATION;
+        subject.state = SubjectState::kFixation;
+        break;
+    case SubjectState::kFixation:
+        subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.IDENTIFICATION;
+        subject.state = SubjectState::kIdentification;
+        break;
+    case SubjectState::kIdentification:
+        subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.ANSWERING;
+        subject.state = SubjectState::kAnswer;
+        break;
+    case SubjectState::kAnswer:
+        if (subject.prompt.currentSelectedAnswer == subject.prompt.correctAnswerTextureIndex) {
+            subject.numSuccessAttempts += 1;
+        }
+        // If we've reached the last trial, end game and stop further transitions/prompts
+        if (subject.currentTrialIndex >= (_trials.size() - 1)) {
+            endGame(subject);
+            return;
+        }
+        // Otherwise advance to next trial and show blank screen
+        subject.currentTrialIndex += 1;
+        subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.BLANK;
+        subject.state = SubjectState::kBlank;
+        populatePromptContext(subject, ctx);
+        break;
+    }
+}
+
+void AppPseudoIsochromaticTest::buildTrialList()
+{
+    _trials.clear();
+
+    // Get genotypes from the color picker
+    std::vector<std::string> genotypes = _colorPicker->GetGenotypes();
+
+    // Build all trials: genotype × metameric_axis × repetition
+    for (const std::string& genotype : genotypes) {
+        for (int axis = 0; axis < 4; axis++) {
+            for (int rep = 0; rep < SETTINGS.REPETITIONS_PER_AXIS; rep++) {
+                Trial trial;
+                trial.genotype = genotype;
+                trial.metameric_axis = axis;
+                trial.repetition_idx = rep;
+                _trials.push_back(trial);
+            }
+        }
+    }
+
+    // Randomize the trial order
+    std::random_device rd;
+    std::mt19937 g(rd());
+    std::shuffle(_trials.begin(), _trials.end(), g);
+
+    INFO("Built and randomized {} trials", _trials.size());
+}
+
+void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
+{
+    // Clean up old generators
+    if (_plateGenerator) {
+        delete _plateGenerator;
+    }
+    if (_colorPicker) {
+        delete _colorPicker;
+    }
+    if (_logger) {
+        delete _logger;
+    }
+
+    // Create color picker with the new interface
+    std::vector<int> dimensions = {2};
+    _colorPicker = new TetriumColor::GeneticColorPicker(
+        "female", // sex
+        0.999f,   // percentage_screened
+        547.0f,   // peak_to_test
+        1.0f,     // luminance
+        0.5f,     // saturation
+        dimensions,
+        42,                                                      // seed
+        "led",                                                   // cst_display_type
+        TETRIUM_COLOR_PATH + "measurements/2025-10-12/primaries" // display_primaries_path
+    );
+
+    // Create plate generator with color picker
+    _plateGenerator = new TetriumColor::GeneticColorPickerPlateGenerator(
+        *_colorPicker, 42 // seed
+    );
+
+    // Build and randomize trial list
+    buildTrialList();
+
+    // Initialize logger
+    std::vector<std::string> headers
+        = {"subject_id",
+           "session_timestamp",
+           "trial_idx",
+           "genotype",
+           "metameric_axis",
+           "repetition_idx",
+           "orientation",
+           "user_choice",
+           "correct",
+           "lum_noise",
+           "s_cone_noise",
+           "stimulus_size"};
+    _logger = new TestDataLogger("AppPseudoIsochromaticTest", _nameInputBuffer, headers);
+
+    _subject = SubjectContext{
+        .name = _nameInputBuffer,
+        .currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.BLANK,
+        .state = SubjectState::kBlank,
+        .currentTrialIndex = 0,
+        .numSuccessAttempts = 0,
+    };
+    populatePromptContext(_subject, ctx);
+    _state = TestState::kTesting;
+}
+
+void AppPseudoIsochromaticTest::endGame(SubjectContext& subject)
+{
+    DEBUG("ending game for subject {}", subject.name);
+    _state = TestState::kTestResult;
+}
+
+void AppPseudoIsochromaticTest::drawFixGazePage()
+{
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+    ImVec2 screenCenter = ImGui::GetIO().DisplaySize;
+    screenCenter.x *= 0.5f;
+    screenCenter.y *= 0.5f;
+
+    float crossHairSize = 70.f;
+    float crossHairThickness = 10.f;
+    ImU32 crossHairColor = IM_COL32(255, 255, 255, 255); // White color
+
+    drawList->AddLine(
+        ImVec2(screenCenter.x - crossHairSize, screenCenter.y),
+        ImVec2(screenCenter.x + crossHairSize, screenCenter.y),
+        crossHairColor,
+        crossHairThickness
+    );
+    drawList->AddLine(
+        ImVec2(screenCenter.x, screenCenter.y - crossHairSize),
+        ImVec2(screenCenter.x, screenCenter.y + crossHairSize),
+        crossHairColor,
+        crossHairThickness
+    );
+
+    // Add text below crosshair
+    ImVec2 textSize = ImGui::CalcTextSize("Fix Gaze Onto Crosshair");
+    float spacing = 20;
+    ImVec2 textPos(
+        screenCenter.x - textSize.x * 0.5f, screenCenter.y + textSize.y + spacing + crossHairSize
+    );
+    ImGui::SetCursorPos(textPos);
+    ImGui::Text("Fix Gaze Onto Crosshair");
+}
+
+std::pair<std::string, std::string> AppPseudoIsochromaticTest::generateLandoltCTextures(
+    SubjectContext& subject,
+    const std::string& genotype,
+    int metameric_axis,
+    AnswerKind orientation
+)
+{
+    // Ensure the temp directory exists
+    std::filesystem::create_directories("./temp");
+
+    const std::string orientationStr = OrientationToString(orientation);
+
+    std::string baseFilename = "./temp/" + subject.name + "_" + genotype + "_axis"
+                               + std::to_string(metameric_axis) + "_" + orientationStr;
+
+    // Call GetPlate with genotype and metameric axis
+    _plateGenerator->GetPlate(
+        genotype,
+        metameric_axis,
+        baseFilename,
+        "landolt_" + orientationStr,
+        TetriumColor::ColorSpaceType::DISP_6P,
+        SETTINGS.LUM_NOISE,
+        SETTINGS.S_CONE_NOISE
+    );
+
+    std::string rgbTexturePath = baseFilename + "_RGB.png";
+    std::string ocvTexturePath = baseFilename + "_OCV.png";
+
+    return {rgbTexturePath, ocvTexturePath};
+}
+
+void AppPseudoIsochromaticTest::populatePromptContext(
+    SubjectContext& subject,
+    const TetriumApp::TickContextImGui& ctx
+)
+{
+    // Get the current trial
+    const Trial& trial = getCurrentTrial();
+
+    // Pick a random orientation for the correct answer
+    AnswerKind answerOrientation = LANDOLT_C_ORIENTATIONS[rand() % LANDOLT_C_ORIENTATIONS.size()];
+
+    // Generate Landolt C textures for this trial's genotype and metameric axis
+    auto [rgbTexturePath, ocvTexturePath] = generateLandoltCTextures(
+        _subject, trial.genotype, trial.metameric_axis, answerOrientation
+    );
+
+    // unload previous textures
+    if (_subject.prompt.currentLandoltCTextureHandle[ColorSpace::RGB] != 0) {
+        ctx.apis.UnloadTexture(_subject.prompt.currentLandoltCTextureHandle[ColorSpace::RGB]);
+    }
+    if (_subject.prompt.currentLandoltCTextureHandle[ColorSpace::OCV] != 0) {
+        ctx.apis.UnloadTexture(_subject.prompt.currentLandoltCTextureHandle[ColorSpace::OCV]);
+    }
+
+    _subject.prompt.currentLandoltCTextureHandle[ColorSpace::RGB]
+        = ctx.apis.LoadTexture(rgbTexturePath);
+    _subject.prompt.currentLandoltCTextureHandle[ColorSpace::OCV]
+        = ctx.apis.LoadTexture(ocvTexturePath);
+
+    _subject.prompt.currentLandoltCTexture[ColorSpace::RGB]
+        = ctx.apis.InitImGuiTexture(_subject.prompt.currentLandoltCTextureHandle[ColorSpace::RGB]);
+    _subject.prompt.currentLandoltCTexture[ColorSpace::OCV]
+        = ctx.apis.InitImGuiTexture(_subject.prompt.currentLandoltCTextureHandle[ColorSpace::OCV]);
+
+    // Create a fixed mapping between button positions and orientations
+    std::array<AnswerKind, 4> buttonOrientationMap = {
+        AnswerKind::kDown,  // Index 0: bottomPos → "↓"
+        AnswerKind::kLeft,  // Index 1: leftPos → "←"
+        AnswerKind::kRight, // Index 2: rightPos → "→"
+        AnswerKind::kUp     // Index 3: topPos → "↑"
+    };
+
+    // populate answer textures -- they're pre-generated
+    for (int i = 0; i < 4; i++) {
+        _subject.prompt.currentAnswerTextureHandle[i]
+            = _answerPromptTextureHandles[buttonOrientationMap[i]];
+        _subject.prompt.currentAnswerTexture[i]
+            = _answerPromptImGuiTextures[buttonOrientationMap[i]];
+    }
+
+    // Find which button index corresponds to the correct answer
+    int correctButtonIndex = -1;
+    for (int i = 0; i < 4; i++) {
+        if (buttonOrientationMap[i] == answerOrientation) {
+            correctButtonIndex = i;
+            break;
+        }
+    }
+
+    // Set the correct answer index
+    _subject.prompt.correctAnswerTextureIndex = correctButtonIndex;
+
+    // Store current orientation for logging
+    _subject.prompt.currentOrientation = answerOrientation;
+}
+
+void AppPseudoIsochromaticTest::logTrialData(
+    const SubjectContext& subject,
+    const std::string& genotype,
+    int metameric_axis,
+    AnswerKind orientation,
+    int userChoice,
+    bool correct
+)
+{
+    if (!_logger)
+        return;
+
+    const Trial& trial = getCurrentTrial();
+
+    std::map<std::string, std::string> data;
+    data["subject_id"] = subject.name;
+    data["trial_idx"] = std::to_string(subject.currentTrialIndex);
+    data["genotype"] = genotype;
+    data["metameric_axis"] = std::to_string(metameric_axis);
+    data["repetition_idx"] = std::to_string(trial.repetition_idx);
+    data["orientation"] = OrientationToString(orientation);
+    data["user_choice"] = std::to_string(userChoice);
+    data["correct"] = correct ? "1" : "0";
+    data["lum_noise"] = std::to_string(SETTINGS.LUM_NOISE);
+    data["s_cone_noise"] = std::to_string(SETTINGS.S_CONE_NOISE);
+    data["stimulus_size"] = std::to_string(SETTINGS.STIMULUS_SIZE);
+
+    _logger->LogRow(data);
+}
+
+void AppPseudoIsochromaticTest::Init(TetriumApp::InitContext& ctx)
+{
+    for (AnswerKind orientation : LANDOLT_C_ORIENTATIONS) {
+        std::string path = AppPseudoIsochromaticTest::GetLandoltCAnswerTexturePath(orientation);
+        uint32_t textureHandle = ctx.api.LoadTexture(path);
+        _answerPromptTextureHandles[orientation] = textureHandle;
+        _answerPromptImGuiTextures[orientation] = ctx.api.InitImGuiTexture(textureHandle);
+    }
+    // load chromalab logo
+    _textures.chromalabLogo
+        = ctx.api.InitImGuiTexture(ctx.api.LoadTexture(ASSETS_PATH + "textures/chromalab-logo.png")
+        );
+};
+
+void AppPseudoIsochromaticTest::Cleanup(TetriumApp::CleanupContext& ctx)
+{
+    for (AnswerKind orientation : LANDOLT_C_ORIENTATIONS) {
+        ctx.api.UnloadTexture(_answerPromptTextureHandles[orientation]);
+    }
+
+    // Clean up generators
+    if (_plateGenerator) {
+        delete _plateGenerator;
+        _plateGenerator = nullptr;
+    }
+    if (_colorPicker) {
+        delete _colorPicker;
+        _colorPicker = nullptr;
+    }
+    if (_logger) {
+        delete _logger;
+        _logger = nullptr;
+    }
+}
+} // namespace TetriumApp
