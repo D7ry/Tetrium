@@ -108,9 +108,10 @@ void AppScrambledFaceTest::drawSettings(const TetriumApp::TickContextImGui& ctx)
     (void)ctx;
     if (ImGui::BeginPopupModal("Settings", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::Text("Trial Settings");
-        ImGui::SliderInt("Metameric Axes", &settings.numMetamericAxes, 1, 4);
         ImGui::SliderInt("Repetitions per axis", &settings.repetitionsPerAxis, 1, 10);
-        ImGui::Text("Total trials: %d", settings.numMetamericAxes * settings.repetitionsPerAxis);
+        ImGui::Text("(Genotypes and axes determined by color picker)");
+        ImGui::SliderInt("Trials per break", &settings.trialsPerBreak, 10, 120);
+        ImGui::Text("(0 = no breaks)");
         ImGui::Separator();
 
         ImGui::Text("Timing Settings");
@@ -149,19 +150,54 @@ void AppScrambledFaceTest::startTest(const TetriumApp::TickContextImGui& ctx)
 
     std::filesystem::create_directories("./temp");
 
-    int totalTrials = settings.numMetamericAxes * settings.repetitionsPerAxis;
+    // Create CircleGridGenerator with genetic parameters
+    std::vector<int> dimensions = {2};
     generator = new TetriumColor::CircleGridGenerator(
-        std::string(TETRIUM_COLOR_PATH) + "measurements/2025-10-12/primaries",
-        totalTrials,
-        settings.scrambleProb
+        settings.scrambleProb,
+        "female", // sex
+        0.999f,   // percentage_screened
+        547.0f,   // peak_to_test
+        settings.luminance,
+        settings.saturation,
+        dimensions,
+        42,    // seed
+        "led", // cst_display_type
+        std::string(TETRIUM_COLOR_PATH) + "measurements/2025-10-12/primaries"
     );
+
+    // Get genotypes from generator
+    std::vector<std::string> genotypes = generator->GetGenotypes();
+
+    // Build all trials: genotype × metameric_axis × repetition
+    trials.clear();
+    for (const std::string& genotype : genotypes) {
+        for (int axis = 0; axis < 4; axis++) {
+            for (int rep = 0; rep < settings.repetitionsPerAxis; ++rep) {
+                Trial trial;
+                trial.genotype = genotype;
+                trial.metamericAxis = axis;
+                trial.repetitionIdx = rep;
+                trials.push_back(trial);
+            }
+        }
+    }
+
+    int totalTrials = trials.size();
+
+    // Shuffle trials to randomize order
+    for (int i = totalTrials - 1; i > 0; --i) {
+        int j = rand() % (i + 1);
+        std::swap(trials[i], trials[j]);
+    }
 
     // Initialize logger
     std::vector<std::string> headers
         = {"subject_id",
            "session_timestamp",
            "trial_idx",
+           "genotype",
            "metameric_axis",
+           "repetition_idx",
            "scrambled_original_idx",
            "user_choice",
            "correct",
@@ -172,36 +208,28 @@ void AppScrambledFaceTest::startTest(const TetriumApp::TickContextImGui& ctx)
            "scramble_prob"};
     logger = new TestDataLogger("AppScrambledFaceTest", subjectName, headers);
 
-    // Generate all trial combinations (metameric_axis × repetitions)
-    trials.clear();
-    trials.resize(totalTrials);
-    int trialIdx = 0;
-    for (int axis = 0; axis < settings.numMetamericAxes; ++axis) {
-        for (int rep = 0; rep < settings.repetitionsPerAxis; ++rep) {
-            trials[trialIdx].metamericAxis = axis;
-            trialIdx++;
-        }
-    }
-
-    // Shuffle trials to randomize order
-    for (int i = totalTrials - 1; i > 0; --i) {
-        int j = rand() % (i + 1);
-        std::swap(trials[i], trials[j]);
-    }
-
     currentTrial = 0;
     numCorrect = 0;
-    generateTrial(trials[currentTrial], ctx, currentTrial, trials[currentTrial].metamericAxis);
+    generateTrial(
+        trials[currentTrial],
+        ctx,
+        currentTrial,
+        trials[currentTrial].genotype,
+        trials[currentTrial].metamericAxis
+    );
 
-    // Reset timer AFTER generating trial to avoid counting generation time
-    trialState = TrialState::kViewing;
+    // Start with fixation cross (ITI state) before showing first trial
+    // This prevents the flash of stimuli appearing immediately
+    trialState = TrialState::kITI;
     trialStateTimer = 0.0f;
+    isInitialFixation = true; // Mark this as the initial fixation period
 }
 
 void AppScrambledFaceTest::generateTrial(
     Trial& t,
     const TetriumApp::TickContextImGui& ctx,
     int trialIdx,
+    const std::string& genotype,
     int metamericAxis
 )
 {
@@ -212,19 +240,13 @@ void AppScrambledFaceTest::generateTrial(
     names.reserve(settings.imagesPerTrial);
     for (int i = 0; i < settings.imagesPerTrial; ++i) {
         names.emplace_back(
-            "./temp/" + subjectName + "_trial" + std::to_string(trialIdx) + "_axis"
-            + std::to_string(metamericAxis) + "_" + std::to_string(i)
+            "./temp/" + subjectName + "_trial" + std::to_string(trialIdx) + "_genotype" + genotype
+            + "_axis" + std::to_string(metamericAxis) + "_" + std::to_string(i)
         );
     }
-    // Generate a unique seed for each trial to randomize the pattern
-    int seed = static_cast<int>(time(nullptr)) + trialIdx + (rand() % 10000);
+
     auto idxs = generator->GetImages(
-        metamericAxis,
-        settings.luminance,
-        settings.saturation,
-        names,
-        TetriumColor::ColorSpaceType::DISP_6P,
-        seed
+        genotype, metamericAxis, names, TetriumColor::ColorSpaceType::DISP_6P
     );
     (void)idxs;
 
@@ -264,6 +286,13 @@ void AppScrambledFaceTest::drawRunning(const TetriumApp::TickContextImGui& ctx)
     // Update timer
     ImGuiIO& io = ImGui::GetIO();
     trialStateTimer += io.DeltaTime;
+
+    // Draw progress counter in upper left corner
+    int totalTrials = trials.size();
+    // Add 1 to currentTrial for display since it's 0-indexed
+    std::string progressText = std::to_string(currentTrial + 1) + "/" + std::to_string(totalTrials);
+    ImGui::SetCursorPos(ImVec2(20, 20));
+    ImGui::Text("%s", progressText.c_str());
 
     // State machine for trial phases
     switch (trialState) {
@@ -310,21 +339,57 @@ void AppScrambledFaceTest::drawRunning(const TetriumApp::TickContextImGui& ctx)
 
         // Check if ITI is complete
         if (trialStateTimer >= settings.itiDuration) {
-            // Start next trial
-            int totalTrials = settings.numMetamericAxes * settings.repetitionsPerAxis;
-            if (currentTrial + 1 >= totalTrials) {
-                state = TestState::kResult;
-            } else {
-                currentTrial++;
-                generateTrial(
-                    trials[currentTrial], ctx, currentTrial, trials[currentTrial].metamericAxis
-                );
-
-                // Reset timer AFTER generating trial
+            // For the initial fixation before first trial, just transition to viewing
+            // The trial was already generated in startTest()
+            if (isInitialFixation) {
+                isInitialFixation = false;
                 trialState = TrialState::kViewing;
                 trialStateTimer = 0.0f;
+            } else {
+                // Between trials: check if we need a break or move to next trial
+                int totalTrials = trials.size();
+                if (currentTrial + 1 >= totalTrials) {
+                    state = TestState::kResult;
+                } else {
+                    currentTrial++;
+
+                    // Check if it's time for a break (not on the first trial, not on last trial)
+                    bool needsBreak = settings.trialsPerBreak > 0
+                                      && (currentTrial % settings.trialsPerBreak) == 0
+                                      && currentTrial < totalTrials - 1;
+
+                    if (needsBreak) {
+                        // Generate trial but show break screen first
+                        generateTrial(
+                            trials[currentTrial],
+                            ctx,
+                            currentTrial,
+                            trials[currentTrial].genotype,
+                            trials[currentTrial].metamericAxis
+                        );
+                        trialState = TrialState::kBreak;
+                        trialStateTimer = 0.0f;
+                    } else {
+                        // Normal progression: generate trial and start viewing
+                        generateTrial(
+                            trials[currentTrial],
+                            ctx,
+                            currentTrial,
+                            trials[currentTrial].genotype,
+                            trials[currentTrial].metamericAxis
+                        );
+                        trialState = TrialState::kViewing;
+                        trialStateTimer = 0.0f;
+                    }
+                }
             }
         }
+        break;
+    }
+
+    case TrialState::kBreak: {
+        // Show break screen with continue button
+        drawBreakScreen(ctx);
         break;
     }
     }
@@ -355,7 +420,9 @@ void AppScrambledFaceTest::handleTrialResponse(
         std::map<std::string, std::string> data;
         data["subject_id"] = subjectName;
         data["trial_idx"] = std::to_string(currentTrial);
+        data["genotype"] = t.genotype;
         data["metameric_axis"] = std::to_string(t.metamericAxis);
+        data["repetition_idx"] = std::to_string(t.repetitionIdx);
         data["scrambled_original_idx"] = std::to_string(t.scrambledOriginalIndex);
         data["user_choice"] = std::to_string(t.userChoice);
         data["correct"] = correct ? "1" : "0";
@@ -392,6 +459,58 @@ void AppScrambledFaceTest::drawFixationCross(ImVec2 center)
         crossColor,
         crossThickness
     );
+}
+
+void AppScrambledFaceTest::drawBreakScreen(const TetriumApp::TickContextImGui& ctx)
+{
+    (void)ctx;
+    ImVec2 screenSize = ImGui::GetIO().DisplaySize;
+    ImVec2 boxSize(600, 400);
+    ImVec2 pos((screenSize.x - boxSize.x) * 0.5f, (screenSize.y - boxSize.y) * 0.5f);
+
+    ImGui::SetCursorPos(pos);
+    ImGui::BeginChild("BreakBox", boxSize, true);
+
+    int totalTrials = trials.size();
+    int trialsRemaining = totalTrials - currentTrial;
+    int trialsCompleted = currentTrial;
+
+    // Center the text vertically
+    float lineSpacing = ImGui::GetTextLineHeightWithSpacing();
+    float yStart = (boxSize.y - (lineSpacing * 6.0f)) * 0.5f;
+
+    // Title
+    ImGui::SetWindowFontScale(1.5f);
+    const char* titleText = "Take a Break";
+    ImVec2 titleSize = ImGui::CalcTextSize(titleText);
+    ImGui::SetCursorPos(ImVec2((boxSize.x - titleSize.x * 1.5f) * 0.5f, yStart));
+    ImGui::Text("%s", titleText);
+    ImGui::SetWindowFontScale(1.0f);
+
+    // Progress info
+    ImGui::SetCursorPos(ImVec2(50, yStart + lineSpacing * 3.0f));
+    ImGui::Text("Trials completed: %d / %d", trialsCompleted, totalTrials);
+
+    ImGui::SetCursorPos(ImVec2(50, yStart + lineSpacing * 4.5f));
+    ImGui::Text("Trials remaining: %d", trialsRemaining);
+
+    // Continue button
+    ImVec2 buttonSize(200, 60);
+    ImVec2 buttonPos((boxSize.x - buttonSize.x) * 0.5f, yStart + lineSpacing * 7.0f);
+    ImGui::SetCursorPos(buttonPos);
+    bool continueClicked = ImGui::Button("Continue", buttonSize);
+
+    // Gamepad: A button to continue
+    if (ImGui::IsKeyPressed(ImGuiKey_GamepadFaceDown)) {
+        continueClicked = true;
+    }
+
+    if (continueClicked) {
+        trialState = TrialState::kViewing;
+        trialStateTimer = 0.0f;
+    }
+
+    ImGui::EndChild();
 }
 
 void AppScrambledFaceTest::drawStimuli(
@@ -442,7 +561,7 @@ void AppScrambledFaceTest::drawResult(const TetriumApp::TickContextImGui& ctx)
     ImVec2 pos((win.x - boxSize.x) * 0.5f, (win.y - boxSize.y) * 0.5f);
     ImGui::SetCursorPos(pos);
     ImGui::BeginChild("ResultBox", boxSize, true);
-    int totalTrials = settings.numMetamericAxes * settings.repetitionsPerAxis;
+    int totalTrials = trials.size();
     ImGui::Text("Subject: %s", subjectName.c_str());
     ImGui::Text("Trials: %d", totalTrials);
     ImGui::Text("Correct: %d", numCorrect);

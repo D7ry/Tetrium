@@ -28,14 +28,15 @@ class AppScrambledFaceTest : public App
     {
         kViewing,  // Show stimuli
         kResponse, // Blank screen, wait for response
-        kITI       // Inter-trial interval, fixation cross after response
+        kITI,      // Inter-trial interval, fixation cross after response
+        kBreak     // Break screen with continue button
     };
 
     struct Settings
     {
-        int numMetamericAxes = 4; // 0-3 for tetrachromats
         int repetitionsPerAxis = 5;
-        int imagesPerTrial = 3; // layout width (fixed at 3 for triangle)
+        int imagesPerTrial = 3;  // layout width (fixed at 3 for triangle)
+        int trialsPerBreak = 60; // number of trials before offering a break
         float luminance = 1.0f;
         float saturation = 0.4f;
         float scrambleProb = 0.5f;
@@ -62,7 +63,9 @@ class AppScrambledFaceTest : public App
         std::vector<int> displayToOriginal;
         int scrambledOriginalIndex = 2; // last in original list
         int userChoice = -1;
+        std::string genotype;  // genotype string for this trial
         int metamericAxis = 0; // which metameric axis this trial uses
+        int repetitionIdx = 0; // repetition index for this genotype/axis combination
     };
 
     TestState state = TestState::kIdle;
@@ -72,12 +75,14 @@ class AppScrambledFaceTest : public App
     int numCorrect = 0;
     std::vector<Trial> trials;
     float trialStateTimer = 0.0f;
+    bool isInitialFixation = false; // True during initial fixation before first trial
 
     void startTest(const TetriumApp::TickContextImGui& ctx);
     void generateTrial(
         Trial& t,
         const TetriumApp::TickContextImGui& ctx,
         int trialIdx,
+        const std::string& genotype,
         int metamericAxis
     );
     void drawIdle(const TetriumApp::TickContextImGui& ctx);
@@ -91,6 +96,7 @@ class AppScrambledFaceTest : public App
         ImVec2 center
     );
     void drawFixationCross(ImVec2 center);
+    void drawBreakScreen(const TetriumApp::TickContextImGui& ctx);
     void handleTrialResponse(Trial& t, const TetriumApp::TickContextImGui& ctx, int choice);
 
     TetriumColor::CircleGridGenerator* generator = nullptr;
