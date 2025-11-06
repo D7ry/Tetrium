@@ -946,6 +946,13 @@ VkPresentModeKHR Tetrium::chooseSwapPresentMode(
 #if VIRTUAL_VSYNC
     return VK_PRESENT_MODE_IMMEDIATE_KHR; // force immediate mode
 #endif                                    // VIRTUAL_VSYNC
+
+    // For hardware even-odd sync, we MUST use immediate mode to avoid buffering delays
+    if (_tetraMode == TetraMode::kEvenOddHardwareSync) {
+        INFO("Hardware even-odd sync mode: forcing IMMEDIATE present mode");
+        return VK_PRESENT_MODE_IMMEDIATE_KHR;
+    }
+
     INFO("available present modes: ");
     for (const auto& availablePresentMode : availablePresentModes) {
         INFO("{}", string_VkPresentModeKHR(availablePresentMode));
