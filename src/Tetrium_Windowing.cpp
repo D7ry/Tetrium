@@ -129,8 +129,11 @@ void Tetrium::selectDisplayXlib(DisplayContext& ctx)
             VkResult result = vkGetRandROutputDisplayEXT(device, xDisplay, output, &display);
             if (result == VK_SUCCESS) {
                 // display display properties
-                displays.push_back(display);
                 XRROutputInfo* outputInfo = XRRGetOutputInfo(xDisplay, resources, output);
+                INFO("Found display: {} (connection: {})", 
+                     outputInfo->name, 
+                     outputInfo->connection == RR_Connected ? "Connected" : "Disconnected");
+                displays.push_back(display);
                 displayNames.push_back(outputInfo->name);
                 XRRFreeOutputInfo(outputInfo);
             }
@@ -277,6 +280,30 @@ void Tetrium::initExclusiveDisplay(Tetrium::DisplayContext& ctx)
         vkCreateDisplayPlaneSurfaceKHR(_instance, &surfaceCreateInfo, nullptr, &ctx.surface)
     );
     ASSERT(ctx.surface != VK_NULL_HANDLE);
+
+    // Verify that this surface supports vblank counter
+    auto vkGetPhysicalDeviceSurfaceCapabilities2EXT = 
+        (PFN_vkGetPhysicalDeviceSurfaceCapabilities2EXT)vkGetInstanceProcAddr(
+            _instance, "vkGetPhysicalDeviceSurfaceCapabilities2EXT");
+    if (vkGetPhysicalDeviceSurfaceCapabilities2EXT) {
+        VkSurfaceCapabilities2EXT capabilities{
+            .sType = VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES_2_EXT, 
+            .pNext = VK_NULL_HANDLE
+        };
+        VkResult result = vkGetPhysicalDeviceSurfaceCapabilities2EXT(device, ctx.surface, &capabilities);
+        if (result == VK_SUCCESS) {
+            bool hasVBlankCounter = (capabilities.supportedSurfaceCounters & 
+                                     VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_BIT_EXT) != 0;
+            INFO("Surface VBLANK counter support: {}", hasVBlankCounter ? "YES" : "NO");
+            INFO("Supported surface counters: 0x{:x}", capabilities.supportedSurfaceCounters);
+            if (!hasVBlankCounter) {
+                WARN("WARNING: Selected display does NOT support VBLANK counter!");
+                WARN("Even-odd sync will NOT work correctly!");
+            }
+        } else {
+            WARN("Failed to query surface capabilities, result: {}", (int)result);
+        }
+    }
 
     _deletionStack.push([this, ctx]() { vkDestroySurfaceKHR(_instance, ctx.surface, nullptr); });
 

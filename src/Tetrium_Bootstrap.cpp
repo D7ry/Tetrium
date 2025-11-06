@@ -96,7 +96,6 @@ void Tetrium::initDefaultStates()
     // clear color
     _clearValues[0].color = {0.0f, 0.0f, 0.f, 1.f};
     _clearValues[1].depthStencil = vk::ClearDepthStencilValue(1.f, 0.f);
-
 };
 
 void Tetrium::Init(const Tetrium::InitOptions& options)
@@ -163,7 +162,7 @@ void Tetrium::Init(const Tetrium::InitOptions& options)
     } else {
         NEEDS_IMPLEMENTATION()
     }
-    
+
     initDefaultStates();
 
     _soundManager.LoadAllSounds();
@@ -244,7 +243,7 @@ void Tetrium::initVulkan()
         _dxgiDisplay = DXGI::PickAndInitDXGIDisplayContext();
         SCHEDULE_DELETE(DXGI::CleanupDXGIDisplayContext(_dxgiDisplay);)
         // note here we don't set mainWindowSurface
-#endif 
+#endif
         break;
     case TetraMode::kEvenOddSoftwareSync:
         mainWindowSurface = createGlfwWindowSurface(_window);
@@ -257,7 +256,6 @@ void Tetrium::initVulkan()
     this->_device->CreateLogicalDeviceAndQueue(getRequiredDeviceExtensions());
     this->_device->CreateGraphicsCommandPool();
     this->_device->CreateGraphicsCommandBuffer(NUM_FRAME_IN_FLIGHT);
-
 
     createSwapChain(_swapChain, mainWindowSurface);
     createImageViews(_swapChain);
@@ -599,8 +597,19 @@ VkPhysicalDevice Tetrium::pickPhysicalDevice()
     std::vector<VkPhysicalDevice> devices(deviceCount);
     vkEnumeratePhysicalDevices(_instance, &deviceCount, devices.data());
     for (const auto& device : devices) {
+        VkPhysicalDeviceProperties props;
+        vkGetPhysicalDeviceProperties(device, &props);
+        DEBUG(
+            "Found GPU: {} (type: {})",
+            props.deviceName,
+            props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU     ? "Discrete"
+            : props.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU ? "Integrated"
+                                                                         : "Other"
+        );
+
         if (isDeviceSuitable(device)) {
             physicalDevice = device;
+            INFO("Selected GPU: {}", props.deviceName);
             break;
         }
     }
@@ -794,14 +803,15 @@ void Tetrium::createSwapChainDXGI(Tetrium::SwapChainContext& ctx, const VkSurfac
              1},
             1,
             1,
-            VK_SAMPLE_COUNT_1_BIT,   // mip, array, samples
+            VK_SAMPLE_COUNT_1_BIT, // mip, array, samples
             VK_IMAGE_TILING_OPTIMAL,
-            //VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+            // VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
             VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
             VK_SHARING_MODE_EXCLUSIVE,
             0,
-            nullptr,                  // queue families share
-            VK_IMAGE_LAYOUT_GENERAL // should be undefined, but to suppress validation warnings we use general. Works just fine
+            nullptr,                // queue families share
+            VK_IMAGE_LAYOUT_GENERAL // should be undefined, but to suppress validation warnings we
+                                    // use general. Works just fine
         };
         VK_CHECK_RESULT(vkCreateImage(_device->logicalDevice, &ii, nullptr, &ctx.image[i]));
         std::wstring sharedHandleName
@@ -874,7 +884,6 @@ void Tetrium::createSwapChainDXGI(Tetrium::SwapChainContext& ctx, const VkSurfac
         VK_CHECK_RESULT(
             vkBindImageMemory(_device->logicalDevice, ctx.image[i], ctx.sharedImageMemories[i], 0)
         );
-
     }
 
     for (ID3D12Resource* image : dxImages) {
@@ -1022,8 +1031,7 @@ void Tetrium::createSynchronizationObjects(
         }
         VK_CHECK_RESULT(vkCreateFence(
             _device->logicalDevice, &fenceInfo, nullptr, &primitive.fenceBackbufferRendering
-        )
-        );
+        ));
         VK_CHECK_RESULT(vkCreateFence(
             _device->logicalDevice, &fenceInfo, nullptr, &primitive.fenceRenderFinished
         ));
@@ -1126,7 +1134,7 @@ void Tetrium::createVirtualFrameBuffer(
         imageInfo.format = imageFormat;
         imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
         imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        //imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+        // imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
         imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
         imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
         imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;

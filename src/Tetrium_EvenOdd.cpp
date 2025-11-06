@@ -152,12 +152,26 @@ void Tetrium::updateSurfaceCounterValue()
         NEEDS_IMPLEMENTATION();
 #endif
 #if __linux__
-        _hardWareEvenOddCtx.vkGetSwapchainCounterEXT(
+        VkResult result = _hardWareEvenOddCtx.vkGetSwapchainCounterEXT(
             _device->logicalDevice,
             _swapChain.chain,
             VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_EXT,
             &surfaceCounter
         );
+
+        // Log counter value periodically for debugging
+        static uint64_t lastLoggedCounter = 0;
+        static int framesSinceLog = 0;
+        if (framesSinceLog++ > 60) { // Log every ~60 frames
+            if (result != VK_SUCCESS) {
+                ERROR("vkGetSwapchainCounterEXT failed with result: {}", (int)result);
+            }
+            DEBUG(
+                "VBlank counter: {} (delta: {})", surfaceCounter, surfaceCounter - lastLoggedCounter
+            );
+            lastLoggedCounter = surfaceCounter;
+            framesSinceLog = 0;
+        }
 #endif
         break;
     default:
