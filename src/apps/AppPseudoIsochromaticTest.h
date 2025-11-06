@@ -121,6 +121,9 @@ class AppPseudoIsochromaticTest : public App
     // List of all trials (randomized)
     std::vector<Trial> _trials;
 
+    // Input state captured once per frame
+    int _capturedGamepadInput = -1; // -1 = no input, 0-3 = button index
+
   private:
     struct
     {

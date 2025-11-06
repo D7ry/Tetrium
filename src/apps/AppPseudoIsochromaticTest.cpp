@@ -66,6 +66,29 @@ std::string AppPseudoIsochromaticTest::GetLandoltCAnswerTexturePath(
 
 void TetriumApp::AppPseudoIsochromaticTest::TickImGui(const TetriumApp::TickContextImGui& ctx)
 {
+    // Capture gamepad input ONCE at the beginning of the frame
+    _capturedGamepadInput = -1;
+    bool backPressed = ImGui::IsKeyPressed(ImGuiKey_GamepadBack);
+
+    ImGuiKey gamepadKeys[4] = {
+        ImGuiKey_GamepadFaceDown,  // A button -> Down (index 0)
+        ImGuiKey_GamepadFaceLeft,  // X button -> Left (index 1)
+        ImGuiKey_GamepadFaceRight, // B button -> Right (index 2)
+        ImGuiKey_GamepadFaceUp     // Y button -> Up (index 3)
+    };
+    for (int i = 0; i < 4; i++) {
+        if (ImGui::IsKeyPressed(gamepadKeys[i])) {
+            _capturedGamepadInput = i;
+            break;
+        }
+    }
+
+    // Handle back button to exit test
+    if (backPressed && _state == TestState::kTesting) {
+        ctx.apis.PlaySound(Sound::kVineBoom);
+        _state = TestState::kIdle;
+    }
+
     ImGui::SetNextWindowPos(ImVec2(0, 0));
     ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
     auto flags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse
@@ -249,54 +272,39 @@ void AppPseudoIsochromaticTest::drawLandoltC(
     ImGui::Image(tex.id, textureFullscreenSize);
 
     // Allow answering during stimulus presentation (only if response not already given)
-    if (!subject.prompt.responseGiven) {
-        // Gamepad button keys corresponding to each answer direction
-        ImGuiKey gamepadKeys[4] = {
-            ImGuiKey_GamepadFaceDown,  // A button -> Down
-            ImGuiKey_GamepadFaceLeft,  // X button -> Left
-            ImGuiKey_GamepadFaceRight, // B button -> Right
-            ImGuiKey_GamepadFaceUp     // Y button -> Up
-        };
+    if (!subject.prompt.responseGiven && _capturedGamepadInput >= 0) {
+        subject.prompt.responseGiven = true; // Mark response as given
+        subject.prompt.currentSelectedAnswer = _capturedGamepadInput;
+        bool correct
+            = (subject.prompt.currentSelectedAnswer == subject.prompt.correctAnswerTextureIndex);
 
-        // Check for gamepad input
-        for (int i = 0; i < 4; i++) {
-            if (ImGui::IsKeyPressed(gamepadKeys[i])) {
-                subject.prompt.responseGiven = true; // Mark response as given
-                subject.prompt.currentSelectedAnswer = i;
-                bool correct
-                    = (subject.prompt.currentSelectedAnswer
-                       == subject.prompt.correctAnswerTextureIndex);
-
-                if (correct) {
-                    subject.numSuccessAttempts += 1;
-                    if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL
-                        || SETTINGS.MUSIC_SETTING == MusicSetting::CORRECT_WRONG) {
-                        ctx.apis.PlaySound(Sound::kCorrectAnswer);
-                    }
-                } else {
-                    if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL
-                        || SETTINGS.MUSIC_SETTING == MusicSetting::CORRECT_WRONG) {
-                        ctx.apis.PlaySound(Sound::kWrongAnswer);
-                    }
-                }
-
-                // Log trial data
-                const Trial& trial = getCurrentTrial();
-                logTrialData(
-                    subject,
-                    trial.genotype,
-                    trial.metameric_axis,
-                    subject.prompt.currentOrientation,
-                    i,
-                    correct
-                );
-
-                // Set timer to 0 to trigger state transition on next frame (without disrupting
-                // display)
-                subject.currStateRemainderTime = 0.0f;
-                break;
+        if (correct) {
+            subject.numSuccessAttempts += 1;
+            if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL
+                || SETTINGS.MUSIC_SETTING == MusicSetting::CORRECT_WRONG) {
+                ctx.apis.PlaySound(Sound::kCorrectAnswer);
+            }
+        } else {
+            if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL
+                || SETTINGS.MUSIC_SETTING == MusicSetting::CORRECT_WRONG) {
+                ctx.apis.PlaySound(Sound::kWrongAnswer);
             }
         }
+
+        // Log trial data
+        const Trial& trial = getCurrentTrial();
+        logTrialData(
+            subject,
+            trial.genotype,
+            trial.metameric_axis,
+            subject.prompt.currentOrientation,
+            _capturedGamepadInput,
+            correct
+        );
+
+        // Set timer to 0 to trigger state transition on next frame (without disrupting
+        // display)
+        subject.currStateRemainderTime = 0.0f;
     }
 }
 
@@ -309,11 +317,6 @@ void AppPseudoIsochromaticTest::drawTestForSubject(
         ctx.controls.musicOverride = Sound::kMusicGamePlay;
     } else {
         ctx.controls.musicOverride = std::nullopt;
-    }
-
-    if (ImGui::IsKeyPressed(ImGuiKey_GamepadBack)) {
-        ctx.apis.PlaySound(Sound::kVineBoom);
-        _state = TestState::kIdle;
     }
 
     // Handle state transition (only for timer-based states, not break)
@@ -430,54 +433,39 @@ void AppPseudoIsochromaticTest::drawAnswerPrompts(
     // Just show a black screen with no visual prompts
     // Still accept gamepad input (only if response not already given)
 
-    if (!subject.prompt.responseGiven) {
-        // Gamepad button keys corresponding to each answer direction
-        ImGuiKey gamepadKeys[4] = {
-            ImGuiKey_GamepadFaceDown,  // A button -> Down
-            ImGuiKey_GamepadFaceLeft,  // X button -> Left
-            ImGuiKey_GamepadFaceRight, // B button -> Right
-            ImGuiKey_GamepadFaceUp     // Y button -> Up
-        };
+    if (!subject.prompt.responseGiven && _capturedGamepadInput >= 0) {
+        subject.prompt.responseGiven = true; // Mark response as given
+        subject.prompt.currentSelectedAnswer = _capturedGamepadInput;
+        bool correct
+            = (subject.prompt.currentSelectedAnswer == subject.prompt.correctAnswerTextureIndex);
 
-        // Check for gamepad input
-        for (int i = 0; i < 4; i++) {
-            if (ImGui::IsKeyPressed(gamepadKeys[i])) {
-                subject.prompt.responseGiven = true; // Mark response as given
-                subject.prompt.currentSelectedAnswer = i;
-                bool correct
-                    = (subject.prompt.currentSelectedAnswer
-                       == subject.prompt.correctAnswerTextureIndex);
-
-                if (correct) {
-                    subject.numSuccessAttempts += 1;
-                    if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL
-                        || SETTINGS.MUSIC_SETTING == MusicSetting::CORRECT_WRONG) {
-                        ctx.apis.PlaySound(Sound::kCorrectAnswer);
-                    }
-                } else {
-                    if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL
-                        || SETTINGS.MUSIC_SETTING == MusicSetting::CORRECT_WRONG) {
-                        ctx.apis.PlaySound(Sound::kWrongAnswer);
-                    }
-                }
-
-                // Log trial data
-                const Trial& trial = getCurrentTrial();
-                logTrialData(
-                    subject,
-                    trial.genotype,
-                    trial.metameric_axis,
-                    subject.prompt.currentOrientation,
-                    i,
-                    correct
-                );
-
-                // Set timer to 0 to trigger state transition on next frame (without disrupting
-                // display)
-                subject.currStateRemainderTime = 0.0f;
-                break;
+        if (correct) {
+            subject.numSuccessAttempts += 1;
+            if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL
+                || SETTINGS.MUSIC_SETTING == MusicSetting::CORRECT_WRONG) {
+                ctx.apis.PlaySound(Sound::kCorrectAnswer);
+            }
+        } else {
+            if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL
+                || SETTINGS.MUSIC_SETTING == MusicSetting::CORRECT_WRONG) {
+                ctx.apis.PlaySound(Sound::kWrongAnswer);
             }
         }
+
+        // Log trial data
+        const Trial& trial = getCurrentTrial();
+        logTrialData(
+            subject,
+            trial.genotype,
+            trial.metameric_axis,
+            subject.prompt.currentOrientation,
+            _capturedGamepadInput,
+            correct
+        );
+
+        // Set timer to 0 to trigger state transition on next frame (without disrupting
+        // display)
+        subject.currStateRemainderTime = 0.0f;
     }
 }
 
@@ -801,7 +789,7 @@ void AppPseudoIsochromaticTest::drawBreakWindow(
     ImGui::SetCursorPos(buttonPos);
 
     bool continuePressed = ImGui::Button("Continue (A)", buttonSize)
-                           || ImGui::IsKeyPressed(ImGuiKey_GamepadFaceDown);
+                           || (_capturedGamepadInput == 0); // A button is index 0
 
     if (continuePressed) {
         // Continue to next trial
