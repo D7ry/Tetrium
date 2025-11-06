@@ -11,8 +11,8 @@
 #include <vulkan/vulkan_core.h>
 
 #if defined(WIN32)
-#include "lib/dxgi/DXGISwapchain.h"
 #include "lib/dxgi/DXGIDisplayContext.h"
+#include "lib/dxgi/DXGISwapchain.h"
 #endif
 
 // vq library
@@ -32,13 +32,13 @@
 #include "components/DeltaTimer.h"
 #include "components/InputManager.h"
 #include "components/Profiler.h"
+#include "components/SoundManager.h"
 #include "components/TextureManager.h"
 #include "components/imgui_widgets/ImGuiWidget.h"
-#include "components/SoundManager.h"
 
+#include "components/imgui_widgets/ImGuiWidgetBlobHunter.h"
 #include "components/imgui_widgets/ImGuiWidgetColorTile.h"
 #include "components/imgui_widgets/ImGuiWidgetEvenOddCalibration.h"
-#include "components/imgui_widgets/ImGuiWidgetBlobHunter.h"
 
 // Applications
 #include "apps/App.h"
@@ -62,7 +62,8 @@ class Tetrium
         kNumTextures
     };
 
-    static const std::array<std::string, static_cast<int>(EngineTexture::kNumTextures)> ENGINE_TEXTURE_PATHS;
+    static const std::array<std::string, static_cast<int>(EngineTexture::kNumTextures)>
+        ENGINE_TEXTURE_PATHS;
 
   public:
     // Display mode to present tetracolor outputs.
@@ -101,7 +102,6 @@ class Tetrium
     /* ---------- Packed Structs ---------- */
     // context for a single swapchain;
     // each window & display manages their separate
-
 
     struct DepthBuffer
     {
@@ -177,7 +177,8 @@ class Tetrium
         ImPlotContext* backendImPlotContext;
     };
 
-    enum class ROCVPresentMode{
+    enum class ROCVPresentMode
+    {
         kNormal,
         kRGBOnly,
         kOCVOnly
@@ -282,7 +283,7 @@ class Tetrium
     void drawAppsImGui(ColorSpace colorSpace, int currentFrameInFlight);
     void pollInputs();
     void updateSurfaceCounterValue();
-    
+
     void getFullScreenViewportAndScissor(
         const SwapChainContext& swapChain,
         VkViewport& viewport,
@@ -366,7 +367,7 @@ class Tetrium
     std::array<VQBuffer, NUM_FRAME_IN_FLIGHT> _engineUBOStatic;
 
     float _FOV = 90;
-    double _timeSinceStartSeconds; // seconds in time since engine start, regardless of pause
+    double _timeSinceStartSeconds;   // seconds in time since engine start, regardless of pause
     unsigned long int _numTicks = 0; // how many ticks has happened so far
 
     // even-odd frame
@@ -421,7 +422,8 @@ class Tetrium
     std::unordered_map<std::string, TetriumApp::App*> _appMap;
     std::optional<TetriumApp::App*> _primaryApp = std::nullopt;
 
-    std::array<std::pair<uint32_t, ImGuiTexture>, static_cast<int>(EngineTexture::kNumTextures)> _engineTextures;
+    std::array<std::pair<uint32_t, ImGuiTexture>, static_cast<int>(EngineTexture::kNumTextures)>
+        _engineTextures;
 
     ROCVPresentMode _rocvPresentMode = ROCVPresentMode::kNormal;
 };

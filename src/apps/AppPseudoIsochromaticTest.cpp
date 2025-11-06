@@ -733,20 +733,18 @@ std::pair<std::string, std::string> AppPseudoIsochromaticTest::generateLandoltCT
                                + std::to_string(metameric_axis) + "_" + orientationStr;
 
     // Call GetPlate with genotype and metameric axis
+    auto outputSpace = GetOutputColorSpace();
     _plateGenerator->GetPlate(
         genotype,
         metameric_axis,
         baseFilename,
         "landolt_" + orientationStr,
-        TetriumColor::ColorSpaceType::DISP_6P,
+        outputSpace,
         SETTINGS.LUM_NOISE,
         SETTINGS.S_CONE_NOISE
     );
 
-    std::string rgbTexturePath = baseFilename + "_RGB.png";
-    std::string ocvTexturePath = baseFilename + "_OCV.png";
-
-    return {rgbTexturePath, ocvTexturePath};
+    return GetTexturePaths(baseFilename, outputSpace);
 }
 
 void AppPseudoIsochromaticTest::populatePromptContext(

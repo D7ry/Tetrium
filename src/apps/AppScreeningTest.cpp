@@ -770,22 +770,17 @@ std::pair<std::string, std::string> AppScreeningTest::generateLandoltCTextures(
 
     std::string baseFilename = "./temp/" + subject.name + "_" + orientationStr;
 
-    // Call NewPlate with DISP_6P output space
+    // Call NewPlate with appropriate output space
+    auto outputSpace = GetOutputColorSpace();
     _plateGenerator->NewPlate(
         baseFilename,
         "landolt_" + orientationStr, // Use orientation string for Landolt C
-        TetriumColor::ColorSpaceType::DISP_6P,
+        outputSpace,
         SETTINGS.LUM_NOISE,
         SETTINGS.S_CONE_NOISE
     );
 
-    // Return paths - the 6P files will be at baseFilename_0.png ... baseFilename_5.png
-    // and sRGB at baseFilename_srgb.png
-    // For compatibility, we'll use the sRGB version for RGB and one of the 6P channels for OCV
-    std::string rgbTexturePath = baseFilename + "_RGB.png";
-    std::string ocvTexturePath = baseFilename + "_OCV.png"; // Use first channel of 6P
-
-    return {rgbTexturePath, ocvTexturePath};
+    return GetTexturePaths(baseFilename, outputSpace);
 }
 
 std::pair<std::string, std::string> AppScreeningTest::generateLuminanceLandoltTextures(
@@ -797,17 +792,16 @@ std::pair<std::string, std::string> AppScreeningTest::generateLuminanceLandoltTe
     const std::string orientationStr = OrientationToString(orientation);
     std::string baseFilename = "./temp/" + subject.name + "_tutorial_" + orientationStr;
 
+    auto outputSpace = GetOutputColorSpace();
     _plateGenerator->GetLuminancePlate(
         baseFilename,
         "landolt_" + orientationStr,
-        TetriumColor::ColorSpaceType::DISP_6P,
+        outputSpace,
         SETTINGS.LUM_NOISE,
         SETTINGS.S_CONE_NOISE
     );
 
-    std::string rgbTexturePath = baseFilename + "_RGB.png";
-    std::string ocvTexturePath = baseFilename + "_OCV.png";
-    return {rgbTexturePath, ocvTexturePath};
+    return GetTexturePaths(baseFilename, outputSpace);
 }
 
 void AppScreeningTest::populatePromptContext(

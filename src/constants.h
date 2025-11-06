@@ -5,6 +5,7 @@
 #include <vulkan/vulkan_beta.h> // VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME, for molten-vk support
 #endif
 
+#include "TetriumColor/ColorSpaceType.h"
 #include "vulkan/vulkan.hpp"
 
 // absolute constants
@@ -77,7 +78,6 @@ const char* const BANNER_TEXT = "___  ___ ___  __               \n"
                                 " |  |__   |  |__) | |  |  |\\/| \n"
                                 " |  |___  |  |  \\ | \\__/  |  | \n";
 
-
 } // namespace Engine
 
 } // namespace DEFAULTS
@@ -86,18 +86,50 @@ using INDEX_BUFFER_INDEX_TYPE = unsigned int;
 
 namespace GLOBALS
 {
-    /**
-     * Expected extent of the DLP's presented content.
-     * This extent is different from the projector's swapchain; the swapchain's pixels maps 1:1 to the individual physical lights
-     * of the DLP. The DLP optically squishes the output from the LED into a view of DISPLAY_EXTENT.
-     * When rendering in none-pattern mode, the DLP internally re-samples the HDMI input to this extent, projects the light, and
-     * then optically corrects the aspect ratio using its lenses.
-     * When rendering in pattern mode, however,, the re-sampling does not happen in DLP. Therefore we we-sample the image ourselves.
-     */
+/**
+ * Expected extent of the DLP's presented content.
+ * This extent is different from the projector's swapchain; the swapchain's pixels maps 1:1 to the
+ * individual physical lights of the DLP. The DLP optically squishes the output from the LED into a
+ * view of DISPLAY_EXTENT. When rendering in none-pattern mode, the DLP internally re-samples the
+ * HDMI input to this extent, projects the light, and then optically corrects the aspect ratio using
+ * its lenses. When rendering in pattern mode, however,, the re-sampling does not happen in DLP.
+ * Therefore we we-sample the image ourselves.
+ */
 #if !__APPLE__
-    const vk::Extent2D DISPLAY_EXTENT{2560, 1600};
+const vk::Extent2D DISPLAY_EXTENT{2560, 1600};
 #else
-    const vk::Extent2D DISPLAY_EXTENT{DEFAULTS::WINDOW_WIDTH*2, DEFAULTS::WINDOW_HEIGHT*2}; // stupid MacOS
+const vk::Extent2D DISPLAY_EXTENT{
+    DEFAULTS::WINDOW_WIDTH * 2,
+    DEFAULTS::WINDOW_HEIGHT * 2}; // stupid MacOS
 #endif // __APPLE__
 
+} // namespace GLOBALS
+
+// Helper function to get the appropriate output color space for the current platform
+// On Mac (dev machines), use sRGB for simulation; on other platforms use DISP_6P for projector
+inline TetriumColor::ColorSpaceType GetOutputColorSpace()
+{
+#if defined(__APPLE__)
+    return TetriumColor::ColorSpaceType::SRGB;
+#else
+    return TetriumColor::ColorSpaceType::DISP_6P;
+#endif
+}
+
+// Helper function to get texture paths based on output color space
+// Returns pair of (RGB path, OCV path)
+inline std::pair<std::string, std::string> GetTexturePaths(
+    const std::string& baseFilename,
+    TetriumColor::ColorSpaceType outputSpace = GetOutputColorSpace()
+)
+{
+    if (outputSpace == TetriumColor::ColorSpaceType::SRGB) {
+        // For SRGB output, use _SRGB.png for both RGB and OCV (MONO_COLOR_SPACE will only show RGB)
+        INFO("Using SRGB output for texture paths");
+        std::string srgbPath = baseFilename + "_SRGB.png";
+        return {srgbPath, srgbPath};
+    } else {
+        // For DISP_6P output, use separate _RGB.png and _OCV.png files
+        return {baseFilename + "_RGB.png", baseFilename + "_OCV.png"};
+    }
 }

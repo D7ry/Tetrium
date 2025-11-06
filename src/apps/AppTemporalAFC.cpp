@@ -473,7 +473,7 @@ void AppTemporalAFC::loadCurrentTrialTextures(const TetriumApp::TickContextImGui
             512, // image size
             settings.circleRadius,
             settings.hasNoisyBoundary,
-            TetriumColor::ColorSpaceType::DISP_6P
+            GetOutputColorSpace()
         );
 
         // Load textures

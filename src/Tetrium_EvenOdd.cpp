@@ -91,8 +91,7 @@ void Tetrium::checkHardwareEvenOddFrameSupport()
 
 #if defined(__LINUX__)
     VkSurfaceCapabilities2EXT capabilities{
-        .sType = VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES_2_EXT, .pNext = VK_NULL_HANDLE
-    };
+        .sType = VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES_2_EXT, .pNext = VK_NULL_HANDLE};
 
     auto func = (PFN_vkGetPhysicalDeviceSurfaceCapabilities2EXT
     )vkGetInstanceProcAddr(_instance, "vkGetPhysicalDeviceSurfaceCapabilities2EXT");
@@ -176,17 +175,15 @@ bool Tetrium::isEvenFrame()
     // offset the surface counter with # of dropped frames,
     // dropping a frame leads to a wrong swapchain offset, here we
     // offset it back.
-    //surfaceCounterValue += _swapChain.chainDXGI->GetNumDroppedFrames();
+    // surfaceCounterValue += _swapChain.chainDXGI->GetNumDroppedFrames();
 #endif // WIN32
     return surfaceCounterValue % 2 == 0;
-    
 }
 
-uint64_t Tetrium::getSurfaceCounterValue() {
-    return _surfaceCounterValue;
-}
+uint64_t Tetrium::getSurfaceCounterValue() { return _surfaceCounterValue; }
 
-ColorSpace Tetrium::getCurrentColorSpace() {
+ColorSpace Tetrium::getCurrentColorSpace()
+{
     ColorSpace cs = isEvenFrame() ? ColorSpace::RGB : ColorSpace::OCV;
     if (_flipEvenOdd) {
         cs = cs == ColorSpace::RGB ? ColorSpace::OCV : ColorSpace::RGB;

@@ -467,7 +467,7 @@ void AppAnomaloscope::updateStimulus(const TetriumApp::TickContextImGui& ctx)
         512, // image size
         settings.circleRadius,
         settings.hasNoisyBoundary,
-        TetriumColor::ColorSpaceType::DISP_6P
+        GetOutputColorSpace()
     );
 
     stimulus.topHandleRGB = ctx.apis.LoadTexture(topRGBPath);
@@ -490,7 +490,7 @@ void AppAnomaloscope::updateStimulus(const TetriumApp::TickContextImGui& ctx)
         512, // image size
         settings.circleRadius,
         settings.hasNoisyBoundary,
-        TetriumColor::ColorSpaceType::DISP_6P
+        GetOutputColorSpace()
     );
 
     stimulus.bottomHandleRGB = ctx.apis.LoadTexture(bottomRGBPath);

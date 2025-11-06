@@ -266,9 +266,8 @@ void AppScrambledFaceTest::generateTrial(
         );
     }
 
-    auto idxs = generator->GetImages(
-        genotype, metamericAxis, names, TetriumColor::ColorSpaceType::DISP_6P
-    );
+    auto outputSpace = GetOutputColorSpace();
+    auto idxs = generator->GetImages(genotype, metamericAxis, names, outputSpace);
     (void)idxs;
 
     if (settings.normalFaceMode == NormalFaceMode::kSame) {
@@ -276,8 +275,7 @@ void AppScrambledFaceTest::generateTrial(
         int pickedIdx = rand() % 2;
 
         // Load the picked image for positions 0 and 1 (two copies of the normal face)
-        std::string normalRgbPath = names[pickedIdx] + "_RGB.png";
-        std::string normalOcvPath = names[pickedIdx] + "_OCV.png";
+        auto [normalRgbPath, normalOcvPath] = GetTexturePaths(names[pickedIdx], outputSpace);
 
         for (int i = 0; i < 2; ++i) {
             t.choices[i].handleRGB = ctx.apis.LoadTexture(normalRgbPath);
@@ -288,8 +286,7 @@ void AppScrambledFaceTest::generateTrial(
     } else {
         // DIFF mode: Load both of the first two images as different normal faces
         for (int i = 0; i < 2; ++i) {
-            std::string normalRgbPath = names[i] + "_RGB.png";
-            std::string normalOcvPath = names[i] + "_OCV.png";
+            auto [normalRgbPath, normalOcvPath] = GetTexturePaths(names[i], outputSpace);
             t.choices[i].handleRGB = ctx.apis.LoadTexture(normalRgbPath);
             t.choices[i].handleOCV = ctx.apis.LoadTexture(normalOcvPath);
             t.choices[i].texRGB = ctx.apis.InitImGuiTexture(t.choices[i].handleRGB);
@@ -298,8 +295,7 @@ void AppScrambledFaceTest::generateTrial(
     }
 
     // Load the third image (index 2) as the scrambled/odd one out
-    std::string scrambledRgbPath = names[2] + "_RGB.png";
-    std::string scrambledOcvPath = names[2] + "_OCV.png";
+    auto [scrambledRgbPath, scrambledOcvPath] = GetTexturePaths(names[2], outputSpace);
     t.choices[2].handleRGB = ctx.apis.LoadTexture(scrambledRgbPath);
     t.choices[2].handleOCV = ctx.apis.LoadTexture(scrambledOcvPath);
     t.choices[2].texRGB = ctx.apis.InitImGuiTexture(t.choices[2].handleRGB);
