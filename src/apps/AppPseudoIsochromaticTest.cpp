@@ -259,19 +259,7 @@ void AppPseudoIsochromaticTest::drawLandoltC(
     const TetriumApp::TickContextImGui& ctx
 )
 {
-    ImGuiTexture tex = subject.prompt.currentLandoltCTexture[ctx.colorSpace]; // RGB is the default
-
-    ImVec2 availSize = ImGui::GetContentRegionAvail();
-    ImVec2 textureFullscreenSize
-        = ImVec2(tex.width * SETTINGS.STIMULUS_SIZE, tex.height * SETTINGS.STIMULUS_SIZE);
-
-    // center the texture onto the screen
-    ImVec2 centerPos = ImVec2(availSize.x * 0.5f, availSize.y * 0.5f);
-    ImGui::SetCursorPos(centerPos - textureFullscreenSize * 0.5f);
-
-    ImGui::Image(tex.id, textureFullscreenSize);
-
-    // Allow answering during stimulus presentation (only if response not already given)
+    // Process input first (before drawing)
     if (!subject.prompt.responseGiven && _capturedGamepadInput >= 0) {
         subject.prompt.responseGiven = true; // Mark response as given
         subject.prompt.currentSelectedAnswer = _capturedGamepadInput;
@@ -302,10 +290,26 @@ void AppPseudoIsochromaticTest::drawLandoltC(
             correct
         );
 
-        // Set timer to 0 to trigger state transition on next frame (without disrupting
-        // display)
+        // Set timer to 0 to trigger state transition on next frame
         subject.currStateRemainderTime = 0.0f;
     }
+
+    // Only draw the stimulus if no response has been given yet
+    // Once response is given, screen goes black immediately
+    if (!subject.prompt.responseGiven) {
+        ImGuiTexture tex = subject.prompt.currentLandoltCTexture[ctx.colorSpace];
+
+        ImVec2 availSize = ImGui::GetContentRegionAvail();
+        ImVec2 textureFullscreenSize
+            = ImVec2(tex.width * SETTINGS.STIMULUS_SIZE, tex.height * SETTINGS.STIMULUS_SIZE);
+
+        // center the texture onto the screen
+        ImVec2 centerPos = ImVec2(availSize.x * 0.5f, availSize.y * 0.5f);
+        ImGui::SetCursorPos(centerPos - textureFullscreenSize * 0.5f);
+
+        ImGui::Image(tex.id, textureFullscreenSize);
+    }
+    // else: screen remains black after response
 }
 
 void AppPseudoIsochromaticTest::drawTestForSubject(
@@ -430,9 +434,7 @@ void AppPseudoIsochromaticTest::drawAnswerPrompts(
     const TetriumApp::TickContextImGui& ctx
 )
 {
-    // Just show a black screen with no visual prompts
-    // Still accept gamepad input (only if response not already given)
-
+    // Process input (screen is already black, no visual prompts)
     if (!subject.prompt.responseGiven && _capturedGamepadInput >= 0) {
         subject.prompt.responseGiven = true; // Mark response as given
         subject.prompt.currentSelectedAnswer = _capturedGamepadInput;
@@ -463,10 +465,10 @@ void AppPseudoIsochromaticTest::drawAnswerPrompts(
             correct
         );
 
-        // Set timer to 0 to trigger state transition on next frame (without disrupting
-        // display)
+        // Set timer to 0 to trigger state transition on next frame
         subject.currStateRemainderTime = 0.0f;
     }
+    // Screen remains black throughout this state
 }
 
 void AppPseudoIsochromaticTest::transitionSubjectState(
