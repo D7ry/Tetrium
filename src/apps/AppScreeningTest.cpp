@@ -590,7 +590,7 @@ void AppScreeningTest::newGame(const TetriumApp::TickContextImGui& ctx)
     // Matching the Python snippet:
     // primaries = load_primaries_from_csv("./measurements/2025-05-06/primaries")
     // color_generator = GeneticCDFTestColorGenerator(
-    //     sex='female', percentage_screened=0.99, cst_display_type='led',
+    //     sex='female', percentage_screened=0.99,
     //     display_primaries=primaries, dimensions=[2])
 
     std::vector<int> dimensions = {2};
@@ -599,7 +599,6 @@ void AppScreeningTest::newGame(const TetriumApp::TickContextImGui& ctx)
         0.999f,     // percentage_screened
         547.0f,     // peak_to_test (default from Python)
         dimensions, // dimensions
-        "led",      // cst_display_type
         TETRIUM_COLOR_PATH + "measurements/2025-10-12/primaries" // display_primaries_path
     );
 

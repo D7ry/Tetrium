@@ -95,7 +95,26 @@ void TetriumApp::AppPseudoIsochromaticTest::drawSettingsWindow(
 {
     // draw a settings pop-up window
     if (ImGui::BeginPopup("Settings", ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::SliderInt("Repetitions Per Axis", &SETTINGS.REPETITIONS_PER_AXIS, 1, 10);
+        // Color picker type dropdown
+        ImGui::Text("Color Picker Type");
+        const char* pickerOptions[] = {"Genetic", "Quest"};
+        int currentPickerType = static_cast<int>(SETTINGS.PICKER_TYPE);
+        if (ImGui::Combo("##PickerType", &currentPickerType, pickerOptions, 2)) {
+            SETTINGS.PICKER_TYPE = static_cast<ColorPickerType>(currentPickerType);
+        }
+
+        ImGui::Separator();
+
+        // Show different trial count setting based on picker type
+        if (SETTINGS.PICKER_TYPE == ColorPickerType::GENETIC) {
+            ImGui::SliderInt("Repetitions Per Axis", &SETTINGS.REPETITIONS_PER_AXIS, 1, 10);
+        } else {
+            ImGui::SliderInt(
+                "Quest Trials Per Direction", &SETTINGS.QUEST_TRIALS_PER_DIRECTION, 5, 40
+            );
+            ImGui::Checkbox("Test Only 547nm Cone (Axis 1)", &SETTINGS.QUEST_TEST_ONLY_547NM);
+        }
+
         ImGui::SliderInt("Break Interval (0 = no breaks)", &SETTINGS.BREAK_INTERVAL, 0, 100);
         ImGui::Text("Duration of Blank Period (seconds)");
         ImGui::InputFloat("##Blank", &SETTINGS.STATE_DURATIONS_SECONDS.BLANK);
@@ -519,16 +538,32 @@ void AppPseudoIsochromaticTest::buildTrialList()
 {
     _trials.clear();
 
-    // Get genotypes from the color picker
-    std::vector<std::string> genotypes = _colorPicker->GetGenotypes();
+    if (SETTINGS.PICKER_TYPE == ColorPickerType::GENETIC) {
+        // Get genotypes from the genetic color picker
+        std::vector<std::string> genotypes = _geneticColorPicker->GetGenotypes();
 
-    // Build all trials: genotype × metameric_axis × repetition
-    for (const std::string& genotype : genotypes) {
-        for (int axis = 0; axis < 4; axis++) {
-            for (int rep = 0; rep < SETTINGS.REPETITIONS_PER_AXIS; rep++) {
+        // Build all trials: genotype × metameric_axis × repetition
+        for (const std::string& genotype : genotypes) {
+            for (int axis = 0; axis < 4; axis++) {
+                for (int rep = 0; rep < SETTINGS.REPETITIONS_PER_AXIS; rep++) {
+                    Trial trial;
+                    trial.genotype = genotype;
+                    trial.metameric_axis = axis;
+                    trial.repetition_idx = rep;
+                    _trials.push_back(trial);
+                }
+            }
+        }
+    } else {
+        // Get directions metadata from quest color picker
+        auto metadata = _questColorPicker->GetDirectionsMetadata();
+
+        // Build trials for each direction × Quest trials
+        for (const auto& [dir_idx, genotype_axis] : metadata) {
+            for (int rep = 0; rep < SETTINGS.QUEST_TRIALS_PER_DIRECTION; rep++) {
                 Trial trial;
-                trial.genotype = genotype;
-                trial.metameric_axis = axis;
+                trial.genotype = genotype_axis.first;
+                trial.metameric_axis = genotype_axis.second;
                 trial.repetition_idx = rep;
                 _trials.push_back(trial);
             }
@@ -546,34 +581,71 @@ void AppPseudoIsochromaticTest::buildTrialList()
 void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
 {
     // Clean up old generators
-    if (_plateGenerator) {
-        delete _plateGenerator;
+    if (_geneticPlateGenerator) {
+        delete _geneticPlateGenerator;
+        _geneticPlateGenerator = nullptr;
     }
-    if (_colorPicker) {
-        delete _colorPicker;
+    if (_geneticColorPicker) {
+        delete _geneticColorPicker;
+        _geneticColorPicker = nullptr;
+    }
+    if (_questPlateGenerator) {
+        delete _questPlateGenerator;
+        _questPlateGenerator = nullptr;
+    }
+    if (_questColorPicker) {
+        delete _questColorPicker;
+        _questColorPicker = nullptr;
     }
     if (_logger) {
         delete _logger;
+        _logger = nullptr;
     }
 
-    // Create color picker with the new interface
     std::vector<int> dimensions = {2};
-    _colorPicker = new TetriumColor::GeneticColorPicker(
-        "female", // sex
-        0.999f,   // percentage_screened
-        547.0f,   // peak_to_test
-        1.0f,     // luminance
-        0.5f,     // saturation
-        dimensions,
-        42,                                                      // seed
-        "led",                                                   // cst_display_type
-        TETRIUM_COLOR_PATH + "measurements/2025-10-12/primaries" // display_primaries_path
-    );
+    std::string display_primaries_path = TETRIUM_COLOR_PATH + "measurements/2025-10-12/primaries";
 
-    // Create plate generator with color picker
-    _plateGenerator = new TetriumColor::GeneticColorPickerPlateGenerator(
-        *_colorPicker, 42 // seed
-    );
+    if (SETTINGS.PICKER_TYPE == ColorPickerType::GENETIC) {
+        // Create genetic color picker
+        _geneticColorPicker = new TetriumColor::GeneticColorPicker(
+            "female", // sex
+            0.999f,   // percentage_screened
+            547.0f,   // peak_to_test
+            1.0f,     // luminance
+            0.5f,     // saturation
+            dimensions,
+            42,                    // seed
+            display_primaries_path // display_primaries_path
+        );
+
+        // Create plate generator with color picker
+        _geneticPlateGenerator = new TetriumColor::GeneticColorPickerPlateGenerator(
+            *_geneticColorPicker, 42 // seed
+        );
+    } else {
+        // Create quest color picker
+        std::vector<int> axes_to_test;
+        if (SETTINGS.QUEST_TEST_ONLY_547NM) {
+            axes_to_test = {2}; // Only test metameric axis 1 (547nm cone)
+        }
+        // If empty, will test all axes (default behavior)
+
+        _questColorPicker = new TetriumColor::QuestColorPicker(
+            "cone_shift",                        // mode
+            8,                                   // num_genotypes
+            SETTINGS.QUEST_TRIALS_PER_DIRECTION, // trials_per_direction
+            "female",                            // sex
+            0.5f,                                // background_luminance
+            42,                                  // seed
+            display_primaries_path,              // display_primaries_path
+            axes_to_test                         // metameric_axes
+        );
+
+        // Create plate generator with quest color picker
+        _questPlateGenerator = new TetriumColor::QuestColorPickerPlateGenerator(
+            *_questColorPicker, 42 // seed
+        );
+    }
 
     // Build and randomize trial list
     buildTrialList();
@@ -610,6 +682,22 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
 void AppPseudoIsochromaticTest::endGame(SubjectContext& subject)
 {
     DEBUG("ending game for subject {}", subject.name);
+
+    // Export thresholds if using Quest color picker
+    if (SETTINGS.PICKER_TYPE == ColorPickerType::QUEST && _questColorPicker) {
+        std::string thresholds_filename = _logger->GetFilePath();
+        // Replace .csv extension with _thresholds.csv
+        size_t ext_pos = thresholds_filename.rfind(".csv");
+        if (ext_pos != std::string::npos) {
+            thresholds_filename.replace(ext_pos, 4, "_thresholds.csv");
+        } else {
+            thresholds_filename += "_thresholds.csv";
+        }
+
+        INFO("Exporting Quest thresholds to {}", thresholds_filename);
+        _questColorPicker->ExportThresholds(thresholds_filename);
+    }
+
     _state = TestState::kTestResult;
 }
 
@@ -734,15 +822,41 @@ std::pair<std::string, std::string> AppPseudoIsochromaticTest::generateLandoltCT
 
     // Call GetPlate with genotype and metameric axis
     auto outputSpace = GetOutputColorSpace();
-    _plateGenerator->GetPlate(
-        genotype,
-        metameric_axis,
-        baseFilename,
-        "landolt_" + orientationStr,
-        outputSpace,
-        SETTINGS.LUM_NOISE,
-        SETTINGS.S_CONE_NOISE
-    );
+
+    if (SETTINGS.PICKER_TYPE == ColorPickerType::GENETIC) {
+        _geneticPlateGenerator->GetPlate(
+            genotype,
+            metameric_axis,
+            baseFilename,
+            "landolt_" + orientationStr,
+            outputSpace,
+            SETTINGS.LUM_NOISE,
+            SETTINGS.S_CONE_NOISE
+        );
+    } else {
+        // For Quest, we need to find the direction index that matches this genotype/axis
+        auto metadata = _questColorPicker->GetDirectionsMetadata();
+        int direction_idx = -1;
+        for (const auto& [idx, genotype_axis] : metadata) {
+            if (genotype_axis.first == genotype && genotype_axis.second == metameric_axis) {
+                direction_idx = idx;
+                break;
+            }
+        }
+
+        if (direction_idx >= 0) {
+            _questPlateGenerator->GetPlate(
+                direction_idx,
+                baseFilename,
+                "landolt_" + orientationStr,
+                outputSpace,
+                SETTINGS.LUM_NOISE,
+                SETTINGS.S_CONE_NOISE
+            );
+        } else {
+            ERROR("Could not find direction for genotype {} axis {}", genotype, metameric_axis);
+        }
+    }
 
     return GetTexturePaths(baseFilename, outputSpace);
 }
@@ -888,13 +1002,21 @@ void AppPseudoIsochromaticTest::Cleanup(TetriumApp::CleanupContext& ctx)
     }
 
     // Clean up generators
-    if (_plateGenerator) {
-        delete _plateGenerator;
-        _plateGenerator = nullptr;
+    if (_geneticPlateGenerator) {
+        delete _geneticPlateGenerator;
+        _geneticPlateGenerator = nullptr;
     }
-    if (_colorPicker) {
-        delete _colorPicker;
-        _colorPicker = nullptr;
+    if (_geneticColorPicker) {
+        delete _geneticColorPicker;
+        _geneticColorPicker = nullptr;
+    }
+    if (_questPlateGenerator) {
+        delete _questPlateGenerator;
+        _questPlateGenerator = nullptr;
+    }
+    if (_questColorPicker) {
+        delete _questColorPicker;
+        _questColorPicker = nullptr;
     }
     if (_logger) {
         delete _logger;

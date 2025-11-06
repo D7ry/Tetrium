@@ -2,6 +2,8 @@
 
 #include "TetriumColor/GeneticColorPicker.h"
 #include "TetriumColor/GeneticColorPickerPlateGenerator.h"
+#include "TetriumColor/QuestColorPicker.h"
+#include "TetriumColor/QuestColorPickerPlateGenerator.h"
 #include "lib/TestDataLogger.h"
 
 #include "App.h"
@@ -35,10 +37,21 @@ class AppPseudoIsochromaticTest : public App
         OFF
     };
 
+    enum class ColorPickerType
+    {
+        GENETIC,
+        QUEST
+    };
+
     struct
     {
-        int REPETITIONS_PER_AXIS = 4; // number of repetitions for each genotype × metameric axis
-        int BREAK_INTERVAL = 50;      // number of trials between breaks (0 = no breaks)
+        ColorPickerType PICKER_TYPE = ColorPickerType::QUEST;
+        int REPETITIONS_PER_AXIS
+            = 4; // number of repetitions for each genotype × metameric axis (Genetic mode)
+        int QUEST_TRIALS_PER_DIRECTION = 30; // number of Quest trials per direction (Quest mode)
+        bool QUEST_TEST_ONLY_547NM
+            = false;             // Quest: only test axis 1 (547nm cone) instead of all axes
+        int BREAK_INTERVAL = 50; // number of trials between breaks (0 = no breaks)
         MusicSetting MUSIC_SETTING = MusicSetting::CORRECT_WRONG;
         float LUM_NOISE = 0.0f;     // luminance noise [0.0, 1.0]
         float S_CONE_NOISE = 0.1f;  // s-cone noise [0.0, 1.0]
@@ -148,8 +161,10 @@ class AppPseudoIsochromaticTest : public App
 
     std::string _nameInputBuffer = "guest";
 
-    TetriumColor::GeneticColorPicker* _colorPicker = nullptr;
-    TetriumColor::GeneticColorPickerPlateGenerator* _plateGenerator = nullptr;
+    TetriumColor::GeneticColorPicker* _geneticColorPicker = nullptr;
+    TetriumColor::GeneticColorPickerPlateGenerator* _geneticPlateGenerator = nullptr;
+    TetriumColor::QuestColorPicker* _questColorPicker = nullptr;
+    TetriumColor::QuestColorPickerPlateGenerator* _questPlateGenerator = nullptr;
     TestDataLogger* _logger = nullptr;
 
     void populatePromptContext(SubjectContext& subject, const TetriumApp::TickContextImGui& ctx);

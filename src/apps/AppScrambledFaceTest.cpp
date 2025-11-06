@@ -178,8 +178,7 @@ void AppScrambledFaceTest::startTest(const TetriumApp::TickContextImGui& ctx)
         settings.luminance,
         settings.saturation,
         dimensions,
-        42,    // seed
-        "led", // cst_display_type
+        42, // seed
         std::string(TETRIUM_COLOR_PATH) + "measurements/2025-10-12/primaries"
     );
 

@@ -125,7 +125,6 @@ inline std::pair<std::string, std::string> GetTexturePaths(
 {
     if (outputSpace == TetriumColor::ColorSpaceType::SRGB) {
         // For SRGB output, use _SRGB.png for both RGB and OCV (MONO_COLOR_SPACE will only show RGB)
-        INFO("Using SRGB output for texture paths");
         std::string srgbPath = baseFilename + "_SRGB.png";
         return {srgbPath, srgbPath};
     } else {
