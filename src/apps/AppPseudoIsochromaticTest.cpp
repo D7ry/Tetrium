@@ -66,6 +66,17 @@ std::string AppPseudoIsochromaticTest::GetLandoltCAnswerTexturePath(
 
 void TetriumApp::AppPseudoIsochromaticTest::TickImGui(const TetriumApp::TickContextImGui& ctx)
 {
+    // Process deferred state transition from PREVIOUS frame (if any)
+    // This ensures texture loading/unloading happens at the START of a new frame
+    if (_needsStateTransition && _state == TestState::kTesting) {
+        transitionSubjectState(_subject, ctx);
+        _needsStateTransition = false;
+        // If the game ended, stop here
+        if (_state != TestState::kTesting) {
+            return;
+        }
+    }
+
     // Process deferred response from PREVIOUS frame (if any)
     // This ensures sound/logging happens at the START of a new frame, not during rendering
     if (_deferredResponse.hasResponse) {
@@ -336,15 +347,8 @@ void AppPseudoIsochromaticTest::drawTestForSubject(
     if (subject.state != SubjectState::kBreak) {
         subject.currStateRemainderTime -= ImGui::GetIO().DeltaTime;
         if (subject.currStateRemainderTime <= 0) {
-            transitionSubjectState(subject, ctx);
-            // If the game just ended, we switched out of testing; stop drawing this frame
-            if (_state != TestState::kTesting) {
-                return;
-            }
-            // After transition, verify timer was reset (unless we're now in break state)
-            if (subject.state != SubjectState::kBreak) {
-                ASSERT(subject.currStateRemainderTime > 0);
-            }
+            // Defer state transition to next frame to avoid texture loading mid-frame
+            _needsStateTransition = true;
         }
     }
 
@@ -534,8 +538,10 @@ void AppPseudoIsochromaticTest::transitionSubjectState(
         }
         break;
     case SubjectState::kBreak:
-        // Break state is handled by button press in drawBreakWindow
-        // This case shouldn't be reached by timer, but included for completeness
+        // Continuing from break - transition to blank state and load new trial
+        subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.BLANK;
+        subject.state = SubjectState::kBlank;
+        populatePromptContext(subject, ctx);
         break;
     }
 }
@@ -793,10 +799,10 @@ void AppPseudoIsochromaticTest::drawBreakWindow(
                            || (_capturedGamepadInput == 0); // A button is index 0
 
     if (continuePressed) {
-        // Continue to next trial
-        subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.BLANK;
-        subject.state = SubjectState::kBlank;
-        populatePromptContext(subject, ctx);
+        // Defer transition to next frame to avoid texture loading mid-frame
+        // transitionSubjectState will see kBreak and handle the transition to kBlank + load
+        // textures
+        _needsStateTransition = true;
     }
 
     ImGui::EndChild();

@@ -137,6 +137,9 @@ class AppPseudoIsochromaticTest : public App
 
     DeferredResponse _deferredResponse;
 
+    // Flag to defer state transition to next frame (to avoid texture loading mid-frame)
+    bool _needsStateTransition = false;
+
   private:
     struct
     {
