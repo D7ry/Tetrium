@@ -93,6 +93,35 @@ void TetriumApp::AppPseudoIsochromaticTest::TickImGui(const TetriumApp::TickCont
             }
         }
 
+        // Get next trial from Quest (if using Quest mode)
+        if (SETTINGS.PICKER_TYPE == ColorPickerType::QUEST && _questColorPicker) {
+            try {
+                auto result = _questColorPicker->GetColor(_deferredResponse.correct);
+
+                if (!result.is_done) {
+                    // Fill in the next trial slot
+                    int next_trial_idx = _subject.currentTrialIndex + 1;
+                    if (next_trial_idx < static_cast<int>(_trials.size())) {
+                        _trials[next_trial_idx].genotype = result.genotype;
+                        _trials[next_trial_idx].metameric_axis = result.metameric_axis;
+                        _trials[next_trial_idx].direction_idx = result.direction_idx;
+                        _trials[next_trial_idx].intensity = result.intensity;
+
+                        INFO(
+                            "Quest next trial ({}): direction {} at intensity {:.3f}",
+                            next_trial_idx,
+                            result.direction_idx,
+                            result.intensity
+                        );
+                    }
+                } else {
+                    INFO("Quest completed all trials");
+                }
+            } catch (const std::exception& e) {
+                ERROR("Failed to get next Quest trial: {}", e.what());
+            }
+        }
+
         // Log trial data
         logTrialData(
             _subject,
@@ -341,6 +370,7 @@ void AppPseudoIsochromaticTest::drawTestForSubject(
         _deferredResponse.genotype = trial.genotype;
         _deferredResponse.metameric_axis = trial.metameric_axis;
         _deferredResponse.orientation = subject.prompt.currentOrientation;
+        _deferredResponse.direction_idx = trial.direction_idx;
     }
 
     // Handle state transition (only for timer-based states, not break)
@@ -572,32 +602,48 @@ void AppPseudoIsochromaticTest::buildTrialList()
                     trial.genotype = genotype;
                     trial.metameric_axis = axis;
                     trial.repetition_idx = rep;
+                    trial.direction_idx = -1; // Not used in genetic mode
                     _trials.push_back(trial);
                 }
             }
         }
     } else {
-        // Get directions metadata from quest color picker
-        auto metadata = _questColorPicker->GetDirectionsMetadata();
+        // Quest mode: Pre-allocate trial slots for progress tracking
+        // Trials will be filled dynamically as Quest determines them adaptively
+        size_t num_directions = _questColorPicker->GetNumDirections();
+        size_t total_trials = num_directions * SETTINGS.QUEST_TRIALS_PER_DIRECTION;
 
-        // Build trials for each direction × Quest trials
-        for (const auto& [dir_idx, genotype_axis] : metadata) {
-            for (int rep = 0; rep < SETTINGS.QUEST_TRIALS_PER_DIRECTION; rep++) {
-                Trial trial;
-                trial.genotype = genotype_axis.first;
-                trial.metameric_axis = genotype_axis.second;
-                trial.repetition_idx = rep;
-                _trials.push_back(trial);
-            }
+        // Pre-allocate empty trial slots
+        for (size_t i = 0; i < total_trials; i++) {
+            Trial trial;
+            trial.genotype = "";
+            trial.metameric_axis = -1;
+            trial.repetition_idx = i;
+            trial.direction_idx = -1;
+            trial.intensity = 1.0;
+            _trials.push_back(trial);
+        }
+
+        // Get the first trial using NewColor() (no previous result yet)
+        try {
+            auto result = _questColorPicker->NewColor();
+            _trials[0].genotype = result.genotype;
+            _trials[0].metameric_axis = result.metameric_axis;
+            _trials[0].direction_idx = result.direction_idx;
+            _trials[0].intensity = result.intensity;
+
+            INFO(
+                "Quest mode: {} total trials, first trial: direction {} at intensity {:.3f}",
+                total_trials,
+                result.direction_idx,
+                result.intensity
+            );
+        } catch (const std::exception& e) {
+            ERROR("Failed to get first Quest trial: {}", e.what());
         }
     }
 
-    // Randomize the trial order
-    std::random_device rd;
-    std::mt19937 g(rd());
-    std::shuffle(_trials.begin(), _trials.end(), g);
-
-    INFO("Built and randomized {} trials", _trials.size());
+    INFO("Built {} trial(s)", _trials.size());
 }
 
 void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
@@ -820,8 +866,7 @@ void AppPseudoIsochromaticTest::drawBreakWindow(
 
 std::pair<std::string, std::string> AppPseudoIsochromaticTest::generateLandoltCTextures(
     SubjectContext& subject,
-    const std::string& genotype,
-    int metameric_axis,
+    const Trial& trial,
     AnswerKind orientation
 )
 {
@@ -829,49 +874,40 @@ std::pair<std::string, std::string> AppPseudoIsochromaticTest::generateLandoltCT
     std::filesystem::create_directories("./temp");
 
     const std::string orientationStr = OrientationToString(orientation);
-
-    std::string baseFilename = "./temp/" + subject.name + "_" + genotype + "_axis"
-                               + std::to_string(metameric_axis) + "_" + orientationStr;
-
-    // Call GetPlate with genotype and metameric axis
     auto outputSpace = GetOutputColorSpace();
 
     if (SETTINGS.PICKER_TYPE == ColorPickerType::GENETIC) {
+        std::string baseFilename = "./temp/" + subject.name + "_" + trial.genotype + "_axis"
+                                   + std::to_string(trial.metameric_axis) + "_" + orientationStr;
+
         _geneticPlateGenerator->GetPlate(
-            genotype,
-            metameric_axis,
+            trial.genotype,
+            trial.metameric_axis,
             baseFilename,
             "landolt_" + orientationStr,
             outputSpace,
             SETTINGS.LUM_NOISE,
             SETTINGS.S_CONE_NOISE
         );
+
+        return GetTexturePaths(baseFilename, outputSpace);
     } else {
-        // For Quest, we need to find the direction index that matches this genotype/axis
-        auto metadata = _questColorPicker->GetDirectionsMetadata();
-        int direction_idx = -1;
-        for (const auto& [idx, genotype_axis] : metadata) {
-            if (genotype_axis.first == genotype && genotype_axis.second == metameric_axis) {
-                direction_idx = idx;
-                break;
-            }
-        }
+        // Quest mode: use direction_idx and intensity directly from trial
+        std::string baseFilename = "./temp/" + subject.name + "_dir"
+                                   + std::to_string(trial.direction_idx) + "_" + orientationStr;
 
-        if (direction_idx >= 0) {
-            _questPlateGenerator->GetPlate(
-                direction_idx,
-                baseFilename,
-                "landolt_" + orientationStr,
-                outputSpace,
-                SETTINGS.LUM_NOISE,
-                SETTINGS.S_CONE_NOISE
-            );
-        } else {
-            ERROR("Could not find direction for genotype {} axis {}", genotype, metameric_axis);
-        }
+        _questPlateGenerator->GetPlate(
+            trial.direction_idx,
+            baseFilename,
+            "landolt_" + orientationStr,
+            outputSpace,
+            SETTINGS.LUM_NOISE,
+            SETTINGS.S_CONE_NOISE,
+            trial.intensity
+        );
+
+        return GetTexturePaths(baseFilename, outputSpace);
     }
-
-    return GetTexturePaths(baseFilename, outputSpace);
 }
 
 void AppPseudoIsochromaticTest::populatePromptContext(
@@ -882,13 +918,21 @@ void AppPseudoIsochromaticTest::populatePromptContext(
     // Get the current trial
     const Trial& trial = getCurrentTrial();
 
+    // For Quest mode, validate that the trial has been filled by Quest
+    if (SETTINGS.PICKER_TYPE == ColorPickerType::QUEST && trial.direction_idx < 0) {
+        ERROR(
+            "Cannot populate prompt: Quest trial not yet filled (direction_idx = {})",
+            trial.direction_idx
+        );
+        return;
+    }
+
     // Pick a random orientation for the correct answer
     AnswerKind answerOrientation = LANDOLT_C_ORIENTATIONS[rand() % LANDOLT_C_ORIENTATIONS.size()];
 
-    // Generate Landolt C textures for this trial's genotype and metameric axis
-    auto [rgbTexturePath, ocvTexturePath] = generateLandoltCTextures(
-        _subject, trial.genotype, trial.metameric_axis, answerOrientation
-    );
+    // Generate Landolt C textures for this trial
+    auto [rgbTexturePath, ocvTexturePath]
+        = generateLandoltCTextures(_subject, trial, answerOrientation);
 
     // unload previous textures
     if (_subject.prompt.currentLandoltCTextureHandle[ColorSpace::RGB] != 0) {

@@ -48,7 +48,7 @@ class AppPseudoIsochromaticTest : public App
         ColorPickerType PICKER_TYPE = ColorPickerType::QUEST;
         int REPETITIONS_PER_AXIS
             = 4; // number of repetitions for each genotype × metameric axis (Genetic mode)
-        int QUEST_TRIALS_PER_DIRECTION = 30; // number of Quest trials per direction (Quest mode)
+        int QUEST_TRIALS_PER_DIRECTION = 20; // number of Quest trials per direction (Quest mode)
         bool QUEST_TEST_ONLY_547NM
             = false;             // Quest: only test axis 1 (547nm cone) instead of all axes
         int BREAK_INTERVAL = 50; // number of trials between breaks (0 = no breaks)
@@ -89,6 +89,8 @@ class AppPseudoIsochromaticTest : public App
         std::string genotype; // The genotype string
         int metameric_axis;   // 0, 1, 2, or 3
         int repetition_idx;   // Which repetition this is (0 to REPETITIONS_PER_AXIS-1)
+        int direction_idx;    // Quest direction index (only used in Quest mode)
+        double intensity;     // Quest intensity/proportion (only used in Quest mode)
     };
 
     struct SubjectPromptContext
@@ -133,6 +135,7 @@ class AppPseudoIsochromaticTest : public App
         std::string genotype;
         int metameric_axis;
         AnswerKind orientation;
+        int direction_idx; // Quest direction index (only used in Quest mode)
     };
 
     DeferredResponse _deferredResponse;
@@ -171,11 +174,10 @@ class AppPseudoIsochromaticTest : public App
 
     void endGame(SubjectContext& subject);
 
-    // generate a pair of Landolt C textures for a specific genotype and metameric axis
+    // generate a pair of Landolt C textures for a specific trial
     std::pair<std::string, std::string> generateLandoltCTextures(
         SubjectContext& subject,
-        const std::string& genotype,
-        int metameric_axis,
+        const Trial& trial,
         AnswerKind orientation
     );
 
