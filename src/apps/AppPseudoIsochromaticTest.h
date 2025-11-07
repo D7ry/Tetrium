@@ -124,6 +124,19 @@ class AppPseudoIsochromaticTest : public App
     // Input state captured once per frame
     int _capturedGamepadInput = -1; // -1 = no input, 0-3 = button index
 
+    // Deferred actions to execute after frame completes
+    struct DeferredResponse
+    {
+        bool hasResponse = false;
+        int buttonIndex;
+        bool correct;
+        std::string genotype;
+        int metameric_axis;
+        AnswerKind orientation;
+    };
+
+    DeferredResponse _deferredResponse;
+
   private:
     struct
     {

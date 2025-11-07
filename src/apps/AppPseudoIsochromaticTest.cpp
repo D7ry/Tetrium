@@ -66,6 +66,35 @@ std::string AppPseudoIsochromaticTest::GetLandoltCAnswerTexturePath(
 
 void TetriumApp::AppPseudoIsochromaticTest::TickImGui(const TetriumApp::TickContextImGui& ctx)
 {
+    // Process deferred response from PREVIOUS frame (if any)
+    // This ensures sound/logging happens at the START of a new frame, not during rendering
+    if (_deferredResponse.hasResponse) {
+        if (_deferredResponse.correct) {
+            _subject.numSuccessAttempts += 1;
+            if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL
+                || SETTINGS.MUSIC_SETTING == MusicSetting::CORRECT_WRONG) {
+                ctx.apis.PlaySound(Sound::kCorrectAnswer);
+            }
+        } else {
+            if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL
+                || SETTINGS.MUSIC_SETTING == MusicSetting::CORRECT_WRONG) {
+                ctx.apis.PlaySound(Sound::kWrongAnswer);
+            }
+        }
+
+        // Log trial data
+        logTrialData(
+            _subject,
+            _deferredResponse.genotype,
+            _deferredResponse.metameric_axis,
+            _deferredResponse.orientation,
+            _deferredResponse.buttonIndex,
+            _deferredResponse.correct
+        );
+
+        _deferredResponse.hasResponse = false;
+    }
+
     // Capture gamepad input ONCE at the beginning of the frame
     _capturedGamepadInput = -1;
     bool backPressed = ImGui::IsKeyPressed(ImGuiKey_GamepadBack);
@@ -259,57 +288,18 @@ void AppPseudoIsochromaticTest::drawLandoltC(
     const TetriumApp::TickContextImGui& ctx
 )
 {
-    // Process input first (before drawing)
-    if (!subject.prompt.responseGiven && _capturedGamepadInput >= 0) {
-        subject.prompt.responseGiven = true; // Mark response as given
-        subject.prompt.currentSelectedAnswer = _capturedGamepadInput;
-        bool correct
-            = (subject.prompt.currentSelectedAnswer == subject.prompt.correctAnswerTextureIndex);
+    // Always draw the stimulus for the full presentation time
+    ImGuiTexture tex = subject.prompt.currentLandoltCTexture[ctx.colorSpace];
 
-        if (correct) {
-            subject.numSuccessAttempts += 1;
-            if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL
-                || SETTINGS.MUSIC_SETTING == MusicSetting::CORRECT_WRONG) {
-                ctx.apis.PlaySound(Sound::kCorrectAnswer);
-            }
-        } else {
-            if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL
-                || SETTINGS.MUSIC_SETTING == MusicSetting::CORRECT_WRONG) {
-                ctx.apis.PlaySound(Sound::kWrongAnswer);
-            }
-        }
+    ImVec2 availSize = ImGui::GetContentRegionAvail();
+    ImVec2 textureFullscreenSize
+        = ImVec2(tex.width * SETTINGS.STIMULUS_SIZE, tex.height * SETTINGS.STIMULUS_SIZE);
 
-        // Log trial data
-        const Trial& trial = getCurrentTrial();
-        logTrialData(
-            subject,
-            trial.genotype,
-            trial.metameric_axis,
-            subject.prompt.currentOrientation,
-            _capturedGamepadInput,
-            correct
-        );
+    // center the texture onto the screen
+    ImVec2 centerPos = ImVec2(availSize.x * 0.5f, availSize.y * 0.5f);
+    ImGui::SetCursorPos(centerPos - textureFullscreenSize * 0.5f);
 
-        // Set timer to 0 to trigger state transition on next frame
-        subject.currStateRemainderTime = 0.0f;
-    }
-
-    // Only draw the stimulus if no response has been given yet
-    // Once response is given, screen goes black immediately
-    if (!subject.prompt.responseGiven) {
-        ImGuiTexture tex = subject.prompt.currentLandoltCTexture[ctx.colorSpace];
-
-        ImVec2 availSize = ImGui::GetContentRegionAvail();
-        ImVec2 textureFullscreenSize
-            = ImVec2(tex.width * SETTINGS.STIMULUS_SIZE, tex.height * SETTINGS.STIMULUS_SIZE);
-
-        // center the texture onto the screen
-        ImVec2 centerPos = ImVec2(availSize.x * 0.5f, availSize.y * 0.5f);
-        ImGui::SetCursorPos(centerPos - textureFullscreenSize * 0.5f);
-
-        ImGui::Image(tex.id, textureFullscreenSize);
-    }
-    // else: screen remains black after response
+    ImGui::Image(tex.id, textureFullscreenSize);
 }
 
 void AppPseudoIsochromaticTest::drawTestForSubject(
@@ -323,6 +313,25 @@ void AppPseudoIsochromaticTest::drawTestForSubject(
         ctx.controls.musicOverride = std::nullopt;
     }
 
+    // Process gamepad input for identification and answer states
+    if ((subject.state == SubjectState::kIdentification || subject.state == SubjectState::kAnswer)
+        && !subject.prompt.responseGiven && _capturedGamepadInput >= 0) {
+
+        subject.prompt.responseGiven = true;
+        subject.prompt.currentSelectedAnswer = _capturedGamepadInput;
+        bool correct
+            = (subject.prompt.currentSelectedAnswer == subject.prompt.correctAnswerTextureIndex);
+
+        // Defer sound playing and logging until NEXT frame to avoid disrupting even-odd timing
+        const Trial& trial = getCurrentTrial();
+        _deferredResponse.hasResponse = true;
+        _deferredResponse.buttonIndex = _capturedGamepadInput;
+        _deferredResponse.correct = correct;
+        _deferredResponse.genotype = trial.genotype;
+        _deferredResponse.metameric_axis = trial.metameric_axis;
+        _deferredResponse.orientation = subject.prompt.currentOrientation;
+    }
+
     // Handle state transition (only for timer-based states, not break)
     if (subject.state != SubjectState::kBreak) {
         subject.currStateRemainderTime -= ImGui::GetIO().DeltaTime;
@@ -332,8 +341,11 @@ void AppPseudoIsochromaticTest::drawTestForSubject(
             if (_state != TestState::kTesting) {
                 return;
             }
+            // After transition, verify timer was reset (unless we're now in break state)
+            if (subject.state != SubjectState::kBreak) {
+                ASSERT(subject.currStateRemainderTime > 0);
+            }
         }
-        ASSERT(subject.currStateRemainderTime > 0);
     }
 
     // Draw progress indicator in upper left corner
@@ -434,41 +446,8 @@ void AppPseudoIsochromaticTest::drawAnswerPrompts(
     const TetriumApp::TickContextImGui& ctx
 )
 {
-    // Process input (screen is already black, no visual prompts)
-    if (!subject.prompt.responseGiven && _capturedGamepadInput >= 0) {
-        subject.prompt.responseGiven = true; // Mark response as given
-        subject.prompt.currentSelectedAnswer = _capturedGamepadInput;
-        bool correct
-            = (subject.prompt.currentSelectedAnswer == subject.prompt.correctAnswerTextureIndex);
-
-        if (correct) {
-            subject.numSuccessAttempts += 1;
-            if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL
-                || SETTINGS.MUSIC_SETTING == MusicSetting::CORRECT_WRONG) {
-                ctx.apis.PlaySound(Sound::kCorrectAnswer);
-            }
-        } else {
-            if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL
-                || SETTINGS.MUSIC_SETTING == MusicSetting::CORRECT_WRONG) {
-                ctx.apis.PlaySound(Sound::kWrongAnswer);
-            }
-        }
-
-        // Log trial data
-        const Trial& trial = getCurrentTrial();
-        logTrialData(
-            subject,
-            trial.genotype,
-            trial.metameric_axis,
-            subject.prompt.currentOrientation,
-            _capturedGamepadInput,
-            correct
-        );
-
-        // Set timer to 0 to trigger state transition on next frame
-        subject.currStateRemainderTime = 0.0f;
-    }
     // Screen remains black throughout this state
+    // Input processing is handled in drawTestForSubject()
 }
 
 void AppPseudoIsochromaticTest::transitionSubjectState(
@@ -486,9 +465,9 @@ void AppPseudoIsochromaticTest::transitionSubjectState(
         subject.state = SubjectState::kIdentification;
         break;
     case SubjectState::kIdentification:
-        // If response was already given during identification phase, advance to next trial
+        // Timer expired - check if response was given during presentation
         if (subject.prompt.responseGiven) {
-            // Response was already scored and logged in the draw function
+            // Response was already scored and logged, advance to next trial
             if (subject.currentTrialIndex >= (_trials.size() - 1)) {
                 endGame(subject);
                 return;
@@ -513,25 +492,45 @@ void AppPseudoIsochromaticTest::transitionSubjectState(
         }
         break;
     case SubjectState::kAnswer:
-        // Response was given during answer phase
-        // If we've reached the last trial, end game and stop further transitions/prompts
-        if (subject.currentTrialIndex >= (_trials.size() - 1)) {
-            endGame(subject);
-            return;
-        }
-        // Otherwise advance to next trial
-        subject.currentTrialIndex += 1;
-        subject.trialsSinceLastBreak += 1;
+        // Timer expired - check if response was given
+        if (subject.prompt.responseGiven) {
+            // Response was already scored and logged, advance to next trial
+            if (subject.currentTrialIndex >= (_trials.size() - 1)) {
+                endGame(subject);
+                return;
+            }
+            subject.currentTrialIndex += 1;
+            subject.trialsSinceLastBreak += 1;
 
-        // Check if we should take a break
-        if (SETTINGS.BREAK_INTERVAL > 0
-            && subject.trialsSinceLastBreak >= SETTINGS.BREAK_INTERVAL) {
-            subject.state = SubjectState::kBreak;
-            subject.trialsSinceLastBreak = 0;
+            // Check if we should take a break
+            if (SETTINGS.BREAK_INTERVAL > 0
+                && subject.trialsSinceLastBreak >= SETTINGS.BREAK_INTERVAL) {
+                subject.state = SubjectState::kBreak;
+                subject.trialsSinceLastBreak = 0;
+            } else {
+                subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.BLANK;
+                subject.state = SubjectState::kBlank;
+                populatePromptContext(subject, ctx);
+            }
         } else {
-            subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.BLANK;
-            subject.state = SubjectState::kBlank;
-            populatePromptContext(subject, ctx);
+            // Complete timeout - no response given, advance anyway
+            if (subject.currentTrialIndex >= (_trials.size() - 1)) {
+                endGame(subject);
+                return;
+            }
+            subject.currentTrialIndex += 1;
+            subject.trialsSinceLastBreak += 1;
+
+            // Check if we should take a break
+            if (SETTINGS.BREAK_INTERVAL > 0
+                && subject.trialsSinceLastBreak >= SETTINGS.BREAK_INTERVAL) {
+                subject.state = SubjectState::kBreak;
+                subject.trialsSinceLastBreak = 0;
+            } else {
+                subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.BLANK;
+                subject.state = SubjectState::kBlank;
+                populatePromptContext(subject, ctx);
+            }
         }
         break;
     case SubjectState::kBreak:
