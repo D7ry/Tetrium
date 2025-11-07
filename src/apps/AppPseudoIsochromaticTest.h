@@ -1,9 +1,8 @@
 #pragma once
 
-#include "TetriumColor/GeneticColorPicker.h"
-#include "TetriumColor/GeneticColorPickerPlateGenerator.h"
-#include "TetriumColor/QuestColorPicker.h"
-#include "TetriumColor/QuestColorPickerPlateGenerator.h"
+#include "TetriumColor/ColorTestResult.h"
+#include "TetriumColor/TestGenerator.h"
+#include "TetriumColor/TrialData.h"
 #include "lib/TestDataLogger.h"
 
 #include "App.h"
@@ -50,7 +49,7 @@ class AppPseudoIsochromaticTest : public App
             = 4; // number of repetitions for each genotype × metameric axis (Genetic mode)
         int QUEST_TRIALS_PER_DIRECTION = 20; // number of Quest trials per direction (Quest mode)
         bool QUEST_TEST_ONLY_547NM
-            = false;             // Quest: only test axis 1 (547nm cone) instead of all axes
+            = true;              // Quest: only test axis 1 (547nm cone) instead of all axes
         int BREAK_INTERVAL = 50; // number of trials between breaks (0 = no breaks)
         MusicSetting MUSIC_SETTING = MusicSetting::CORRECT_WRONG;
         float LUM_NOISE = 0.0f;     // luminance noise [0.0, 1.0]
@@ -83,16 +82,6 @@ class AppPseudoIsochromaticTest : public App
         kBreak,
     };
 
-    // Structure to represent a single trial
-    struct Trial
-    {
-        std::string genotype; // The genotype string
-        int metameric_axis;   // 0, 1, 2, or 3
-        int repetition_idx;   // Which repetition this is (0 to REPETITIONS_PER_AXIS-1)
-        int direction_idx;    // Quest direction index (only used in Quest mode)
-        double intensity;     // Quest intensity/proportion (only used in Quest mode)
-    };
-
     struct SubjectPromptContext
     {
         uint32_t currentLandoltCTextureHandle[ColorSpace::ColorSpaceSize] = {};
@@ -120,8 +109,8 @@ class AppPseudoIsochromaticTest : public App
 
     SubjectContext _subject;
 
-    // List of all trials (randomized)
-    std::vector<Trial> _trials;
+    // Current trial data (generated on-demand)
+    std::optional<TetriumColor::TrialData> _currentTrial;
 
     // Input state captured once per frame
     int _capturedGamepadInput = -1; // -1 = no input, 0-3 = button index
@@ -132,10 +121,8 @@ class AppPseudoIsochromaticTest : public App
         bool hasResponse = false;
         int buttonIndex;
         bool correct;
-        std::string genotype;
-        int metameric_axis;
         AnswerKind orientation;
-        int direction_idx; // Quest direction index (only used in Quest mode)
+        std::optional<TetriumColor::TrialData> previousTrial; // Store trial data for logging
     };
 
     DeferredResponse _deferredResponse;
@@ -174,20 +161,13 @@ class AppPseudoIsochromaticTest : public App
 
     void endGame(SubjectContext& subject);
 
-    // generate a pair of Landolt C textures for a specific trial
-    std::pair<std::string, std::string> generateLandoltCTextures(
-        SubjectContext& subject,
-        const Trial& trial,
-        AnswerKind orientation
-    );
-
     std::string _nameInputBuffer = "guest";
 
-    TetriumColor::GeneticColorPicker* _geneticColorPicker = nullptr;
-    TetriumColor::GeneticColorPickerPlateGenerator* _geneticPlateGenerator = nullptr;
-    TetriumColor::QuestColorPicker* _questColorPicker = nullptr;
-    TetriumColor::QuestColorPickerPlateGenerator* _questPlateGenerator = nullptr;
+    TetriumColor::TestGenerator* _testGenerator = nullptr;
     TestDataLogger* _logger = nullptr;
+
+    // Track trial counter for filename generation
+    int _trialCounter = 0;
 
     void populatePromptContext(SubjectContext& subject, const TetriumApp::TickContextImGui& ctx);
     void logTrialData(
@@ -208,11 +188,5 @@ class AppPseudoIsochromaticTest : public App
 
     // Static map for orientation to string conversion
     static const std::unordered_map<AnswerKind, std::string> _orientationToStringMap;
-
-    // Build the randomized trial list
-    void buildTrialList();
-
-    // Get the current trial
-    const Trial& getCurrentTrial() const { return _trials[_subject.currentTrialIndex]; }
 };
 } // namespace TetriumApp

@@ -47,7 +47,7 @@ set(SOURCES_BUILD
         src/structs/Vertex.cpp
 
         # Apps
-        src/apps/AppScreeningTest.cpp
+        # src/apps/AppScreeningTest.cpp  # TODO: Refactor to use new TestGenerator interface
         src/apps/AppPseudoIsochromaticTest.cpp
         src/apps/AppScrambledFaceTest.cpp
         src/apps/AppTemporalAFC.cpp

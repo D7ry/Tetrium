@@ -8,6 +8,10 @@
 
 #include "AppScrambledFaceTest.h"
 #include "Pathing.h"
+#include "TetriumColor/ColorGeneratorFactory.h"
+#include "TetriumColor/TestGenerator.h"
+#include "TetriumColor/TrialData.h"
+#include "constants.h"
 
 namespace TetriumApp
 {
@@ -25,9 +29,9 @@ void AppScrambledFaceTest::Cleanup(TetriumApp::CleanupContext& ctx)
         }
     }
     trials.clear();
-    if (generator) {
-        delete generator;
-        generator = nullptr;
+    if (testGenerator) {
+        delete testGenerator;
+        testGenerator = nullptr;
     }
     if (logger) {
         delete logger;
@@ -157,9 +161,9 @@ void AppScrambledFaceTest::drawSettings(const TetriumApp::TickContextImGui& ctx)
 
 void AppScrambledFaceTest::startTest(const TetriumApp::TickContextImGui& ctx)
 {
-    if (generator) {
-        delete generator;
-        generator = nullptr;
+    if (testGenerator) {
+        delete testGenerator;
+        testGenerator = nullptr;
     }
     if (logger) {
         delete logger;
@@ -168,22 +172,48 @@ void AppScrambledFaceTest::startTest(const TetriumApp::TickContextImGui& ctx)
 
     std::filesystem::create_directories("./temp");
 
-    // Create CircleGridGenerator with genetic parameters
-    std::vector<int> dimensions = {2};
-    generator = new TetriumColor::CircleGridGenerator(
-        settings.scrambleProb,
-        "female", // sex
-        0.999f,   // percentage_screened
-        547.0f,   // peak_to_test
-        settings.luminance,
-        settings.saturation,
-        dimensions,
-        42, // seed
-        std::string(TETRIUM_COLOR_PATH) + "measurements/2025-10-12/primaries"
-    );
+    std::string display_primaries_path = TETRIUM_COLOR_PATH + "measurements/2025-10-12/primaries";
 
-    // Get genotypes from generator
-    std::vector<std::string> genotypes = generator->GetGenotypes();
+    // Create GeneticColorGenerator
+    PyObject* pColorGenerator = nullptr;
+    try {
+        std::vector<int> metameric_axes = {2}; // Use axis 2 for now
+        pColorGenerator = TetriumColor::ColorGeneratorFactory::CreateGeneticColorGenerator(
+            "female",              // sex
+            0.999f,                // percentage_screened
+            547.0f,                // peak_to_test
+            settings.luminance,    // luminance
+            settings.saturation,   // saturation
+            {3},                   // dimensions
+            42,                    // seed
+            20,                    // trials_per_direction (not used for circle grid)
+            metameric_axes,        // metameric_axes
+            display_primaries_path // display_primaries_path
+        );
+    } catch (const std::exception& e) {
+        ERROR("Failed to create ColorGenerator: {}", e.what());
+        throw;
+    }
+
+    // Create CircleGridGenerator using factory
+    PyObject* pTestGenerator = nullptr;
+    try {
+        pTestGenerator = TetriumColor::ColorGeneratorFactory::CreateCircleGridGenerator(
+            pColorGenerator, settings.scrambleProb, settings.luminance, settings.saturation
+        );
+    } catch (const std::exception& e) {
+        Py_DECREF(pColorGenerator);
+        ERROR("Failed to create CircleGridGenerator: {}", e.what());
+        throw;
+    }
+
+    // Create C++ TestGenerator wrapper
+    testGenerator = new TetriumColor::TestGenerator(pTestGenerator);
+    Py_DECREF(pTestGenerator);  // TestGenerator wrapper now owns the reference
+    Py_DECREF(pColorGenerator); // CircleGridGenerator now owns the color generator
+
+    // Get genotypes from test generator
+    std::vector<std::string> genotypes = testGenerator->GetGenotypes();
 
     // Build all trials: genotype × metameric_axis × repetition
     trials.clear();
@@ -255,62 +285,115 @@ void AppScrambledFaceTest::generateTrial(
     t.choices.clear();
     t.choices.resize(settings.imagesPerTrial);
 
-    // GetImages returns 3 images - generate names for all 3
-    std::vector<std::string> names;
-    names.reserve(3);
-    for (int i = 0; i < 3; ++i) {
-        names.emplace_back(
-            "./temp/" + subjectName + "_trial" + std::to_string(trialIdx) + "_genotype" + genotype
-            + "_axis" + std::to_string(metamericAxis) + "_" + std::to_string(i)
-        );
-    }
+    // Generate base filename for this trial
+    std::string baseFilename = "./temp/" + subjectName + "_trial" + std::to_string(trialIdx)
+                               + "_genotype" + genotype + "_axis" + std::to_string(metamericAxis);
 
     auto outputSpace = GetOutputColorSpace();
-    auto idxs = generator->GetImages(genotype, metamericAxis, names, outputSpace);
-    (void)idxs;
 
-    if (settings.normalFaceMode == NormalFaceMode::kSame) {
-        // SAME mode: Randomly pick one of the first two images as the "normal" face
-        int pickedIdx = rand() % 2;
-
-        // Load the picked image for positions 0 and 1 (two copies of the normal face)
-        auto [normalRgbPath, normalOcvPath] = GetTexturePaths(names[pickedIdx], outputSpace);
-
-        for (int i = 0; i < 2; ++i) {
-            t.choices[i].handleRGB = ctx.apis.LoadTexture(normalRgbPath);
-            t.choices[i].handleOCV = ctx.apis.LoadTexture(normalOcvPath);
-            t.choices[i].texRGB = ctx.apis.InitImGuiTexture(t.choices[i].handleRGB);
-            t.choices[i].texOCV = ctx.apis.InitImGuiTexture(t.choices[i].handleOCV);
-        }
-    } else {
-        // DIFF mode: Load both of the first two images as different normal faces
-        for (int i = 0; i < 2; ++i) {
-            auto [normalRgbPath, normalOcvPath] = GetTexturePaths(names[i], outputSpace);
-            t.choices[i].handleRGB = ctx.apis.LoadTexture(normalRgbPath);
-            t.choices[i].handleOCV = ctx.apis.LoadTexture(normalOcvPath);
-            t.choices[i].texRGB = ctx.apis.InitImGuiTexture(t.choices[i].handleRGB);
-            t.choices[i].texOCV = ctx.apis.InitImGuiTexture(t.choices[i].handleOCV);
-        }
+    // Use TestGenerator to generate trial
+    if (!testGenerator) {
+        ERROR("TestGenerator is null");
+        return;
     }
 
-    // Load the third image (index 2) as the scrambled/odd one out
-    auto [scrambledRgbPath, scrambledOcvPath] = GetTexturePaths(names[2], outputSpace);
-    t.choices[2].handleRGB = ctx.apis.LoadTexture(scrambledRgbPath);
-    t.choices[2].handleOCV = ctx.apis.LoadTexture(scrambledOcvPath);
-    t.choices[2].texRGB = ctx.apis.InitImGuiTexture(t.choices[2].handleRGB);
-    t.choices[2].texOCV = ctx.apis.InitImGuiTexture(t.choices[2].handleOCV);
+    try {
+        // Call NewTest with genotype and metameric_axis
+        std::optional<TetriumColor::TrialData> trialData = testGenerator->NewTrial(
+            baseFilename,
+            "", // hidden_symbol not used for circle grid
+            outputSpace,
+            0.0f, // lum_noise
+            0.0f, // s_cone_noise
+            genotype,
+            metamericAxis
+        );
 
-    // Mark that the scrambled image is at original index 2
-    t.scrambledOriginalIndex = 2;
+        if (!trialData.has_value()) {
+            ERROR("Failed to generate trial data");
+            return;
+        }
 
-    // Build display shuffle mapping 0..N-1 and randomize
-    t.displayToOriginal.resize(settings.imagesPerTrial);
-    for (int i = 0; i < settings.imagesPerTrial; ++i)
-        t.displayToOriginal[i] = i;
-    // simple Fisher-Yates
-    for (int i = settings.imagesPerTrial - 1; i > 0; --i) {
-        int j = rand() % (i + 1);
-        std::swap(t.displayToOriginal[i], t.displayToOriginal[j]);
+        // Extract CircleGridTrial data
+        if (!std::holds_alternative<TetriumColor::CircleGridTrial>(*trialData)) {
+            ERROR("Expected CircleGridTrial, got different trial type");
+            return;
+        }
+
+        const auto& trial = std::get<TetriumColor::CircleGridTrial>(*trialData);
+
+        // Store scramble indices (convert from flat list back to pairs if needed)
+        // For now, we'll use the original logic that expects pairs
+        // The scramble_indices are stored as flat list [a1, b1, a2, b2, ...]
+        // We need to convert back to pairs for the display logic
+        std::vector<std::pair<int, int>> idxs;
+        for (size_t i = 0; i < trial.scramble_indices.size(); i += 2) {
+            if (i + 1 < trial.scramble_indices.size()) {
+                idxs.emplace_back(trial.scramble_indices[i], trial.scramble_indices[i + 1]);
+            }
+        }
+        (void)idxs; // Not used directly, but kept for compatibility
+
+        // Extract image paths (base filenames)
+        // trial.image_paths contains base filenames like "{baseFilename}_0", "{baseFilename}_1",
+        // "{baseFilename}_2"
+        if (trial.image_paths.size() < 3) {
+            ERROR("Expected 3 image paths, got {}", trial.image_paths.size());
+            return;
+        }
+
+        // Use GetTexturePaths to get full paths with _RGB/_OCV suffixes
+        std::vector<std::string> names;
+        for (const auto& basePath : trial.image_paths) {
+            names.push_back(basePath);
+        }
+
+        if (settings.normalFaceMode == NormalFaceMode::kSame) {
+            // SAME mode: Randomly pick one of the first two images as the "normal" face
+            int pickedIdx = rand() % 2;
+
+            // Load the picked image for positions 0 and 1 (two copies of the normal face)
+            auto [normalRgbPath, normalOcvPath] = GetTexturePaths(names[pickedIdx], outputSpace);
+
+            for (int i = 0; i < 2; ++i) {
+                t.choices[i].handleRGB = ctx.apis.LoadTexture(normalRgbPath);
+                t.choices[i].handleOCV = ctx.apis.LoadTexture(normalOcvPath);
+                t.choices[i].texRGB = ctx.apis.InitImGuiTexture(t.choices[i].handleRGB);
+                t.choices[i].texOCV = ctx.apis.InitImGuiTexture(t.choices[i].handleOCV);
+            }
+        } else {
+            // DIFF mode: Load both of the first two images as different normal faces
+            for (int i = 0; i < 2; ++i) {
+                auto [normalRgbPath, normalOcvPath] = GetTexturePaths(names[i], outputSpace);
+                t.choices[i].handleRGB = ctx.apis.LoadTexture(normalRgbPath);
+                t.choices[i].handleOCV = ctx.apis.LoadTexture(normalOcvPath);
+                t.choices[i].texRGB = ctx.apis.InitImGuiTexture(t.choices[i].handleRGB);
+                t.choices[i].texOCV = ctx.apis.InitImGuiTexture(t.choices[i].handleOCV);
+            }
+        }
+
+        // Load the third image (index 2) as the scrambled/odd one out
+        auto [scrambledRgbPath, scrambledOcvPath] = GetTexturePaths(names[2], outputSpace);
+        t.choices[2].handleRGB = ctx.apis.LoadTexture(scrambledRgbPath);
+        t.choices[2].handleOCV = ctx.apis.LoadTexture(scrambledOcvPath);
+        t.choices[2].texRGB = ctx.apis.InitImGuiTexture(t.choices[2].handleRGB);
+        t.choices[2].texOCV = ctx.apis.InitImGuiTexture(t.choices[2].handleOCV);
+
+        // Mark that the scrambled image is at original index 2
+        t.scrambledOriginalIndex = 2;
+
+        // Build display shuffle mapping 0..N-1 and randomize
+        t.displayToOriginal.resize(settings.imagesPerTrial);
+        for (int i = 0; i < settings.imagesPerTrial; ++i)
+            t.displayToOriginal[i] = i;
+        // simple Fisher-Yates
+        for (int i = settings.imagesPerTrial - 1; i > 0; --i) {
+            int j = rand() % (i + 1);
+            std::swap(t.displayToOriginal[i], t.displayToOriginal[j]);
+        }
+    } catch (const std::exception& e) {
+        ERROR("Failed to generate trial: {}", e.what());
+        return;
     }
 }
 

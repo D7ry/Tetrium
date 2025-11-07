@@ -2,11 +2,15 @@
 #include <filesystem>
 #include <random>
 #include <sstream>
+#include <variant>
 
 #include "imgui.h"
 #include "misc/cpp/imgui_stdlib.h" // for string input text
 
 #include "AppPseudoIsochromaticTest.h"
+#include "TetriumColor/ColorGeneratorFactory.h"
+#include "TetriumColor/ColorSpaceType.h"
+#include "constants.h"
 
 #include <Pathing.h>
 #include <string>
@@ -93,52 +97,31 @@ void TetriumApp::AppPseudoIsochromaticTest::TickImGui(const TetriumApp::TickCont
             }
         }
 
-        // Get next trial from Quest (if using Quest mode)
-        if (SETTINGS.PICKER_TYPE == ColorPickerType::QUEST && _questColorPicker) {
-            try {
-                auto result = _questColorPicker->GetColor(_deferredResponse.correct);
-
-                if (!result.is_done) {
-                    // Fill in the next trial slot
-                    int next_trial_idx = _subject.currentTrialIndex + 1;
-                    if (next_trial_idx < static_cast<int>(_trials.size())) {
-                        _trials[next_trial_idx].genotype = result.genotype;
-                        _trials[next_trial_idx].metameric_axis = result.metameric_axis;
-                        _trials[next_trial_idx].direction_idx = result.direction_idx;
-                        _trials[next_trial_idx].intensity = result.intensity;
-
-                        INFO(
-                            "Quest next trial ({}): direction {} at intensity {:.3f}",
-                            next_trial_idx,
-                            result.direction_idx,
-                            result.intensity
-                        );
-                    }
-                } else {
-                    INFO("Quest completed all trials");
-                }
-            } catch (const std::exception& e) {
-                ERROR("Failed to get next Quest trial: {}", e.what());
-            }
+        // Log trial data (extract from PREVIOUS trial - the one that was just answered)
+        if (_deferredResponse.hasResponse && _deferredResponse.previousTrial.has_value()
+            && std::holds_alternative<TetriumColor::PseudoIsochromaticTrial>(
+                *_deferredResponse.previousTrial
+            )) {
+            const auto& trial
+                = std::get<TetriumColor::PseudoIsochromaticTrial>(*_deferredResponse.previousTrial);
+            logTrialData(
+                _subject,
+                trial.genotype,
+                trial.metameric_axis,
+                _deferredResponse.orientation,
+                _deferredResponse.buttonIndex,
+                _deferredResponse.correct
+            );
         }
-
-        // Log trial data
-        logTrialData(
-            _subject,
-            _deferredResponse.genotype,
-            _deferredResponse.metameric_axis,
-            _deferredResponse.orientation,
-            _deferredResponse.buttonIndex,
-            _deferredResponse.correct
-        );
 
         _deferredResponse.hasResponse = false;
     }
 
-    // Capture gamepad input ONCE at the beginning of the frame
+    // Capture gamepad or keyboard input ONCE at the beginning of the frame
     _capturedGamepadInput = -1;
     bool backPressed = ImGui::IsKeyPressed(ImGuiKey_GamepadBack);
 
+    // Gamepad button mapping
     ImGuiKey gamepadKeys[4] = {
         ImGuiKey_GamepadFaceDown,  // A button -> Down (index 0)
         ImGuiKey_GamepadFaceLeft,  // X button -> Left (index 1)
@@ -149,6 +132,27 @@ void TetriumApp::AppPseudoIsochromaticTest::TickImGui(const TetriumApp::TickCont
         if (ImGui::IsKeyPressed(gamepadKeys[i])) {
             _capturedGamepadInput = i;
             break;
+        }
+    }
+
+    // Keyboard controls (if no gamepad input yet)
+    if (_capturedGamepadInput == -1) {
+        // Arrow keys or number keys 1-4
+        // Down (index 0): Down arrow or 1
+        if (ImGui::IsKeyPressed(ImGuiKey_DownArrow) || ImGui::IsKeyPressed(ImGuiKey_1)) {
+            _capturedGamepadInput = 0;
+        }
+        // Left (index 1): Left arrow or 2
+        else if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow) || ImGui::IsKeyPressed(ImGuiKey_2)) {
+            _capturedGamepadInput = 1;
+        }
+        // Right (index 2): Right arrow or 3
+        else if (ImGui::IsKeyPressed(ImGuiKey_RightArrow) || ImGui::IsKeyPressed(ImGuiKey_3)) {
+            _capturedGamepadInput = 2;
+        }
+        // Up (index 3): Up arrow or 4
+        else if (ImGui::IsKeyPressed(ImGuiKey_UpArrow) || ImGui::IsKeyPressed(ImGuiKey_4)) {
+            _capturedGamepadInput = 3;
         }
     }
 
@@ -362,15 +366,60 @@ void AppPseudoIsochromaticTest::drawTestForSubject(
         bool correct
             = (subject.prompt.currentSelectedAnswer == subject.prompt.correctAnswerTextureIndex);
 
+        // Store current trial data for logging before generating next trial
+        std::optional<TetriumColor::TrialData> previousTrial = _currentTrial;
+
+        // Generate next trial IMMEDIATELY so it's available for the next state transition
+        // This ensures populatePromptContext uses the new trial, not the old one
+        if (_testGenerator) {
+            try {
+                _trialCounter++;
+                std::string filename
+                    = "./temp/" + subject.name + "_trial_" + std::to_string(_trialCounter);
+                AnswerKind next_orientation
+                    = LANDOLT_C_ORIENTATIONS[rand() % LANDOLT_C_ORIENTATIONS.size()];
+                std::string hidden_symbol = "landolt_" + OrientationToString(next_orientation);
+
+                ColorTestResult result
+                    = correct ? ColorTestResult::Success : ColorTestResult::Failure;
+
+                _currentTrial = _testGenerator->GetNextTrial(
+                    result,
+                    filename,
+                    hidden_symbol,
+                    GetOutputColorSpace(),
+                    SETTINGS.LUM_NOISE,
+                    SETTINGS.S_CONE_NOISE
+                );
+
+                if (!_currentTrial.has_value()) {
+                    INFO("Test completed - no more trials");
+                } else if (std::holds_alternative<TetriumColor::PseudoIsochromaticTrial>(
+                               *_currentTrial
+                           )) {
+                    const auto& trial
+                        = std::get<TetriumColor::PseudoIsochromaticTrial>(*_currentTrial);
+                    INFO(
+                        "Generated trial {}: rgb_path={}, ocv_path={}, genotype={}, axis={}",
+                        _trialCounter,
+                        trial.rgb_path,
+                        trial.ocv_path,
+                        trial.genotype,
+                        trial.metameric_axis
+                    );
+                }
+            } catch (const std::exception& e) {
+                ERROR("Failed to generate next trial: {}", e.what());
+            }
+        }
+
         // Defer sound playing and logging until NEXT frame to avoid disrupting even-odd timing
-        const Trial& trial = getCurrentTrial();
+        // Store previous trial data in deferred response for logging
         _deferredResponse.hasResponse = true;
         _deferredResponse.buttonIndex = _capturedGamepadInput;
         _deferredResponse.correct = correct;
-        _deferredResponse.genotype = trial.genotype;
-        _deferredResponse.metameric_axis = trial.metameric_axis;
         _deferredResponse.orientation = subject.prompt.currentOrientation;
-        _deferredResponse.direction_idx = trial.direction_idx;
+        _deferredResponse.previousTrial = previousTrial; // Store for logging
     }
 
     // Handle state transition (only for timer-based states, not break)
@@ -388,10 +437,9 @@ void AppPseudoIsochromaticTest::drawTestForSubject(
     }
 
     // Draw progress indicator in upper left corner
-    int totalTrials = _trials.size();
-    int currentTrial = subject.currentTrialIndex + 1; // +1 to show 1-based indexing
+    int currentTrial = _trialCounter + 1; // +1 to show 1-based indexing
     char progressText[64];
-    snprintf(progressText, sizeof(progressText), "%d / %d", currentTrial, totalTrials);
+    snprintf(progressText, sizeof(progressText), "Trial %d", currentTrial);
 
     ImGui::SetCursorPos(ImVec2(20, 20));
     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 0.8f)); // Semi-transparent white
@@ -435,7 +483,7 @@ void AppPseudoIsochromaticTest::drawSubjectResult(
         "CenteredBox", boxSize, true, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize
     );
 
-    int totalTrials = _trials.size();
+    int totalTrials = _trialCounter + 1; // Total trials completed
     int numMisses = totalTrials - subject.numSuccessAttempts;
     bool perfect = numMisses < 1;
 
@@ -496,6 +544,32 @@ void AppPseudoIsochromaticTest::transitionSubjectState(
 {
     switch (subject.state) {
     case SubjectState::kFixation:
+        // Generate next trial if we don't have one yet (shouldn't happen, but safety check)
+        if (!_currentTrial.has_value() && _testGenerator && _trialCounter > 0) {
+            // This shouldn't happen - next trial should have been generated in deferred response
+            // handler
+            ERROR("No current trial available when transitioning to fixation - generating one now");
+            try {
+                _trialCounter++;
+                std::string filename
+                    = "./temp/" + subject.name + "_trial_" + std::to_string(_trialCounter);
+                AnswerKind next_orientation
+                    = LANDOLT_C_ORIENTATIONS[rand() % LANDOLT_C_ORIENTATIONS.size()];
+                std::string hidden_symbol = "landolt_" + OrientationToString(next_orientation);
+
+                // Use Success as default (shouldn't matter for first trial after break)
+                _currentTrial = _testGenerator->GetNextTrial(
+                    ColorTestResult::Success,
+                    filename,
+                    hidden_symbol,
+                    GetOutputColorSpace(),
+                    SETTINGS.LUM_NOISE,
+                    SETTINGS.S_CONE_NOISE
+                );
+            } catch (const std::exception& e) {
+                ERROR("Failed to generate trial in transition: {}", e.what());
+            }
+        }
         subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.IDENTIFICATION;
         subject.state = SubjectState::kIdentification;
         break;
@@ -503,8 +577,8 @@ void AppPseudoIsochromaticTest::transitionSubjectState(
         // Timer expired - check if response was given during presentation
         if (subject.prompt.responseGiven) {
             // Response was given during identification - skip answer phase
-            // Go directly to next trial (skip blank, go to fixation)
-            if (subject.currentTrialIndex >= (_trials.size() - 1)) {
+            // Check if there's a next trial
+            if (!_currentTrial.has_value()) {
                 endGame(subject);
                 return;
             }
@@ -532,7 +606,7 @@ void AppPseudoIsochromaticTest::transitionSubjectState(
         // Timer expired - check if response was given
         if (subject.prompt.responseGiven) {
             // Response was given during answer phase - skip blank, go to fixation
-            if (subject.currentTrialIndex >= (_trials.size() - 1)) {
+            if (!_currentTrial.has_value()) {
                 endGame(subject);
                 return;
             }
@@ -551,8 +625,51 @@ void AppPseudoIsochromaticTest::transitionSubjectState(
                 populatePromptContext(subject, ctx);
             }
         } else {
-            // Complete timeout - no response given, advance anyway
-            if (subject.currentTrialIndex >= (_trials.size() - 1)) {
+            // No response given - log -1 and continue
+            INFO("No response given for trial {} - logging as -1", _trialCounter);
+
+            // Store current trial data for logging before generating next trial
+            std::optional<TetriumColor::TrialData> previousTrial = _currentTrial;
+
+            // Generate next trial IMMEDIATELY
+            if (_testGenerator) {
+                try {
+                    _trialCounter++;
+                    std::string filename
+                        = "./temp/" + subject.name + "_trial_" + std::to_string(_trialCounter);
+                    AnswerKind next_orientation
+                        = LANDOLT_C_ORIENTATIONS[rand() % LANDOLT_C_ORIENTATIONS.size()];
+                    std::string hidden_symbol = "landolt_" + OrientationToString(next_orientation);
+
+                    // No response = incorrect
+                    ColorTestResult result = ColorTestResult::Failure;
+
+                    _currentTrial = _testGenerator->GetNextTrial(
+                        result,
+                        filename,
+                        hidden_symbol,
+                        GetOutputColorSpace(),
+                        SETTINGS.LUM_NOISE,
+                        SETTINGS.S_CONE_NOISE
+                    );
+
+                    if (!_currentTrial.has_value()) {
+                        INFO("Test completed - no more trials");
+                    }
+                } catch (const std::exception& e) {
+                    ERROR("Failed to generate next trial: {}", e.what());
+                }
+            }
+
+            // Defer logging until next frame
+            _deferredResponse.hasResponse = true;
+            _deferredResponse.buttonIndex = -1; // No response
+            _deferredResponse.correct = false;  // No response = incorrect
+            _deferredResponse.orientation = subject.prompt.currentOrientation;
+            _deferredResponse.previousTrial = previousTrial;
+
+            // Continue to next trial
+            if (!_currentTrial.has_value()) {
                 endGame(subject);
                 return;
             }
@@ -565,7 +682,7 @@ void AppPseudoIsochromaticTest::transitionSubjectState(
                 subject.state = SubjectState::kBreak;
                 subject.trialsSinceLastBreak = 0;
             } else {
-                // No response - go to fixation
+                // Skip blank period, go directly to fixation
                 subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.FIXATION;
                 subject.state = SubjectState::kFixation;
                 populatePromptContext(subject, ctx);
@@ -586,150 +703,129 @@ void AppPseudoIsochromaticTest::transitionSubjectState(
     }
 }
 
-void AppPseudoIsochromaticTest::buildTrialList()
-{
-    _trials.clear();
-
-    if (SETTINGS.PICKER_TYPE == ColorPickerType::GENETIC) {
-        // Get genotypes from the genetic color picker
-        std::vector<std::string> genotypes = _geneticColorPicker->GetGenotypes();
-
-        // Build all trials: genotype × metameric_axis × repetition
-        for (const std::string& genotype : genotypes) {
-            for (int axis = 0; axis < 4; axis++) {
-                for (int rep = 0; rep < SETTINGS.REPETITIONS_PER_AXIS; rep++) {
-                    Trial trial;
-                    trial.genotype = genotype;
-                    trial.metameric_axis = axis;
-                    trial.repetition_idx = rep;
-                    trial.direction_idx = -1; // Not used in genetic mode
-                    _trials.push_back(trial);
-                }
-            }
-        }
-    } else {
-        // Quest mode: Pre-allocate trial slots for progress tracking
-        // Trials will be filled dynamically as Quest determines them adaptively
-        size_t num_directions = _questColorPicker->GetNumDirections();
-        size_t total_trials = num_directions * SETTINGS.QUEST_TRIALS_PER_DIRECTION;
-
-        // Pre-allocate empty trial slots
-        for (size_t i = 0; i < total_trials; i++) {
-            Trial trial;
-            trial.genotype = "";
-            trial.metameric_axis = -1;
-            trial.repetition_idx = i;
-            trial.direction_idx = -1;
-            trial.intensity = 1.0;
-            _trials.push_back(trial);
-        }
-
-        // Get the first trial using NewColor() (no previous result yet)
-        try {
-            auto result = _questColorPicker->NewColor();
-            _trials[0].genotype = result.genotype;
-            _trials[0].metameric_axis = result.metameric_axis;
-            _trials[0].direction_idx = result.direction_idx;
-            _trials[0].intensity = result.intensity;
-
-            INFO(
-                "Quest mode: {} total trials, first trial: direction {} at intensity {:.3f}",
-                total_trials,
-                result.direction_idx,
-                result.intensity
-            );
-        } catch (const std::exception& e) {
-            ERROR("Failed to get first Quest trial: {}", e.what());
-        }
-    }
-
-    INFO("Built {} trial(s)", _trials.size());
-}
+// buildTrialList removed - trials now generated on-demand via TestGenerator
 
 void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
 {
-    // Clean up old generators
-    if (_geneticPlateGenerator) {
-        delete _geneticPlateGenerator;
-        _geneticPlateGenerator = nullptr;
-    }
-    if (_geneticColorPicker) {
-        delete _geneticColorPicker;
-        _geneticColorPicker = nullptr;
-    }
-    if (_questPlateGenerator) {
-        delete _questPlateGenerator;
-        _questPlateGenerator = nullptr;
-    }
-    if (_questColorPicker) {
-        delete _questColorPicker;
-        _questColorPicker = nullptr;
+    // Clean up old test generator
+    if (_testGenerator) {
+        delete _testGenerator;
+        _testGenerator = nullptr;
     }
     if (_logger) {
         delete _logger;
         _logger = nullptr;
     }
 
-    std::vector<int> dimensions = {2};
+    // Reset trial counter and current trial
+    _trialCounter = 0;
+    _currentTrial = std::nullopt;
+
     std::string display_primaries_path = TETRIUM_COLOR_PATH + "measurements/2025-10-12/primaries";
 
-    if (SETTINGS.PICKER_TYPE == ColorPickerType::GENETIC) {
-        // Create genetic color picker
-        _geneticColorPicker = new TetriumColor::GeneticColorPicker(
-            "female", // sex
-            0.999f,   // percentage_screened
-            547.0f,   // peak_to_test
-            1.0f,     // luminance
-            0.5f,     // saturation
-            dimensions,
-            42,                    // seed
-            display_primaries_path // display_primaries_path
-        );
+    // Create Python ColorGenerator using factory
+    PyObject* pColorGenerator = nullptr;
+    try {
+        if (SETTINGS.PICKER_TYPE == ColorPickerType::GENETIC) {
+            // Create GeneticColorGenerator
+            std::vector<int> metameric_axes = {2};
+            // For now, use all axes (empty vector = Python defaults to [1, 2, 3])
+            // Could add a setting similar to QUEST_TEST_ONLY_547NM if needed
 
-        // Create plate generator with color picker
-        _geneticPlateGenerator = new TetriumColor::GeneticColorPickerPlateGenerator(
-            *_geneticColorPicker, 42 // seed
-        );
-    } else {
-        // Create quest color picker
-        std::vector<int> axes_to_test;
-        if (SETTINGS.QUEST_TEST_ONLY_547NM) {
-            axes_to_test = {2}; // Only test metameric axis 1 (547nm cone)
+            pColorGenerator = TetriumColor::ColorGeneratorFactory::CreateGeneticColorGenerator(
+                "female",                      // sex
+                0.999f,                        // percentage_screened
+                547.0f,                        // peak_to_test
+                1.0f,                          // luminance
+                0.5f,                          // saturation
+                {3},                           // dimensions
+                42,                            // seed
+                SETTINGS.REPETITIONS_PER_AXIS, // trials_per_direction
+                metameric_axes,                // metameric_axes (empty = default [1, 2, 3])
+                display_primaries_path         // display_primaries_path
+            );
+        } else {
+            // Create QuestColorGenerator
+            std::vector<int> metameric_axes;
+            if (SETTINGS.QUEST_TEST_ONLY_547NM) {
+                metameric_axes = {2}; // Only test axis 2 (547nm cone)
+            }
+            // Empty vector = test all axes
+
+            pColorGenerator = TetriumColor::ColorGeneratorFactory::CreateQuestColorGenerator(
+                "female",                            // sex
+                0.999f,                              // percentage_screened
+                0.5f,                                // background_luminance
+                SETTINGS.QUEST_TRIALS_PER_DIRECTION, // trials_per_direction
+                metameric_axes,                      // metameric_axes
+                {3},                                 // dimensions
+                display_primaries_path               // display_primaries_path
+            );
         }
-        // If empty, will test all axes (default behavior)
-
-        _questColorPicker = new TetriumColor::QuestColorPicker(
-            "cone_shift",                        // mode
-            8,                                   // num_genotypes
-            SETTINGS.QUEST_TRIALS_PER_DIRECTION, // trials_per_direction
-            "female",                            // sex
-            0.5f,                                // background_luminance
-            42,                                  // seed
-            display_primaries_path,              // display_primaries_path
-            axes_to_test                         // metameric_axes
-        );
-
-        // Create plate generator with quest color picker
-        _questPlateGenerator = new TetriumColor::QuestColorPickerPlateGenerator(
-            *_questColorPicker, 42 // seed
-        );
+    } catch (const std::exception& e) {
+        ERROR("Failed to create ColorGenerator: {}", e.what());
+        throw;
     }
 
-    // Build and randomize trial list
-    buildTrialList();
+    // Create PseudoIsochromaticPlateGenerator using factory
+    PyObject* pTestGenerator = nullptr;
+    try {
+        pTestGenerator
+            = TetriumColor::ColorGeneratorFactory::CreatePseudoIsochromaticPlateGenerator(
+                pColorGenerator,
+                42 // seed
+            );
+        Py_DECREF(pColorGenerator
+        ); // Factory returns new reference, we're done with color generator
+        pColorGenerator = nullptr;
+    } catch (const std::exception& e) {
+        if (pColorGenerator) {
+            Py_DECREF(pColorGenerator);
+        }
+        ERROR("Failed to create TestGenerator: {}", e.what());
+        throw;
+    }
+
+    // Create C++ TestGenerator wrapper
+    _testGenerator = new TetriumColor::TestGenerator(pTestGenerator);
+    Py_DECREF(pTestGenerator); // TestGenerator constructor does Py_INCREF
+
+    // Generate first trial
+    try {
+        std::string filename = "./temp/" + _nameInputBuffer + "_trial_0";
+        AnswerKind first_orientation
+            = LANDOLT_C_ORIENTATIONS[rand() % LANDOLT_C_ORIENTATIONS.size()];
+        std::string hidden_symbol = "landolt_" + OrientationToString(first_orientation);
+
+        _currentTrial = _testGenerator->NewTrial(
+            filename,
+            hidden_symbol,
+            GetOutputColorSpace(),
+            SETTINGS.LUM_NOISE,
+            SETTINGS.S_CONE_NOISE
+        );
+
+        if (!_currentTrial.has_value()) {
+            throw std::runtime_error("Failed to generate first trial");
+        }
+    } catch (const std::exception& e) {
+        ERROR("Failed to generate first trial: {}", e.what());
+        delete _testGenerator;
+        _testGenerator = nullptr;
+        throw;
+    }
 
     // Initialize logger
     std::vector<std::string> headers
         = {"subject_id",
            "session_timestamp",
            "trial_idx",
-           "genotype_1",
-           "genotype_2",
+           "genotype",
            "metameric_axis",
-           "repetition_idx",
            "orientation",
            "user_choice",
            "correct",
+           "intensity",
            "lum_noise",
            "s_cone_noise",
            "stimulus_size"};
@@ -751,20 +847,8 @@ void AppPseudoIsochromaticTest::endGame(SubjectContext& subject)
 {
     DEBUG("ending game for subject {}", subject.name);
 
-    // Export thresholds if using Quest color picker
-    if (SETTINGS.PICKER_TYPE == ColorPickerType::QUEST && _questColorPicker) {
-        std::string thresholds_filename = _logger->GetFilePath();
-        // Replace .csv extension with _thresholds.csv
-        size_t ext_pos = thresholds_filename.rfind(".csv");
-        if (ext_pos != std::string::npos) {
-            thresholds_filename.replace(ext_pos, 4, "_thresholds.csv");
-        } else {
-            thresholds_filename += "_thresholds.csv";
-        }
-
-        INFO("Exporting Quest thresholds to {}", thresholds_filename);
-        _questColorPicker->ExportThresholds(thresholds_filename);
-    }
+    // Note: Threshold export and analysis can be done in Python side
+    // The logged data is already saved via TestDataLogger
 
     _state = TestState::kTestResult;
 }
@@ -811,9 +895,8 @@ void AppPseudoIsochromaticTest::drawBreakWindow(
     );
 
     // Calculate progress
-    int totalTrials = _trials.size();
-    int completedTrials = subject.currentTrialIndex;
-    int remainingTrials = totalTrials - completedTrials;
+    int completedTrials = _trialCounter;
+    // Note: We don't know total trials ahead of time with adaptive methods
 
     // Vertically center content
     float lineSpacing = ImGui::GetTextLineHeightWithSpacing();
@@ -829,22 +912,16 @@ void AppPseudoIsochromaticTest::drawBreakWindow(
 
     // Progress info
     char progressText[128];
-    snprintf(
-        progressText,
-        sizeof(progressText),
-        "Completed: %d / %d trials",
-        completedTrials,
-        totalTrials
-    );
+    snprintf(progressText, sizeof(progressText), "Completed: %d trials", completedTrials);
     ImVec2 progressSize = ImGui::CalcTextSize(progressText);
     ImGui::SetCursorPos(ImVec2((boxSize.x - progressSize.x) * 0.5f, yStart + lineSpacing * 3.0f));
     ImGui::Text("%s", progressText);
 
-    char remainingText[128];
-    snprintf(remainingText, sizeof(remainingText), "Remaining: %d trials", remainingTrials);
-    ImVec2 remainingSize = ImGui::CalcTextSize(remainingText);
-    ImGui::SetCursorPos(ImVec2((boxSize.x - remainingSize.x) * 0.5f, yStart + lineSpacing * 4.0f));
-    ImGui::Text("%s", remainingText);
+    char infoText[128];
+    snprintf(infoText, sizeof(infoText), "Take your time to rest");
+    ImVec2 infoSize = ImGui::CalcTextSize(infoText);
+    ImGui::SetCursorPos(ImVec2((boxSize.x - infoSize.x) * 0.5f, yStart + lineSpacing * 4.0f));
+    ImGui::Text("%s", infoText);
 
     // Continue button
     ImVec2 buttonSize(200, 60);
@@ -864,75 +941,38 @@ void AppPseudoIsochromaticTest::drawBreakWindow(
     ImGui::EndChild();
 }
 
-std::pair<std::string, std::string> AppPseudoIsochromaticTest::generateLandoltCTextures(
-    SubjectContext& subject,
-    const Trial& trial,
-    AnswerKind orientation
-)
-{
-    // Ensure the temp directory exists
-    std::filesystem::create_directories("./temp");
-
-    const std::string orientationStr = OrientationToString(orientation);
-    auto outputSpace = GetOutputColorSpace();
-
-    if (SETTINGS.PICKER_TYPE == ColorPickerType::GENETIC) {
-        std::string baseFilename = "./temp/" + subject.name + "_" + trial.genotype + "_axis"
-                                   + std::to_string(trial.metameric_axis) + "_" + orientationStr;
-
-        _geneticPlateGenerator->GetPlate(
-            trial.genotype,
-            trial.metameric_axis,
-            baseFilename,
-            "landolt_" + orientationStr,
-            outputSpace,
-            SETTINGS.LUM_NOISE,
-            SETTINGS.S_CONE_NOISE
-        );
-
-        return GetTexturePaths(baseFilename, outputSpace);
-    } else {
-        // Quest mode: use direction_idx and intensity directly from trial
-        std::string baseFilename = "./temp/" + subject.name + "_dir"
-                                   + std::to_string(trial.direction_idx) + "_" + orientationStr;
-
-        _questPlateGenerator->GetPlate(
-            trial.direction_idx,
-            baseFilename,
-            "landolt_" + orientationStr,
-            outputSpace,
-            SETTINGS.LUM_NOISE,
-            SETTINGS.S_CONE_NOISE,
-            trial.intensity
-        );
-
-        return GetTexturePaths(baseFilename, outputSpace);
-    }
-}
+// generateLandoltCTextures removed - textures now generated by Python TestGenerator
 
 void AppPseudoIsochromaticTest::populatePromptContext(
     SubjectContext& subject,
     const TetriumApp::TickContextImGui& ctx
 )
 {
-    // Get the current trial
-    const Trial& trial = getCurrentTrial();
-
-    // For Quest mode, validate that the trial has been filled by Quest
-    if (SETTINGS.PICKER_TYPE == ColorPickerType::QUEST && trial.direction_idx < 0) {
-        ERROR(
-            "Cannot populate prompt: Quest trial not yet filled (direction_idx = {})",
-            trial.direction_idx
-        );
+    // Check if we have a current trial
+    if (!_currentTrial.has_value()) {
+        ERROR("Cannot populate prompt: No current trial available");
         return;
     }
 
-    // Pick a random orientation for the correct answer
-    AnswerKind answerOrientation = LANDOLT_C_ORIENTATIONS[rand() % LANDOLT_C_ORIENTATIONS.size()];
+    // Get trial data from variant (currently only PseudoIsochromaticTrial supported)
+    if (!std::holds_alternative<TetriumColor::PseudoIsochromaticTrial>(*_currentTrial)) {
+        ERROR("Cannot populate prompt: Unsupported trial type");
+        return;
+    }
 
-    // Generate Landolt C textures for this trial
-    auto [rgbTexturePath, ocvTexturePath]
-        = generateLandoltCTextures(_subject, trial, answerOrientation);
+    const auto& trial = std::get<TetriumColor::PseudoIsochromaticTrial>(*_currentTrial);
+
+    // Get texture paths from trial data (already generated by Python)
+    std::string rgbTexturePath = trial.rgb_path;
+    std::string ocvTexturePath = trial.ocv_path;
+
+    INFO(
+        "Loading textures for trial: rgb={}, ocv={}, genotype={}, axis={}",
+        rgbTexturePath,
+        ocvTexturePath,
+        trial.genotype,
+        trial.metameric_axis
+    );
 
     // unload previous textures
     if (_subject.prompt.currentLandoltCTextureHandle[ColorSpace::RGB] != 0) {
@@ -951,6 +991,21 @@ void AppPseudoIsochromaticTest::populatePromptContext(
         = ctx.apis.InitImGuiTexture(_subject.prompt.currentLandoltCTextureHandle[ColorSpace::RGB]);
     _subject.prompt.currentLandoltCTexture[ColorSpace::OCV]
         = ctx.apis.InitImGuiTexture(_subject.prompt.currentLandoltCTextureHandle[ColorSpace::OCV]);
+
+    // Extract orientation from hidden_symbol (e.g., "landolt_up" -> "up")
+    std::string hidden_symbol = trial.hidden_symbol;
+    std::string orientation_str = hidden_symbol.substr(hidden_symbol.find("_") + 1);
+
+    // Convert string to AnswerKind
+    AnswerKind answerOrientation = AnswerKind::kUp;
+    if (orientation_str == "up")
+        answerOrientation = AnswerKind::kUp;
+    else if (orientation_str == "down")
+        answerOrientation = AnswerKind::kDown;
+    else if (orientation_str == "left")
+        answerOrientation = AnswerKind::kLeft;
+    else if (orientation_str == "right")
+        answerOrientation = AnswerKind::kRight;
 
     // Create a fixed mapping between button positions and orientations
     std::array<AnswerKind, 4> buttonOrientationMap = {
@@ -999,41 +1054,24 @@ void AppPseudoIsochromaticTest::logTrialData(
     if (!_logger)
         return;
 
-    const Trial& trial = getCurrentTrial();
-
-    // Parse genotype into separate components
-    std::string genotypeCleaned = genotype;
-    // Remove parentheses
-    genotypeCleaned.erase(
-        std::remove(genotypeCleaned.begin(), genotypeCleaned.end(), '('), genotypeCleaned.end()
-    );
-    genotypeCleaned.erase(
-        std::remove(genotypeCleaned.begin(), genotypeCleaned.end(), ')'), genotypeCleaned.end()
-    );
-
-    // Split by comma
-    std::vector<std::string> genotypeComponents;
-    std::stringstream ss(genotypeCleaned);
-    std::string component;
-    while (std::getline(ss, component, ',')) {
-        genotypeComponents.push_back(component);
+    // Get intensity from current trial if available
+    double intensity = 1.0;
+    if (_currentTrial.has_value()
+        && std::holds_alternative<TetriumColor::PseudoIsochromaticTrial>(*_currentTrial)) {
+        const auto& trial = std::get<TetriumColor::PseudoIsochromaticTrial>(*_currentTrial);
+        intensity = trial.intensity;
     }
 
     std::map<std::string, std::string> data;
     data["subject_id"] = subject.name;
     data["session_timestamp"] = ""; // Empty for now, could add session start time if needed
-    data["trial_idx"] = std::to_string(subject.currentTrialIndex);
-
-    // Save genotype components as separate columns (up to 4)
-    for (int i = 0; i < 2; i++) {
-        data["genotype_" + std::to_string(i + 1)]
-            = (i < (int)genotypeComponents.size()) ? genotypeComponents[i] : "";
-    }
+    data["trial_idx"] = std::to_string(_trialCounter);
+    data["genotype"] = genotype;
     data["metameric_axis"] = std::to_string(metameric_axis);
-    data["repetition_idx"] = std::to_string(trial.repetition_idx);
     data["orientation"] = OrientationToString(orientation);
     data["user_choice"] = std::to_string(userChoice);
     data["correct"] = correct ? "1" : "0";
+    data["intensity"] = std::to_string(intensity);
     data["lum_noise"] = std::to_string(SETTINGS.LUM_NOISE);
     data["s_cone_noise"] = std::to_string(SETTINGS.S_CONE_NOISE);
     data["stimulus_size"] = std::to_string(SETTINGS.STIMULUS_SIZE);
@@ -1061,22 +1099,10 @@ void AppPseudoIsochromaticTest::Cleanup(TetriumApp::CleanupContext& ctx)
         ctx.api.UnloadTexture(_answerPromptTextureHandles[orientation]);
     }
 
-    // Clean up generators
-    if (_geneticPlateGenerator) {
-        delete _geneticPlateGenerator;
-        _geneticPlateGenerator = nullptr;
-    }
-    if (_geneticColorPicker) {
-        delete _geneticColorPicker;
-        _geneticColorPicker = nullptr;
-    }
-    if (_questPlateGenerator) {
-        delete _questPlateGenerator;
-        _questPlateGenerator = nullptr;
-    }
-    if (_questColorPicker) {
-        delete _questColorPicker;
-        _questColorPicker = nullptr;
+    // Clean up test generator
+    if (_testGenerator) {
+        delete _testGenerator;
+        _testGenerator = nullptr;
     }
     if (_logger) {
         delete _logger;

@@ -1,7 +1,8 @@
 #pragma once
 
 #include "TetriumColor/ColorGenerator.h"
-#include "TetriumColor/PseudoIsochromaticPlateGenerator.h"
+#include "TetriumColor/TestGenerator.h"
+#include "TetriumColor/TrialData.h"
 #include "lib/TestDataLogger.h"
 
 #include "App.h"

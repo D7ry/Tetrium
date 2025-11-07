@@ -8,7 +8,7 @@
 #include "apps/AppPainter.h"
 #include "apps/AppPseudoIsochromaticTest.h"
 #include "apps/AppScrambledFaceTest.h"
-#include "apps/AppScreeningTest.h"
+// #include "apps/AppScreeningTest.h"  // TODO: Refactor to use new TestGenerator interface
 #include "apps/AppTemporalAFC.h"
 #include "apps/AppTetraHueSphere.h"
 
@@ -33,7 +33,8 @@ int main(int argc, char** argv)
 #endif // !NDEBUG
 
     std::vector<std::pair<TetriumApp::App*, const char*>> apps = {
-        {new TetriumApp::AppScreeningTest(), "Screening Test"},
+        // {new TetriumApp::AppScreeningTest(), "Screening Test"},  // TODO: Refactor to use new
+        // TestGenerator interface
         {new TetriumApp::AppPseudoIsochromaticTest(), "Pseudoisochromatic Test"},
         {new TetriumApp::AppScrambledFaceTest(), "Scrambled Face Test"},
         {new TetriumApp::AppTemporalAFC(), "Temporal 3AFC"},

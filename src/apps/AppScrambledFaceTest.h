@@ -107,7 +107,7 @@ class AppScrambledFaceTest : public App
     void drawBreakScreen(const TetriumApp::TickContextImGui& ctx);
     void handleTrialResponse(Trial& t, const TetriumApp::TickContextImGui& ctx, int choice);
 
-    TetriumColor::CircleGridGenerator* generator = nullptr;
+    TetriumColor::TestGenerator* testGenerator = nullptr;
     TestDataLogger* logger = nullptr;
 };
 } // namespace TetriumApp
