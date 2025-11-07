@@ -465,10 +465,6 @@ void AppPseudoIsochromaticTest::transitionSubjectState(
 )
 {
     switch (subject.state) {
-    case SubjectState::kBlank:
-        subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.FIXATION;
-        subject.state = SubjectState::kFixation;
-        break;
     case SubjectState::kFixation:
         subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.IDENTIFICATION;
         subject.state = SubjectState::kIdentification;
@@ -525,7 +521,7 @@ void AppPseudoIsochromaticTest::transitionSubjectState(
                 populatePromptContext(subject, ctx);
             }
         } else {
-            // Complete timeout - no response given, advance anyway (use normal timing)
+            // Complete timeout - no response given, advance anyway
             if (subject.currentTrialIndex >= (_trials.size() - 1)) {
                 endGame(subject);
                 return;
@@ -539,18 +535,23 @@ void AppPseudoIsochromaticTest::transitionSubjectState(
                 subject.state = SubjectState::kBreak;
                 subject.trialsSinceLastBreak = 0;
             } else {
-                // No response - use normal blank period
-                subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.BLANK;
-                subject.state = SubjectState::kBlank;
+                // No response - go to fixation
+                subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.FIXATION;
+                subject.state = SubjectState::kFixation;
                 populatePromptContext(subject, ctx);
             }
         }
         break;
     case SubjectState::kBreak:
-        // Continuing from break - transition to blank state and load new trial
-        subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.BLANK;
-        subject.state = SubjectState::kBlank;
+        // Continuing from break - transition to fixation and load new trial
+        subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.FIXATION;
+        subject.state = SubjectState::kFixation;
         populatePromptContext(subject, ctx);
+        break;
+    case SubjectState::kBlank:
+        // This state is no longer used but kept for safety
+        subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.FIXATION;
+        subject.state = SubjectState::kFixation;
         break;
     }
 }
@@ -690,8 +691,8 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
 
     _subject = SubjectContext{
         .name = _nameInputBuffer,
-        .currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.BLANK,
-        .state = SubjectState::kBlank,
+        .currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.FIXATION,
+        .state = SubjectState::kFixation,
         .currentTrialIndex = 0,
         .numSuccessAttempts = 0,
         .trialsSinceLastBreak = 0,
