@@ -476,7 +476,8 @@ void AppPseudoIsochromaticTest::transitionSubjectState(
     case SubjectState::kIdentification:
         // Timer expired - check if response was given during presentation
         if (subject.prompt.responseGiven) {
-            // Response was already scored and logged, advance to next trial
+            // Response was given during identification - skip answer phase
+            // Go directly to next trial (skip blank, go to fixation)
             if (subject.currentTrialIndex >= (_trials.size() - 1)) {
                 endGame(subject);
                 return;
@@ -490,8 +491,9 @@ void AppPseudoIsochromaticTest::transitionSubjectState(
                 subject.state = SubjectState::kBreak;
                 subject.trialsSinceLastBreak = 0;
             } else {
-                subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.BLANK;
-                subject.state = SubjectState::kBlank;
+                // Skip blank period, go directly to fixation
+                subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.FIXATION;
+                subject.state = SubjectState::kFixation;
                 populatePromptContext(subject, ctx);
             }
         } else {
@@ -503,7 +505,7 @@ void AppPseudoIsochromaticTest::transitionSubjectState(
     case SubjectState::kAnswer:
         // Timer expired - check if response was given
         if (subject.prompt.responseGiven) {
-            // Response was already scored and logged, advance to next trial
+            // Response was given during answer phase - skip blank, go to fixation
             if (subject.currentTrialIndex >= (_trials.size() - 1)) {
                 endGame(subject);
                 return;
@@ -517,12 +519,13 @@ void AppPseudoIsochromaticTest::transitionSubjectState(
                 subject.state = SubjectState::kBreak;
                 subject.trialsSinceLastBreak = 0;
             } else {
-                subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.BLANK;
-                subject.state = SubjectState::kBlank;
+                // Skip blank period, go directly to fixation
+                subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.FIXATION;
+                subject.state = SubjectState::kFixation;
                 populatePromptContext(subject, ctx);
             }
         } else {
-            // Complete timeout - no response given, advance anyway
+            // Complete timeout - no response given, advance anyway (use normal timing)
             if (subject.currentTrialIndex >= (_trials.size() - 1)) {
                 endGame(subject);
                 return;
@@ -536,6 +539,7 @@ void AppPseudoIsochromaticTest::transitionSubjectState(
                 subject.state = SubjectState::kBreak;
                 subject.trialsSinceLastBreak = 0;
             } else {
+                // No response - use normal blank period
                 subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.BLANK;
                 subject.state = SubjectState::kBlank;
                 populatePromptContext(subject, ctx);

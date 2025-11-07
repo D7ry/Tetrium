@@ -60,9 +60,9 @@ class AppPseudoIsochromaticTest : public App
         struct
         {
             float BLANK = 1;
-            float FIXATION = 2;
+            float FIXATION = 1;
             float IDENTIFICATION = 1;
-            float ANSWERING = 3;
+            float ANSWERING = 2;
         } STATE_DURATIONS_SECONDS;
     } SETTINGS;
 
