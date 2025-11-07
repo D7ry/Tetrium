@@ -352,6 +352,11 @@ void AppPseudoIsochromaticTest::drawTestForSubject(
         }
     }
 
+    // If waiting for state transition, show black screen (no rendering)
+    if (_needsStateTransition) {
+        return;
+    }
+
     // Draw progress indicator in upper left corner
     int totalTrials = _trials.size();
     int currentTrial = subject.currentTrialIndex + 1; // +1 to show 1-based indexing
