@@ -47,7 +47,7 @@ class AppPseudoIsochromaticTest : public App
         ColorPickerType PICKER_TYPE = ColorPickerType::QUEST;
         int REPETITIONS_PER_AXIS
             = 4; // number of repetitions for each genotype × metameric axis (Genetic mode)
-        int QUEST_TRIALS_PER_DIRECTION = 20; // number of Quest trials per direction (Quest mode)
+        int QUEST_TRIALS_PER_DIRECTION = 1; // number of Quest trials per direction (Quest mode)
         bool QUEST_TEST_ONLY_547NM
             = true;              // Quest: only test axis 1 (547nm cone) instead of all axes
         int BREAK_INTERVAL = 50; // number of trials between breaks (0 = no breaks)
@@ -108,6 +108,9 @@ class AppPseudoIsochromaticTest : public App
     TestState _state;
 
     SubjectContext _subject;
+
+    // Store picker type to know if we should show Quest thresholds
+    ColorPickerType _pickerType = ColorPickerType::QUEST;
 
     // Current trial data (generated on-demand)
     std::optional<TetriumColor::TrialData> _currentTrial;

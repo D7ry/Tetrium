@@ -438,8 +438,19 @@ void AppPseudoIsochromaticTest::drawTestForSubject(
 
     // Draw progress indicator in upper left corner
     int currentTrial = _trialCounter + 1; // +1 to show 1-based indexing
+    int totalTrials = -1;
+
+    // Get total trials if available (for Quest, this is predetermined)
+    if (_testGenerator) {
+        totalTrials = _testGenerator->GetTotalTrials();
+    }
+
     char progressText[64];
-    snprintf(progressText, sizeof(progressText), "Trial %d", currentTrial);
+    if (totalTrials > 0) {
+        snprintf(progressText, sizeof(progressText), "Trial %d/%d", currentTrial, totalTrials);
+    } else {
+        snprintf(progressText, sizeof(progressText), "Trial %d", currentTrial);
+    }
 
     ImGui::SetCursorPos(ImVec2(20, 20));
     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 0.8f)); // Semi-transparent white
@@ -483,8 +494,20 @@ void AppPseudoIsochromaticTest::drawSubjectResult(
         "CenteredBox", boxSize, true, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize
     );
 
-    int totalTrials = _trialCounter + 1; // Total trials completed
-    int numMisses = totalTrials - subject.numSuccessAttempts;
+    int completedTrials = _trialCounter; // Trials completed
+    int totalTrials = -1;
+
+    // Get total trials from TestGenerator if available (for Quest, this is predetermined)
+    if (_testGenerator) {
+        totalTrials = _testGenerator->GetTotalTrials();
+    }
+
+    // If total trials not available, use completed trials
+    if (totalTrials < 0) {
+        totalTrials = completedTrials;
+    }
+
+    int numMisses = completedTrials - subject.numSuccessAttempts;
     bool perfect = numMisses < 1;
 
     const char* mainMsg = perfect ? "You've finished the test" : "You've finished the test";
@@ -493,30 +516,80 @@ void AppPseudoIsochromaticTest::drawSubjectResult(
 
     // Vertically center text block
     float lineSpacing = ImGui::GetTextLineHeightWithSpacing();
-    float yStart = (boxSize.y - (lineSpacing * 5.0f)) * 0.5f;
+    float yStart = (boxSize.y - (lineSpacing * 8.0f)) * 0.5f; // Increased for threshold display
 
-    // 1. "You scored x/x"
+    // 1. "You scored x/x" or "Trial x/x"
     ImVec2 textSize1 = ImGui::CalcTextSize("You scored 000/000");
     ImGui::SetCursorPos(ImVec2((boxSize.x - textSize1.x) * 0.5f, yStart));
-    ImGui::Text("You scored %d/%d", subject.numSuccessAttempts, totalTrials);
+    ImGui::Text("You scored %d/%d", subject.numSuccessAttempts, completedTrials);
+
+    // Show total trials if different from completed (for Quest)
+    if (totalTrials > completedTrials) {
+        ImVec2 textSizeTotal = ImGui::CalcTextSize("Total trials: 000");
+        ImGui::SetCursorPos(ImVec2((boxSize.x - textSizeTotal.x) * 0.5f, yStart + lineSpacing));
+        ImGui::Text("Total trials: %d", totalTrials);
+    }
 
     // 2. Large "Congratulations" or "Tough luck!"
     ImGui::SetWindowFontScale(2.0f);
     ImVec2 textSize2 = ImGui::CalcTextSize(mainMsg);
-    ImGui::SetCursorPos(
-        ImVec2((boxSize.x - textSize2.x * 2.0f * 0.5f) * 0.5f, yStart + lineSpacing * 2.0f)
-    );
+    float offsetY = (totalTrials > completedTrials) ? lineSpacing * 3.0f : lineSpacing * 2.0f;
+    ImGui::SetCursorPos(ImVec2((boxSize.x - textSize2.x * 2.0f * 0.5f) * 0.5f, yStart + offsetY));
     ImGui::Text("%s", mainMsg);
     ImGui::SetWindowFontScale(1.0f);
 
-    // 3. Normal text follow-up line
+    // 3. Quest thresholds summary (if Quest mode)
+    float currentY = yStart + offsetY + lineSpacing * 2.0f;
+    if (_pickerType == ColorPickerType::QUEST && _testGenerator) {
+        auto thresholds = _testGenerator->GetThresholds();
+        if (!thresholds.empty()) {
+            ImGui::Text("Quest Thresholds Summary:");
+            currentY += lineSpacing;
+
+            // Show first few directions as summary
+            int count = 0;
+            for (const auto& [dirIdx, data] : thresholds) {
+                if (count >= 5)
+                    break; // Show max 5 directions
+
+                auto itThreshold = data.find("threshold_proportion");
+                auto itGenotype = data.find("genotype");
+                auto itAxis = data.find("metameric_axis");
+
+                if (itThreshold != data.end()) {
+                    std::string summary = "Direction " + std::to_string(dirIdx) + ": ";
+                    if (itGenotype != data.end() && !itGenotype->second.empty()
+                        && itGenotype->second != "None") {
+                        summary += "Genotype " + itGenotype->second;
+                    }
+                    if (itAxis != data.end() && !itAxis->second.empty()) {
+                        summary += ", Axis " + itAxis->second;
+                    }
+                    summary += ", Threshold: " + itThreshold->second;
+
+                    ImGui::SetCursorPos(ImVec2(20, currentY));
+                    ImGui::Text("%s", summary.c_str());
+                    currentY += lineSpacing * 0.8f;
+                    count++;
+                }
+            }
+            if (thresholds.size() > 5) {
+                ImGui::SetCursorPos(ImVec2(20, currentY));
+                ImGui::Text("... and %zu more directions (see CSV file)", thresholds.size() - 5);
+                currentY += lineSpacing;
+            }
+            currentY += lineSpacing * 0.5f;
+        }
+    }
+
+    // 4. Normal text follow-up line
     ImVec2 textSize3 = ImGui::CalcTextSize(followMsg);
-    ImGui::SetCursorPos(ImVec2((boxSize.x - textSize3.x) * 0.5f, yStart + lineSpacing * 4.0f));
+    ImGui::SetCursorPos(ImVec2((boxSize.x - textSize3.x) * 0.5f, currentY));
     ImGui::Text("%s", followMsg);
 
-    // 4. "Okay" button centered below text
+    // 5. "Okay" button centered below text
     ImVec2 buttonSize(150, 60);
-    ImVec2 buttonPos((boxSize.x - buttonSize.x) * 0.5f, yStart + lineSpacing * 6.0f);
+    ImVec2 buttonPos((boxSize.x - buttonSize.x) * 0.5f, currentY + lineSpacing * 2.0f);
     ImGui::SetCursorPos(buttonPos);
     if (ImGui::Button("Okay", buttonSize)) {
         if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL) {
@@ -723,6 +796,9 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
 
     std::string display_primaries_path = TETRIUM_COLOR_PATH + "measurements/2025-10-12/primaries";
 
+    // Store picker type for later use
+    _pickerType = SETTINGS.PICKER_TYPE;
+
     // Create Python ColorGenerator using factory
     PyObject* pColorGenerator = nullptr;
     try {
@@ -847,9 +923,18 @@ void AppPseudoIsochromaticTest::endGame(SubjectContext& subject)
 {
     DEBUG("ending game for subject {}", subject.name);
 
-    // Note: Threshold export and analysis can be done in Python side
-    // The logged data is already saved via TestDataLogger
+    // Export Quest thresholds if using Quest color generator
+    if (_pickerType == ColorPickerType::QUEST && _testGenerator) {
+        std::string thresholdPath = "../data/AppPseudoIsochromaticTest/" + subject.name + "_"
+                                    + TestDataLogger::getCurrentTimestamp() + "_thresholds.csv";
+        if (_testGenerator->ExportThresholds(thresholdPath)) {
+            INFO("Quest thresholds exported to {}", thresholdPath);
+        } else {
+            WARN("Failed to export Quest thresholds");
+        }
+    }
 
+    // The logged data is already saved via TestDataLogger
     _state = TestState::kTestResult;
 }
 

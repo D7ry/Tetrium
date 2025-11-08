@@ -26,6 +26,8 @@ class TestDataLogger
     // Get the output file path
     std::string GetFilePath() const { return _filePath; }
 
+    static std::string getCurrentTimestamp();
+
   private:
     std::string _filePath;
     std::vector<std::string> _headers;
@@ -34,7 +36,6 @@ class TestDataLogger
     bool _headerWritten;
 
     void writeHeader();
-    std::string getCurrentTimestamp();
 };
 
 } // namespace TetriumApp
