@@ -50,6 +50,7 @@ class AppPseudoIsochromaticTest : public App
         int QUEST_TRIALS_PER_DIRECTION = 20; // number of Quest trials per direction (Quest mode)
         bool QUEST_TEST_ONLY_547NM
             = true;              // Quest: only test axis 1 (547nm cone) instead of all axes
+        int DIMENSION = 3;       // dimension: 2 for M/L cone testing, 3 for full trichromat
         int BREAK_INTERVAL = 50; // number of trials between breaks (0 = no breaks)
         MusicSetting MUSIC_SETTING = MusicSetting::CORRECT_WRONG;
         float LUM_NOISE = 0.0f;     // luminance noise [0.0, 1.0]

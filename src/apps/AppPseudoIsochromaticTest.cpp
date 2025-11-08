@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <random>
 #include <sstream>
@@ -198,6 +199,12 @@ void TetriumApp::AppPseudoIsochromaticTest::drawSettingsWindow(
         if (ImGui::Combo("##PickerType", &currentPickerType, pickerOptions, 2)) {
             SETTINGS.PICKER_TYPE = static_cast<ColorPickerType>(currentPickerType);
         }
+
+        ImGui::Separator();
+
+        // Dimension setting
+        ImGui::SliderInt("Dimension", &SETTINGS.DIMENSION, 2, 3);
+        ImGui::Text("2 = M/L cone testing, 3 = Full trichromat");
 
         ImGui::Separator();
 
@@ -804,20 +811,32 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
     try {
         if (SETTINGS.PICKER_TYPE == ColorPickerType::GENETIC) {
             // Create GeneticColorGenerator
-            std::vector<int> metameric_axes = {2};
-            // For now, use all axes (empty vector = Python defaults to [1, 2, 3])
-            // Could add a setting similar to QUEST_TEST_ONLY_547NM if needed
+            std::vector<int> metameric_axes;
+            float peak_to_test = 547.0f;
+            std::vector<int> dimensions = {3};
+
+            // Handle dimension == 2 case: test M/L cones
+            if (SETTINGS.DIMENSION == 2) {
+                metameric_axes = {1, 2}; // Test axes 1 and 2 for M/L cone function
+                dimensions = {2};        // Use 2D dimensions
+                peak_to_test = 530.0f;
+            } else {
+                // Default: dimension 3, use axis 2, peak 547
+                metameric_axes = {2};
+                peak_to_test = 547.0f;
+                dimensions = {3};
+            }
 
             pColorGenerator = TetriumColor::ColorGeneratorFactory::CreateGeneticColorGenerator(
-                "female",                      // sex
+                "both",                        // sex
                 0.999f,                        // percentage_screened
-                547.0f,                        // peak_to_test
+                peak_to_test,                  // peak_to_test (547, 530, or 559)
                 1.0f,                          // luminance
                 0.5f,                          // saturation
-                {3},                           // dimensions
+                dimensions,                    // dimensions (2 or 3)
                 42,                            // seed
                 SETTINGS.REPETITIONS_PER_AXIS, // trials_per_direction
-                metameric_axes,                // metameric_axes (empty = default [1, 2, 3])
+                metameric_axes,                // metameric_axes
                 display_primaries_path         // display_primaries_path
             );
         } else {
