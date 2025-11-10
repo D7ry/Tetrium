@@ -812,18 +812,16 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
         if (SETTINGS.PICKER_TYPE == ColorPickerType::GENETIC) {
             // Create GeneticColorGenerator
             std::vector<int> metameric_axes;
-            float peak_to_test = 547.0f;
+            float peak_to_test = 547.0f; // dummy basically for now
             std::vector<int> dimensions = {3};
 
             // Handle dimension == 2 case: test M/L cones
             if (SETTINGS.DIMENSION == 2) {
                 metameric_axes = {1, 2}; // Test axes 1 and 2 for M/L cone function
                 dimensions = {2};        // Use 2D dimensions
-                peak_to_test = 530.0f;
             } else {
                 // Default: dimension 3, use axis 2, peak 547
                 metameric_axes = {2};
-                peak_to_test = 547.0f;
                 dimensions = {3};
             }
 
@@ -924,7 +922,14 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
            "lum_noise",
            "s_cone_noise",
            "stimulus_size"};
-    _logger = new TestDataLogger("AppPseudoIsochromaticTest", _nameInputBuffer, headers);
+
+    // Generate additional info string with picker type and dimension
+    std::string pickerTypeStr = (_pickerType == ColorPickerType::GENETIC) ? "Genetic" : "Quest";
+    std::string additionalInfo = pickerTypeStr + "_dim" + std::to_string(SETTINGS.DIMENSION);
+
+    _logger = new TestDataLogger(
+        "AppPseudoIsochromaticTest", _nameInputBuffer, headers, additionalInfo
+    );
 
     _subject = SubjectContext{
         .name = _nameInputBuffer,
@@ -944,7 +949,13 @@ void AppPseudoIsochromaticTest::endGame(SubjectContext& subject)
 
     // Export Quest thresholds if using Quest color generator
     if (_pickerType == ColorPickerType::QUEST && _testGenerator) {
-        std::string thresholdPath = "../data/AppPseudoIsochromaticTest/" + subject.name + "_"
+        std::string pickerTypeStr = (_pickerType == ColorPickerType::GENETIC) ? "Genetic" : "Quest";
+        std::string additionalInfo = pickerTypeStr + "_dim" + std::to_string(SETTINGS.DIMENSION);
+        std::string filenameBase = subject.name;
+        if (!additionalInfo.empty()) {
+            filenameBase += "_" + additionalInfo;
+        }
+        std::string thresholdPath = "../data/AppPseudoIsochromaticTest/" + filenameBase + "_"
                                     + TestDataLogger::getCurrentTimestamp() + "_thresholds.csv";
         if (_testGenerator->ExportThresholds(thresholdPath)) {
             INFO("Quest thresholds exported to {}", thresholdPath);

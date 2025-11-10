@@ -11,7 +11,8 @@ namespace TetriumApp
 TestDataLogger::TestDataLogger(
     const std::string& appName,
     const std::string& subjectId,
-    const std::vector<std::string>& columnHeaders
+    const std::vector<std::string>& columnHeaders,
+    const std::string& additionalInfo
 )
     : _headers(columnHeaders), _headerWritten(false)
 {
@@ -22,7 +23,11 @@ TestDataLogger::TestDataLogger(
 
     // Generate filename with timestamp
     std::string timestamp = getCurrentTimestamp();
-    _filePath = dataDir + "/" + subjectId + "_" + timestamp + ".csv";
+    std::string filenameBase = subjectId;
+    if (!additionalInfo.empty()) {
+        filenameBase += "_" + additionalInfo;
+    }
+    _filePath = dataDir + "/" + filenameBase + "_" + timestamp + ".csv";
 
     // Open file
     _file.open(_filePath, std::ios::out | std::ios::trunc);

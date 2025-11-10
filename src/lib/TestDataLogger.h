@@ -15,7 +15,8 @@ class TestDataLogger
     TestDataLogger(
         const std::string& appName,
         const std::string& subjectId,
-        const std::vector<std::string>& columnHeaders
+        const std::vector<std::string>& columnHeaders,
+        const std::string& additionalInfo = ""
     );
 
     ~TestDataLogger();
