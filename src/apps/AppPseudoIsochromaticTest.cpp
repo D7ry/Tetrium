@@ -71,90 +71,62 @@ std::string AppPseudoIsochromaticTest::GetLandoltCAnswerTexturePath(
 
 void TetriumApp::AppPseudoIsochromaticTest::TickImGui(const TetriumApp::TickContextImGui& ctx)
 {
-    // Process deferred response from PREVIOUS frame (if any)
-    // This ensures sound/logging and trial generation happens at the START of a new frame
-    if (_deferredResponse.hasResponse) {
-        // NOW calculate correctness and store trial data (was deferred to avoid frame delay)
-        // We need to get the PREVIOUS trial that was answered (before generating next one)
+    // Generate next trial if needed (deferred from previous frame)
+    // Do this at start of frame so trial is available for state transitions
+    // But delay sound/logging until state transition to avoid timing issues
+    if (_deferredResponse.needsTrialGeneration && _testGenerator) {
+        // Store previous trial data BEFORE generating next one (for logging during state
+        // transition)
         std::optional<TetriumColor::TrialData> previousTrial = _currentTrial;
         AnswerKind previousOrientation = _subject.prompt.currentOrientation;
 
-        // Calculate if the answer was correct
+        // Calculate correctness (needed for trial generation)
         bool correct = (_deferredResponse.buttonIndex == _subject.prompt.correctAnswerTextureIndex);
 
-        if (correct) {
-            _subject.numSuccessAttempts += 1;
-            if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL
-                || SETTINGS.MUSIC_SETTING == MusicSetting::CORRECT_WRONG) {
-                ctx.apis.PlaySound(Sound::kCorrectAnswer);
-            }
-        } else {
-            if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL
-                || SETTINGS.MUSIC_SETTING == MusicSetting::CORRECT_WRONG) {
-                ctx.apis.PlaySound(Sound::kWrongAnswer);
-            }
-        }
+        // Store for logging during state transition
+        _deferredResponse.previousTrial = previousTrial;
+        _deferredResponse.orientation = previousOrientation;
+        _deferredResponse.correct = correct;
 
-        // Log trial data (extract from PREVIOUS trial - the one that was just answered)
-        if (previousTrial.has_value()
-            && std::holds_alternative<TetriumColor::PseudoIsochromaticTrial>(*previousTrial)) {
-            const auto& trial = std::get<TetriumColor::PseudoIsochromaticTrial>(*previousTrial);
-            logTrialData(
-                _subject,
-                trial.genotype,
-                trial.metameric_axis,
-                previousOrientation,
-                _deferredResponse.buttonIndex,
-                correct
+        try {
+            _trialCounter++;
+            std::string filename
+                = "./temp/" + _subject.name + "_trial_" + std::to_string(_trialCounter);
+            AnswerKind next_orientation
+                = LANDOLT_C_ORIENTATIONS[rand() % LANDOLT_C_ORIENTATIONS.size()];
+            std::string hidden_symbol = "landolt_" + OrientationToString(next_orientation);
+
+            ColorTestResult result = correct ? ColorTestResult::Success : ColorTestResult::Failure;
+
+            _currentTrial = _testGenerator->GetNextTrial(
+                result,
+                filename,
+                hidden_symbol,
+                GetOutputColorSpace(),
+                SETTINGS.LUM_NOISE,
+                SETTINGS.S_CONE_NOISE
             );
-        }
 
-        // Generate next trial if needed (deferred from previous frame)
-        if (_deferredResponse.needsTrialGeneration && _testGenerator) {
-            try {
-                _trialCounter++;
-                std::string filename
-                    = "./temp/" + _subject.name + "_trial_" + std::to_string(_trialCounter);
-                AnswerKind next_orientation
-                    = LANDOLT_C_ORIENTATIONS[rand() % LANDOLT_C_ORIENTATIONS.size()];
-                std::string hidden_symbol = "landolt_" + OrientationToString(next_orientation);
-
-                ColorTestResult result
-                    = correct ? ColorTestResult::Success : ColorTestResult::Failure;
-
-                _currentTrial = _testGenerator->GetNextTrial(
-                    result,
-                    filename,
-                    hidden_symbol,
-                    GetOutputColorSpace(),
-                    SETTINGS.LUM_NOISE,
-                    SETTINGS.S_CONE_NOISE
+            if (!_currentTrial.has_value()) {
+                INFO("Test completed - no more trials");
+            } else if (std::holds_alternative<TetriumColor::PseudoIsochromaticTrial>(*_currentTrial
+                       )) {
+                const auto& trial = std::get<TetriumColor::PseudoIsochromaticTrial>(*_currentTrial);
+                INFO(
+                    "Generated trial {}: rgb_path={}, ocv_path={}, genotype={}, axis={}",
+                    _trialCounter,
+                    trial.rgb_path,
+                    trial.ocv_path,
+                    trial.genotype,
+                    trial.metameric_axis
                 );
-
-                if (!_currentTrial.has_value()) {
-                    INFO("Test completed - no more trials");
-                } else if (std::holds_alternative<TetriumColor::PseudoIsochromaticTrial>(
-                               *_currentTrial
-                           )) {
-                    const auto& trial
-                        = std::get<TetriumColor::PseudoIsochromaticTrial>(*_currentTrial);
-                    INFO(
-                        "Generated trial {}: rgb_path={}, ocv_path={}, genotype={}, axis={}",
-                        _trialCounter,
-                        trial.rgb_path,
-                        trial.ocv_path,
-                        trial.genotype,
-                        trial.metameric_axis
-                    );
-                }
-                // Don't populatePromptContext here - let it happen during state transition
-                // to avoid texture loading during render phase
-            } catch (const std::exception& e) {
-                ERROR("Failed to generate next trial: {}", e.what());
             }
+            // Don't populatePromptContext here - let it happen during state transition
+            // to avoid texture loading during render phase
+        } catch (const std::exception& e) {
+            ERROR("Failed to generate next trial: {}", e.what());
         }
 
-        _deferredResponse.hasResponse = false;
         _deferredResponse.needsTrialGeneration = false;
     }
 
@@ -666,6 +638,41 @@ void AppPseudoIsochromaticTest::transitionSubjectState(
     case SubjectState::kIdentification:
         // Timer expired - check if response was given during presentation
         if (subject.prompt.responseGiven) {
+            // Process sound and logging NOW (during state transition, not during rendering)
+            // This happens when transitioning from Identification to Fixation
+            if (_deferredResponse.hasResponse && _deferredResponse.previousTrial.has_value()
+                && std::holds_alternative<TetriumColor::PseudoIsochromaticTrial>(
+                    *_deferredResponse.previousTrial
+                )) {
+                const auto& trial = std::get<TetriumColor::PseudoIsochromaticTrial>(
+                    *_deferredResponse.previousTrial
+                );
+
+                if (_deferredResponse.correct) {
+                    subject.numSuccessAttempts += 1;
+                    if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL
+                        || SETTINGS.MUSIC_SETTING == MusicSetting::CORRECT_WRONG) {
+                        ctx.apis.PlaySound(Sound::kCorrectAnswer);
+                    }
+                } else {
+                    if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL
+                        || SETTINGS.MUSIC_SETTING == MusicSetting::CORRECT_WRONG) {
+                        ctx.apis.PlaySound(Sound::kWrongAnswer);
+                    }
+                }
+
+                logTrialData(
+                    subject,
+                    trial.genotype,
+                    trial.metameric_axis,
+                    _deferredResponse.orientation,
+                    _deferredResponse.buttonIndex,
+                    _deferredResponse.correct
+                );
+
+                _deferredResponse.hasResponse = false;
+            }
+
             // Response was given during identification - skip answer phase
             // Check if there's a next trial
             if (!_currentTrial.has_value()) {
@@ -695,6 +702,41 @@ void AppPseudoIsochromaticTest::transitionSubjectState(
     case SubjectState::kAnswer:
         // Timer expired - check if response was given
         if (subject.prompt.responseGiven) {
+            // Process sound and logging NOW (during state transition, not during rendering)
+            // This happens when transitioning from Answer to Fixation
+            if (_deferredResponse.hasResponse && _deferredResponse.previousTrial.has_value()
+                && std::holds_alternative<TetriumColor::PseudoIsochromaticTrial>(
+                    *_deferredResponse.previousTrial
+                )) {
+                const auto& trial = std::get<TetriumColor::PseudoIsochromaticTrial>(
+                    *_deferredResponse.previousTrial
+                );
+
+                if (_deferredResponse.correct) {
+                    subject.numSuccessAttempts += 1;
+                    if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL
+                        || SETTINGS.MUSIC_SETTING == MusicSetting::CORRECT_WRONG) {
+                        ctx.apis.PlaySound(Sound::kCorrectAnswer);
+                    }
+                } else {
+                    if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL
+                        || SETTINGS.MUSIC_SETTING == MusicSetting::CORRECT_WRONG) {
+                        ctx.apis.PlaySound(Sound::kWrongAnswer);
+                    }
+                }
+
+                logTrialData(
+                    subject,
+                    trial.genotype,
+                    trial.metameric_axis,
+                    _deferredResponse.orientation,
+                    _deferredResponse.buttonIndex,
+                    _deferredResponse.correct
+                );
+
+                _deferredResponse.hasResponse = false;
+            }
+
             // Response was given during answer phase - skip blank, go to fixation
             if (!_currentTrial.has_value()) {
                 endGame(subject);
