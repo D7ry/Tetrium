@@ -135,6 +135,9 @@ class AppPseudoIsochromaticTest : public App
     // Flag to defer state transition to next frame (to avoid texture loading mid-frame)
     bool _needsStateTransition = false;
 
+    // Flag to defer texture loading to start of next frame (to avoid GPU sync issues)
+    bool _needsTextureLoad = false;
+
   private:
     struct
     {

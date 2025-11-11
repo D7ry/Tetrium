@@ -142,11 +142,8 @@ void TetriumApp::AppPseudoIsochromaticTest::TickImGui(const TetriumApp::TickCont
                         trial.metameric_axis
                     );
                 }
-
-                // If we're in kFixation state waiting for trial, populate prompt context now
-                if (_subject.state == SubjectState::kFixation && _currentTrial.has_value()) {
-                    populatePromptContext(_subject, ctx);
-                }
+                // Don't populatePromptContext here - let it happen during state transition
+                // to avoid texture loading during render phase
             } catch (const std::exception& e) {
                 ERROR("Failed to generate next trial: {}", e.what());
             }
@@ -154,6 +151,12 @@ void TetriumApp::AppPseudoIsochromaticTest::TickImGui(const TetriumApp::TickCont
 
         _deferredResponse.hasResponse = false;
         _deferredResponse.needsTrialGeneration = false;
+    }
+
+    // Load textures if needed (deferred from previous frame to avoid GPU sync issues)
+    if (_needsTextureLoad && _currentTrial.has_value() && _state == TestState::kTesting) {
+        populatePromptContext(_subject, ctx);
+        _needsTextureLoad = false;
     }
 
     // Process deferred state transition from PREVIOUS frame (if any)
@@ -680,7 +683,7 @@ void AppPseudoIsochromaticTest::transitionSubjectState(
                 // Skip blank period, go directly to fixation
                 subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.FIXATION;
                 subject.state = SubjectState::kFixation;
-                populatePromptContext(subject, ctx);
+                _needsTextureLoad = true; // Defer texture loading to avoid GPU sync issues
             }
         } else {
             // No response yet, transition to answer phase
@@ -708,7 +711,7 @@ void AppPseudoIsochromaticTest::transitionSubjectState(
                 // Skip blank period, go directly to fixation
                 subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.FIXATION;
                 subject.state = SubjectState::kFixation;
-                populatePromptContext(subject, ctx);
+                _needsTextureLoad = true; // Defer texture loading to avoid GPU sync issues
             }
         } else {
             // No response given - log -1 and continue
@@ -747,7 +750,7 @@ void AppPseudoIsochromaticTest::transitionSubjectState(
         // Continuing from break - transition to fixation and load new trial
         subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.FIXATION;
         subject.state = SubjectState::kFixation;
-        populatePromptContext(subject, ctx);
+        _needsTextureLoad = true; // Defer texture loading to avoid GPU sync issues
         break;
     case SubjectState::kBlank:
         // This state is no longer used but kept for safety
