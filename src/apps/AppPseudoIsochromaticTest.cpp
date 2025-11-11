@@ -809,22 +809,21 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
     // Create Python ColorGenerator using factory
     PyObject* pColorGenerator = nullptr;
     try {
+        std::vector<int> metameric_axes;
+        std::vector<int> dimensions;
+        // Handle dimension == 2 case: test M/L cones
+        if (SETTINGS.DIMENSION == 2) {
+            metameric_axes = {1, 2}; // Test axes 1 and 2 for M/L cone function
+            dimensions = {2};        // Use 2D dimensions
+        } else {
+            // Default: dimension 3, use axis 2, peak 547
+            metameric_axes = {2};
+            dimensions = {3};
+        }
+
         if (SETTINGS.PICKER_TYPE == ColorPickerType::GENETIC) {
             // Create GeneticColorGenerator
-            std::vector<int> metameric_axes;
             float peak_to_test = 547.0f; // dummy basically for now
-            std::vector<int> dimensions = {3};
-
-            // Handle dimension == 2 case: test M/L cones
-            if (SETTINGS.DIMENSION == 2) {
-                metameric_axes = {1, 2}; // Test axes 1 and 2 for M/L cone function
-                dimensions = {2};        // Use 2D dimensions
-            } else {
-                // Default: dimension 3, use axis 2, peak 547
-                metameric_axes = {2};
-                dimensions = {3};
-            }
-
             pColorGenerator = TetriumColor::ColorGeneratorFactory::CreateGeneticColorGenerator(
                 "both",                        // sex
                 0.999f,                        // percentage_screened
@@ -844,14 +843,13 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
                 metameric_axes = {2}; // Only test axis 2 (547nm cone)
             }
             // Empty vector = test all axes
-
             pColorGenerator = TetriumColor::ColorGeneratorFactory::CreateQuestColorGenerator(
-                "female",                            // sex
+                "both",                              // sex
                 0.999f,                              // percentage_screened
                 0.5f,                                // background_luminance
                 SETTINGS.QUEST_TRIALS_PER_DIRECTION, // trials_per_direction
                 metameric_axes,                      // metameric_axes
-                {3},                                 // dimensions
+                dimensions,                          // dimensions
                 display_primaries_path               // display_primaries_path
             );
         }
