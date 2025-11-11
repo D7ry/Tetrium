@@ -817,7 +817,11 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
             dimensions = {2};        // Use 2D dimensions
         } else {
             // Default: dimension 3, use axis 2, peak 547
-            metameric_axes = {2};
+            if (SETTINGS.QUEST_TEST_ONLY_547NM) {
+                metameric_axes = {2}; // Only test axis 2 (547nm cone)
+            } else {
+                metameric_axes = {1, 2, 3}; // Test all axes
+            }
             dimensions = {3};
         }
 
@@ -838,10 +842,7 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
             );
         } else {
             // Create QuestColorGenerator
-            std::vector<int> metameric_axes;
-            if (SETTINGS.QUEST_TEST_ONLY_547NM) {
-                metameric_axes = {2}; // Only test axis 2 (547nm cone)
-            }
+
             // Empty vector = test all axes
             pColorGenerator = TetriumColor::ColorGeneratorFactory::CreateQuestColorGenerator(
                 "both",                              // sex
