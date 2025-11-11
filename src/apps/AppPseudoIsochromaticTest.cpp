@@ -74,7 +74,15 @@ void TetriumApp::AppPseudoIsochromaticTest::TickImGui(const TetriumApp::TickCont
     // Process deferred response from PREVIOUS frame (if any)
     // This ensures sound/logging and trial generation happens at the START of a new frame
     if (_deferredResponse.hasResponse) {
-        if (_deferredResponse.correct) {
+        // NOW calculate correctness and store trial data (was deferred to avoid frame delay)
+        // We need to get the PREVIOUS trial that was answered (before generating next one)
+        std::optional<TetriumColor::TrialData> previousTrial = _currentTrial;
+        AnswerKind previousOrientation = _subject.prompt.currentOrientation;
+
+        // Calculate if the answer was correct
+        bool correct = (_deferredResponse.buttonIndex == _subject.prompt.correctAnswerTextureIndex);
+
+        if (correct) {
             _subject.numSuccessAttempts += 1;
             if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL
                 || SETTINGS.MUSIC_SETTING == MusicSetting::CORRECT_WRONG) {
@@ -88,19 +96,16 @@ void TetriumApp::AppPseudoIsochromaticTest::TickImGui(const TetriumApp::TickCont
         }
 
         // Log trial data (extract from PREVIOUS trial - the one that was just answered)
-        if (_deferredResponse.hasResponse && _deferredResponse.previousTrial.has_value()
-            && std::holds_alternative<TetriumColor::PseudoIsochromaticTrial>(
-                *_deferredResponse.previousTrial
-            )) {
-            const auto& trial
-                = std::get<TetriumColor::PseudoIsochromaticTrial>(*_deferredResponse.previousTrial);
+        if (previousTrial.has_value()
+            && std::holds_alternative<TetriumColor::PseudoIsochromaticTrial>(*previousTrial)) {
+            const auto& trial = std::get<TetriumColor::PseudoIsochromaticTrial>(*previousTrial);
             logTrialData(
                 _subject,
                 trial.genotype,
                 trial.metameric_axis,
-                _deferredResponse.orientation,
+                previousOrientation,
                 _deferredResponse.buttonIndex,
-                _deferredResponse.correct
+                correct
             );
         }
 
@@ -114,8 +119,8 @@ void TetriumApp::AppPseudoIsochromaticTest::TickImGui(const TetriumApp::TickCont
                     = LANDOLT_C_ORIENTATIONS[rand() % LANDOLT_C_ORIENTATIONS.size()];
                 std::string hidden_symbol = "landolt_" + OrientationToString(next_orientation);
 
-                ColorTestResult result = _deferredResponse.correct ? ColorTestResult::Success
-                                                                   : ColorTestResult::Failure;
+                ColorTestResult result
+                    = correct ? ColorTestResult::Success : ColorTestResult::Failure;
 
                 _currentTrial = _testGenerator->GetNextTrial(
                     result,
@@ -417,24 +422,20 @@ void AppPseudoIsochromaticTest::drawTestForSubject(
     }
 
     // Process gamepad input for identification and answer states
+    // Do ABSOLUTE MINIMUM - just set flags, defer ALL processing to next frame
+    // Any calculation or data access here delays the frame, which desyncs even-odd counter
     if ((subject.state == SubjectState::kIdentification || subject.state == SubjectState::kAnswer)
         && !subject.prompt.responseGiven && _capturedGamepadInput >= 0) {
 
+        // Mark response as given immediately to prevent duplicate processing
         subject.prompt.responseGiven = true;
         subject.prompt.currentSelectedAnswer = _capturedGamepadInput;
-        bool correct
-            = (subject.prompt.currentSelectedAnswer == subject.prompt.correctAnswerTextureIndex);
 
-        // Store current trial data for logging
-        std::optional<TetriumColor::TrialData> previousTrial = _currentTrial;
-
-        // Defer sound playing, logging, and trial generation until NEXT frame
-        // This avoids disrupting even-odd timing during rendering
+        // Store ONLY the button index - defer ALL other processing to next frame
         _deferredResponse.hasResponse = true;
         _deferredResponse.buttonIndex = _capturedGamepadInput;
-        _deferredResponse.correct = correct;
-        _deferredResponse.orientation = subject.prompt.currentOrientation;
-        _deferredResponse.previousTrial = previousTrial; // Store for logging
+        // Don't calculate correct, don't access trial data, don't access orientation
+        // ALL processing (correctness check, trial storage, etc.) happens in TickImGui() next frame
         _deferredResponse.needsTrialGeneration = true; // Generate next trial at start of next frame
     }
 
