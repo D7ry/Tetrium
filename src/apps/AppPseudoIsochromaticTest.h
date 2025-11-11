@@ -127,6 +127,7 @@ class AppPseudoIsochromaticTest : public App
         bool correct;
         AnswerKind orientation;
         std::optional<TetriumColor::TrialData> previousTrial; // Store trial data for logging
+        bool needsTrialGeneration = false; // Flag to generate next trial at start of next frame
     };
 
     DeferredResponse _deferredResponse;
