@@ -27,6 +27,8 @@ int main(int argc, char** argv)
     printGreetingBanner();
     INIT_LOGS();
     INFO("Logger initialized.");
+    // Create ./temp directory if it doesn't exist
+    std::system("mkdir -p ./temp");
 
 #if !defined(NDEBUG)
     DEBUG("running in debug mode");
