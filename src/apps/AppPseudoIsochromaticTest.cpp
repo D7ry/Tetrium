@@ -259,6 +259,8 @@ void TetriumApp::AppPseudoIsochromaticTest::drawSettingsWindow(
                 "Quest Trials Per Direction", &SETTINGS.QUEST_TRIALS_PER_DIRECTION, 1, 40
             );
             ImGui::Checkbox("Test Only 547nm Cone (Axis 1)", &SETTINGS.QUEST_TEST_ONLY_547NM);
+            ImGui::Checkbox("Bipolar Sampling", &SETTINGS.QUEST_BIPOLAR);
+            ImGui::Text("Bipolar: Sample in both direction and -direction");
         }
 
         ImGui::SliderInt("Break Interval (0 = no breaks)", &SETTINGS.BREAK_INTERVAL, 0, 100);
@@ -908,7 +910,8 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
                 SETTINGS.QUEST_TRIALS_PER_DIRECTION, // trials_per_direction
                 metameric_axes,                      // metameric_axes
                 dimensions,                          // dimensions
-                display_primaries_path               // display_primaries_path
+                display_primaries_path,              // display_primaries_path
+                SETTINGS.QUEST_BIPOLAR               // bipolar
             );
         }
     } catch (const std::exception& e) {

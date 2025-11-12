@@ -55,8 +55,10 @@ class AppPseudoIsochromaticTest : public App
             = 4; // number of repetitions for each genotype × metameric axis (Genetic mode)
         int QUEST_TRIALS_PER_DIRECTION = 10; // number of Quest trials per direction (Quest mode)
         bool QUEST_TEST_ONLY_547NM
-            = true;              // Quest: only test axis 1 (547nm cone) instead of all axes
-        int DIMENSION = 3;       // dimension: 2 for M/L cone testing, 3 for full trichromat
+            = true; // Quest: only test axis 1 (547nm cone) instead of all axes
+        bool QUEST_BIPOLAR
+            = false;       // Quest: use bipolar sampling (sample in both direction and -direction)
+        int DIMENSION = 3; // dimension: 2 for M/L cone testing, 3 for full trichromat
         int BREAK_INTERVAL = 50; // number of trials between breaks (0 = no breaks)
         MusicSetting MUSIC_SETTING = MusicSetting::CORRECT_WRONG;
         TrialTimingMode TIMING_MODE
