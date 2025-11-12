@@ -80,6 +80,9 @@ void TetriumApp::AppPseudoIsochromaticTest::TickImGui(const TetriumApp::TickCont
         std::optional<TetriumColor::TrialData> previousTrial = _currentTrial;
         AnswerKind previousOrientation = _subject.prompt.currentOrientation;
 
+        // Check if this is a no-answer case (buttonIndex == -1)
+        bool isNoAnswer = (_deferredResponse.buttonIndex == -1);
+
         // Calculate correctness (needed for trial generation)
         bool correct = (_deferredResponse.buttonIndex == _subject.prompt.correctAnswerTextureIndex);
 
@@ -89,37 +92,48 @@ void TetriumApp::AppPseudoIsochromaticTest::TickImGui(const TetriumApp::TickCont
         _deferredResponse.correct = correct;
 
         try {
-            _trialCounter++;
-            std::string filename
-                = "./temp/" + _subject.name + "_trial_" + std::to_string(_trialCounter);
-            AnswerKind next_orientation
-                = LANDOLT_C_ORIENTATIONS[rand() % LANDOLT_C_ORIENTATIONS.size()];
-            std::string hidden_symbol = "landolt_" + OrientationToString(next_orientation);
+            if (isNoAnswer) {
+                // No answer given - re-queue the previous trial by keeping current trial
+                // Don't increment trial counter, don't generate new trial
+                INFO("No answer given for trial {} - re-queuing same trial", _trialCounter);
+                // _currentTrial remains unchanged - we'll re-use it
+            } else {
+                // Normal response - generate next trial
+                _trialCounter++;
+                std::string filename
+                    = "./temp/" + _subject.name + "_trial_" + std::to_string(_trialCounter);
+                AnswerKind next_orientation
+                    = LANDOLT_C_ORIENTATIONS[rand() % LANDOLT_C_ORIENTATIONS.size()];
+                std::string hidden_symbol = "landolt_" + OrientationToString(next_orientation);
 
-            ColorTestResult result = correct ? ColorTestResult::Success : ColorTestResult::Failure;
+                ColorTestResult result
+                    = correct ? ColorTestResult::Success : ColorTestResult::Failure;
 
-            _currentTrial = _testGenerator->GetNextTrial(
-                result,
-                filename,
-                hidden_symbol,
-                GetOutputColorSpace(),
-                SETTINGS.LUM_NOISE,
-                SETTINGS.S_CONE_NOISE
-            );
-
-            if (!_currentTrial.has_value()) {
-                INFO("Test completed - no more trials");
-            } else if (std::holds_alternative<TetriumColor::PseudoIsochromaticTrial>(*_currentTrial
-                       )) {
-                const auto& trial = std::get<TetriumColor::PseudoIsochromaticTrial>(*_currentTrial);
-                INFO(
-                    "Generated trial {}: rgb_path={}, ocv_path={}, genotype={}, axis={}",
-                    _trialCounter,
-                    trial.rgb_path,
-                    trial.ocv_path,
-                    trial.genotype,
-                    trial.metameric_axis
+                _currentTrial = _testGenerator->GetNextTrial(
+                    result,
+                    filename,
+                    hidden_symbol,
+                    GetOutputColorSpace(),
+                    SETTINGS.LUM_NOISE,
+                    SETTINGS.S_CONE_NOISE
                 );
+
+                if (!_currentTrial.has_value()) {
+                    INFO("Test completed - no more trials");
+                } else if (std::holds_alternative<TetriumColor::PseudoIsochromaticTrial>(
+                               *_currentTrial
+                           )) {
+                    const auto& trial
+                        = std::get<TetriumColor::PseudoIsochromaticTrial>(*_currentTrial);
+                    INFO(
+                        "Generated trial {}: rgb_path={}, ocv_path={}, genotype={}, axis={}",
+                        _trialCounter,
+                        trial.rgb_path,
+                        trial.ocv_path,
+                        trial.genotype,
+                        trial.metameric_axis
+                    );
+                }
             }
             // Don't populatePromptContext here - let it happen during state transition
             // to avoid texture loading during render phase
@@ -242,7 +256,7 @@ void TetriumApp::AppPseudoIsochromaticTest::drawSettingsWindow(
             ImGui::SliderInt("Repetitions Per Axis", &SETTINGS.REPETITIONS_PER_AXIS, 1, 10);
         } else {
             ImGui::SliderInt(
-                "Quest Trials Per Direction", &SETTINGS.QUEST_TRIALS_PER_DIRECTION, 5, 40
+                "Quest Trials Per Direction", &SETTINGS.QUEST_TRIALS_PER_DIRECTION, 1, 40
             );
             ImGui::Checkbox("Test Only 547nm Cone (Axis 1)", &SETTINGS.QUEST_TEST_ONLY_547NM);
         }
@@ -757,36 +771,40 @@ void AppPseudoIsochromaticTest::transitionSubjectState(
                 _needsTextureLoad = true; // Defer texture loading to avoid GPU sync issues
             }
         } else {
-            // No response given - log -1 and continue
-            INFO("No response given for trial {} - logging as -1", _trialCounter);
+            // No response given - re-queue the same trial
+            INFO("No response given for trial {} - re-queuing same trial", _trialCounter);
 
             // Store current trial data for logging
             std::optional<TetriumColor::TrialData> previousTrial = _currentTrial;
 
-            // Defer logging and trial generation until next frame
+            // Log the no-answer response immediately
+            if (previousTrial.has_value()
+                && std::holds_alternative<TetriumColor::PseudoIsochromaticTrial>(*previousTrial)) {
+                const auto& trial = std::get<TetriumColor::PseudoIsochromaticTrial>(*previousTrial);
+                logTrialData(
+                    subject,
+                    trial.genotype,
+                    trial.metameric_axis,
+                    subject.prompt.currentOrientation,
+                    -1,   // No response
+                    false // No response = incorrect
+                );
+            }
+
+            // Defer trial handling until next frame (re-queue same trial)
             _deferredResponse.hasResponse = true;
             _deferredResponse.buttonIndex = -1; // No response
             _deferredResponse.correct = false;  // No response = incorrect
             _deferredResponse.orientation = subject.prompt.currentOrientation;
             _deferredResponse.previousTrial = previousTrial;
             _deferredResponse.needsTrialGeneration
-                = true; // Generate next trial at start of next frame
+                = true; // Handle trial re-queuing at start of next frame
 
-            // Transition to next trial (will happen after trial is generated on next frame)
-            subject.currentTrialIndex += 1;
-            subject.trialsSinceLastBreak += 1;
-
-            // Check if we should take a break
-            if (SETTINGS.BREAK_INTERVAL > 0
-                && subject.trialsSinceLastBreak >= SETTINGS.BREAK_INTERVAL) {
-                subject.state = SubjectState::kBreak;
-                subject.trialsSinceLastBreak = 0;
-            } else {
-                // Go to fixation (trial will be loaded on next frame after generation)
-                subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.FIXATION;
-                subject.state = SubjectState::kFixation;
-            }
-            // Don't populatePromptContext yet - wait for trial generation on next frame
+            // Don't increment trial counters - we're re-queuing the same trial
+            // Just transition back to fixation to show the trial again
+            subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.FIXATION;
+            subject.state = SubjectState::kFixation;
+            _needsTextureLoad = true; // Reload textures (same trial, but reset state)
         }
         break;
     case SubjectState::kBreak:
