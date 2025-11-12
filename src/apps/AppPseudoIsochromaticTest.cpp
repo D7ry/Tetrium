@@ -262,6 +262,20 @@ void TetriumApp::AppPseudoIsochromaticTest::drawSettingsWindow(
         }
 
         ImGui::SliderInt("Break Interval (0 = no breaks)", &SETTINGS.BREAK_INTERVAL, 0, 100);
+
+        ImGui::Separator();
+
+        // Trial timing mode
+        ImGui::Text("Trial Timing Mode");
+        const char* timingOptions[] = {"Fixed Trial Time", "Early Exit"};
+        int currentTimingMode = static_cast<int>(SETTINGS.TIMING_MODE);
+        if (ImGui::Combo("##TimingMode", &currentTimingMode, timingOptions, 2)) {
+            SETTINGS.TIMING_MODE = static_cast<TrialTimingMode>(currentTimingMode);
+        }
+        ImGui::Text("Fixed: Wait full duration | Early Exit: Move on immediately after answer");
+
+        ImGui::Separator();
+
         ImGui::Text("Duration of Blank Period (seconds)");
         ImGui::InputFloat("##Blank", &SETTINGS.STATE_DURATIONS_SECONDS.BLANK);
         ImGui::Text("Duration of Fixation (seconds)");
@@ -423,6 +437,11 @@ void AppPseudoIsochromaticTest::drawTestForSubject(
         // Don't calculate correct, don't access trial data, don't access orientation
         // ALL processing (correctness check, trial storage, etc.) happens in TickImGui() next frame
         _deferredResponse.needsTrialGeneration = true; // Generate next trial at start of next frame
+
+        // If EARLY_EXIT mode is enabled, immediately trigger state transition
+        if (SETTINGS.TIMING_MODE == TrialTimingMode::EARLY_EXIT) {
+            subject.currStateRemainderTime = 0.0f; // Force timer to expire immediately
+        }
     }
 
     // Handle state transition (only for timer-based states, not break)

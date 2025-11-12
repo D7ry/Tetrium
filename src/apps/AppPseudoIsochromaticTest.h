@@ -42,6 +42,12 @@ class AppPseudoIsochromaticTest : public App
         QUEST
     };
 
+    enum class TrialTimingMode
+    {
+        FIXED_TRIAL_TIME, // Wait for full duration even if answered early
+        EARLY_EXIT        // Move to next state immediately after answer
+    };
+
     struct
     {
         ColorPickerType PICKER_TYPE = ColorPickerType::QUEST;
@@ -53,9 +59,11 @@ class AppPseudoIsochromaticTest : public App
         int DIMENSION = 3;       // dimension: 2 for M/L cone testing, 3 for full trichromat
         int BREAK_INTERVAL = 50; // number of trials between breaks (0 = no breaks)
         MusicSetting MUSIC_SETTING = MusicSetting::CORRECT_WRONG;
-        float LUM_NOISE = 0.0f;     // luminance noise [0.0, 1.0]
-        float S_CONE_NOISE = 0.1f;  // s-cone noise [0.0, 1.0]
-        float STIMULUS_SIZE = 0.5f; // stimulus texture size multiplier [0.0, 1.0]
+        TrialTimingMode TIMING_MODE
+            = TrialTimingMode::FIXED_TRIAL_TIME; // Timing behavior for trials
+        float LUM_NOISE = 0.0f;                  // luminance noise [0.0, 1.0]
+        float S_CONE_NOISE = 0.1f;               // s-cone noise [0.0, 1.0]
+        float STIMULUS_SIZE = 0.5f;              // stimulus texture size multiplier [0.0, 1.0]
 
         struct
         {
