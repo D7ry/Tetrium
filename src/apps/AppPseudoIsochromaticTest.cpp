@@ -4,6 +4,7 @@
 #include <random>
 #include <sstream>
 #include <variant>
+#include <vector>
 
 #include "imgui.h"
 #include "misc/cpp/imgui_stdlib.h" // for string input text
@@ -972,7 +973,9 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
         = {"subject_id",
            "session_timestamp",
            "trial_idx",
-           "genotype",
+           "genotype_1",
+           "genotype_2",
+           "genotype_3",
            "metameric_axis",
            "orientation",
            "user_choice",
@@ -1216,6 +1219,55 @@ void AppPseudoIsochromaticTest::populatePromptContext(
     _subject.prompt.responseGiven = false;
 }
 
+namespace
+{
+// Helper function to parse genotype string (e.g., "(547, 530, 559)" or "(558.9, 530.3)")
+// Returns vector of peak values, empty if parsing fails
+std::vector<double> ParseGenotypeString(const std::string& genotypeStr)
+{
+    std::vector<double> peaks;
+
+    // Handle empty or "unknown" genotype
+    if (genotypeStr.empty() || genotypeStr == "unknown" || genotypeStr == "None") {
+        return peaks;
+    }
+
+    // Remove whitespace
+    std::string trimmed = genotypeStr;
+    trimmed.erase(0, trimmed.find_first_not_of(" \t\n\r"));
+    trimmed.erase(trimmed.find_last_not_of(" \t\n\r") + 1);
+
+    // Check if it starts with '(' and ends with ')'
+    if (trimmed.empty() || trimmed.front() != '(' || trimmed.back() != ')') {
+        return peaks; // Return empty if not a tuple format
+    }
+
+    // Remove parentheses
+    trimmed = trimmed.substr(1, trimmed.length() - 2);
+
+    // Split by comma
+    std::istringstream iss(trimmed);
+    std::string token;
+    while (std::getline(iss, token, ',')) {
+        // Trim whitespace from token
+        token.erase(0, token.find_first_not_of(" \t\n\r"));
+        token.erase(token.find_last_not_of(" \t\n\r") + 1);
+
+        if (!token.empty()) {
+            try {
+                double peak = std::stod(token);
+                peaks.push_back(peak);
+            } catch (const std::exception&) {
+                // If conversion fails, skip this peak
+                continue;
+            }
+        }
+    }
+
+    return peaks;
+}
+} // namespace
+
 void AppPseudoIsochromaticTest::logTrialData(
     const SubjectContext& subject,
     const std::string& genotype,
@@ -1236,11 +1288,28 @@ void AppPseudoIsochromaticTest::logTrialData(
         intensity = trial.intensity;
     }
 
+    // Parse genotype string to extract individual peaks
+    std::vector<double> peaks = ParseGenotypeString(genotype);
+
+    // Determine how many peaks to populate based on dimension
+    int numPeaksToPopulate = SETTINGS.DIMENSION;
+
     std::map<std::string, std::string> data;
     data["subject_id"] = subject.name;
     data["session_timestamp"] = ""; // Empty for now, could add session start time if needed
     data["trial_idx"] = std::to_string(_trialCounter);
-    data["genotype"] = genotype;
+
+    // Save individual peaks as genotype_1, genotype_2, genotype_3
+    // Always save all 3 columns, but only populate up to dimension
+    for (int i = 0; i < 3; i++) {
+        std::string key = "genotype_" + std::to_string(i + 1);
+        if (i < numPeaksToPopulate && i < static_cast<int>(peaks.size())) {
+            data[key] = std::to_string(peaks[i]);
+        } else {
+            data[key] = ""; // Empty if peak not available or beyond dimension
+        }
+    }
+
     data["metameric_axis"] = std::to_string(metameric_axis);
     data["orientation"] = OrientationToString(orientation);
     data["user_choice"] = std::to_string(userChoice);
