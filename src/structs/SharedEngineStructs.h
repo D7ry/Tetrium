@@ -55,11 +55,12 @@ enum class Sound
 {
     kProgramStart,
     kVineBoom,
+    kDigitalBellNegative,
     kMusicGameMenu,
     kMusicGamePlay,
 
     kMusicInterstellar,
 
     kCorrectAnswer,
-    kWrongAnswer = kVineBoom,
+    kWrongAnswer = kDigitalBellNegative,
 };

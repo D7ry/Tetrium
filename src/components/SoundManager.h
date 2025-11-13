@@ -9,16 +9,15 @@
 class SoundManager
 {
   public:
-
     inline static const std::unordered_map<Sound, std::string> SOUNDS_FILES = {
         {Sound::kProgramStart, ASSETS_PATH + "sounds/costco.wav"},
         {Sound::kVineBoom, ASSETS_PATH + "sounds/vine_boom.wav"},
+        {Sound::kDigitalBellNegative, ASSETS_PATH + "sounds/digital-bell-negative.mp3"},
         {Sound::kMusicGameMenu, ASSETS_PATH + "sounds/music/wii.wav"},
         {Sound::kMusicGamePlay, ASSETS_PATH + "sounds/music/sneaky.wav"},
         {Sound::kCorrectAnswer, ASSETS_PATH + "sounds/correct.wav"},
         {Sound::kMusicInterstellar, ASSETS_PATH + "sounds/music/spin.wav"},
     };
-
 
     SoundManager();
     ~SoundManager();

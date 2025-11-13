@@ -203,7 +203,7 @@ void TetriumApp::AppPseudoIsochromaticTest::TickImGui(const TetriumApp::TickCont
 
     // Handle back button to exit test
     if (backPressed && _state == TestState::kTesting) {
-        ctx.apis.PlaySound(Sound::kVineBoom);
+        ctx.apis.PlaySound(Sound::kDigitalBellNegative);
         _state = TestState::kIdle;
     }
 
@@ -386,7 +386,7 @@ void TetriumApp::AppPseudoIsochromaticTest::drawIdle(const TetriumApp::TickConte
     ImGui::SetCursorPos(elemPos);
     if (ImGui::Button("Exit", buttonSize)) {
         if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL) {
-            ctx.apis.PlaySound(Sound::kVineBoom);
+            ctx.apis.PlaySound(Sound::kDigitalBellNegative);
         }
         ctx.controls.wantExit = true;
     }
@@ -618,7 +618,7 @@ void AppPseudoIsochromaticTest::drawSubjectResult(
     ImGui::SetCursorPos(buttonPos);
     if (ImGui::Button("Okay", buttonSize)) {
         if (SETTINGS.MUSIC_SETTING == MusicSetting::ALL) {
-            ctx.apis.PlaySound(Sound::kVineBoom);
+            ctx.apis.PlaySound(Sound::kDigitalBellNegative);
         }
         _state = TestState::kIdle;
     }
