@@ -52,20 +52,19 @@ class AppPseudoIsochromaticTest : public App
     {
         ColorPickerType PICKER_TYPE = ColorPickerType::QUEST;
         int REPETITIONS_PER_AXIS
-            = 4; // number of repetitions for each genotype × metameric axis (Genetic mode)
-        int QUEST_TRIALS_PER_DIRECTION = 10; // number of Quest trials per direction (Quest mode)
+            = 20; // number of repetitions for each genotype × metameric axis (Genetic mode)
+        int QUEST_TRIALS_PER_DIRECTION = 20; // number of Quest trials per direction (Quest mode)
         bool QUEST_TEST_ONLY_547NM
             = true; // Quest: only test axis 1 (547nm cone) instead of all axes
         bool QUEST_BIPOLAR
-            = false;       // Quest: use bipolar sampling (sample in both direction and -direction)
+            = true;        // Quest: use bipolar sampling (sample in both direction and -direction)
         int DIMENSION = 3; // dimension: 2 for M/L cone testing, 3 for full trichromat
         int BREAK_INTERVAL = 50; // number of trials between breaks (0 = no breaks)
         MusicSetting MUSIC_SETTING = MusicSetting::CORRECT_WRONG;
-        TrialTimingMode TIMING_MODE
-            = TrialTimingMode::FIXED_TRIAL_TIME; // Timing behavior for trials
-        float LUM_NOISE = 0.0f;                  // luminance noise [0.0, 1.0]
-        float S_CONE_NOISE = 0.1f;               // s-cone noise [0.0, 1.0]
-        float STIMULUS_SIZE = 0.5f;              // stimulus texture size multiplier [0.0, 1.0]
+        TrialTimingMode TIMING_MODE = TrialTimingMode::EARLY_EXIT; // Timing behavior for trials
+        float LUM_NOISE = 0.0f;                                    // luminance noise [0.0, 1.0]
+        float S_CONE_NOISE = 0.1f;                                 // s-cone noise [0.0, 1.0]
+        float STIMULUS_SIZE = 0.5f; // stimulus texture size multiplier [0.0, 1.0]
 
         struct
         {

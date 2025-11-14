@@ -893,7 +893,7 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
             float peak_to_test = 547.0f; // dummy basically for now
             pColorGenerator = TetriumColor::ColorGeneratorFactory::CreateGeneticColorGenerator(
                 "both",                        // sex
-                0.999f,                        // percentage_screened
+                0.99f,                         // percentage_screened
                 peak_to_test,                  // peak_to_test (547, 530, or 559)
                 1.0f,                          // luminance
                 0.5f,                          // saturation
