@@ -194,7 +194,8 @@ class AppPseudoIsochromaticTest : public App
         int metameric_axis,
         AnswerKind orientation,
         int userChoice,
-        bool correct
+        bool correct,
+        double intensity
     );
 
     // Static helper functions for Landolt C orientations

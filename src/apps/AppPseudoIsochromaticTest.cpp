@@ -703,7 +703,8 @@ void AppPseudoIsochromaticTest::transitionSubjectState(
                     trial.metameric_axis,
                     _deferredResponse.orientation,
                     _deferredResponse.buttonIndex,
-                    _deferredResponse.correct
+                    _deferredResponse.correct,
+                    trial.intensity
                 );
 
                 _deferredResponse.hasResponse = false;
@@ -767,7 +768,8 @@ void AppPseudoIsochromaticTest::transitionSubjectState(
                     trial.metameric_axis,
                     _deferredResponse.orientation,
                     _deferredResponse.buttonIndex,
-                    _deferredResponse.correct
+                    _deferredResponse.correct,
+                    trial.intensity
                 );
 
                 _deferredResponse.hasResponse = false;
@@ -808,8 +810,9 @@ void AppPseudoIsochromaticTest::transitionSubjectState(
                     trial.genotype,
                     trial.metameric_axis,
                     subject.prompt.currentOrientation,
-                    -1,   // No response
-                    false // No response = incorrect
+                    -1,    // No response
+                    false, // No response = incorrect
+                    trial.intensity
                 );
             }
 
@@ -1274,19 +1277,12 @@ void AppPseudoIsochromaticTest::logTrialData(
     int metameric_axis,
     AnswerKind orientation,
     int userChoice,
-    bool correct
+    bool correct,
+    double intensity
 )
 {
     if (!_logger)
         return;
-
-    // Get intensity from current trial if available
-    double intensity = 1.0;
-    if (_currentTrial.has_value()
-        && std::holds_alternative<TetriumColor::PseudoIsochromaticTrial>(*_currentTrial)) {
-        const auto& trial = std::get<TetriumColor::PseudoIsochromaticTrial>(*_currentTrial);
-        intensity = trial.intensity;
-    }
 
     // Parse genotype string to extract individual peaks
     std::vector<double> peaks = ParseGenotypeString(genotype);
