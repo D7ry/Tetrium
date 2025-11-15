@@ -29,10 +29,36 @@ void PR650::Init()
     }
 
     std::string reply;
+    int attemptCount = 0;
+    const int maxAttempts = 10;
 
-    while (reply != "000\r\n") {
-        ERROR("reply {}, not 000, trying again", reply);
-        ASSERT(sendMessage("b1", reply, 1000));
+    while (reply != "000\r\n" && attemptCount < maxAttempts) {
+        attemptCount++;
+        ERROR(
+            "reply '{}' (size: {}), not 000, trying again (attempt {}/{})",
+            reply,
+            reply.size(),
+            attemptCount,
+            maxAttempts
+        );
+        if (!sendMessage("b1", reply, 2000)) { // Increased timeout to 2 seconds
+            ERROR("sendMessage failed on attempt {}", attemptCount);
+#if defined(WIN32)
+            Sleep(1000); // Wait 1 second before retrying
+#else
+            usleep(1000000); // Wait 1 second before retrying
+#endif
+            continue;
+        }
+        INFO("Got reply: '{}' (size: {})", reply, reply.size());
+    }
+
+    if (reply != "000\r\n") {
+        PANIC(
+            "Failed to get '000\\r\\n' response from PR650 after {} attempts. Last reply: '{}'",
+            maxAttempts,
+            reply
+        );
     }
 
     INFO("PR650 connected on {}, backlight on: {}", portName_, reply);
@@ -203,14 +229,22 @@ bool PR650::sendMessage(const std::string& message, std::string& response, int t
     tcflush(serialHandle_, TCIFLUSH);
 
     std::string msg = message.back() == '\n' ? message : message + "\n";
+    INFO("Sending message: '{}' (length: {})", msg.substr(0, msg.length() - 1), msg.length());
     ssize_t bytesWritten = write(serialHandle_, msg.c_str(), msg.length());
     if (bytesWritten < 0) {
         perror("write");
+        ERROR("Failed to write to serial port");
         return false;
     }
+    if (bytesWritten != (ssize_t)msg.length()) {
+        ERROR("Partial write: wrote {}/{} bytes", bytesWritten, msg.length());
+        return false;
+    }
+    INFO("Wrote {} bytes", bytesWritten);
 
     tcdrain(serialHandle_); // Wait for all data to be transmitted
     usleep(500000);         // Allow PR650 to process (500ms delay like Python version)
+    INFO("Waiting for response (timeout: {}ms)...", timeout);
 
     // Read until newline or timeout using select()
     auto start = std::chrono::steady_clock::now();
@@ -236,6 +270,16 @@ bool PR650::sendMessage(const std::string& message, std::string& response, int t
         }
 
         int remaining_timeout = timeout - elapsed;
+        if (remaining_timeout <= 0) {
+            if (totalData.empty()) {
+                ERROR(
+                    "Timeout waiting for response (elapsed: {}ms, timeout: {}ms)", elapsed, timeout
+                );
+                return false;
+            }
+            break; // Timeout, return what we have
+        }
+
         struct timeval tv;
         tv.tv_sec = remaining_timeout / 1000;
         tv.tv_usec = (remaining_timeout % 1000) * 1000;
@@ -244,42 +288,63 @@ bool PR650::sendMessage(const std::string& message, std::string& response, int t
 
         if (select_result < 0) {
             perror("select");
+            ERROR("select() failed with errno: {}", errno);
             return false;
         } else if (select_result == 0) {
-            // Timeout
+            // Timeout from select
             if (totalData.empty()) {
+                ERROR(
+                    "select() timed out after {}ms (total elapsed: {}ms)",
+                    remaining_timeout,
+                    elapsed
+                );
                 return false;
             }
             break;
         }
+
+        INFO("select() returned {} (data available)", select_result);
 
         // Data is available, read it
         if (FD_ISSET(serialHandle_, &readfds)) {
             int n = read(serialHandle_, buf, sizeof(buf) - 1);
             if (n > 0) {
                 buf[n] = '\0';
+                INFO("Read {} bytes: '{}'", n, std::string(buf, n));
                 totalData.insert(totalData.end(), buf, buf + n);
 
                 // Check if we got a complete line (ends with \n)
                 if (totalData.size() >= 1 && totalData.back() == '\n') {
+                    INFO("Got complete line (ends with \\n)");
                     break;
                 }
             } else if (n < 0) {
                 perror("read");
+                ERROR("read() failed with errno: {}", errno);
                 return false;
             } else {
-                // EOF
+                // EOF (n == 0)
+                INFO("read() returned 0 (EOF)");
                 break;
             }
         }
     }
 
     if (totalData.empty()) {
+        ERROR("No data received from PR650");
         return false;
     }
 
     response = std::string(totalData.data(), totalData.size());
-    INFO("response: {}", response);
+    INFO("Final response ({} bytes): '{}'", response.size(), response);
+    // Log hex representation for debugging
+    std::string hexRep;
+    for (char c : response) {
+        char hex[4];
+        snprintf(hex, sizeof(hex), "%02X ", (unsigned char)c);
+        hexRep += hex;
+    }
+    INFO("Response hex: {}", hexRep);
 #endif
     return true;
 }
