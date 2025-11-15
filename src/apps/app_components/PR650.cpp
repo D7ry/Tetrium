@@ -12,6 +12,7 @@
 #else
 #include <errno.h>
 #include <fcntl.h>
+#include <sys/select.h>
 #include <termios.h>
 #include <unistd.h>
 #endif
@@ -82,7 +83,7 @@ bool PR650::initConnection()
 
     SetCommTimeouts(serialHandle_, &timeouts);
 #else
-    serialHandle_ = open(portName_.c_str(), O_RDWR | O_NOCTTY | O_SYNC);
+    serialHandle_ = open(portName_.c_str(), O_RDWR | O_NOCTTY);
     if (serialHandle_ < 0) {
         perror("Error opening serial port");
         return false;
@@ -105,8 +106,8 @@ bool PR650::initConnection()
 
     tty.c_lflag = 0;
     tty.c_oflag = 0;
-    tty.c_cc[VMIN] = 0;
-    tty.c_cc[VTIME] = 5;
+    tty.c_cc[VMIN] = 0;  // Non-blocking read (we use select for waiting)
+    tty.c_cc[VTIME] = 0; // No inter-character timeout (we use select for timeout)
 
     if (tcsetattr(serialHandle_, TCSANOW, &tty) != 0) {
         perror("tcsetattr");
@@ -134,6 +135,9 @@ bool PR650::isConnected() const { return serialConnected_ && connected_; }
 bool PR650::sendMessage(const std::string& message, std::string& response, int timeout)
 {
 #if defined(WIN32)
+    // Flush any pending input (Windows equivalent of tcflush)
+    PurgeComm(serialHandle_, PURGE_RXCLEAR);
+
     DWORD bytesWritten;
     std::string msg = message.back() == '\n' ? message : message + "\n";
     if (!WriteFile(serialHandle_, msg.c_str(), msg.length(), &bytesWritten, NULL)) {
@@ -141,8 +145,9 @@ bool PR650::sendMessage(const std::string& message, std::string& response, int t
         return false;
     }
 
-    // const int WAIT_REACT_TIMME = 1000; // wait for 1000 ms for PR650 to clear the IO buffer.
-    // Sleep(WAIT_REACT_TIMME);           // milliseconds
+    // Wait for data to be transmitted
+    FlushFileBuffers(serialHandle_);
+    Sleep(500); // Allow PR650 to process (500ms delay like Python version)
 
     char* buf = (char*)malloc(1024);
     DWORD bytesRead;
@@ -157,6 +162,7 @@ bool PR650::sendMessage(const std::string& message, std::string& response, int t
                 break;
             } else {
                 PANIC("Failed to read from port. Error code: {}", error);
+                free(buf);
                 return false;
             }
         }
@@ -164,6 +170,11 @@ bool PR650::sendMessage(const std::string& message, std::string& response, int t
         if (bytesRead > 0) {
             INFO("Read {} bytes", bytesRead);
             totalData.insert(totalData.end(), buf, buf + bytesRead);
+
+            // Check if we got a complete line (ends with \r\n or \n)
+            if (totalData.size() >= 1 && totalData.back() == '\n') {
+                break;
+            }
         } else {
             INFO("read 0 bytes");
         }
@@ -177,9 +188,13 @@ bool PR650::sendMessage(const std::string& message, std::string& response, int t
             break;
         }
 
-        // std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        Sleep(10); // Small delay to avoid busy waiting
     }
-    delete buf;
+    free(buf);
+
+    if (totalData.empty()) {
+        return false;
+    }
 
     response = std::string(totalData.data(), totalData.size());
     INFO("response: {}", response);
@@ -197,35 +212,66 @@ bool PR650::sendMessage(const std::string& message, std::string& response, int t
     tcdrain(serialHandle_); // Wait for all data to be transmitted
     usleep(500000);         // Allow PR650 to process (500ms delay like Python version)
 
-    // Read until newline or timeout
+    // Read until newline or timeout using select()
     auto start = std::chrono::steady_clock::now();
     std::vector<char> totalData;
     char buf[256];
 
     while (true) {
-        int n = read(serialHandle_, buf, sizeof(buf) - 1);
-        if (n > 0) {
-            buf[n] = '\0';
-            totalData.insert(totalData.end(), buf, buf + n);
-
-            // Check if we got a complete line (ends with \r\n or \n)
-            if (totalData.size() >= 1 && totalData.back() == '\n') {
-                break;
-            }
-        } else if (n < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
-            perror("read");
-            return false;
-        }
+        // Use select() to wait for data to be available
+        fd_set readfds;
+        FD_ZERO(&readfds);
+        FD_SET(serialHandle_, &readfds);
 
         auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
                            std::chrono::steady_clock::now() - start
         )
                            .count();
-        if (elapsed > timeout) {
+
+        if (elapsed >= timeout) {
+            if (totalData.empty()) {
+                return false;
+            }
+            break; // Timeout, return what we have
+        }
+
+        int remaining_timeout = timeout - elapsed;
+        struct timeval tv;
+        tv.tv_sec = remaining_timeout / 1000;
+        tv.tv_usec = (remaining_timeout % 1000) * 1000;
+
+        int select_result = select(serialHandle_ + 1, &readfds, nullptr, nullptr, &tv);
+
+        if (select_result < 0) {
+            perror("select");
+            return false;
+        } else if (select_result == 0) {
+            // Timeout
+            if (totalData.empty()) {
+                return false;
+            }
             break;
         }
 
-        usleep(10000); // Small delay to avoid busy waiting
+        // Data is available, read it
+        if (FD_ISSET(serialHandle_, &readfds)) {
+            int n = read(serialHandle_, buf, sizeof(buf) - 1);
+            if (n > 0) {
+                buf[n] = '\0';
+                totalData.insert(totalData.end(), buf, buf + n);
+
+                // Check if we got a complete line (ends with \n)
+                if (totalData.size() >= 1 && totalData.back() == '\n') {
+                    break;
+                }
+            } else if (n < 0) {
+                perror("read");
+                return false;
+            } else {
+                // EOF
+                break;
+            }
+        }
     }
 
     if (totalData.empty()) {
