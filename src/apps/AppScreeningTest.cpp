@@ -595,11 +595,11 @@ void AppScreeningTest::newGame(const TetriumApp::TickContextImGui& ctx)
 
     std::vector<int> dimensions = {2};
     _colorGenerator = new TetriumColor::ColorGenerator(
-        "female",   // sex
-        0.999f,     // percentage_screened
-        547.0f,     // peak_to_test (default from Python)
-        dimensions, // dimensions
-        TETRIUM_COLOR_PATH + "measurements/2025-10-12/primaries" // display_primaries_path
+        "female",               // sex
+        0.999f,                 // percentage_screened
+        547.0f,                 // peak_to_test (default from Python)
+        dimensions,             // dimensions
+        getTodayPrimariesPath() // display_primaries_path
     );
 
     // Create plate generator with color generator

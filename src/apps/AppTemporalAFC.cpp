@@ -364,9 +364,7 @@ void AppTemporalAFC::startTest(const TetriumApp::TickContextImGui& ctx)
     if (colorGenerator) {
         delete colorGenerator;
     }
-    colorGenerator = new TetriumColor::SolidColorGenerator(
-        TETRIUM_COLOR_PATH + "measurements/2025-10-12/primaries"
-    );
+    colorGenerator = new TetriumColor::SolidColorGenerator(getTodayPrimariesPath());
 
     // Initialize logger
     std::vector<std::string> headers

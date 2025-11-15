@@ -1,31 +1,17 @@
 #include "AppAutoMeasure.h"
+#include "Pathing.h"
 #include "imgui.h"
+#include <chrono>
+#include <filesystem>
 #include <fstream>
+#include <iomanip>
+#include <sstream>
 #include <thread>
 
 #include "app_components/PR650.h"
 
 namespace
 {
-std::string getCurrentTimeForFileName()
-{
-    // Get the current time as a time_point
-    auto now = std::chrono::system_clock::now();
-
-    // Convert to time_t to obtain the time in seconds
-    std::time_t t = std::chrono::system_clock::to_time_t(now);
-
-    // Convert to tm struct for formatting
-    std::tm tm = *std::localtime(&t);
-
-    // Create a string stream to format the date/time
-    std::stringstream ss;
-
-    // Format as YYYY-MM-DD_HH-MM-SS
-    ss << std::put_time(&tm, "%Y-%m-%d_%H-%M-%S");
-
-    return ss.str();
-}
 
 static struct
 {
@@ -68,17 +54,21 @@ static struct
 void writeToFile(const std::string file_path, const std::string text_to_write)
 {
     std::thread([file_path, text_to_write]() {
-        std::ofstream file;
         try {
+            // Create directory if it doesn't exist
+            std::filesystem::path path(file_path);
+            std::filesystem::create_directories(path.parent_path());
+
+            std::ofstream file;
             file.open(file_path, std::ios::out | std::ios::trunc); // Overwrite existing file
             if (!file.is_open()) {
-                PANIC("failed to open file")
+                PANIC("failed to open file: {}", file_path)
             }
             file << text_to_write;
             file.close();
             INFO("written to {}", file_path);
         } catch (const std::exception& e) {
-            PANIC("error writing file");
+            PANIC("error writing file: {}", e.what());
         }
     }).detach(); // Detach the thread to let it run independently
 }
@@ -174,11 +164,13 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx)
                     resultStr << wavelength << ',' << power << ',' << result.luminance << '\n';
                     INFO("{} : {} {}", i, power, wavelength);
                 }
-                // write results to ffile
+                // write results to file in date-based directory
+                std::string primariesDir = getTodayPrimariesPath();
                 std::stringstream fileName;
-                fileName << 'r' << RGBO.x << 'g' << RGBO.y << 'b' << RGBO.z << 'o' << RGBO.w
-                         << ".csv";
+                fileName << primariesDir << "/r" << RGBO.x << "g" << RGBO.y << "b" << RGBO.z << "o"
+                         << RGBO.w << ".csv";
                 writeToFile(fileName.str(), resultStr.str());
+                INFO("Saved measurement to: {}", fileName.str());
 
                 // measure next primary
                 measureContext.currPrimaryIndex++;

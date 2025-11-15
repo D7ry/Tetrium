@@ -90,9 +90,7 @@ void AppAnomaloscope::drawIdle(const TetriumApp::TickContextImGui& ctx)
     if (ImGui::Button("Start", buttonSize)) {
         // Initialize color generator
         if (!colorGenerator) {
-            colorGenerator = new TetriumColor::SolidColorGenerator(
-                TETRIUM_COLOR_PATH + "measurements/2025-10-12/primaries"
-            );
+            colorGenerator = new TetriumColor::SolidColorGenerator(getTodayPrimariesPath());
         }
         state = TestState::kRunning;
         stimulusNeedsUpdate = true;

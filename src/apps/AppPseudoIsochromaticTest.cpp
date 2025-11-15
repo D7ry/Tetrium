@@ -864,7 +864,7 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
     _trialCounter = 0;
     _currentTrial = std::nullopt;
 
-    std::string display_primaries_path = TETRIUM_COLOR_PATH + "measurements/2025-10-12/primaries";
+    std::string display_primaries_path = getTodayPrimariesPath();
 
     // Store picker type for later use
     _pickerType = SETTINGS.PICKER_TYPE;

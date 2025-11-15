@@ -172,7 +172,7 @@ void AppScrambledFaceTest::startTest(const TetriumApp::TickContextImGui& ctx)
 
     std::filesystem::create_directories("./temp");
 
-    std::string display_primaries_path = TETRIUM_COLOR_PATH + "measurements/2025-10-12/primaries";
+    std::string display_primaries_path = getTodayPrimariesPath();
 
     // Create GeneticColorGenerator
     PyObject* pColorGenerator = nullptr;
