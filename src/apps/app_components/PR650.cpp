@@ -10,8 +10,10 @@
 #if defined(WIN32)
 #include <windows.h>
 #else
+#include <cstring>
 #include <errno.h>
 #include <fcntl.h>
+#include <sys/ioctl.h>
 #include <sys/select.h>
 #include <termios.h>
 #include <unistd.h>
@@ -132,13 +134,28 @@ bool PR650::initConnection()
 
     tty.c_lflag = 0;
     tty.c_oflag = 0;
-    tty.c_cc[VMIN] = 0;  // Non-blocking read (we use select for waiting)
-    tty.c_cc[VTIME] = 0; // No inter-character timeout (we use select for timeout)
+    // Use blocking read with timeout (similar to pyserial's readline behavior)
+    // VMIN=1 means wait for at least 1 character
+    // VTIME=0 means no inter-character timeout (we'll handle timeout in code)
+    tty.c_cc[VMIN] = 1;  // Wait for at least 1 character
+    tty.c_cc[VTIME] = 0; // No inter-character timeout
 
     if (tcsetattr(serialHandle_, TCSANOW, &tty) != 0) {
         perror("tcsetattr");
         return false;
     }
+
+    // Set DTR and RTS signals (some devices need these to be active)
+    int flags = TIOCM_DTR | TIOCM_RTS;
+    if (ioctl(serialHandle_, TIOCMBIS, &flags) < 0) {
+        WARN("Failed to set DTR/RTS signals (errno: {})", errno);
+    } else {
+        INFO("Set DTR and RTS signals");
+    }
+
+    // Wait for connection to stabilize (like Python version does)
+    usleep(1000000); // 1 second delay
+    INFO("Serial port opened and configured, waiting 1s for device to stabilize");
 #endif
     return true;
 }
@@ -287,6 +304,10 @@ bool PR650::sendMessage(const std::string& message, std::string& response, int t
         int select_result = select(serialHandle_ + 1, &readfds, nullptr, nullptr, &tv);
 
         if (select_result < 0) {
+            if (errno == EINTR) {
+                // Interrupted by signal, continue
+                continue;
+            }
             perror("select");
             ERROR("select() failed with errno: {}", errno);
             return false;
@@ -294,10 +315,22 @@ bool PR650::sendMessage(const std::string& message, std::string& response, int t
             // Timeout from select
             if (totalData.empty()) {
                 ERROR(
-                    "select() timed out after {}ms (total elapsed: {}ms)",
+                    "select() timed out after {}ms (total elapsed: {}ms) - no data received from "
+                    "PR650",
                     remaining_timeout,
                     elapsed
                 );
+                // Try to read anyway in case there's a race condition
+                int n = read(serialHandle_, buf, sizeof(buf) - 1);
+                if (n > 0) {
+                    INFO("Got data after select timeout: {} bytes", n);
+                    buf[n] = '\0';
+                    totalData.insert(totalData.end(), buf, buf + n);
+                    if (totalData.back() == '\n') {
+                        break;
+                    }
+                    continue;
+                }
                 return false;
             }
             break;
