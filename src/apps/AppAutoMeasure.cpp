@@ -65,20 +65,20 @@ static struct
     std::string measuringString;
 } measureContext;
 
-void appendToFile(const std::string file_path, const std::string text_to_append)
+void writeToFile(const std::string file_path, const std::string text_to_write)
 {
-    std::thread([file_path, text_to_append]() {
+    std::thread([file_path, text_to_write]() {
         std::ofstream file;
         try {
-            file.open(file_path, std::ios::out | std::ios::app);
+            file.open(file_path, std::ios::out | std::ios::trunc); // Overwrite existing file
             if (!file.is_open()) {
                 PANIC("failed to open file")
             }
-            file << text_to_append;
+            file << text_to_write;
             file.close();
             INFO("written to {}", file_path);
         } catch (const std::exception& e) {
-            PANIC("error appending");
+            PANIC("error writing file");
         }
     }).detach(); // Detach the thread to let it run independently
 }
@@ -178,7 +178,7 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx)
                 std::stringstream fileName;
                 fileName << 'r' << RGBO.x << 'g' << RGBO.y << 'b' << RGBO.z << 'o' << RGBO.w
                          << ".csv";
-                appendToFile(fileName.str(), resultStr.str());
+                writeToFile(fileName.str(), resultStr.str());
 
                 // measure next primary
                 measureContext.currPrimaryIndex++;
