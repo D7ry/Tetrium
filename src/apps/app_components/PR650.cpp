@@ -388,15 +388,170 @@ bool PR650::sendMessageMultiLine(
     int timeout
 )
 {
-    std::string fullResponse;
-    if (!sendMessage(message, fullResponse, timeout))
-        return false;
+    // For multi-line responses (like "d5"), we need to read all lines
+    // until the device stops sending data
+#if defined(WIN32)
+    // Flush any pending input
+    PurgeComm(serialHandle_, PURGE_RXCLEAR);
 
+    DWORD bytesWritten;
+    std::string msg = message.back() == '\n' ? message : message + "\n";
+    if (!WriteFile(serialHandle_, msg.c_str(), msg.length(), &bytesWritten, NULL)) {
+        std::cerr << "Failed to write to port.\n";
+        return false;
+    }
+
+    FlushFileBuffers(serialHandle_);
+    Sleep(500); // Allow PR650 to process
+
+    char* buf = (char*)malloc(1024);
+    DWORD bytesRead;
+    std::vector<char> totalData;
+    auto start = std::chrono::steady_clock::now();
+    bool gotData = false;
+
+    // Read all lines until timeout with no new data
+    while (true) {
+        if (!ReadFile(serialHandle_, buf, 1024, &bytesRead, NULL)) {
+            DWORD error = GetLastError();
+            if (error == ERROR_HANDLE_EOF) {
+                break;
+            } else if (error != ERROR_IO_PENDING) {
+                free(buf);
+                return false;
+            }
+        }
+
+        if (bytesRead > 0) {
+            gotData = true;
+            totalData.insert(totalData.end(), buf, buf + bytesRead);
+            // Reset timeout if we got data
+            start = std::chrono::steady_clock::now();
+        } else {
+            // No data, check if we've timed out
+            auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                               std::chrono::steady_clock::now() - start
+            )
+                               .count();
+            if (elapsed > 1000 && gotData) { // 1 second of no data after getting some
+                break;
+            }
+            if (elapsed > timeout) {
+                break;
+            }
+        }
+        Sleep(10);
+    }
+    free(buf);
+
+    if (totalData.empty()) {
+        return false;
+    }
+
+    std::string fullResponse(totalData.data(), totalData.size());
+#else
+    // Flush any pending input
+    tcflush(serialHandle_, TCIFLUSH);
+
+    std::string msg = message.back() == '\n' ? message : message + "\n";
+    INFO("Sending multi-line message: '{}'", msg.substr(0, msg.length() - 1));
+    ssize_t bytesWritten = write(serialHandle_, msg.c_str(), msg.length());
+    if (bytesWritten < 0 || bytesWritten != (ssize_t)msg.length()) {
+        ERROR("Failed to write to serial port");
+        return false;
+    }
+
+    tcdrain(serialHandle_);
+    usleep(500000); // Allow PR650 to process
+
+    // Read all lines until timeout with no new data
+    auto start = std::chrono::steady_clock::now();
+    std::vector<char> totalData;
+    char buf[256];
+    bool gotData = false;
+    const int noDataTimeout = 1000; // 1 second of no data after getting some
+
+    while (true) {
+        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                           std::chrono::steady_clock::now() - start
+        )
+                           .count();
+
+        // If we got data but haven't received any for 1 second, we're done
+        if (gotData && elapsed > noDataTimeout) {
+            INFO("No new data for {}ms, assuming complete", noDataTimeout);
+            break;
+        }
+        // If total timeout exceeded, we're done
+        if (elapsed > timeout) {
+            if (!gotData) {
+                ERROR("Timeout waiting for multi-line response");
+                return false;
+            }
+            break;
+        }
+
+        // Use select to wait for data
+        fd_set readfds;
+        FD_ZERO(&readfds);
+        FD_SET(serialHandle_, &readfds);
+
+        int remaining_timeout
+            = (timeout - elapsed < noDataTimeout) ? (timeout - elapsed) : noDataTimeout;
+        struct timeval tv;
+        tv.tv_sec = remaining_timeout / 1000;
+        tv.tv_usec = (remaining_timeout % 1000) * 1000;
+
+        int select_result = select(serialHandle_ + 1, &readfds, nullptr, nullptr, &tv);
+
+        if (select_result < 0) {
+            if (errno == EINTR)
+                continue;
+            perror("select");
+            return false;
+        } else if (select_result == 0) {
+            // Timeout - if we got data, we're done; otherwise continue waiting
+            if (gotData) {
+                break;
+            }
+            continue;
+        }
+
+        // Data available, read it
+        if (FD_ISSET(serialHandle_, &readfds)) {
+            int n = read(serialHandle_, buf, sizeof(buf) - 1);
+            if (n > 0) {
+                gotData = true;
+                buf[n] = '\0';
+                totalData.insert(totalData.end(), buf, buf + n);
+                start = std::chrono::steady_clock::now(); // Reset timeout
+                INFO("Read {} bytes (total: {})", n, totalData.size());
+            } else if (n < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
+                perror("read");
+                return false;
+            }
+        }
+    }
+
+    if (totalData.empty()) {
+        ERROR("No data received for multi-line response");
+        return false;
+    }
+
+    std::string fullResponse(totalData.data(), totalData.size());
+    INFO("Multi-line response received: {} bytes", fullResponse.size());
+#endif
+
+    // Split into lines
     std::istringstream iss(fullResponse);
     std::string line;
     while (std::getline(iss, line)) {
-        responseLines.push_back(line);
+        if (!line.empty() || responseLines.empty()) { // Keep empty lines if they're meaningful
+            responseLines.push_back(line);
+        }
     }
+
+    INFO("Parsed {} lines from multi-line response", responseLines.size());
     return true;
 }
 
