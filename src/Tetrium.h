@@ -59,6 +59,8 @@ class Tetrium
     {
         kCursor,
         kCalibrationGraient,
+        kRGBLogo,
+        kOCVLogo,
         kNumTextures
     };
 

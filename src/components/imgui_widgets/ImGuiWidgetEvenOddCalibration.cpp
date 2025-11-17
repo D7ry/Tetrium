@@ -246,36 +246,32 @@ void ImGuiWidgetEvenOddCalibration::Draw(Tetrium* engine, ColorSpace colorSpace)
         }
     }
 
-    if (true) { // draw RGO and BGO gradients
+    if (true) { // draw RGB or OCV logo full width
         ImDrawList* dl = ImGui::GetWindowDrawList();
 
         ImVec2 availableSize = ImGui::GetContentRegionAvail();
-        availableSize.x *= 0.5;
 
-        ImGuiTexture& gradientTexture
-            = engine->_engineTextures[(int)Tetrium::EngineTexture::kCalibrationGraient].second;
+        // Select texture based on color space
+        ImGuiTexture& logoTexture
+            = (colorSpace == ColorSpace::RGB)
+                  ? engine->_engineTextures[(int)Tetrium::EngineTexture::kRGBLogo].second
+                  : engine->_engineTextures[(int)Tetrium::EngineTexture::kOCVLogo].second;
 
-        // scale the texture
-        float scale = availableSize.x / (float)gradientTexture.width;
+        // Scale the texture to fit full width while preserving aspect ratio
+        float scale = availableSize.x / (float)logoTexture.width;
 
         ImVec2 fitSize;
-        fitSize.x = (float)gradientTexture.width * scale;
-        fitSize.y = (float)gradientTexture.height * scale;
+        fitSize.x = availableSize.x;
+        fitSize.y = (float)logoTexture.height * scale;
 
         ImVec2 imageBegin = ImGui::GetCursorPos() + ImGui::GetWindowPos();
-
-        // draw black background
-        dl->AddRectFilled(
-            imageBegin, imageBegin + ImVec2{fitSize.x * 2, fitSize.y}, IM_COL32(0, 0, 0, 255)
-        );
-
-        if (colorSpace == ColorSpace::OCV) {
-            imageBegin.x += fitSize.x; // RGB is drawn on the lhs
-        }
-
         ImVec2 imageEnd(imageBegin.x + fitSize.x, imageBegin.y + fitSize.y);
 
-        dl->AddImage(gradientTexture.id, imageBegin, imageEnd);
+        // Draw black background
+        dl->AddRectFilled(imageBegin, imageEnd, IM_COL32(0, 0, 0, 255));
+
+        // Draw the image
+        dl->AddImage(logoTexture.id, imageBegin, imageEnd);
     }
     // if (ImGui::Button("Draw Calibration Window")) {
     //     _drawTestWindow = true;

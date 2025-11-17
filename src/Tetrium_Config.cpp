@@ -67,4 +67,6 @@ const std::vector<const char*> Tetrium::EVEN_ODD_SOFTWARE_DEVICE_EXTENSIONS = {
 const std::array<std::string, static_cast<int>(Tetrium::EngineTexture::kNumTextures)>
     Tetrium::ENGINE_TEXTURE_PATHS
     = {ASSETS_PATH + "textures/engine/cursor.png", // kCursor
-       ASSETS_PATH + "textures/engine/even_odd_calibration/rgb_gradient.png"};
+       ASSETS_PATH + "textures/engine/even_odd_calibration/rgb_gradient.png", // kCalibrationGraient
+       ASSETS_PATH + "textures/RGB.png", // kRGBLogo
+       ASSETS_PATH + "textures/OCV.png"}; // kOCVLogo

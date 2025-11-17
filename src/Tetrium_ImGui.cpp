@@ -1,20 +1,19 @@
 ﻿// ImGui initialization and resource management
 
-
 #include "imgui.h"
 #include "implot.h"
 #include "misc/freetype/imgui_freetype.h"
 
 #if defined(WIN32)
 #include "backends/imgui_impl_win32.h"
-#else 
+#else
 #include "backends/imgui_impl_glfw.h"
 #endif // WIN32
 
 #include "backends/imgui_impl_vulkan.h"
 
-#include "lib/ImGuiUtils.h"
 #include "Tetrium.h"
+#include "lib/ImGuiUtils.h"
 
 #include "Pathing.h"
 
@@ -139,7 +138,10 @@ void initFonts()
     cfg.FontBuilderFlags |= ImGuiFreeTypeBuilderFlags_LoadColor;
 
     atlas->AddFontFromFileTTF(
-        std::string(ASSETS_PATH + "fonts/seguiemj.ttf").c_str(), DEFAULTS::ImGui::DEFAULT_FONT_SIZE, &cfg, ranges
+        std::string(ASSETS_PATH + "fonts/seguiemj.ttf").c_str(),
+        DEFAULTS::ImGui::DEFAULT_FONT_SIZE,
+        &cfg,
+        ranges
     );
 
     atlas->Build();
@@ -191,7 +193,8 @@ void Tetrium::initImGuiRenderContext(Tetrium::ImGuiRenderContext& ctx)
     VkImageLayout imguiInitialLayout, imguiFinalLayout;
     imguiInitialLayout = VK_IMAGE_LAYOUT_UNDEFINED; // for first pass
     // imguiFinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    imguiFinalLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL; // frame buffer after imgui pass gets blitted
+    imguiFinalLayout
+        = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL; // frame buffer after imgui pass gets blitted
 
     ctx.renderPass = createRenderPass(
         _device->Get(),
@@ -211,7 +214,8 @@ void Tetrium::initImGuiRenderContext(Tetrium::ImGuiRenderContext& ctx)
         GLOBALS::DISPLAY_EXTENT,
         ctx.renderPass,
         //_renderContextRYGB.virtualFrameBuffer.imageView,
-        _renderContextRYGB.virtualFrameBuffer.imageView, // render to vfb to be rescaled onto swapchain
+        _renderContextRYGB.virtualFrameBuffer
+            .imageView, // render to vfb to be rescaled onto swapchain
         ctx.frameBuffer
     );
 
@@ -338,6 +342,7 @@ void Tetrium::clearImGuiDrawData()
 #pragma endregion
 
 #pragma region ImGui Draw
+
 void Tetrium::drawAppsImGui(ColorSpace colorSpace, int currentFrameInFlight)
 {
     if (_primaryApp.has_value()) {
@@ -346,17 +351,18 @@ void Tetrium::drawAppsImGui(ColorSpace colorSpace, int currentFrameInFlight)
         TetriumApp::TickContextImGui ctxImGui{
             .currentFrameInFlight = currentFrameInFlight,
             .colorSpace = colorSpace,
-            .apis = {
-                .PlaySound = [this](Sound sound) { _soundManager.PlaySound(sound); },
-                .LoadTexture = [this](const std::string& path) { return _textureManager.LoadTexture(path); },
-                .InitImGuiTexture = [this](uint32_t textureHandle) {
-                    _textureManager.LoadImGuiTexture(textureHandle);
-                    return _textureManager.GetImGuiTexture(textureHandle);
-                },
-                .UnloadTexture = [this](uint32_t textureHandle) { _textureManager.UnLoadTexture(textureHandle); }
-            },
-            .controls = {.wantExit = false, .musicOverride = std::nullopt}
-        };
+            .apis
+            = {.PlaySound = [this](Sound sound) { _soundManager.PlaySound(sound); },
+               .LoadTexture
+               = [this](const std::string& path) { return _textureManager.LoadTexture(path); },
+               .InitImGuiTexture =
+                   [this](uint32_t textureHandle) {
+                       _textureManager.LoadImGuiTexture(textureHandle);
+                       return _textureManager.GetImGuiTexture(textureHandle);
+                   },
+               .UnloadTexture
+               = [this](uint32_t textureHandle) { _textureManager.UnLoadTexture(textureHandle); }},
+            .controls = {.wantExit = false, .musicOverride = std::nullopt}};
 
         app->TickImGui(ctxImGui);
 
@@ -415,7 +421,6 @@ void Tetrium::drawMainMenu(ColorSpace colorSpace)
                 ImGui::EndTabItem();
             }
 
-
             if (ImGui::BeginTabItem("Color Tile")) {
                 _widgetColorTile.Draw(this, colorSpace);
                 ImGui::EndTabItem();
@@ -445,20 +450,20 @@ void Tetrium::drawImGui(ColorSpace colorSpace, int currentFrameInFlight)
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
 
-
     // imgui is associated with the glfw window to handle inputs,
     // but its actual fb is associated with the projector display;
     // so we need to manually re-adjust the display size for the scissors/
     // viewports/clipping to be consistent
     bool imguiDisplaySizeOverride = _tetraMode == TetraMode::kEvenOddHardwareSync;
     if (imguiDisplaySizeOverride) {
-        ImVec2 projectorDisplaySize{
+        ImVec2 projectorDisplaySize
+        {
 #if defined(WIN32) || __linux__
             static_cast<float>(GLOBALS::DISPLAY_EXTENT.width),
-            static_cast<float>(GLOBALS::DISPLAY_EXTENT.height)
+                static_cast<float>(GLOBALS::DISPLAY_EXTENT.height)
 #else
             static_cast<float>(_mainProjectorDisplay.extent.width),
-            static_cast<float>(_mainProjectorDisplay.extent.height)
+                static_cast<float>(_mainProjectorDisplay.extent.height)
 #endif
         };
         io.DisplaySize = projectorDisplaySize;
@@ -469,13 +474,13 @@ void Tetrium::drawImGui(ColorSpace colorSpace, int currentFrameInFlight)
 
     if (GlobalStates::isWindowFocused) {
 #if defined(WIN32)
-        //SetCapture(_dxgiDisplay.window);
+        // SetCapture(_dxgiDisplay.window);
 #else
         glfwSetInputMode(_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 #endif // WIN32
     } else {
 #if defined(WIN32)
-        //ReleaseCapture();
+        // ReleaseCapture();
 #else
         glfwSetInputMode(_window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 #endif // WIN32
@@ -484,19 +489,20 @@ void Tetrium::drawImGui(ColorSpace colorSpace, int currentFrameInFlight)
 
     std::string footnoteText = (const char*)u8"🧩 Tetrium 0.9a";
     switch (_rocvPresentMode) {
-        case ROCVPresentMode::kNormal:
-            footnoteText += " | Normal Mode";
-            break;
-        case ROCVPresentMode::kRGBOnly:
-            footnoteText += " | RGB Only Mode";
-            break;
-        case ROCVPresentMode::kOCVOnly:
-            footnoteText += " | OCV Only Mode";
-            break;
+    case ROCVPresentMode::kNormal:
+        footnoteText += " | Normal Mode";
+        break;
+    case ROCVPresentMode::kRGBOnly:
+        footnoteText += " | RGB Only Mode";
+        break;
+    case ROCVPresentMode::kOCVOnly:
+        footnoteText += " | OCV Only Mode";
+        break;
     }
 
 #if defined(WIN32)
-    //footnoteText += "| Dropped Frames: " + std::to_string(_swapChain.chainDXGI->GetNumDroppedFrames());
+    // footnoteText += "| Dropped Frames: " +
+    // std::to_string(_swapChain.chainDXGI->GetNumDroppedFrames());
 #endif
     ImGuiU::DrawFootNote(footnoteText.c_str());
 
