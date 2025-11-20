@@ -69,7 +69,11 @@ void createCommandPoolAndBuffers(
  * @param properties
  * @return uint32_t
  */
-uint32_t findMemoryType(VkPhysicalDevice physicalDevice, uint32_t typeFilter, VkMemoryPropertyFlags properties);
+uint32_t findMemoryType(
+    VkPhysicalDevice physicalDevice,
+    uint32_t typeFilter,
+    VkMemoryPropertyFlags properties
+);
 
 void vkMemCopy(void* src, VkDeviceMemory dstMemory, VkDeviceSize size, VkDevice dstDevice);
 
@@ -85,7 +89,7 @@ void copyBuffer(
 VkImageView createImageView(
     VkImage& textureImage,
     VkDevice logicalDevice,
-    VkFormat format = VK_FORMAT_R8G8B8A8_SRGB,
+    VkFormat format = VK_FORMAT_R8G8B8A8_UNORM,
     VkImageAspectFlags flags = VK_IMAGE_ASPECT_COLOR_BIT
 );
 

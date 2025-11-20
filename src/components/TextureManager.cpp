@@ -111,7 +111,7 @@ void TextureManager::GetDescriptorImageInfo(uint32_t handle, VkDescriptorImageIn
 
 uint32_t TextureManager::LoadCubemapTexture(const std::string& imagePath)
 {
-    const auto imageFormat = VK_FORMAT_R8G8B8A8_SRGB;
+    const auto imageFormat = VK_FORMAT_R8G8B8A8_UNORM;
     // Load the single image
     int width, height, channels;
     stbi_uc* pixels = stbi_load(imagePath.c_str(), &width, &height, &channels, STBI_rgb_alpha);

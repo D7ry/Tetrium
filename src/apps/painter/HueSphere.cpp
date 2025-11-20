@@ -1,8 +1,8 @@
 #include "HueSphere.h"
 #include "Pathing.h"
-#include "structs/Vertex.h"
 #include "components/ShaderUtils.h"
 #include "imgui.h"
+#include "structs/Vertex.h"
 #include <lib/VQUtils.h>
 
 std::string VERTEX_SHADER_PATH = ASSETS_PATH + "apps/AppPainter/shaders/hue_sphere.vert.spv";
@@ -20,14 +20,19 @@ std::string HUE_SPHERE_PRETTY_MODEL_PATH = ASSETS_PATH + "apps/AppPainter/sphere
 std::string HUE_SPHERE_PRETTY_TEXTURE_PATH_RGB = HUE_SPHERE_UGLY_TEXTURE_PATH_RGB;
 std::string HUE_SPHERE_PRETTY_TEXTURE_PATH_OCV = HUE_SPHERE_UGLY_TEXTURE_PATH_OCV;
 
-void HueSphere::DrawHuesphereInImGui(const TetriumApp::TickContextImGui& ctx, float scale, float hRotation, float vRotation)
+void HueSphere::DrawHuesphereInImGui(
+    const TetriumApp::TickContextImGui& ctx,
+    float scale,
+    float hRotation,
+    float vRotation
+)
 {
     auto& fb = _renderContexts[ctx.colorSpace].fb;
-    
+
     glm::vec3 defaultScale(1, 1, 1);
     _rasterizationCtx.hueSpheretransform.scale = defaultScale * (_scaleToSaturation ? scale : 1);
-    //FIXME: fix rotation
-    _rasterizationCtx.hueSpheretransform.rotation = glm::vec3(90 ,hRotation * 365,0);
+    // FIXME: fix rotation
+    _rasterizationCtx.hueSpheretransform.rotation = glm::vec3(90, hRotation * 365, 0);
 
     ImGui::Image(fb.GetImGuiTextureId(), ImVec2{(float)_fbWidth, (float)_fbHeight});
 
@@ -65,9 +70,7 @@ void HueSphere::DrawHuesphereInImGui(const TetriumApp::TickContextImGui& ctx, fl
 
     ImGui::Text("Projection Type");
     ImGui::RadioButton(
-        "Orthographic",
-        (int*)&_rasterizationCtx.projectionType,
-        (int)ProjectionType::Orthographic
+        "Orthographic", (int*)&_rasterizationCtx.projectionType, (int)ProjectionType::Orthographic
     );
     ImGui::SameLine();
     ImGui::RadioButton(
@@ -98,19 +101,19 @@ void HueSphere::TickVulkan(TetriumApp::TickContextVulkan& ctx)
 
         glm::mat4 projectionMatrix = _rasterizationCtx.projectionType == ProjectionType::Perspective
                                          ? glm::perspective(
-                                               glm::radians(_rasterizationCtx.perspectiveFOV),
-                                               aspectRatio,
-                                               DEFAULTS::ZNEAR,
-                                               DEFAULTS::ZFAR
-                                           )
+                                             glm::radians(_rasterizationCtx.perspectiveFOV),
+                                             aspectRatio,
+                                             DEFAULTS::ZNEAR,
+                                             DEFAULTS::ZFAR
+                                         )
                                          : glm::ortho(
-                                               -orthoWidth / 2.0f,  // left
-                                               orthoWidth / 2.0f,   // right
-                                               -orthoHeight / 2.0f, // bottom
-                                               orthoHeight / 2.0f,  // top
-                                               DEFAULTS::ZNEAR,     // near
-                                               DEFAULTS::ZFAR       // far
-                                           );
+                                             -orthoWidth / 2.0f,  // left
+                                             orthoWidth / 2.0f,   // right
+                                             -orthoHeight / 2.0f, // bottom
+                                             orthoHeight / 2.0f,  // top
+                                             DEFAULTS::ZNEAR,     // near
+                                             DEFAULTS::ZFAR       // far
+                                         );
 
         projectionMatrix[1][1] *= -1; // invert for vulkan coord system
         pUBO->proj = projectionMatrix;
@@ -169,15 +172,21 @@ void HueSphere::Cleanup(TetriumApp::CleanupContext& ctx)
 
     vk::Device device = ctx.device.logicalDevice;
     device.destroyRenderPass(_renderPass);
-    //cleanupCubemapTexture(ctx);
+    // cleanupCubemapTexture(ctx);
 };
 
-void HueSphere::Init(TetriumApp::InitContext& ctx, uint32_t fbWidth, uint32_t fbHeight, uint32_t cubemapSize, TextureFrameBuffer& cubemapTexture)
+void HueSphere::Init(
+    TetriumApp::InitContext& ctx,
+    uint32_t fbWidth,
+    uint32_t fbHeight,
+    uint32_t cubemapSize,
+    TextureFrameBuffer& cubemapTexture
+)
 {
     DEBUG("Initializing Huesphere...");
     _fbWidth = fbWidth;
     _fbHeight = fbHeight;
-    //initCubemapTexture(ctx, cubemapSize);
+    // initCubemapTexture(ctx, cubemapSize);
 
     initRenderPass(ctx);
 
@@ -195,10 +204,7 @@ void HueSphere::Init(TetriumApp::InitContext& ctx, uint32_t fbWidth, uint32_t fb
     _rasterizationCtx.camera.SetPosition(-2, 0, 0);
 };
 
-void HueSphere::cleanupRenderContext(
-    RenderContext& ctx,
-    TetriumApp::CleanupContext& cleanupCtx
-)
+void HueSphere::cleanupRenderContext(RenderContext& ctx, TetriumApp::CleanupContext& cleanupCtx)
 {
     ctx.fb.Cleanup();
 }
@@ -211,7 +217,7 @@ void HueSphere::initRenderContext(RenderContext& ctx, TetriumApp::InitContext& i
         _renderPass,
         _fbWidth,
         _fbHeight,
-        VK_FORMAT_R8G8B8A8_SRGB,
+        VK_FORMAT_R8G8B8A8_UNORM,
         initCtx.device.depthFormat
     );
 }
@@ -243,7 +249,7 @@ void HueSphere::initRenderPass(TetriumApp::InitContext& initCtx)
     {
         VkAttachmentDescription& colorAttachment = attachments[0];
         colorAttachment = {};
-        colorAttachment.format = VK_FORMAT_R8G8B8A8_SRGB;
+        colorAttachment.format = VK_FORMAT_R8G8B8A8_UNORM;
         colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
 
         colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
@@ -280,8 +286,7 @@ void HueSphere::initRenderPass(TetriumApp::InitContext& initCtx)
         .dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, // what to not execute
         // we care about src and dst access masks only when there's a potential data race.
         .srcAccessMask = VK_ACCESS_NONE,
-        .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
-    };
+        .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT};
 
     VkRenderPassCreateInfo renderPassInfo{};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
@@ -299,7 +304,10 @@ void HueSphere::initRenderPass(TetriumApp::InitContext& initCtx)
     DEBUG("render pass created");
 }
 
-void HueSphere::initRasterization(TetriumApp::InitContext& initCtx, TextureFrameBuffer& cubemapTexture)
+void HueSphere::initRasterization(
+    TetriumApp::InitContext& initCtx,
+    TextureFrameBuffer& cubemapTexture
+)
 {
     vk::Device device = initCtx.device.logicalDevice;
     // allocate device memory for UBO
@@ -388,7 +396,6 @@ void HueSphere::initRasterization(TetriumApp::InitContext& initCtx, TextureFrame
                 nullptr
             );
 
-
             vk::DescriptorImageInfo cubemapTextureInfo = cubemapTexture.GetDescriptorImageInfo();
 
             descriptorWrites[1] = vk::WriteDescriptorSet(
@@ -409,8 +416,9 @@ void HueSphere::initRasterization(TetriumApp::InitContext& initCtx, TextureFrame
     // build graphics pipeline
     {
         // shader modules
-        vk::ShaderModule vertShaderModule
-            = ShaderCreation::createShaderModule(initCtx.device.logicalDevice, VERTEX_SHADER_PATH.c_str());
+        vk::ShaderModule vertShaderModule = ShaderCreation::createShaderModule(
+            initCtx.device.logicalDevice, VERTEX_SHADER_PATH.c_str()
+        );
         vk::ShaderModule fragShaderModule = ShaderCreation::createShaderModule(
             initCtx.device.logicalDevice, FRAGMENT_SHADER_PATH.c_str()
         );
@@ -550,7 +558,7 @@ void HueSphere::initRasterization(TetriumApp::InitContext& initCtx, TextureFrame
         );
     }
 
-    _rasterizationCtx.hueSpheretransform.rotation = glm::vec3(90,0, 0);
+    _rasterizationCtx.hueSpheretransform.rotation = glm::vec3(90, 0, 0);
 }
 
 void HueSphere::cleanupRasterization(TetriumApp::CleanupContext& cleanupCtx)
@@ -615,7 +623,7 @@ void HueSphere::initCubemapTexture(TetriumApp::InitContext& ctx, uint32_t faceSi
     VkImageCreateInfo imageCreateInfo = {};
     imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
-    imageCreateInfo.format = VK_FORMAT_R8G8B8A8_SRGB;
+    imageCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
     imageCreateInfo.extent.width = faceSize;
     imageCreateInfo.extent.height = faceSize;
     imageCreateInfo.extent.depth = 1;
@@ -627,7 +635,7 @@ void HueSphere::initCubemapTexture(TetriumApp::InitContext& ctx, uint32_t faceSi
     imageCreateInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
     imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     VK_CHECK(vkCreateImage(ctx.device.Get(), &imageCreateInfo, nullptr, &_cubemapTexture.image));
-    
+
     VkMemoryAllocateInfo allocInfo = {};
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     VkMemoryRequirements memRequirements;
@@ -647,7 +655,7 @@ void HueSphere::initCubemapTexture(TetriumApp::InitContext& ctx, uint32_t faceSi
     viewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     viewCreateInfo.image = _cubemapTexture.image;
     viewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_CUBE;
-    viewCreateInfo.format = VK_FORMAT_R8G8B8A8_SRGB;
+    viewCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
     viewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     viewCreateInfo.subresourceRange.baseMipLevel = 0;
     viewCreateInfo.subresourceRange.levelCount = 1;
@@ -675,9 +683,9 @@ void HueSphere::initCubemapTexture(TetriumApp::InitContext& ctx, uint32_t faceSi
     samplerCreateInfo.compareOp = VK_COMPARE_OP_ALWAYS;
     samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 
-    VK_CHECK(vkCreateSampler(
-        device.logicalDevice, &samplerCreateInfo, nullptr, &_cubemapTexture.sampler
-    ));
+    VK_CHECK(
+        vkCreateSampler(device.logicalDevice, &samplerCreateInfo, nullptr, &_cubemapTexture.sampler)
+    );
 }
 
 void HueSphere::cleanupCubemapTexture(TetriumApp::CleanupContext& ctx)

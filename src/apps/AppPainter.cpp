@@ -128,7 +128,7 @@ void AppPainter::initViewSpaceFrameBuffer(TetriumApp::InitContext& ctx)
             _paintToViewSpaceContext.renderPass,
             _canvasWidth,
             _canvasHeight,
-            VK_FORMAT_R8G8B8A8_SRGB, // RGB / OCV color space
+            VK_FORMAT_R8G8B8A8_UNORM, // RGB / OCV color space
             ctx.device.depthFormat,
             true
         );

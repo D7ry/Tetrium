@@ -21,7 +21,7 @@ namespace
 unsigned int FB_WIDTH = 1024;
 unsigned int FB_HEIGHT = 1024;
 
-static const VkFormat FB_IMAGE_FORMAT = VK_FORMAT_R8G8B8A8_SRGB;
+static const VkFormat FB_IMAGE_FORMAT = VK_FORMAT_R8G8B8A8_UNORM;
 
 std::string VERTEX_SHADER_PATH = ASSETS_PATH + "apps/AppTetraHueSphere/shader.vert.spv";
 std::string FRAGMENT_SHADER_PATH = ASSETS_PATH + "apps/AppTetraHueSphere/shader.frag.spv";
@@ -37,7 +37,6 @@ std::string HUE_SPHERE_PRETTY_MODEL_PATH = ASSETS_PATH + "apps/AppTetraHueSphere
 
 std::string HUE_SPHERE_PRETTY_TEXTURE_PATH_RGB = HUE_SPHERE_UGLY_TEXTURE_PATH_RGB;
 std::string HUE_SPHERE_PRETTY_TEXTURE_PATH_OCV = HUE_SPHERE_UGLY_TEXTURE_PATH_OCV;
-
 
 } // namespace
 
@@ -122,7 +121,7 @@ void AppTetraHueSphere::TickImGui(const TetriumApp::TickContextImGui& ctx)
         // if (ImGui::SliderFloat("Hue Sphere Z", &hueSpherePos.z, -10.f, 10.f)) {
         //     _rasterizationCtx.hueSpheretransform.position = hueSpherePos;
         // }
-        
+
         ImGui::SeparatorText("Rendering");
         // color & depth stencil clear value sliders
         ImGui::ColorEdit4("Clear Color", (float*)&_clearValues[0].color);
@@ -192,19 +191,19 @@ void AppTetraHueSphere::TickVulkan(TetriumApp::TickContextVulkan& ctx)
 
         glm::mat4 projectionMatrix = _rasterizationCtx.projectionType == ProjectionType::Perspective
                                          ? glm::perspective(
-                                               glm::radians(_rasterizationCtx.perspectiveFOV),
-                                               aspectRatio,
-                                               DEFAULTS::ZNEAR,
-                                               DEFAULTS::ZFAR
-                                           )
+                                             glm::radians(_rasterizationCtx.perspectiveFOV),
+                                             aspectRatio,
+                                             DEFAULTS::ZNEAR,
+                                             DEFAULTS::ZFAR
+                                         )
                                          : glm::ortho(
-                                               -orthoWidth / 2.0f,  // left
-                                               orthoWidth / 2.0f,   // right
-                                               -orthoHeight / 2.0f, // bottom
-                                               orthoHeight / 2.0f,  // top
-                                               DEFAULTS::ZNEAR,     // near
-                                               DEFAULTS::ZFAR       // far
-                                           );
+                                             -orthoWidth / 2.0f,  // left
+                                             orthoWidth / 2.0f,   // right
+                                             -orthoHeight / 2.0f, // bottom
+                                             orthoHeight / 2.0f,  // top
+                                             DEFAULTS::ZNEAR,     // near
+                                             DEFAULTS::ZFAR       // far
+                                         );
 
         projectionMatrix[1][1] *= -1; // invert for vulkan coord system
         pUBO->proj = projectionMatrix;
@@ -373,8 +372,7 @@ void AppTetraHueSphere::initRenderPass(TetriumApp::InitContext& initCtx)
         .dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, // what to not execute
         // we care about src and dst access masks only when there's a potential data race.
         .srcAccessMask = VK_ACCESS_NONE,
-        .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
-    };
+        .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT};
 
     VkRenderPassCreateInfo renderPassInfo{};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
@@ -481,16 +479,24 @@ void AppTetraHueSphere::initRasterization(TetriumApp::InitContext& initCtx)
                 nullptr
             );
 
-            uint32_t imageInfoUglyRGBHandle = initCtx.api.LoadCubemapTexture(HUE_SPHERE_UGLY_TEXTURE_PATH_RGB);
-            uint32_t imageInfoUglyOCVHandle = initCtx.api.LoadCubemapTexture(HUE_SPHERE_UGLY_TEXTURE_PATH_OCV);
-            uint32_t imageInfoPrettyRGBHandle = initCtx.api.LoadCubemapTexture(HUE_SPHERE_PRETTY_TEXTURE_PATH_RGB);
-            uint32_t imageInfoPrettyOCVHandle = initCtx.api.LoadCubemapTexture(HUE_SPHERE_PRETTY_TEXTURE_PATH_OCV);
+            uint32_t imageInfoUglyRGBHandle
+                = initCtx.api.LoadCubemapTexture(HUE_SPHERE_UGLY_TEXTURE_PATH_RGB);
+            uint32_t imageInfoUglyOCVHandle
+                = initCtx.api.LoadCubemapTexture(HUE_SPHERE_UGLY_TEXTURE_PATH_OCV);
+            uint32_t imageInfoPrettyRGBHandle
+                = initCtx.api.LoadCubemapTexture(HUE_SPHERE_PRETTY_TEXTURE_PATH_RGB);
+            uint32_t imageInfoPrettyOCVHandle
+                = initCtx.api.LoadCubemapTexture(HUE_SPHERE_PRETTY_TEXTURE_PATH_OCV);
 
             // sampler
-            vk::DescriptorImageInfo imageInfoUglyRGB = initCtx.api.GetTextureDescriptorImageInfo(imageInfoUglyRGBHandle);
-            vk::DescriptorImageInfo imageInfoUglyOCV = initCtx.api.GetTextureDescriptorImageInfo(imageInfoUglyOCVHandle);
-            vk::DescriptorImageInfo imageInfoPrettyRGB = initCtx.api.GetTextureDescriptorImageInfo(imageInfoPrettyRGBHandle);
-            vk::DescriptorImageInfo imageInfoPrettyOCV = initCtx.api.GetTextureDescriptorImageInfo(imageInfoPrettyOCVHandle);
+            vk::DescriptorImageInfo imageInfoUglyRGB
+                = initCtx.api.GetTextureDescriptorImageInfo(imageInfoUglyRGBHandle);
+            vk::DescriptorImageInfo imageInfoUglyOCV
+                = initCtx.api.GetTextureDescriptorImageInfo(imageInfoUglyOCVHandle);
+            vk::DescriptorImageInfo imageInfoPrettyRGB
+                = initCtx.api.GetTextureDescriptorImageInfo(imageInfoPrettyRGBHandle);
+            vk::DescriptorImageInfo imageInfoPrettyOCV
+                = initCtx.api.GetTextureDescriptorImageInfo(imageInfoPrettyOCVHandle);
 
             _rasterizationCtx.loadedTextures.push_back(imageInfoUglyRGBHandle);
 
@@ -515,8 +521,9 @@ void AppTetraHueSphere::initRasterization(TetriumApp::InitContext& initCtx)
     // build graphics pipeline
     {
         // shader modules
-        vk::ShaderModule vertShaderModule
-            = ShaderCreation::createShaderModule(initCtx.device.logicalDevice, VERTEX_SHADER_PATH.c_str());
+        vk::ShaderModule vertShaderModule = ShaderCreation::createShaderModule(
+            initCtx.device.logicalDevice, VERTEX_SHADER_PATH.c_str()
+        );
         vk::ShaderModule fragShaderModule = ShaderCreation::createShaderModule(
             initCtx.device.logicalDevice, FRAGMENT_SHADER_PATH.c_str()
         );
@@ -662,7 +669,7 @@ void AppTetraHueSphere::initRasterization(TetriumApp::InitContext& initCtx)
         );
     }
 
-    _rasterizationCtx.hueSpheretransform.rotation = glm::vec3(90,0, 0);
+    _rasterizationCtx.hueSpheretransform.rotation = glm::vec3(90, 0, 0);
 }
 
 void AppTetraHueSphere::cleanupRasterization(TetriumApp::CleanupContext& cleanupCtx)
