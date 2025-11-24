@@ -65,6 +65,8 @@ class AppPseudoIsochromaticTest : public App
         float LUM_NOISE = 0.0f;                                    // luminance noise [0.0, 1.0]
         float S_CONE_NOISE = 0.1f;                                 // s-cone noise [0.0, 1.0]
         float STIMULUS_SIZE = 0.5f; // stimulus texture size multiplier [0.0, 1.0]
+        float STIMULUS_RAMP_UP_DURATION
+            = 0.5f; // duration in seconds for brightness ramp-up [0.0, 10.0]
 
         struct
         {
@@ -107,7 +109,8 @@ class AppPseudoIsochromaticTest : public App
     struct SubjectContext
     {
         std::string name;
-        float currStateRemainderTime; // remaining time before jumping to next state
+        float currStateRemainderTime;       // remaining time before jumping to next state
+        float identificationStateStartTime; // initial duration when entering identification state
         SubjectState state;
         uint32_t currentTrialIndex;  // index to the current trial in the trial list
         uint32_t numSuccessAttempts; // # of attempts where the tester identified the right pattern

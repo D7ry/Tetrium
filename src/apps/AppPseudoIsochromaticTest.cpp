@@ -297,6 +297,11 @@ void TetriumApp::AppPseudoIsochromaticTest::drawSettingsWindow(
         // Stimulus size slider
         ImGui::SliderFloat("Stimulus Size", &SETTINGS.STIMULUS_SIZE, 0.0f, 1.0f);
 
+        // Stimulus ramp-up duration slider
+        ImGui::SliderFloat(
+            "Stimulus Ramp-Up Duration (seconds)", &SETTINGS.STIMULUS_RAMP_UP_DURATION, 0.0f, 10.0f
+        );
+
         // Music setting dropdown
         ImGui::Text("Music Setting");
         const char* musicOptions[] = {"ALL", "CORRECT_WRONG", "OFF"};
@@ -406,11 +411,23 @@ void AppPseudoIsochromaticTest::drawLandoltC(
     ImVec2 textureFullscreenSize
         = ImVec2(tex.width * SETTINGS.STIMULUS_SIZE, tex.height * SETTINGS.STIMULUS_SIZE);
 
+    // Calculate brightness based on elapsed time in identification state
+    float elapsedTime = subject.identificationStateStartTime - subject.currStateRemainderTime;
+    float brightness = 1.0f;
+
+    if (SETTINGS.STIMULUS_RAMP_UP_DURATION > 0.0f) {
+        brightness = std::min(1.0f, elapsedTime / SETTINGS.STIMULUS_RAMP_UP_DURATION);
+        brightness = std::max(0.0f, brightness); // Clamp to [0, 1]
+    }
+
+    // Apply brightness as tint color (RGB all set to brightness, alpha = 1.0)
+    ImVec4 tintColor(brightness, brightness, brightness, 1.0f);
+
     // center the texture onto the screen
     ImVec2 centerPos = ImVec2(availSize.x * 0.5f, availSize.y * 0.5f);
     ImGui::SetCursorPos(centerPos - textureFullscreenSize * 0.5f);
 
-    ImGui::Image(tex.id, textureFullscreenSize);
+    ImGui::Image(tex.id, textureFullscreenSize, ImVec2(0, 0), ImVec2(1, 1), tintColor);
 }
 
 void AppPseudoIsochromaticTest::drawTestForSubject(
@@ -669,6 +686,7 @@ void AppPseudoIsochromaticTest::transitionSubjectState(
             }
         }
         subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.IDENTIFICATION;
+        subject.identificationStateStartTime = SETTINGS.STATE_DURATIONS_SECONDS.IDENTIFICATION;
         subject.state = SubjectState::kIdentification;
         break;
     case SubjectState::kIdentification:
@@ -999,6 +1017,7 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
     _subject = SubjectContext{
         .name = _nameInputBuffer,
         .currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.FIXATION,
+        .identificationStateStartTime = SETTINGS.STATE_DURATIONS_SECONDS.IDENTIFICATION,
         .state = SubjectState::kFixation,
         .currentTrialIndex = 0,
         .numSuccessAttempts = 0,
