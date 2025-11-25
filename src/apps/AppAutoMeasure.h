@@ -2,18 +2,19 @@
 
 #include "App.h"
 
-namespace TetriumApp {
+namespace TetriumApp
+{
 
-class AppAutoMeasure: public App
+class AppAutoMeasure : public App
 {
   public:
     virtual void Init(TetriumApp::InitContext& ctx) override;
     virtual void Cleanup(TetriumApp::CleanupContext& ctx) override;
 
     // Called when the app is opened i.e. becomes the primary app
-    virtual void OnOpen() override {};
+    virtual void OnOpen() override{};
     // Called when the app is closed i.e. no longer the primary app
-    virtual void OnClose() override {};
+    virtual void OnClose() override{};
 
     // TickImGui() and TickVulkan() are only called if the app is active
     // i.e. we expect the app to render to the screen
@@ -31,12 +32,25 @@ class AppAutoMeasure: public App
     // Off-screen Tick() function,
     // function runs regardless of the window being visible
     virtual void TickOffScreen(TetriumApp::TickContextOffScreen& ctx) override {}
-  private:
 
+  private:
     void drawColorBlock(const TetriumApp::TickContextImGui& ctx, glm::ivec4 rgbo);
-    struct {
+    bool loadPrimariesFromFile(const std::string& filename);
+    void scanMeasurementFiles();
+
+    struct
+    {
         bool connecting = false;
         bool measuring = false;
     } pr650States;
+
+    struct
+    {
+        std::vector<std::string> availableFiles;
+        std::vector<glm::ivec4> currentPrimaries;
+        std::string selectedFile = "";
+        int selectedFileIndex = 0;
+        int currPrimaryIndex = 0;
+    } measurementData;
 };
 }; // namespace TetriumApp

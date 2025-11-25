@@ -15,73 +15,6 @@ namespace
 
 static struct
 {
-    // jessica, shove in the stuff here, in {r, y, g, b} format
-    const std::vector<glm::ivec4> PRIMARIES{
-        // PRIMARIES
-        // {{255, 0, 0, 0}, {0, 255, 0, 0}, {0, 0, 255, 0}, {0, 0, 0, 255}}
-        // TEST VALUES
-        {{11, 77, 71, 255},  {255, 121, 66, 42}, {0, 101, 72, 240},  {255, 147, 67, 16},
-         {0, 119, 76, 211},  {241, 162, 71, 0},  {0, 65, 98, 247},   {255, 111, 93, 23},
-         {0, 93, 99, 220},   {252, 138, 95, 0},  {0, 116, 99, 192},  {219, 156, 95, 0},
-         {0, 57, 124, 222},  {254, 103, 119, 0}, {0, 82, 127, 196},  {224, 122, 123, 0},
-         {0, 108, 126, 171}, {195, 143, 122, 0}, {0, 76, 69, 249},   {255, 117, 65, 43},
-         {0, 98, 72, 220},   {255, 139, 68, 14}, {0, 114, 75, 197},  {244, 152, 71, 0},
-         {0, 66, 95, 232},   {255, 107, 90, 26}, {0, 92, 96, 206},   {255, 132, 92, 0},
-         {0, 112, 96, 180},  {223, 148, 92, 0},  {0, 58, 119, 209},  {255, 99, 115, 3},
-         {0, 82, 123, 184},  {228, 118, 119, 0}, {0, 105, 121, 160}, {198, 137, 118, 0},
-         {23, 79, 73, 255},  {255, 127, 68, 43}, {0, 103, 73, 252},  {255, 155, 68, 19},
-         {0, 124, 77, 221},  {242, 173, 72, 0},  {2, 65, 101, 255},  {255, 116, 96, 24},
-         {0, 94, 103, 230},  {252, 145, 97, 0},  {0, 121, 102, 200}, {219, 165, 98, 0},
-         {0, 56, 128, 231},  {254, 108, 123, 0}, {0, 83, 131, 204},  {224, 129, 126, 0},
-         {0, 110, 129, 178}, {195, 150, 125, 0}, {52, 76, 77, 255},  {255, 145, 70, 27},
-         {29, 102, 77, 255}, {255, 180, 69, 2},  {1, 125, 79, 255},  {228, 203, 72, 0},
-         {32, 58, 107, 255}, {255, 135, 99, 5},  {6, 86, 109, 255},  {234, 164, 101, 0},
-         {0, 119, 109, 230}, {205, 190, 102, 0}, {7, 43, 136, 255},  {234, 121, 128, 0},
-         {0, 74, 139, 234},  {208, 146, 132, 0}, {0, 108, 137, 206}, {183, 171, 130, 0}}
-        // {{11, 77, 70, 255},  {255, 121, 66, 43}, {0, 101, 71, 239},  {255, 146, 66, 18},
-        //  {0, 119, 75, 211},  {243, 162, 71, 0},  {0, 65, 97, 246},   {255, 110, 92, 25},
-        //  {0, 93, 98, 220},   {253, 138, 94, 0},  {0, 116, 98, 192},  {221, 155, 94, 0},
-        //  {0, 57, 123, 222},  {255, 102, 118, 1}, {0, 82, 126, 196},  {226, 122, 122, 0},
-        //  {0, 108, 124, 170}, {196, 143, 121, 0}, {0, 76, 68, 249},   {255, 117, 64, 44},
-        //  {0, 98, 71, 220},   {255, 138, 67, 16}, {0, 114, 74, 196},  {245, 152, 70, 0},
-        //  {0, 66, 94, 231},   {255, 106, 90, 27}, {0, 92, 95, 206},   {255, 132, 91, 2},
-        //  {0, 112, 95, 180},  {225, 148, 91, 0},  {0, 58, 118, 209},  {255, 98, 114, 4},
-        //  {0, 82, 121, 184},  {230, 118, 118, 0}, {0, 105, 120, 160}, {199, 137, 117, 0},
-        //  {22, 79, 72, 255},  {255, 126, 67, 44}, {0, 103, 72, 251},  {255, 154, 67, 20},
-        //  {0, 124, 76, 220},  {244, 173, 71, 0},  {1, 64, 100, 255},  {255, 116, 95, 25},
-        //  {0, 94, 101, 229},  {253, 145, 96, 0},  {0, 121, 101, 199}, {221, 165, 97, 0},
-        //  {0, 56, 127, 231},  {255, 108, 121, 0}, {0, 83, 130, 204},  {225, 129, 125, 0},
-        //  {0, 110, 128, 178}, {196, 150, 124, 0}, {51, 75, 76, 255},  {255, 145, 69, 28},
-        //  {28, 102, 76, 255}, {255, 179, 68, 2},  {0, 125, 78, 255},  {229, 203, 71, 0},
-        //  {31, 58, 105, 255}, {255, 134, 98, 6},  {5, 85, 107, 255},  {234, 164, 100, 0},
-        //  {0, 119, 107, 229}, {206, 189, 100, 0}, {6, 43, 134, 255},  {235, 121, 127, 0},
-        //  {0, 74, 137, 233},  {209, 145, 130, 0}, {0, 108, 135, 205}, {184, 170, 129, 0}}
-        // CUBEMAP
-        /*  {{54, 91, 89, 255},  {255, 129, 85, 109}, {41, 109, 84, 255}, {255, 150, 80, 100},
-           {18, 129, 83, 255}, {255, 174, 78, 83},  {0, 148, 86, 247},  {255, 196, 81, 63},
-           {0, 164, 92, 228},  {255, 212, 86, 43},  {44, 79, 110, 255}, {255, 119, 106, 102},
-           {30, 98, 108, 255}, {255, 141, 103, 92}, {3, 121, 108, 255}, {255, 169, 102, 73},
-           {0, 147, 110, 233}, {255, 195, 104, 48}, {0, 164, 113, 212}, {255, 212, 108, 28},
-           {25, 66, 137, 255}, {255, 109, 132, 89}, {8, 84, 139, 255},  {255, 130, 134, 76},
-           {0, 112, 141, 238}, {255, 160, 136, 54}, {0, 140, 141, 214}, {255, 188, 135, 29},
-           {0, 159, 139, 195}, {255, 207, 134, 10}, {0, 55, 163, 255},  {255, 104, 158, 70},
-           {0, 75, 169, 239},  {255, 123, 164, 54}, {0, 102, 173, 217}, {255, 150, 167, 32},
-           {0, 129, 171, 195}, {255, 177, 165, 11}, {0, 149, 165, 180}, {249, 196, 160, 0},
-           {0, 54, 183, 236},  {255, 102, 177, 52}, {0, 71, 190, 220},  {255, 119, 184, 35},
-           {0, 94, 193, 200},  {255, 142, 188, 16}, {0, 118, 191, 183}, {252, 165, 186, 0},
-           {0, 137, 184, 170}, {235, 181, 179, 0}}*/
-        /* {{0, 148, 86, 247},
-          {255, 196, 81, 63},
-          {255, 212, 86, 43},
-          {255, 130, 134, 76},
-          {0, 54, 183, 236},
-          {0, 102, 173, 217},
-          {255, 150, 167, 32},
-          {0, 129, 171, 195},
-          {0, 54, 183, 236}}*/
-    };
-    int currPrimaryIndex = 0;
-
     std::string rgboValuesString;
     std::string measuringString;
 } measureContext;
@@ -135,9 +68,82 @@ void AppAutoMeasure::Init(TetriumApp::InitContext& ctx)
 #endif
 
     IPR650 = new PR650(portName);
+
+    // Scan for available measurement files
+    scanMeasurementFiles();
 };
 
 void AppAutoMeasure::Cleanup(TetriumApp::CleanupContext& ctx) { delete IPR650; };
+
+bool AppAutoMeasure::loadPrimariesFromFile(const std::string& filename)
+{
+    std::string fullPath = ASSETS_PATH + "apps/AppAutoMeasure/" + filename;
+    std::ifstream file(fullPath);
+
+    if (!file.is_open()) {
+        ERROR("Failed to open measurement file: {}", fullPath);
+        return false;
+    }
+
+    measurementData.currentPrimaries.clear();
+    std::string line;
+
+    while (std::getline(file, line)) {
+        // Skip empty lines and comments
+        if (line.empty() || line[0] == '#') {
+            continue;
+        }
+
+        std::istringstream iss(line);
+        int r, g, b, o;
+
+        if (iss >> r >> g >> b >> o) {
+            // Validate range
+            if (r >= 0 && r <= 255 && g >= 0 && g <= 255 && b >= 0 && b <= 255 && o >= 0
+                && o <= 255) {
+                measurementData.currentPrimaries.emplace_back(r, g, b, o);
+            } else {
+                WARN("Invalid RGBO values in line: {}", line);
+            }
+        } else {
+            WARN("Failed to parse line: {}", line);
+        }
+    }
+
+    file.close();
+
+    if (measurementData.currentPrimaries.empty()) {
+        ERROR("No valid primaries loaded from file: {}", filename);
+        return false;
+    }
+
+    INFO("Loaded {} primaries from {}", measurementData.currentPrimaries.size(), filename);
+    measurementData.selectedFile = filename;
+    measurementData.currPrimaryIndex = 0;
+    return true;
+}
+
+void AppAutoMeasure::scanMeasurementFiles()
+{
+    measurementData.availableFiles.clear();
+    std::string measurementDir = ASSETS_PATH + "apps/AppAutoMeasure/";
+
+    try {
+        for (const auto& entry : std::filesystem::directory_iterator(measurementDir)) {
+            if (entry.is_regular_file() && entry.path().extension() == ".txt") {
+                measurementData.availableFiles.push_back(entry.path().filename().string());
+            }
+        }
+    } catch (const std::filesystem::filesystem_error& e) {
+        WARN("Failed to scan measurement directory: {}", e.what());
+    }
+
+    // Load the first available file by default
+    if (!measurementData.availableFiles.empty()) {
+        measurementData.selectedFileIndex = 0;
+        loadPrimariesFromFile(measurementData.availableFiles[0]);
+    }
+}
 
 void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx)
 {
@@ -150,6 +156,39 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx)
             | ImGuiWindowFlags_NoResize;
 
     if (ImGui::Begin("measure", NULL, flags)) {
+        // Measurement file selection dropdown
+        ImGui::Text("Measurement File:");
+        ImGui::SameLine();
+
+        if (!measurementData.availableFiles.empty()) {
+            const char* currentFile = measurementData.selectedFile.c_str();
+            if (ImGui::BeginCombo("##MeasurementFile", currentFile)) {
+                for (int i = 0; i < measurementData.availableFiles.size(); i++) {
+                    bool isSelected = (measurementData.selectedFileIndex == i);
+                    if (ImGui::Selectable(measurementData.availableFiles[i].c_str(), isSelected)) {
+                        measurementData.selectedFileIndex = i;
+                        loadPrimariesFromFile(measurementData.availableFiles[i]);
+                    }
+                    if (isSelected) {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                }
+                ImGui::EndCombo();
+            }
+
+            ImGui::SameLine();
+            if (ImGui::Button("Refresh Files")) {
+                scanMeasurementFiles();
+            }
+        } else {
+            ImGui::Text("No .txt files found in assets/apps/AppAutoMeasure/");
+            if (ImGui::Button("Refresh Files")) {
+                scanMeasurementFiles();
+            }
+        }
+
+        ImGui::Separator();
+
         if (!IPR650->isConnected()) {
             ImGui::Text("PR650 not connected");
             ImGui::SameLine();
@@ -167,7 +206,14 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx)
         }
     }
 
-    glm::ivec4 RGBO = measureContext.PRIMARIES[measureContext.currPrimaryIndex];
+    if (measurementData.currentPrimaries.empty()) {
+        ImGui::Text("No measurement data loaded. Please select a valid .txt file.");
+        ImGui::End();
+        ImGui::PopStyleColor();
+        return;
+    }
+
+    glm::ivec4 RGBO = measurementData.currentPrimaries[measurementData.currPrimaryIndex];
     if (IPR650->isConnected()) {
         if (!pr650States.measuring) {
             // if not measuring, prompt user to start measuring
@@ -178,9 +224,9 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx)
             }
         } else {
             measureContext.measuringString
-                = "Measuring" + std::to_string(measureContext.currPrimaryIndex + 1) + '/'
-                  + std::to_string(measureContext.PRIMARIES.size());
-            ImGui::Button(measureContext.measuringString.data());
+                = "Measuring " + std::to_string(measurementData.currPrimaryIndex + 1) + "/"
+                  + std::to_string(measurementData.currentPrimaries.size());
+            ImGui::Button(measureContext.measuringString.c_str());
             // query pr650 to see if data is ready
             if (IPR650->MeasureResult.ready) {
                 // read back pr650 states
@@ -199,20 +245,27 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx)
                     resultStr << wavelength << ',' << power << ',' << result.luminance << '\n';
                     INFO("{} : {} {}", i, power, wavelength);
                 }
-                // write results to file in date-based directory
-                std::string primariesDir = getTodayPrimariesPath();
+                // write results to file in measurement-specific directory
+                std::string baseFileName = measurementData.selectedFile;
+                // Remove .txt extension
+                if (baseFileName.size() > 4
+                    && baseFileName.substr(baseFileName.size() - 4) == ".txt") {
+                    baseFileName = baseFileName.substr(0, baseFileName.size() - 4);
+                }
+
+                std::string measurementDir = getTodayPrimariesPath() + "/" + baseFileName;
                 std::stringstream fileName;
-                fileName << primariesDir << "/r" << RGBO.x << "g" << RGBO.y << "b" << RGBO.z << "o"
-                         << RGBO.w << ".csv";
+                fileName << measurementDir << "/r" << RGBO.x << "g" << RGBO.y << "b" << RGBO.z
+                         << "o" << RGBO.w << ".csv";
                 writeToFile(fileName.str(), resultStr.str());
                 INFO("Saved measurement to: {}", fileName.str());
 
                 // measure next primary
-                measureContext.currPrimaryIndex++;
+                measurementData.currPrimaryIndex++;
                 // done measuring
-                if (measureContext.currPrimaryIndex == measureContext.PRIMARIES.size()) {
+                if (measurementData.currPrimaryIndex == measurementData.currentPrimaries.size()) {
                     pr650States.measuring = false;
-                    measureContext.currPrimaryIndex = 0;
+                    measurementData.currPrimaryIndex = 0;
                 } else {
                     // update internal states to proceed to measure next
                     std::thread t([]() { IPR650->StartMeasuring(); });
@@ -227,7 +280,7 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx)
         measureContext.rgboValuesString += std::to_string(RGBO[i]);
         measureContext.rgboValuesString += ' ';
     }
-    ImGui::Text(measureContext.rgboValuesString.data());
+    ImGui::Text("%s", measureContext.rgboValuesString.c_str());
 
     // for (int i = 0; i < 4; i++) {
     //     const char* label = labels.at(i);
