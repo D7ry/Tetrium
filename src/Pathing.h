@@ -39,3 +39,9 @@ inline std::string getTodayPrimariesPath()
     std::string date = getCurrentDate();
     return TETRIUM_COLOR_PATH + "measurements/" + date + "/primaries";
 }
+
+inline std::string getTodayMeasurementsPath()
+{
+    std::string date = getCurrentDate();
+    return TETRIUM_COLOR_PATH + "measurements/" + date;
+}

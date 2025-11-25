@@ -253,7 +253,7 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx)
                     baseFileName = baseFileName.substr(0, baseFileName.size() - 4);
                 }
 
-                std::string measurementDir = getTodayPrimariesPath() + "/" + baseFileName;
+                std::string measurementDir = getTodayMeasurementsPath() + "/" + baseFileName;
                 std::stringstream fileName;
                 fileName << measurementDir << "/r" << RGBO.x << "g" << RGBO.y << "b" << RGBO.z
                          << "o" << RGBO.w << ".csv";
