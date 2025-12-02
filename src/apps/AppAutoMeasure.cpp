@@ -19,6 +19,23 @@ static struct
     std::string measuringString;
 } measureContext;
 
+std::string getTimestampString()
+{
+    auto now = std::chrono::system_clock::now();
+    std::time_t t = std::chrono::system_clock::to_time_t(now);
+    std::tm tm = *std::localtime(&t);
+
+    // Get milliseconds
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
+
+    std::stringstream ss;
+    // Format as YYYYMMDD_HHMMSS_fff (filesystem-safe, no colons)
+    ss << std::put_time(&tm, "%Y%m%d_%H%M%S");
+    ss << "_" << std::setfill('0') << std::setw(3) << ms.count();
+
+    return ss.str();
+}
+
 void writeToFile(const std::string file_path, const std::string text_to_write)
 {
     std::thread([file_path, text_to_write]() {
@@ -254,9 +271,10 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx)
                 }
 
                 std::string measurementDir = getTodayMeasurementsPath() + "/" + baseFileName;
+                std::string timestamp = getTimestampString();
                 std::stringstream fileName;
                 fileName << measurementDir << "/r" << RGBO.x << "g" << RGBO.y << "b" << RGBO.z
-                         << "o" << RGBO.w << ".csv";
+                         << "o" << RGBO.w << "_" << timestamp << ".csv";
                 writeToFile(fileName.str(), resultStr.str());
                 INFO("Saved measurement to: {}", fileName.str());
 
