@@ -64,7 +64,7 @@ void PR650::Init()
     }
 
     INFO("PR650 connected on {}, backlight on: {}", portName_, reply);
-    ASSERT(sendMessage("s01,,,,,,01,1", reply, 1000));
+    ASSERT(sendMessage("s01,,,,30,200,05,1", reply, 1000));
     INFO("response to some shit we sent: {}", reply);
     connected_ = true;
 }
