@@ -345,7 +345,7 @@ void AppAutoMeasure::drawLandoltCStimulus(const TetriumApp::TickContextImGui& ct
     float stimulusPixelSize = referenceTextureSize * STIMULUS_SIZE;
 
     // Ensure stimulus fits in available space
-    float maxRadius = std::min(availSize.x, availSize.y) * 0.4f; // Use 40% of available space
+    float maxRadius = std::min(availSize.x, availSize.y); // Use 40% of available space
     float stimulusRadius = std::min(stimulusPixelSize * 0.5f, maxRadius);
 
     // Annulus parameters
