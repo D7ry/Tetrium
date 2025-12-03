@@ -307,7 +307,11 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx)
     //     ImGui::SliderInt(label, &RGBO[i], 0, 255);
     // }
 
-    drawLandoltCStimulus(ctx, RGBO);
+    // Get the Y position after the menu (where we'll draw the stimulus)
+    float menuEndY = ImGui::GetCursorScreenPos().y;
+    float menuHeight = menuEndY - ImGui::GetWindowPos().y;
+
+    drawLandoltCStimulus(ctx, RGBO, menuHeight);
     ImGui::End();
     ImGui::PopStyleColor(2); // Pop both WindowBg and Text colors
 }
@@ -315,37 +319,44 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx)
 void AppAutoMeasure::drawColorBlock(const TetriumApp::TickContextImGui& ctx, glm::ivec4 rgbo)
 {
     // Legacy function - now using drawLandoltCStimulus instead
-    drawLandoltCStimulus(ctx, rgbo);
+    // Get menu height (0 if called from elsewhere)
+    float menuHeight = ImGui::GetCursorScreenPos().y - ImGui::GetWindowPos().y;
+    drawLandoltCStimulus(ctx, rgbo, menuHeight);
 }
 
-void AppAutoMeasure::drawLandoltCStimulus(const TetriumApp::TickContextImGui& ctx, glm::ivec4 rgbo)
+void AppAutoMeasure::drawLandoltCStimulus(
+    const TetriumApp::TickContextImGui& ctx,
+    glm::ivec4 rgbo,
+    float menuHeight
+)
 {
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     ImVec2 windowSize = ImGui::GetWindowSize();
     ImVec2 windowPos = ImGui::GetWindowPos();
 
-    // Get available space (accounting for UI elements at top)
-    ImVec2 availSize = ImGui::GetContentRegionAvail();
-    ImVec2 cursorPos = ImGui::GetCursorScreenPos();
+    // Calculate available space below the menu
+    float availableHeight = windowSize.y - menuHeight;
+    float availableStartY = windowPos.y + menuHeight;
 
-    // Center in the available space below the UI
-    ImVec2 center = ImVec2(cursorPos.x + availSize.x * 0.5f, cursorPos.y + availSize.y * 0.5f);
+    // Center horizontally, but vertically center in the space below the menu
+    ImVec2 center
+        = ImVec2(windowPos.x + windowSize.x * 0.5f, availableStartY + availableHeight * 0.5f);
 
-    // Fill only the available area below the UI with black (not the entire window)
+    // Fill only the area below the menu with black
     drawList->AddRectFilled(
-        cursorPos,
-        ImVec2(cursorPos.x + availSize.x, cursorPos.y + availSize.y),
+        ImVec2(windowPos.x, availableStartY),
+        ImVec2(windowPos.x + windowSize.x, windowPos.y + windowSize.y),
         IM_COL32(0, 0, 0, 255)
     );
 
-    // Calculate stimulus size to fit in available space
+    // Calculate stimulus size to fit in available space below menu
     // Use a reference texture size - typical Landolt C texture is around 1024x1024
     // STIMULUS_SIZE of 0.5 means half the reference size
     const float referenceTextureSize = 1024.0f;
     float stimulusPixelSize = referenceTextureSize * STIMULUS_SIZE;
 
-    // Ensure stimulus fits in available space
-    float maxRadius = std::min(availSize.x, availSize.y); // Use 40% of available space
+    // Ensure stimulus fits in available space below menu
+    float maxRadius = std::min(windowSize.x, availableHeight) * 0.4f; // Use 40% of available space
     float stimulusRadius = std::min(stimulusPixelSize * 0.5f, maxRadius);
 
     // Annulus parameters

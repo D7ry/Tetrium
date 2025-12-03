@@ -36,7 +36,11 @@ class AppAutoMeasure : public App
 
   private:
     void drawColorBlock(const TetriumApp::TickContextImGui& ctx, glm::ivec4 rgbo);
-    void drawLandoltCStimulus(const TetriumApp::TickContextImGui& ctx, glm::ivec4 rgbo);
+    void drawLandoltCStimulus(
+        const TetriumApp::TickContextImGui& ctx,
+        glm::ivec4 rgbo,
+        float menuHeight
+    );
     void drawMeasurementBoxes(ImVec2 center, float innerRadius, float outerRadius);
     bool loadPrimariesFromFile(const std::string& filename);
     void scanMeasurementFiles();
