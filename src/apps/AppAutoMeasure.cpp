@@ -333,18 +333,14 @@ void AppAutoMeasure::drawLandoltCStimulus(
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     ImVec2 windowSize = ImGui::GetWindowSize();
     ImVec2 windowPos = ImGui::GetWindowPos();
-
-    // Calculate available space below the menu
-    float availableHeight = windowSize.y - menuHeight;
-    float availableStartY = windowPos.y + menuHeight;
+    // Calculate available space below the menud    float availableHeight = windowSize.y;
 
     // Center horizontally, but vertically center in the space below the menu
-    ImVec2 center
-        = ImVec2(windowPos.x + windowSize.x * 0.5f, availableStartY + availableHeight * 0.5f);
+    ImVec2 center = ImVec2(windowPos.x + windowSize.x * 0.5f, (windowSize.y - menuHeight) * 0.5f);
 
     // Fill only the area below the menu with black
     drawList->AddRectFilled(
-        ImVec2(windowPos.x, availableStartY),
+        ImVec2(windowPos.x, windowPos.y + menuHeight),
         ImVec2(windowPos.x + windowSize.x, windowPos.y + windowSize.y),
         IM_COL32(0, 0, 0, 255)
     );
@@ -356,7 +352,7 @@ void AppAutoMeasure::drawLandoltCStimulus(
     float stimulusPixelSize = referenceTextureSize * STIMULUS_SIZE;
 
     // Ensure stimulus fits in available space below menu
-    float maxRadius = std::min(windowSize.x, availableHeight) * 0.4f; // Use 40% of available space
+    float maxRadius = std::min(windowSize.x, windowSize.y); // Use 40% of available space
     float stimulusRadius = std::min(stimulusPixelSize * 0.5f, maxRadius);
 
     // Annulus parameters
