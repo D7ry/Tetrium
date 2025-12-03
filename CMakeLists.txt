@@ -56,6 +56,7 @@ set(SOURCES_BUILD
         src/apps/AppImageViewer.cpp
         src/apps/AppPainter.cpp
         src/apps/AppAutoMeasure.cpp
+        src/apps/AppGeneticTestViewer.cpp
         
         # Test data logging
         src/lib/TestDataLogger.cpp

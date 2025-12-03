@@ -9,6 +9,7 @@
 #include "apps/AppPseudoIsochromaticTest.h"
 #include "apps/AppScrambledFaceTest.h"
 // #include "apps/AppScreeningTest.h"  // TODO: Refactor to use new TestGenerator interface
+#include "apps/AppGeneticTestViewer.h"
 #include "apps/AppTemporalAFC.h"
 #include "apps/AppTetraHueSphere.h"
 
@@ -45,6 +46,7 @@ int main(int argc, char** argv)
         {new TetriumApp::AppImageViewer(), "Image Viewer"},
         {new TetriumApp::AppPainter(), "Painter"},
         {new TetriumApp::AppAutoMeasure(), "Measure"},
+        {new TetriumApp::AppGeneticTestViewer(), "Genetic Test Viewer"},
     };
 
 #if defined(__APPLE__)
