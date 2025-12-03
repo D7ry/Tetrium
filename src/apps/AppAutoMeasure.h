@@ -1,6 +1,7 @@
 #pragma once
 
 #include "App.h"
+#include "imgui.h"
 
 namespace TetriumApp
 {
@@ -35,8 +36,12 @@ class AppAutoMeasure : public App
 
   private:
     void drawColorBlock(const TetriumApp::TickContextImGui& ctx, glm::ivec4 rgbo);
+    void drawLandoltCStimulus(const TetriumApp::TickContextImGui& ctx, glm::ivec4 rgbo);
+    void drawMeasurementBoxes(ImVec2 center, float innerRadius, float outerRadius);
     bool loadPrimariesFromFile(const std::string& filename);
     void scanMeasurementFiles();
+
+    static constexpr float STIMULUS_SIZE = 0.5f; // Same as AppPseudoIsochromaticTest default
 
     struct
     {

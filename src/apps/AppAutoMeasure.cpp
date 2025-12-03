@@ -2,6 +2,7 @@
 #include "Pathing.h"
 #include "imgui.h"
 #include <chrono>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
@@ -166,6 +167,7 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx)
 {
 
     ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0, 0, 0, 1));
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1, 1, 1, 1)); // White text
     ImGuiWindowFlags flags = 0;
     ImGui::SetNextWindowPos(ImVec2(0, 0));
     ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
@@ -305,26 +307,99 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx)
     //     ImGui::SliderInt(label, &RGBO[i], 0, 255);
     // }
 
-    drawColorBlock(ctx, RGBO);
+    drawLandoltCStimulus(ctx, RGBO);
     ImGui::End();
-    ImGui::PopStyleColor();
+    ImGui::PopStyleColor(2); // Pop both WindowBg and Text colors
 }
 
 void AppAutoMeasure::drawColorBlock(const TetriumApp::TickContextImGui& ctx, glm::ivec4 rgbo)
 {
-    ImVec2 start_pos = ImGui::GetCursorScreenPos();
-    ImVec2 window_pos = ImGui::GetWindowPos();
-    ImVec2 window_size = ImGui::GetWindowSize();
+    // Legacy function - now using drawLandoltCStimulus instead
+    drawLandoltCStimulus(ctx, rgbo);
+}
 
-    // Define the rectangle from current draw line (cursor Y) to the bottom of the window
-    ImVec2 rect_min = start_pos;
-    ImVec2 rect_max = ImVec2(window_pos.x + window_size.x, window_pos.y + window_size.y);
+void AppAutoMeasure::drawLandoltCStimulus(const TetriumApp::TickContextImGui& ctx, glm::ivec4 rgbo)
+{
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+    ImVec2 windowSize = ImGui::GetWindowSize();
+    ImVec2 windowPos = ImGui::GetWindowPos();
 
-    // Choose your color (RGBA)
+    // Get available space (accounting for UI elements at top)
+    ImVec2 availSize = ImGui::GetContentRegionAvail();
+    ImVec2 cursorPos = ImGui::GetCursorScreenPos();
+
+    // Center in the available space below the UI
+    ImVec2 center = ImVec2(cursorPos.x + availSize.x * 0.5f, cursorPos.y + availSize.y * 0.5f);
+
+    // Fill only the available area below the UI with black (not the entire window)
+    drawList->AddRectFilled(
+        cursorPos,
+        ImVec2(cursorPos.x + availSize.x, cursorPos.y + availSize.y),
+        IM_COL32(0, 0, 0, 255)
+    );
+
+    // Calculate stimulus size to fit in available space
+    // Use a reference texture size - typical Landolt C texture is around 1024x1024
+    // STIMULUS_SIZE of 0.5 means half the reference size
+    const float referenceTextureSize = 1024.0f;
+    float stimulusPixelSize = referenceTextureSize * STIMULUS_SIZE;
+
+    // Ensure stimulus fits in available space
+    float maxRadius = std::min(availSize.x, availSize.y) * 0.4f; // Use 40% of available space
+    float stimulusRadius = std::min(stimulusPixelSize * 0.5f, maxRadius);
+
+    // Annulus parameters
+    float outerRadius = stimulusRadius * 0.8f;     // Leave margin
+    float strokeWidth = outerRadius * 1.0f;        // Ring thickness
+    float innerRadius = outerRadius - strokeWidth; // Inner radius for the annulus
+
+    // Choose color (RGBA)
     ImU32 color = ctx.colorSpace == RGB ? IM_COL32(rgbo.x, rgbo.y, rgbo.w, 255)
                                         : IM_COL32(rgbo.z, rgbo.y, rgbo.w, 255);
 
-    // Draw the filled rectangle
-    ImGui::GetWindowDrawList()->AddRectFilled(rect_min, rect_max, color);
+    // Draw a complete annulus (full ring without gap)
+    // Draw outer circle filled, then subtract inner circle
+    drawList->AddCircleFilled(center, outerRadius, color, 0);
+    drawList->AddCircleFilled(
+        center, innerRadius, IM_COL32(0, 0, 0, 255), 0
+    ); // Black to create hole
+
+    // Draw measurement boxes at gap locations and center
+    drawMeasurementBoxes(center, innerRadius, outerRadius);
+}
+
+void AppAutoMeasure::drawMeasurementBoxes(ImVec2 center, float innerRadius, float outerRadius)
+{
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+
+    // Box size - make it bigger for easier measurement
+    float boxSize = outerRadius * 0.4f; // Box is 40% of inner radius
+
+    // Position boxes inside the circle, at the gap locations
+    // Place them at a distance between inner and outer radius, closer to inner
+    float boxDistance = (outerRadius * 0.75f); // Middle of the ring
+
+    // Box color (white outline)
+    ImU32 boxColor = IM_COL32(255, 255, 255, 255);
+    float boxThickness = 2.0f;
+
+    // Draw boxes at 4 gap locations (inside the circle)
+    ImVec2 positions[4] = {
+        ImVec2(center.x, center.y - boxDistance), // Up
+        ImVec2(center.x, center.y + boxDistance), // Down
+        ImVec2(center.x - boxDistance, center.y), // Left
+        ImVec2(center.x + boxDistance, center.y)  // Right
+    };
+
+    for (int i = 0; i < 4; i++) {
+        ImVec2 boxMin = ImVec2(positions[i].x - boxSize * 0.5f, positions[i].y - boxSize * 0.5f);
+        ImVec2 boxMax = ImVec2(positions[i].x + boxSize * 0.5f, positions[i].y + boxSize * 0.5f);
+        drawList->AddRect(boxMin, boxMax, boxColor, 0.0f, 0, boxThickness);
+    }
+
+    // Draw box at center
+    ImVec2 centerBoxMin = ImVec2(center.x - boxSize * 0.5f, center.y - boxSize * 0.5f);
+    ImVec2 centerBoxMax = ImVec2(center.x + boxSize * 0.5f, center.y + boxSize * 0.5f);
+    drawList->AddRect(centerBoxMin, centerBoxMax, boxColor, 0.0f, 0, boxThickness);
 }
 } // namespace TetriumApp
