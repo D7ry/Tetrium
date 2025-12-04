@@ -38,7 +38,8 @@ def generate_genetic_test(primaries_dir: str, output_dir: str, testing_dim: int 
         dimensions=[testing_dim],
         metameric_axes=[2],
         trials_per_direction=1,
-        randomize_genotypes=False
+        randomize_genotypes=False,
+        debug_middle=True
     )
 
     print(f"Number of Genotypes: {len(color_generator.genotypes)}")
