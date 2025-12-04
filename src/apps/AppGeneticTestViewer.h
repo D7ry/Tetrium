@@ -2,6 +2,7 @@
 
 #include "App.h"
 #include "Pathing.h"
+#include "imgui.h"
 
 namespace TetriumApp
 {
@@ -36,6 +37,11 @@ class AppGeneticTestViewer : public App
     bool _generating = false;
     bool _adaptiveImageSize = true;
     float _zoom = 0.5f;
+
+    // Drag state
+    ImVec2 _imageOffset = {0.0f, 0.0f};
+    bool _isDragging = false;
+    ImVec2 _dragStartPos = {0.0f, 0.0f};
 
     // Image state
     GridImage _gridImage;

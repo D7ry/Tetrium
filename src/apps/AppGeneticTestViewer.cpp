@@ -122,7 +122,13 @@ void AppGeneticTestViewer::drawControls()
     // Zoom controls
     ImGui::Checkbox("Adaptive Size", &_adaptiveImageSize);
     if (!_adaptiveImageSize) {
-        ImGui::SliderFloat("Zoom", &_zoom, 0.1f, 2.0f);
+        ImGui::SliderFloat("Zoom", &_zoom, 0.1f, 5.0f);
+        ImGui::SameLine();
+        if (ImGui::Button("Reset View")) {
+            _imageOffset = {0.0f, 0.0f};
+            _zoom = 0.5f;
+        }
+        ImGui::Text("Controls: Drag to pan | +/- to zoom | R to reset");
     }
 }
 
@@ -137,9 +143,59 @@ void AppGeneticTestViewer::drawImage(const TickContextImGui& ctx, ColorSpace col
     if (_adaptiveImageSize) {
         ImVec2 availableSize = ImGui::GetContentRegionAvail();
         size = calculateFitSize(tex, availableSize);
+        _imageOffset = {0.0f, 0.0f}; // Reset offset when in adaptive mode
     }
 
+    // Keyboard controls for zoom (when not in adaptive mode)
+    if (!_adaptiveImageSize) {
+        if (ImGui::IsKeyPressed(ImGuiKey_Equal) || ImGui::IsKeyPressed(ImGuiKey_KeypadAdd)) {
+            _zoom = std::min(_zoom + 0.1f, 5.0f);
+        }
+        if (ImGui::IsKeyPressed(ImGuiKey_Minus) || ImGui::IsKeyPressed(ImGuiKey_KeypadSubtract)) {
+            _zoom = std::max(_zoom - 0.1f, 0.1f);
+        }
+        if (ImGui::IsKeyPressed(ImGuiKey_R)) {
+            _imageOffset = {0.0f, 0.0f};
+            _zoom = 0.5f;
+        }
+    }
+
+    // Get cursor position before drawing
+    ImVec2 cursorPos = ImGui::GetCursorScreenPos();
+
+    // Apply offset to cursor position
+    ImGui::SetCursorScreenPos(ImVec2(cursorPos.x + _imageOffset.x, cursorPos.y + _imageOffset.y));
+
+    // Draw the image
     ImGui::Image(tex.id, size);
+
+    // Handle dragging
+    if (!_adaptiveImageSize) {
+        // Check if mouse is hovering over the image area
+        ImVec2 imageMin = ImVec2(cursorPos.x + _imageOffset.x, cursorPos.y + _imageOffset.y);
+        ImVec2 imageMax = ImVec2(imageMin.x + size.x, imageMin.y + size.y);
+
+        if (ImGui::IsMouseHoveringRect(imageMin, imageMax) || _isDragging) {
+            if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+                _isDragging = true;
+                _dragStartPos = ImGui::GetMousePos();
+            }
+        }
+
+        if (_isDragging) {
+            if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+                ImVec2 currentMousePos = ImGui::GetMousePos();
+                ImVec2 delta = ImVec2(
+                    currentMousePos.x - _dragStartPos.x, currentMousePos.y - _dragStartPos.y
+                );
+                _imageOffset.x += delta.x;
+                _imageOffset.y += delta.y;
+                _dragStartPos = currentMousePos;
+            } else {
+                _isDragging = false;
+            }
+        }
+    }
 }
 
 void AppGeneticTestViewer::scanPrimariesDirectories()
