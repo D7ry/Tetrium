@@ -303,8 +303,11 @@ void AppScrambledFaceTest::generateTrial(
             baseFilename,
             "", // hidden_symbol not used for circle grid
             outputSpace,
-            0.0f, // lum_noise
-            0.0f, // s_cone_noise
+            0.0f,               // lum_noise
+            0.0f,               // s_cone_noise
+            settings.luminance, // background_luminance
+            1.0f,               // dot_size (not used for circle grid)
+            4.0f,               // degree (visual angle)
             genotype,
             metamericAxis
         );

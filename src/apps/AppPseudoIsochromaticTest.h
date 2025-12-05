@@ -66,7 +66,11 @@ class AppPseudoIsochromaticTest : public App
         float S_CONE_NOISE = 0.1f;                                 // s-cone noise [0.0, 1.0]
         float STIMULUS_SIZE = 0.5f; // stimulus texture size multiplier [0.0, 1.0]
         float STIMULUS_RAMP_UP_DURATION
-            = 0.5f; // duration in seconds for brightness ramp-up [0.0, 10.0]
+            = 0.5f;                     // duration in seconds for brightness ramp-up [0.0, 10.0]
+        float LUMINANCE = 0.5f;         // luminance level [0.0, 2.0]
+        float DOT_SIZE = 1.0f;          // dot size multiplier for plates [0.5, 2.0]
+        float VISUAL_ANGLE = 4.0f;      // stimulus visual angle in degrees [1.0, 10.0]
+        float VIEWING_DISTANCE = 57.0f; // viewing distance in cm [30.0, 200.0]
 
         struct
         {
@@ -166,7 +170,11 @@ class AppPseudoIsochromaticTest : public App
 
     void drawSubjectResult(SubjectContext& subject, const TetriumApp::TickContextImGui& ctx);
 
-    void drawLandoltC(SubjectContext& subject, const TetriumApp::TickContextImGui& ctx);
+    void drawLandoltC(
+        SubjectContext& subject,
+        const TetriumApp::TickContextImGui& ctx,
+        float brightness
+    );
 
     void drawAnswerPrompts(SubjectContext& subject, const TetriumApp::TickContextImGui& ctx);
 

@@ -36,6 +36,8 @@ ImVec2 calculateFitSize(float width, float height, const ImVec2& availableSize)
 }
 } // namespace
 
+static const float MAX_L = 2.0f; // Maximum luminance in HERING space (cone white [1,1,1,1])
+
 namespace TetriumApp
 {
 
@@ -116,7 +118,10 @@ void TetriumApp::AppPseudoIsochromaticTest::TickImGui(const TetriumApp::TickCont
                     hidden_symbol,
                     GetOutputColorSpace(),
                     SETTINGS.LUM_NOISE,
-                    SETTINGS.S_CONE_NOISE
+                    SETTINGS.S_CONE_NOISE,
+                    SETTINGS.LUMINANCE,
+                    SETTINGS.DOT_SIZE,
+                    SETTINGS.VISUAL_ANGLE
                 );
 
                 if (!_currentTrial.has_value()) {
@@ -294,13 +299,27 @@ void TetriumApp::AppPseudoIsochromaticTest::drawSettingsWindow(
         // S-cone noise slider
         ImGui::SliderFloat("S-Cone Noise", &SETTINGS.S_CONE_NOISE, 0.0f, 1.0f);
 
-        // Stimulus size slider
-        ImGui::SliderFloat("Stimulus Size", &SETTINGS.STIMULUS_SIZE, 0.0f, 1.0f);
+        // Visual angle slider
+        ImGui::SliderFloat("Visual Angle (degrees)", &SETTINGS.VISUAL_ANGLE, 1.0f, 10.0f);
+
+        // Viewing distance slider
+        ImGui::SliderFloat("Viewing Distance (cm)", &SETTINGS.VIEWING_DISTANCE, 30.0f, 200.0f);
+
+        // Calculate and display stimulus size
+        float radians = SETTINGS.VISUAL_ANGLE * 3.14159f / 180.0f;
+        float stimulusPhysicalSize = 2.0f * SETTINGS.VIEWING_DISTANCE * std::tan(radians / 2.0f);
+        ImGui::Text("Calculated stimulus size: %.2f cm", stimulusPhysicalSize);
 
         // Stimulus ramp-up duration slider
         ImGui::SliderFloat(
             "Stimulus Ramp-Up Duration (seconds)", &SETTINGS.STIMULUS_RAMP_UP_DURATION, 0.0f, 10.0f
         );
+
+        // Luminance slider
+        ImGui::SliderFloat("Luminance", &SETTINGS.LUMINANCE, 0.0f, float(MAX_L));
+
+        // Dot size slider
+        ImGui::SliderFloat("Dot Size", &SETTINGS.DOT_SIZE, 0.5f, 2.0f);
 
         // Music setting dropdown
         ImGui::Text("Music Setting");
@@ -401,24 +420,21 @@ void TetriumApp::AppPseudoIsochromaticTest::drawIdle(const TetriumApp::TickConte
 
 void AppPseudoIsochromaticTest::drawLandoltC(
     SubjectContext& subject,
-    const TetriumApp::TickContextImGui& ctx
+    const TetriumApp::TickContextImGui& ctx,
+    float brightness
 )
 {
     // Always draw the stimulus for the full presentation time
     ImGuiTexture tex = subject.prompt.currentLandoltCTexture[ctx.colorSpace];
 
     ImVec2 availSize = ImGui::GetContentRegionAvail();
-    ImVec2 textureFullscreenSize
-        = ImVec2(tex.width * SETTINGS.STIMULUS_SIZE, tex.height * SETTINGS.STIMULUS_SIZE);
 
-    // Calculate brightness based on elapsed time in identification state
-    float elapsedTime = subject.identificationStateStartTime - subject.currStateRemainderTime;
-    float brightness = 1.0f;
+    // Calculate stimulus size from visual angle
+    // Assuming baseline: 4 degrees at size multiplier 0.5
+    // This gives: size_multiplier = visual_angle / 8.0
+    float calculatedSize = SETTINGS.VISUAL_ANGLE / 8.0f;
 
-    if (SETTINGS.STIMULUS_RAMP_UP_DURATION > 0.0f) {
-        brightness = std::min(1.0f, elapsedTime / SETTINGS.STIMULUS_RAMP_UP_DURATION);
-        brightness = std::max(0.0f, brightness); // Clamp to [0, 1]
-    }
+    ImVec2 textureFullscreenSize = ImVec2(tex.width * calculatedSize, tex.height * calculatedSize);
 
     // Apply brightness as tint color (RGB all set to brightness, alpha = 1.0)
     ImVec4 tintColor(brightness, brightness, brightness, 1.0f);
@@ -478,6 +494,39 @@ void AppPseudoIsochromaticTest::drawTestForSubject(
         return;
     }
 
+    // Calculate brightness ramp for stimulus
+    float brightness = 0.0f; // Default to black for states that don't show stimuli
+    if (subject.state == SubjectState::kIdentification) {
+        if (SETTINGS.STIMULUS_RAMP_UP_DURATION > 0.0f) {
+            float elapsedTime
+                = subject.identificationStateStartTime - subject.currStateRemainderTime;
+            brightness = std::min(1.0f, elapsedTime / SETTINGS.STIMULUS_RAMP_UP_DURATION);
+            brightness = std::max(0.0f, brightness); // Clamp to [0, 1]
+        } else {
+            brightness = 1.0f; // No ramp, full brightness immediately
+        }
+    }
+
+    // Draw background at the target luminance level (always visible for adaptation)
+    ImVec2 screenSize = ImGui::GetIO().DisplaySize;
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+
+    // Background color: scale LUMINANCE [0, MAX_L] to display range [0, 1]
+    // MAX_L is the Hering V of cone white, so LUMINANCE/MAX_L gives the display level
+    // During identification, scale by brightness ramp for smooth fade-in
+    float bgLevel = SETTINGS.LUMINANCE / MAX_L;
+    if (subject.state == SubjectState::kIdentification) {
+        bgLevel *= brightness; // Apply ramp only during identification
+    }
+
+    // Clamp to [0, 1] for display
+    bgLevel = std::max(0.0f, std::min(1.0f, bgLevel));
+
+    ImU32 bgColor = IM_COL32((int)(bgLevel * 255), (int)(bgLevel * 255), (int)(bgLevel * 255), 255);
+
+    // Draw fullscreen rectangle
+    drawList->AddRectFilled(ImVec2(0, 0), screenSize, bgColor);
+
     // Draw progress indicator in upper left corner
     int currentTrial = _trialCounter + 1; // +1 to show 1-based indexing
     int totalTrials = -1;
@@ -509,7 +558,7 @@ void AppPseudoIsochromaticTest::drawTestForSubject(
         drawFixGazePage();
         break;
     case SubjectState::kIdentification:
-        drawLandoltC(subject, ctx);
+        drawLandoltC(subject, ctx, brightness);
         break;
     case SubjectState::kAnswer:
         drawAnswerPrompts(subject, ctx);
@@ -679,7 +728,10 @@ void AppPseudoIsochromaticTest::transitionSubjectState(
                     hidden_symbol,
                     GetOutputColorSpace(),
                     SETTINGS.LUM_NOISE,
-                    SETTINGS.S_CONE_NOISE
+                    SETTINGS.S_CONE_NOISE,
+                    SETTINGS.LUMINANCE,
+                    SETTINGS.DOT_SIZE,
+                    SETTINGS.VISUAL_ANGLE
                 );
             } catch (const std::exception& e) {
                 ERROR("Failed to generate trial in transition: {}", e.what());
@@ -913,13 +965,14 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
                 "both",                        // sex
                 0.99f,                         // percentage_screened
                 peak_to_test,                  // peak_to_test (547, 530, or 559)
-                1.0f,                          // luminance
+                SETTINGS.LUMINANCE,            // luminance (same as background)
                 0.5f,                          // saturation
                 dimensions,                    // dimensions (2 or 3)
                 42,                            // seed
                 SETTINGS.REPETITIONS_PER_AXIS, // trials_per_direction
                 metameric_axes,                // metameric_axes
-                display_primaries_path         // display_primaries_path
+                display_primaries_path,        // display_primaries_path
+                SETTINGS.VISUAL_ANGLE          // degree (visual angle)
             );
         } else {
             // Create QuestColorGenerator
@@ -928,12 +981,13 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
             pColorGenerator = TetriumColor::ColorGeneratorFactory::CreateQuestColorGenerator(
                 "both",                              // sex
                 0.99f,                               // percentage_screened
-                0.5f,                                // background_luminance
+                SETTINGS.LUMINANCE,                  // background_luminance
                 SETTINGS.QUEST_TRIALS_PER_DIRECTION, // trials_per_direction
                 metameric_axes,                      // metameric_axes
                 dimensions,                          // dimensions
                 display_primaries_path,              // display_primaries_path
-                SETTINGS.QUEST_BIPOLAR               // bipolar
+                SETTINGS.QUEST_BIPOLAR,              // bipolar
+                SETTINGS.VISUAL_ANGLE                // degree (visual angle)
             );
         }
     } catch (const std::exception& e) {
@@ -976,7 +1030,10 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
             hidden_symbol,
             GetOutputColorSpace(),
             SETTINGS.LUM_NOISE,
-            SETTINGS.S_CONE_NOISE
+            SETTINGS.S_CONE_NOISE,
+            SETTINGS.LUMINANCE,
+            SETTINGS.DOT_SIZE,
+            SETTINGS.VISUAL_ANGLE
         );
 
         if (!_currentTrial.has_value()) {
