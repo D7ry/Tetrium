@@ -416,7 +416,7 @@ void AppPseudoIsochromaticTest::drawLandoltC(
     float brightness = 1.0f;
 
     if (SETTINGS.STIMULUS_RAMP_UP_DURATION > 0.0f) {
-        brightness = std::min(0.5f, elapsedTime / SETTINGS.STIMULUS_RAMP_UP_DURATION);
+        brightness = std::min(1.0f, elapsedTime / SETTINGS.STIMULUS_RAMP_UP_DURATION);
         brightness = std::max(0.0f, brightness); // Clamp to [0, 1]
     }
 
