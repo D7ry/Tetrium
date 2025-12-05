@@ -10,6 +10,12 @@ namespace TetriumApp
 class AppGeneticTestViewer : public App
 {
   public:
+    enum class GeneratorType
+    {
+        Plate,
+        Bipartite
+    };
+
     virtual void Init(TetriumApp::InitContext& ctx) override;
     virtual void Cleanup(TetriumApp::CleanupContext& ctx) override;
     virtual void TickImGui(const TetriumApp::TickContextImGui& ctx) override;
@@ -34,6 +40,7 @@ class AppGeneticTestViewer : public App
     std::vector<std::string> _primariesDirs;
     int _selectedDirIndex = -1;
     int _testingDim = 3;
+    GeneratorType _generatorType = GeneratorType::Plate;
     bool _generating = false;
     bool _adaptiveImageSize = true;
     float _zoom = 0.5f;

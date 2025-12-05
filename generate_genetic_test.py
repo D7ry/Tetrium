@@ -8,6 +8,7 @@ from PIL import Image
 from TetriumColor.Utils.ImageUtils import CreatePaddedGrid
 from TetriumColor.Measurement import load_primaries_from_csv
 from TetriumColor import PseudoIsochromaticPlateGenerator, ColorSpaceType
+from TetriumColor.TetraPlate import BipartiteFieldGenerator
 from TetriumColor.TetraColorPicker import GeneticColorGenerator
 import sys
 import os
@@ -17,7 +18,7 @@ import numpy as np
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'extern', 'TetriumColor'))
 
 
-def generate_genetic_test(primaries_dir: str, output_dir: str, testing_dim: int = 3):
+def generate_genetic_test(primaries_dir: str, output_dir: str, testing_dim: int = 3, generator_type: str = 'plate'):
     """
     Generate genetic color picker test grid.
 
@@ -25,6 +26,7 @@ def generate_genetic_test(primaries_dir: str, output_dir: str, testing_dim: int 
         primaries_dir: Directory containing primaries CSV files
         output_dir: Directory to save output images
         testing_dim: Testing dimension (default: 3)
+        generator_type: Type of generator to use - 'plate' or 'bipartite' (default: 'plate')
     """
     # Load primaries
     print(f"Loading primaries from: {primaries_dir}")
@@ -44,8 +46,13 @@ def generate_genetic_test(primaries_dir: str, output_dir: str, testing_dim: int 
 
     print(f"Number of Genotypes: {len(color_generator.genotypes)}")
 
-    # Create plate generator
-    plate_generator = PseudoIsochromaticPlateGenerator(color_generator)
+    # Create test generator based on type
+    if generator_type == 'bipartite':
+        print("Using BipartiteFieldGenerator")
+        test_generator = BipartiteFieldGenerator(color_generator)
+    else:
+        print("Using PseudoIsochromaticPlateGenerator")
+        test_generator = PseudoIsochromaticPlateGenerator(color_generator)
 
     # Parameters
     lum_noise = 0.0
@@ -55,16 +62,17 @@ def generate_genetic_test(primaries_dir: str, output_dir: str, testing_dim: int 
     # Create output directory
     os.makedirs(output_dir, exist_ok=True)
 
-    # Generate plates
+    # Generate tests
     landolt_symbols = ['landolt_up', 'landolt_down', 'landolt_left', 'landolt_right']
     images = []
 
     idx = 0
     while True:
-        random_landolt_symbol = np.random.choice(landolt_symbols)
-        print(f"Generating plate {idx}")
+        # For plate generator, use landolt symbols; for bipartite, not needed but pass anyway
+        random_landolt_symbol = np.random.choice(landolt_symbols) if generator_type == 'plate' else None
+        print(f"Generating test {idx}")
 
-        image_info = plate_generator.GetTest(
+        image_info = test_generator.GetTest(
             None,
             os.path.join(output_dir, f"test_{idx}"),
             random_landolt_symbol,
@@ -101,11 +109,13 @@ def generate_genetic_test(primaries_dir: str, output_dir: str, testing_dim: int 
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
-        print("Usage: python generate_genetic_test.py <primaries_dir> <output_dir> [testing_dim]")
+        print("Usage: python generate_genetic_test.py <primaries_dir> <output_dir> [testing_dim] [generator_type]")
+        print("  generator_type: 'plate' (default) or 'bipartite'")
         sys.exit(1)
 
     primaries_dir = sys.argv[1]
     output_dir = sys.argv[2]
     testing_dim = int(sys.argv[3]) if len(sys.argv) > 3 else 3
+    generator_type = sys.argv[4] if len(sys.argv) > 4 else 'plate'
 
-    generate_genetic_test(primaries_dir, output_dir, testing_dim)
+    generate_genetic_test(primaries_dir, output_dir, testing_dim, generator_type)

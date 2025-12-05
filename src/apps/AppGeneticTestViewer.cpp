@@ -91,6 +91,25 @@ void AppGeneticTestViewer::drawControls()
         ImGui::EndCombo();
     }
 
+    // Generator type selector
+    const char* currentGeneratorType = (_generatorType == GeneratorType::Plate)
+                                           ? "Pseudoisochromatic Plate"
+                                           : "Bipartite Circle";
+
+    if (ImGui::BeginCombo("Generator Type", currentGeneratorType)) {
+        bool isPlateSelected = _generatorType == GeneratorType::Plate;
+        if (ImGui::Selectable("Pseudoisochromatic Plate", isPlateSelected)) {
+            _generatorType = GeneratorType::Plate;
+        }
+
+        bool isBipartiteSelected = _generatorType == GeneratorType::Bipartite;
+        if (ImGui::Selectable("Bipartite Circle", isBipartiteSelected)) {
+            _generatorType = GeneratorType::Bipartite;
+        }
+
+        ImGui::EndCombo();
+    }
+
     // Testing dimension
     ImGui::InputInt("Testing Dimension", &_testingDim);
     if (_testingDim < 1)
@@ -255,9 +274,10 @@ void AppGeneticTestViewer::generateGrid()
 
     // Build Python command
     std::string pythonScript = "../generate_genetic_test.py";
+    std::string generatorTypeStr = (_generatorType == GeneratorType::Plate) ? "plate" : "bipartite";
     std::stringstream cmd;
-    cmd << "conda run -n tetriumcolor python " << pythonScript << " \"" << primariesPath << "\" \""
-        << outputPath << "\" " << _testingDim;
+    cmd << "conda run -n tetrium python " << pythonScript << " \"" << primariesPath << "\" \""
+        << outputPath << "\" " << _testingDim << " " << generatorTypeStr;
 
     INFO("Running: {}", cmd.str());
 
