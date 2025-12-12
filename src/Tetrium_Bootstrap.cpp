@@ -19,6 +19,7 @@
 // imgui
 #include "imgui.h"
 #include "lib/VulkanUtils.h"
+#include "lib/DisplayCalibration.h"
 
 // Tetrium-color
 #include "TetriumColor/TetriumColor.h"
@@ -141,6 +142,14 @@ void Tetrium::Init(const Tetrium::InitOptions& options)
     _textureManager.Init(_device);
     this->_deletionStack.push([this]() { _textureManager.Cleanup(); });
 
+    // Load daily calibration matrices (with caching)
+    {
+        std::string primariesPath = TetriumApp::DisplayCalibration::GetTodayPrimariesPath();
+        auto [rygbToRGB, rygbToOCV] = TetriumApp::DisplayCalibration::GetOrComputeMatrices(primariesPath);
+        _textureManager.SetRYGBTransformMatrices(rygbToRGB, rygbToOCV);
+        INFO("Loaded RYGB transformation matrices for {}", primariesPath);
+    }
+
     // create static engine ubo
     {
         for (VQBuffer& engineUBO : _engineUBOStatic)
@@ -201,6 +210,17 @@ void Tetrium::Init(const Tetrium::InitOptions& options)
             .InitImGuiTexture = [this](uint32_t handle) {
                 this->_textureManager.LoadImGuiTexture(handle);
                 return this->_textureManager.GetImGuiTexture(handle);
+            },
+
+            // RYGB texture loading and transformation
+            .LoadRYGBTexture = [this](const std::string& tiffPath) -> uint32_t {
+                return this->_textureManager.LoadRYGBTexture(tiffPath);
+            },
+            .GetRYGBImGuiTextures = [this](uint32_t handle) -> std::pair<ImGuiTexture, ImGuiTexture> {
+                return this->_textureManager.GetRYGBImGuiTextures(handle);
+            },
+            .UnloadRYGBTexture = [this](uint32_t handle) {
+                this->_textureManager.UnloadRYGBTexture(handle);
             },
         },
     };

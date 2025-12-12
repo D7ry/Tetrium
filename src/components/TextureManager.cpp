@@ -1,9 +1,13 @@
 #include "backends/imgui_impl_vulkan.h"
 
+#include "Pathing.h"
 #include "TextureManager.h"
+#include "components/Logging.h"
+#include "components/ShaderUtils.h"
 #include "lib/VQBuffer.h"
 #include "lib/VulkanUtils.h"
 #include <stb_image.h>
+#include <tiffio.h>
 #include <vulkan/vulkan_core.h>
 
 namespace
@@ -75,6 +79,9 @@ TextureManager::~TextureManager()
 
 void TextureManager::Cleanup()
 {
+    // Cleanup RYGB transform context
+    cleanupRYGBTransformContext();
+
     for (auto& elem : _textures) {
         __TextureInternal& texture = elem.second;
         vkDestroyImageView(_device->logicalDevice, texture.textureImageView, nullptr);
@@ -83,6 +90,7 @@ void TextureManager::Cleanup()
         vkFreeMemory(_device->logicalDevice, texture.textureImageMemory, nullptr);
     }
     _textures.clear();
+    _rygbTextureMap.clear();
 }
 
 void TextureManager::GetDescriptorImageInfo(uint32_t handle, VkDescriptorImageInfo& imageInfo)
@@ -539,4 +547,610 @@ void TextureManager::LoadImGuiTexture(uint32_t handle)
     tex.imguiTextureId = ImGui_ImplVulkan_AddTexture(
         tex.textureSampler, tex.textureImageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
     );
+}
+
+// ============================================================================
+// RYGB Texture Loading and Transformation
+// ============================================================================
+
+void TextureManager::SetRYGBTransformMatrices(const glm::mat4x4& toRGB, const glm::mat4x4& toOCV)
+{
+    _rygbToRGBMatrix = toRGB;
+    _rygbToOCVMatrix = toOCV;
+    INFO("RYGB transformation matrices set");
+}
+
+uint32_t TextureManager::LoadRYGBTexture(const std::string& tiffPath)
+{
+    // 1. Open TIFF with libtiff
+    TIFF* tiff = TIFFOpen(tiffPath.c_str(), "r");
+    if (!tiff) {
+        ERROR("Failed to load RYGB TIFF: {}", tiffPath);
+        return 0;
+    }
+
+    // 2. Validate format (4 channels, 32-bit float)
+    uint16_t samplesPerPixel, bitsPerSample;
+    TIFFGetField(tiff, TIFFTAG_SAMPLESPERPIXEL, &samplesPerPixel);
+    TIFFGetField(tiff, TIFFTAG_BITSPERSAMPLE, &bitsPerSample);
+
+    if (samplesPerPixel != 4 || bitsPerSample != 32) {
+        ERROR("Invalid RYGB TIFF format: {} (expected 4ch 32bit)", tiffPath);
+        TIFFClose(tiff);
+        return 0;
+    }
+
+    // 3. Read dimensions
+    uint32_t width, height;
+    TIFFGetField(tiff, TIFFTAG_IMAGEWIDTH, &width);
+    TIFFGetField(tiff, TIFFTAG_IMAGELENGTH, &height);
+
+    // 4. Allocate CPU buffer
+    std::vector<float> rygbData(width * height * 4);
+
+    // 5. Read scanlines
+    for (uint32_t row = 0; row < height; ++row) {
+        float* rowData = rygbData.data() + row * width * 4;
+        if (TIFFReadScanline(tiff, rowData, row, 0) < 0) {
+            ERROR("Failed to read TIFF scanline {}", row);
+            TIFFClose(tiff);
+            return 0;
+        }
+    }
+    TIFFClose(tiff);
+
+    INFO("Loaded RYGB TIFF: {} ({}x{})", tiffPath, width, height);
+
+    // 6. Create GPU texture (VK_FORMAT_R32G32B32A32_SFLOAT)
+    uint32_t rygbSourceHandle = createRYGBGPUTexture(rygbData.data(), width, height);
+
+    // 7. Initialize RYGB transform context (if not already)
+    if (!_rygbTransformCtx.initialized) {
+        initRYGBTransformContext();
+    }
+
+    // 8. Create RGB and OCV output framebuffers (VK_FORMAT_R8G8B8A8_UNORM)
+    uint32_t rgbHandle = createTransformedTexture(rygbSourceHandle, width, height, ColorSpace::RGB);
+    uint32_t ocvHandle = createTransformedTexture(rygbSourceHandle, width, height, ColorSpace::OCV);
+
+    // 9. Store handles
+    uint32_t combinedHandle = _nextHandle++;
+    _rygbTextureMap[combinedHandle] = {rgbHandle, ocvHandle, rygbSourceHandle};
+
+    INFO(
+        "Created RYGB texture pair: handle={}, RGB={}, OCV={}", combinedHandle, rgbHandle, ocvHandle
+    );
+    return combinedHandle;
+}
+
+std::pair<ImGuiTexture, ImGuiTexture> TextureManager::GetRYGBImGuiTextures(uint32_t rygbHandle)
+{
+    auto it = _rygbTextureMap.find(rygbHandle);
+    if (it == _rygbTextureMap.end()) {
+        ERROR("Invalid RYGB texture handle: {}", rygbHandle);
+        return {{}, {}};
+    }
+
+    // Load ImGui textures if not already loaded
+    LoadImGuiTexture(it->second.rgbHandle);
+    LoadImGuiTexture(it->second.ocvHandle);
+
+    ImGuiTexture rgbTex = GetImGuiTexture(it->second.rgbHandle);
+    ImGuiTexture ocvTex = GetImGuiTexture(it->second.ocvHandle);
+    return {rgbTex, ocvTex};
+}
+
+void TextureManager::UnloadRYGBTexture(uint32_t rygbHandle)
+{
+    auto it = _rygbTextureMap.find(rygbHandle);
+    if (it == _rygbTextureMap.end()) {
+        WARN("Attempted to unload invalid RYGB texture handle: {}", rygbHandle);
+        return;
+    }
+
+    UnLoadTexture(it->second.rgbHandle);
+    UnLoadTexture(it->second.ocvHandle);
+    UnLoadTexture(it->second.rygbSource);
+    _rygbTextureMap.erase(it);
+    DEBUG("Unloaded RYGB texture: {}", rygbHandle);
+}
+
+uint32_t TextureManager::createRYGBGPUTexture(
+    const float* rygbData,
+    uint32_t width,
+    uint32_t height
+)
+{
+    VkDevice device = _device->logicalDevice;
+    VkPhysicalDevice physicalDevice = _device->physicalDevice;
+
+    // Create staging buffer for CPU->GPU transfer
+    VkDeviceSize imageSize = width * height * 4 * sizeof(float);
+
+    VQBuffer stagingBuffer = _device->CreateBuffer(
+        imageSize,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+    );
+
+    // Copy data to staging buffer
+    memcpy(stagingBuffer.bufferAddress, rygbData, static_cast<size_t>(imageSize));
+
+    // Create GPU image (R32G32B32A32_SFLOAT)
+    VkImage textureImage;
+    VkDeviceMemory textureImageMemory;
+
+    VulkanUtils::createImage(
+        width,
+        height,
+        VK_FORMAT_R32G32B32A32_SFLOAT,
+        VK_IMAGE_TILING_OPTIMAL,
+        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        textureImage,
+        textureImageMemory,
+        physicalDevice,
+        device
+    );
+
+    // Transition image layout: UNDEFINED -> TRANSFER_DST
+    transitionImageLayout(
+        textureImage,
+        VK_FORMAT_R32G32B32A32_SFLOAT,
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+    );
+
+    // Copy buffer to image
+    copyBufferToImage(stagingBuffer.buffer, textureImage, width, height);
+
+    // Transition image layout: TRANSFER_DST -> SHADER_READ_ONLY
+    transitionImageLayout(
+        textureImage,
+        VK_FORMAT_R32G32B32A32_SFLOAT,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+    );
+
+    // Cleanup staging buffer
+    stagingBuffer.Cleanup();
+
+    // Create image view
+    VkImageView textureImageView = VulkanUtils::createImageView(
+        textureImage, device, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT
+    );
+
+    // Create sampler
+    VkSamplerCreateInfo samplerInfo{};
+    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerInfo.magFilter = VK_FILTER_LINEAR;
+    samplerInfo.minFilter = VK_FILTER_LINEAR;
+    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerInfo.anisotropyEnable = VK_FALSE;
+    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    samplerInfo.unnormalizedCoordinates = VK_FALSE;
+    samplerInfo.compareEnable = VK_FALSE;
+    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+
+    VkSampler textureSampler;
+    if (vkCreateSampler(device, &samplerInfo, nullptr, &textureSampler) != VK_SUCCESS) {
+        PANIC("Failed to create texture sampler!");
+    }
+
+    // Store in texture map
+    uint32_t handle = _nextHandle++;
+    _textures[handle]
+        = {.textureImage = textureImage,
+           .textureImageView = textureImageView,
+           .textureImageMemory = textureImageMemory,
+           .textureSampler = textureSampler,
+           .width = static_cast<int>(width),
+           .height = static_cast<int>(height),
+           .imguiTextureId = std::nullopt};
+
+    return handle;
+}
+
+void TextureManager::initRYGBTransformContext()
+{
+    VkDevice device = _device->logicalDevice;
+    vk::Device vkDevice = _device->logicalDevice;
+
+    INFO("Initializing RYGB transform context...");
+
+    // 1. Create render pass
+    vk::AttachmentDescription colorAttachment{};
+    colorAttachment.format = vk::Format::eR8G8B8A8Unorm;
+    colorAttachment.samples = vk::SampleCountFlagBits::e1;
+    colorAttachment.loadOp = vk::AttachmentLoadOp::eClear;
+    colorAttachment.storeOp = vk::AttachmentStoreOp::eStore;
+    colorAttachment.stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
+    colorAttachment.stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
+    colorAttachment.initialLayout = vk::ImageLayout::eUndefined;
+    colorAttachment.finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+
+    vk::AttachmentReference colorAttachmentRef{};
+    colorAttachmentRef.attachment = 0;
+    colorAttachmentRef.layout = vk::ImageLayout::eColorAttachmentOptimal;
+
+    vk::SubpassDescription subpass{};
+    subpass.pipelineBindPoint = vk::PipelineBindPoint::eGraphics;
+    subpass.colorAttachmentCount = 1;
+    subpass.pColorAttachments = &colorAttachmentRef;
+
+    vk::SubpassDependency dependency{};
+    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+    dependency.dstSubpass = 0;
+    dependency.srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+    dependency.dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+    dependency.srcAccessMask = vk::AccessFlagBits::eNone;
+    dependency.dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
+
+    vk::RenderPassCreateInfo renderPassInfo{};
+    renderPassInfo.attachmentCount = 1;
+    renderPassInfo.pAttachments = &colorAttachment;
+    renderPassInfo.subpassCount = 1;
+    renderPassInfo.pSubpasses = &subpass;
+    renderPassInfo.dependencyCount = 1;
+    renderPassInfo.pDependencies = &dependency;
+
+    _rygbTransformCtx.renderPass = vkDevice.createRenderPass(renderPassInfo);
+
+    // 2. Create descriptor set layout
+    vk::DescriptorSetLayoutBinding uboBinding{};
+    uboBinding.binding = 0;
+    uboBinding.descriptorType = vk::DescriptorType::eUniformBuffer;
+    uboBinding.descriptorCount = 1;
+    uboBinding.stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment;
+
+    vk::DescriptorSetLayoutBinding samplerBinding{};
+    samplerBinding.binding = 1;
+    samplerBinding.descriptorType = vk::DescriptorType::eCombinedImageSampler;
+    samplerBinding.descriptorCount = 1;
+    samplerBinding.stageFlags = vk::ShaderStageFlagBits::eFragment;
+
+    std::array<vk::DescriptorSetLayoutBinding, 2> bindings = {uboBinding, samplerBinding};
+    vk::DescriptorSetLayoutCreateInfo layoutInfo{};
+    layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+    layoutInfo.pBindings = bindings.data();
+
+    _rygbTransformCtx.descriptorSetLayout = vkDevice.createDescriptorSetLayout(layoutInfo);
+
+    // 3. Create graphics pipeline
+    std::vector<char> vertShaderCode
+        = ShaderCreation::readFile(ASSETS_PATH + "shaders/rygb_transform.vert.spv");
+    std::vector<char> fragShaderCode
+        = ShaderCreation::readFile(ASSETS_PATH + "shaders/rygb_transform.frag.spv");
+
+    vk::ShaderModule vertShaderModule(ShaderCreation::createShaderModule(device, vertShaderCode));
+    vk::ShaderModule fragShaderModule(ShaderCreation::createShaderModule(device, fragShaderCode));
+
+    vk::PipelineShaderStageCreateInfo vertShaderStageInfo{};
+    vertShaderStageInfo.stage = vk::ShaderStageFlagBits::eVertex;
+    vertShaderStageInfo.module = vertShaderModule;
+    vertShaderStageInfo.pName = "main";
+
+    vk::PipelineShaderStageCreateInfo fragShaderStageInfo{};
+    fragShaderStageInfo.stage = vk::ShaderStageFlagBits::eFragment;
+    fragShaderStageInfo.module = fragShaderModule;
+    fragShaderStageInfo.pName = "main";
+
+    vk::PipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
+
+    vk::PipelineVertexInputStateCreateInfo vertexInputInfo{};
+    vertexInputInfo.vertexBindingDescriptionCount = 0;
+    vertexInputInfo.vertexAttributeDescriptionCount = 0;
+
+    vk::PipelineInputAssemblyStateCreateInfo inputAssembly{};
+    inputAssembly.topology = vk::PrimitiveTopology::eTriangleList;
+    inputAssembly.primitiveRestartEnable = VK_FALSE;
+
+    vk::PipelineViewportStateCreateInfo viewportState{};
+    viewportState.viewportCount = 1;
+    viewportState.scissorCount = 1;
+
+    vk::PipelineRasterizationStateCreateInfo rasterizer{};
+    rasterizer.depthClampEnable = VK_FALSE;
+    rasterizer.rasterizerDiscardEnable = VK_FALSE;
+    rasterizer.polygonMode = vk::PolygonMode::eFill;
+    rasterizer.lineWidth = 1.0f;
+    rasterizer.cullMode = vk::CullModeFlagBits::eNone;
+    rasterizer.frontFace = vk::FrontFace::eCounterClockwise;
+    rasterizer.depthBiasEnable = VK_FALSE;
+
+    vk::PipelineMultisampleStateCreateInfo multisampling{};
+    multisampling.sampleShadingEnable = VK_FALSE;
+    multisampling.rasterizationSamples = vk::SampleCountFlagBits::e1;
+
+    vk::PipelineColorBlendAttachmentState colorBlendAttachment{};
+    colorBlendAttachment.colorWriteMask
+        = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG
+          | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+    colorBlendAttachment.blendEnable = VK_FALSE;
+
+    vk::PipelineColorBlendStateCreateInfo colorBlending{};
+    colorBlending.logicOpEnable = VK_FALSE;
+    colorBlending.attachmentCount = 1;
+    colorBlending.pAttachments = &colorBlendAttachment;
+
+    std::vector<vk::DynamicState> dynamicStates
+        = {vk::DynamicState::eViewport, vk::DynamicState::eScissor};
+
+    vk::PipelineDynamicStateCreateInfo dynamicState{};
+    dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
+    dynamicState.pDynamicStates = dynamicStates.data();
+
+    vk::PipelineLayoutCreateInfo pipelineLayoutInfo{};
+    pipelineLayoutInfo.setLayoutCount = 1;
+    pipelineLayoutInfo.pSetLayouts = &_rygbTransformCtx.descriptorSetLayout;
+
+    _rygbTransformCtx.pipelineLayout = vkDevice.createPipelineLayout(pipelineLayoutInfo);
+
+    vk::GraphicsPipelineCreateInfo pipelineInfo{};
+    pipelineInfo.stageCount = 2;
+    pipelineInfo.pStages = shaderStages;
+    pipelineInfo.pVertexInputState = &vertexInputInfo;
+    pipelineInfo.pInputAssemblyState = &inputAssembly;
+    pipelineInfo.pViewportState = &viewportState;
+    pipelineInfo.pRasterizationState = &rasterizer;
+    pipelineInfo.pMultisampleState = &multisampling;
+    pipelineInfo.pColorBlendState = &colorBlending;
+    pipelineInfo.pDynamicState = &dynamicState;
+    pipelineInfo.layout = _rygbTransformCtx.pipelineLayout;
+    pipelineInfo.renderPass = _rygbTransformCtx.renderPass;
+    pipelineInfo.subpass = 0;
+
+    auto result = vkDevice.createGraphicsPipeline(nullptr, pipelineInfo);
+    if (result.result != vk::Result::eSuccess) {
+        PANIC("Failed to create RYGB transform graphics pipeline!");
+    }
+    _rygbTransformCtx.pipeline = result.value;
+
+    vkDevice.destroyShaderModule(vertShaderModule, nullptr);
+    vkDevice.destroyShaderModule(fragShaderModule, nullptr);
+
+    // 4. Create descriptor pool
+    std::array<vk::DescriptorPoolSize, 2> poolSizes{};
+    poolSizes[0].type = vk::DescriptorType::eUniformBuffer;
+    poolSizes[0].descriptorCount = NUM_FRAME_IN_FLIGHT * 100; // 100 textures max
+    poolSizes[1].type = vk::DescriptorType::eCombinedImageSampler;
+    poolSizes[1].descriptorCount = NUM_FRAME_IN_FLIGHT * 100;
+
+    vk::DescriptorPoolCreateInfo poolInfo{};
+    poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+    poolInfo.pPoolSizes = poolSizes.data();
+    poolInfo.maxSets = NUM_FRAME_IN_FLIGHT * 100;
+
+    _rygbTransformCtx.descriptorPool = vkDevice.createDescriptorPool(poolInfo);
+
+    // 5. Create UBOs for each frame in flight
+    for (int i = 0; i < NUM_FRAME_IN_FLIGHT; i++) {
+        _device->CreateBufferInPlace(
+            sizeof(RYGBToViewSpaceUBO),
+            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            _rygbTransformCtx.ubo[i]
+        );
+    }
+
+    // 6. Create samplers
+    vk::SamplerCreateInfo samplerInfo{};
+    samplerInfo.magFilter = vk::Filter::eLinear;
+    samplerInfo.minFilter = vk::Filter::eLinear;
+    samplerInfo.addressModeU = vk::SamplerAddressMode::eClampToEdge;
+    samplerInfo.addressModeV = vk::SamplerAddressMode::eClampToEdge;
+    samplerInfo.addressModeW = vk::SamplerAddressMode::eClampToEdge;
+    samplerInfo.anisotropyEnable = VK_FALSE;
+    samplerInfo.borderColor = vk::BorderColor::eIntOpaqueBlack;
+    samplerInfo.unnormalizedCoordinates = VK_FALSE;
+    samplerInfo.compareEnable = VK_FALSE;
+    samplerInfo.mipmapMode = vk::SamplerMipmapMode::eLinear;
+
+    for (int i = 0; i < NUM_FRAME_IN_FLIGHT; i++) {
+        _rygbTransformCtx.samplers[i] = vkDevice.createSampler(samplerInfo);
+    }
+
+    _rygbTransformCtx.initialized = true;
+    INFO("RYGB transform context initialized successfully");
+}
+
+void TextureManager::cleanupRYGBTransformContext()
+{
+    if (!_rygbTransformCtx.initialized)
+        return;
+
+    vk::Device device = _device->logicalDevice;
+
+    for (int i = 0; i < NUM_FRAME_IN_FLIGHT; i++) {
+        device.destroySampler(_rygbTransformCtx.samplers[i], nullptr);
+        _rygbTransformCtx.ubo[i].Cleanup();
+    }
+
+    device.destroyDescriptorPool(_rygbTransformCtx.descriptorPool, nullptr);
+    device.destroyPipeline(_rygbTransformCtx.pipeline, nullptr);
+    device.destroyPipelineLayout(_rygbTransformCtx.pipelineLayout, nullptr);
+    device.destroyDescriptorSetLayout(_rygbTransformCtx.descriptorSetLayout, nullptr);
+    device.destroyRenderPass(_rygbTransformCtx.renderPass, nullptr);
+
+    _rygbTransformCtx.initialized = false;
+    INFO("RYGB transform context cleaned up");
+}
+
+uint32_t TextureManager::createTransformedTexture(
+    uint32_t rygbSourceHandle,
+    uint32_t width,
+    uint32_t height,
+    ColorSpace colorSpace
+)
+{
+    vk::Device device = _device->logicalDevice;
+    VkPhysicalDevice physicalDevice = _device->physicalDevice;
+
+    // 1. Create output framebuffer image (R8G8B8A8_UNORM)
+    VkImage outputImage;
+    VkDeviceMemory outputImageMemory;
+
+    VulkanUtils::createImage(
+        width,
+        height,
+        VK_FORMAT_R8G8B8A8_UNORM,
+        VK_IMAGE_TILING_OPTIMAL,
+        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        outputImage,
+        outputImageMemory,
+        physicalDevice,
+        _device->logicalDevice
+    );
+
+    VkImageView outputImageView = VulkanUtils::createImageView(
+        outputImage, _device->logicalDevice, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT
+    );
+
+    // 2. Create framebuffer
+    vk::ImageView vkppOutputImageView(outputImageView);
+    vk::FramebufferCreateInfo framebufferInfo{};
+    framebufferInfo.renderPass = _rygbTransformCtx.renderPass;
+    framebufferInfo.attachmentCount = 1;
+    framebufferInfo.pAttachments = &vkppOutputImageView;
+    framebufferInfo.width = width;
+    framebufferInfo.height = height;
+    framebufferInfo.layers = 1;
+
+    vk::Framebuffer framebuffer = device.createFramebuffer(framebufferInfo);
+
+    // 3. Create descriptor set for this transformation
+    vk::DescriptorSetAllocateInfo allocInfo{};
+    allocInfo.descriptorPool = _rygbTransformCtx.descriptorPool;
+    allocInfo.descriptorSetCount = 1;
+    allocInfo.pSetLayouts = &_rygbTransformCtx.descriptorSetLayout;
+
+    vk::DescriptorSet descriptorSet = device.allocateDescriptorSets(allocInfo)[0];
+
+    // 4. Update UBO with transformation matrix
+    int frameIdx = 0; // Use first frame for one-time transformation
+    RYGBToViewSpaceUBO* pUBO
+        = reinterpret_cast<RYGBToViewSpaceUBO*>(_rygbTransformCtx.ubo[frameIdx].bufferAddress);
+    pUBO->transformMatrix = (colorSpace == ColorSpace::RGB) ? _rygbToRGBMatrix : _rygbToOCVMatrix;
+
+    // 5. Update descriptor set
+    vk::DescriptorBufferInfo bufferInfo{};
+    bufferInfo.buffer = _rygbTransformCtx.ubo[frameIdx].buffer;
+    bufferInfo.offset = 0;
+    bufferInfo.range = sizeof(RYGBToViewSpaceUBO);
+
+    auto& rygbTex = _textures[rygbSourceHandle];
+    vk::DescriptorImageInfo imageInfo{};
+    imageInfo.sampler = _rygbTransformCtx.samplers[frameIdx];
+    imageInfo.imageView = rygbTex.textureImageView;
+    imageInfo.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+
+    std::array<vk::WriteDescriptorSet, 2> descriptorWrites{};
+    descriptorWrites[0].dstSet = descriptorSet;
+    descriptorWrites[0].dstBinding = 0;
+    descriptorWrites[0].dstArrayElement = 0;
+    descriptorWrites[0].descriptorType = vk::DescriptorType::eUniformBuffer;
+    descriptorWrites[0].descriptorCount = 1;
+    descriptorWrites[0].pBufferInfo = &bufferInfo;
+
+    descriptorWrites[1].dstSet = descriptorSet;
+    descriptorWrites[1].dstBinding = 1;
+    descriptorWrites[1].dstArrayElement = 0;
+    descriptorWrites[1].descriptorType = vk::DescriptorType::eCombinedImageSampler;
+    descriptorWrites[1].descriptorCount = 1;
+    descriptorWrites[1].pImageInfo = &imageInfo;
+
+    device.updateDescriptorSets(descriptorWrites, nullptr);
+
+    // 6. Execute rendering: RYGB -> RGB/OCV transformation
+    VkCommandBuffer commandBuffer = _device->BeginSingleTimeCommands();
+
+    // Note: Image layout transition from UNDEFINED to COLOR_ATTACHMENT_OPTIMAL
+    // is handled by the render pass (initialLayout -> finalLayout)
+
+    vk::RenderPassBeginInfo renderPassInfo{};
+    renderPassInfo.renderPass = _rygbTransformCtx.renderPass;
+    renderPassInfo.framebuffer = framebuffer;
+    renderPassInfo.renderArea.offset = vk::Offset2D{0, 0};
+    renderPassInfo.renderArea.extent = vk::Extent2D{width, height};
+
+    vk::ClearValue clearColor{std::array<float, 4>{0.0f, 0.0f, 0.0f, 1.0f}};
+    renderPassInfo.clearValueCount = 1;
+    renderPassInfo.pClearValues = &clearColor;
+
+    vk::CommandBuffer vkCmdBuffer(commandBuffer);
+    vkCmdBuffer.beginRenderPass(&renderPassInfo, vk::SubpassContents::eInline);
+
+    vkCmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, _rygbTransformCtx.pipeline);
+
+    vk::Viewport viewport{};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = static_cast<float>(width);
+    viewport.height = static_cast<float>(height);
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    vkCmdBuffer.setViewport(0, 1, &viewport);
+
+    vk::Rect2D scissor{};
+    scissor.offset = vk::Offset2D{0, 0};
+    scissor.extent = vk::Extent2D{width, height};
+    vkCmdBuffer.setScissor(0, 1, &scissor);
+
+    vkCmdBuffer.bindDescriptorSets(
+        vk::PipelineBindPoint::eGraphics,
+        _rygbTransformCtx.pipelineLayout,
+        0,
+        1,
+        &descriptorSet,
+        0,
+        nullptr
+    );
+
+    vkCmdBuffer.draw(3, 1, 0, 0); // Full-screen triangle
+
+    vkCmdBuffer.endRenderPass();
+
+    _device->EndSingleTimeCommands(commandBuffer);
+
+    // 7. Destroy temporary framebuffer
+    device.destroyFramebuffer(framebuffer, nullptr);
+
+    // 8. Create sampler for output texture
+    vk::SamplerCreateInfo samplerInfo{};
+    samplerInfo.magFilter = vk::Filter::eLinear;
+    samplerInfo.minFilter = vk::Filter::eLinear;
+    samplerInfo.addressModeU = vk::SamplerAddressMode::eClampToEdge;
+    samplerInfo.addressModeV = vk::SamplerAddressMode::eClampToEdge;
+    samplerInfo.addressModeW = vk::SamplerAddressMode::eClampToEdge;
+    samplerInfo.anisotropyEnable = VK_FALSE;
+    samplerInfo.borderColor = vk::BorderColor::eIntOpaqueBlack;
+    samplerInfo.unnormalizedCoordinates = VK_FALSE;
+    samplerInfo.compareEnable = VK_FALSE;
+    samplerInfo.mipmapMode = vk::SamplerMipmapMode::eLinear;
+
+    vk::Sampler textureSampler = device.createSampler(samplerInfo);
+
+    // 9. Store output texture
+    uint32_t handle = _nextHandle++;
+    _textures[handle]
+        = {.textureImage = outputImage,
+           .textureImageView = outputImageView,
+           .textureImageMemory = outputImageMemory,
+           .textureSampler = textureSampler,
+           .width = static_cast<int>(width),
+           .height = static_cast<int>(height),
+           .imguiTextureId = std::nullopt};
+
+    DEBUG(
+        "Created transformed texture: {} ({} -> {})",
+        handle,
+        rygbSourceHandle,
+        (colorSpace == ColorSpace::RGB ? "RGB" : "OCV")
+    );
+
+    return handle;
 }

@@ -33,6 +33,7 @@ set(SOURCES_BUILD
         src/components/Camera.cpp
         src/components/TextureManager.cpp
         src/components/InputManager.cpp
+        # src/components/RYGBTextureRenderer.cpp  # DEPRECATED - RYGB functionality now in TextureManager
         src/components/imgui_widgets/ImGuiWidgetPerfPlot.cpp
         src/components/imgui_widgets/ImGuiWidgetDeviceInfo.cpp
         src/components/imgui_widgets/ImGuiWidgetEvenOddCalibration.cpp
@@ -44,6 +45,7 @@ set(SOURCES_BUILD
         src/lib/VQDevice.cpp
         src/lib/VQUtils.cpp
         src/lib/ImGuiUtils.cpp
+        src/lib/DisplayCalibration.cpp
         src/structs/Vertex.cpp
 
         # Apps

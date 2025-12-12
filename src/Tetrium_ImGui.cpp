@@ -361,7 +361,15 @@ void Tetrium::drawAppsImGui(ColorSpace colorSpace, int currentFrameInFlight)
                        return _textureManager.GetImGuiTexture(textureHandle);
                    },
                .UnloadTexture
-               = [this](uint32_t textureHandle) { _textureManager.UnLoadTexture(textureHandle); }},
+               = [this](uint32_t textureHandle) { _textureManager.UnLoadTexture(textureHandle); },
+
+               // RYGB texture loading and transformation
+               .LoadRYGBTexture
+               = [this](const std::string& tiffPath) { return _textureManager.LoadRYGBTexture(tiffPath); },
+               .GetRYGBImGuiTextures
+               = [this](uint32_t handle) { return _textureManager.GetRYGBImGuiTextures(handle); },
+               .UnloadRYGBTexture
+               = [this](uint32_t handle) { _textureManager.UnloadRYGBTexture(handle); }},
             .controls = {.wantExit = false, .musicOverride = std::nullopt}};
 
         app->TickImGui(ctxImGui);
