@@ -7,7 +7,7 @@
 #include "apps/AppImageViewer.h"
 #include "apps/AppPainter.h"
 #include "apps/AppPseudoIsochromaticTest.h"
-#include "apps/AppScrambledFaceTest.h"
+// #include "apps/AppScrambledFaceTest.h"  // Commented out - not in use
 // #include "apps/AppScreeningTest.h"  // TODO: Refactor to use new TestGenerator interface
 #include "apps/AppGeneticTestViewer.h"
 #include "apps/AppTemporalAFC.h"
@@ -39,7 +39,7 @@ int main(int argc, char** argv)
         // {new TetriumApp::AppScreeningTest(), "Screening Test"},  // TODO: Refactor to use new
         // TestGenerator interface
         {new TetriumApp::AppPseudoIsochromaticTest(), "Pseudoisochromatic Test"},
-        {new TetriumApp::AppScrambledFaceTest(), "Scrambled Face Test"},
+        // {new TetriumApp::AppScrambledFaceTest(), "Scrambled Face Test"},  // Commented out - not in use
         {new TetriumApp::AppTemporalAFC(), "Temporal 3AFC"},
         {new TetriumApp::AppAnomaloscope(), "Anomaloscope"},
         {new TetriumApp::AppTetraHueSphere(), "Tetra Hue Sphere"},

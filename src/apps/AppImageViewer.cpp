@@ -82,8 +82,12 @@ void AppImageViewer::refreshTetraImagePicker(const TickContextImGui& ctx)
 {
     _currTetraImage = -1;
     for (TetraImageFile& image : _tetraImages) {
-        ctx.apis.UnloadTexture(image.textureHandles[ColorSpace::RGB]);
-        ctx.apis.UnloadTexture(image.textureHandles[ColorSpace::OCV]);
+        if (image.isRYGB) {
+            ctx.apis.UnloadRYGBTexture(image.rygbHandle);
+        } else {
+            ctx.apis.UnloadTexture(image.textureHandles[ColorSpace::RGB]);
+            ctx.apis.UnloadTexture(image.textureHandles[ColorSpace::OCV]);
+        }
     }
     _tetraImages.clear();
 
@@ -134,12 +138,47 @@ void AppImageViewer::refreshTetraImagePicker(const TickContextImGui& ctx)
         }
     }
 
-    // sort all tetra images by rgb file name
+    // Also scan for RYGB TIFF files
+    for (const std::filesystem::directory_entry& entry :
+         std::filesystem::directory_iterator(TETRA_IMAGE_FOLDER_PATH)) {
+        if (entry.is_directory() || entry.is_symlink()) {
+            continue;
+        }
+        std::string fileName = entry.path().filename().string();
+        bool isTiff = fileName.ends_with(".tiff") || fileName.ends_with(".tif");
+        if (!isTiff) {
+            continue;
+        }
+
+        // Load RYGB TIFF and get both RGB and OCV views
+        std::string tetraImageName = entry.path().stem().string();
+        std::string tiffFilePath = TETRA_IMAGE_FOLDER_PATH + fileName;
+
+        uint32_t rygbHandle = ctx.apis.LoadRYGBTexture(tiffFilePath);
+        if (rygbHandle == 0) {
+            ERROR("Failed to load RYGB TIFF: {}", tiffFilePath);
+            continue;
+        }
+
+        auto [rgbTex, ocvTex] = ctx.apis.GetRYGBImGuiTextures(rygbHandle);
+
+        TetraImageFile image{
+            .name = tetraImageName,
+            .fileNames = {fileName, fileName}, // Same file for both
+            .textureHandles = {0, 0},          // Not used for RYGB
+            .textures = {rgbTex, ocvTex},
+            .isRYGB = true,
+            .rygbHandle = rygbHandle};
+
+        _tetraImages.emplace_back(image);
+    }
+
+    // sort all tetra images by name
     std::sort(
         _tetraImages.begin(),
         _tetraImages.end(),
         [](const TetraImageFile& a, const TetraImageFile& b) {
-            return a.fileNames[ColorSpace::RGB] < b.fileNames[ColorSpace::RGB];
+            return a.name < b.name;
         }
     );
 }
@@ -208,8 +247,12 @@ void AppImageViewer::pollControls()
 void AppImageViewer::Cleanup(TetriumApp::CleanupContext& ctx)
 {
     for (TetraImageFile& image : _tetraImages) {
-        for (int i = 0; i < ColorSpaceSize; i++) {
-            ctx.api.UnloadTexture(image.textureHandles[i]);
+        if (image.isRYGB) {
+            ctx.api.UnloadRYGBTexture(image.rygbHandle);
+        } else {
+            for (int i = 0; i < ColorSpaceSize; i++) {
+                ctx.api.UnloadTexture(image.textureHandles[i]);
+            }
         }
     }
 }

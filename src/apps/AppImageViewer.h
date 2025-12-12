@@ -19,6 +19,8 @@ class AppImageViewer : public App
         std::string fileNames[ColorSpaceSize];
         uint32_t textureHandles[ColorSpaceSize];
         ImGuiTexture textures[ColorSpaceSize];
+        bool isRYGB = false;           // True if loaded from RYGB TIFF
+        uint32_t rygbHandle = 0;       // RYGB texture handle (if isRYGB is true)
     };
 
     bool _wantReloadImages = true;

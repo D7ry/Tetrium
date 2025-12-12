@@ -1103,6 +1103,8 @@ void Tetrium::Cleanup()
         .api = {
             .UnloadTexture
             = [this](uint32_t handle) { this->_textureManager.UnLoadTexture(handle); },
+            .UnloadRYGBTexture
+            = [this](uint32_t handle) { this->_textureManager.UnloadRYGBTexture(handle); },
         }};
 
     for (auto& [appName, app] : _appMap) {

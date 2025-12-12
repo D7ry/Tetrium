@@ -43,6 +43,7 @@ struct CleanupContext
     struct
     {
         std::function<void(uint32_t)> UnloadTexture;
+        std::function<void(uint32_t)> UnloadRYGBTexture;
     } api;
 };
 

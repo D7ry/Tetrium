@@ -64,8 +64,7 @@ class AppTemporalAFC : public App
 
     struct StimulusTextures
     {
-        uint32_t handleRGB = 0;
-        uint32_t handleOCV = 0;
+        uint32_t rygbHandle = 0;  // Handle to RYGB texture (provides both RGB and OCV)
         ImGuiTexture texRGB{};
         ImGuiTexture texOCV{};
     };
