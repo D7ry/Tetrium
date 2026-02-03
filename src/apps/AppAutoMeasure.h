@@ -44,6 +44,15 @@ class AppAutoMeasure : public App
     void drawMeasurementBoxes(ImVec2 center, float innerRadius, float outerRadius);
     bool loadPrimariesFromFile(const std::string& filename);
     void scanMeasurementFiles();
+    
+    // Daily validation methods
+    void runDailyValidation();
+    bool measureDisplayPrimaries(const std::string& primariesDir);
+    bool convertRYGBToRGBO(const std::string& date);
+    bool measureValidationTargets(const std::string& date);
+    bool runValidation(const std::string& date);
+    std::vector<glm::ivec4> parseRGBOTargets(const std::string& csvPath);
+    void measureAndSaveSpectrum(glm::ivec4 rgbo, const std::string& outputDir);
 
     static constexpr float STIMULUS_SIZE = 0.5f; // Same as AppPseudoIsochromaticTest default
 
@@ -51,6 +60,8 @@ class AppAutoMeasure : public App
     {
         bool connecting = false;
         bool measuring = false;
+        bool validating = false;
+        bool validationComplete = false;
     } pr650States;
 
     struct
@@ -61,5 +72,13 @@ class AppAutoMeasure : public App
         int selectedFileIndex = 0;
         int currPrimaryIndex = 0;
     } measurementData;
+    
+    struct
+    {
+        std::string currentStep = "";
+        int stepNumber = 0;
+        int totalSteps = 4;
+        std::string statusMessage = "";
+    } validationState;
 };
 }; // namespace TetriumApp
