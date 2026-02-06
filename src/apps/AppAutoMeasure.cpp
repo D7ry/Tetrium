@@ -267,6 +267,7 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx)
                 if (ImGui::Button("OK##validation")) {
                     pr650States.validating = false;
                     pr650States.validationComplete = false;
+                    validationState.displayValidationColor = false;
                 }
             } else {
                 if (pr650States.measuring) {
@@ -396,7 +397,10 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx)
     float menuEndY = ImGui::GetCursorScreenPos().y;
     float menuHeight = menuEndY - ImGui::GetWindowPos().y;
 
-    drawLandoltCStimulus(ctx, RGBO, menuHeight);
+    // Use validation RGBO if validation is active, otherwise use measurement list RGBO
+    glm::ivec4 displayRGBO = validationState.displayValidationColor ? validationState.currentRGBO : RGBO;
+    
+    drawLandoltCStimulus(ctx, displayRGBO, menuHeight);
     ImGui::End();
     ImGui::PopStyleColor(2); // Pop both WindowBg and Text colors
 }
@@ -510,9 +514,10 @@ void AppAutoMeasure::runDailyValidation()
         validationState.statusMessage = "ERROR: Failed to measure display primaries";
         ERROR("Failed to measure display primaries");
         pr650States.validating = false;
+        validationState.displayValidationColor = false;
         return;
     }
-
+    
     // Step 2: Convert RYGB to RGBO
     validationState.stepNumber = 2;
     validationState.currentStep = "Converting RYGB to RGBO";
@@ -520,9 +525,10 @@ void AppAutoMeasure::runDailyValidation()
         validationState.statusMessage = "ERROR: Failed to convert RYGB to RGBO";
         ERROR("Failed to convert RYGB to RGBO");
         pr650States.validating = false;
+        validationState.displayValidationColor = false;
         return;
     }
-
+    
     // Step 3: Measure validation targets
     validationState.stepNumber = 3;
     validationState.currentStep = "Measuring Validation Targets";
@@ -530,9 +536,10 @@ void AppAutoMeasure::runDailyValidation()
         validationState.statusMessage = "ERROR: Failed to measure validation targets";
         ERROR("Failed to measure validation targets");
         pr650States.validating = false;
+        validationState.displayValidationColor = false;
         return;
     }
-
+    
     // Step 4: Run validation
     validationState.stepNumber = 4;
     validationState.currentStep = "Running Validation";
@@ -540,12 +547,16 @@ void AppAutoMeasure::runDailyValidation()
         validationState.statusMessage = "ERROR: Validation failed";
         ERROR("Validation failed");
         pr650States.validating = false;
+        validationState.displayValidationColor = false;
         return;
     }
 
     validationState.statusMessage = "Validation complete! Check measurements/" + date + "/";
     INFO("Daily validation complete for {}", date);
     pr650States.validationComplete = true;
+    
+    // Clear validation display state
+    validationState.displayValidationColor = false;
 }
 
 bool AppAutoMeasure::measureDisplayPrimaries(const std::string& primariesDir)
@@ -703,12 +714,13 @@ void AppAutoMeasure::measureAndSaveSpectrum(glm::ivec4 rgbo, const std::string& 
 {
     INFO("Measuring spectrum for RGBO: ({}, {}, {}, {})", rgbo.x, rgbo.y, rgbo.z, rgbo.w);
 
-    // TODO: Display the color on screen here
-    // This would require integration with the rendering system
-    // For now, assuming the color is already displayed
-
-    // Wait for display to stabilize
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    // Display the color on screen
+    validationState.currentRGBO = rgbo;
+    validationState.displayValidationColor = true;
+    
+    // Wait for display to update and stabilize (increased from 500ms to 1000ms)
+    // This ensures the ImGui rendering loop has time to display the new color
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
     // Start measurement
     IPR650->StartMeasuring();

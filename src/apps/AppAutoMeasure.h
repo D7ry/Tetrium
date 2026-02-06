@@ -79,6 +79,8 @@ class AppAutoMeasure : public App
         int stepNumber = 0;
         int totalSteps = 4;
         std::string statusMessage = "";
+        glm::ivec4 currentRGBO = glm::ivec4(0, 0, 0, 0);
+        bool displayValidationColor = false;
     } validationState;
 };
 }; // namespace TetriumApp
