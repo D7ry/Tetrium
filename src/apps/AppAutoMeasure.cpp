@@ -398,8 +398,9 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx)
     float menuHeight = menuEndY - ImGui::GetWindowPos().y;
 
     // Use validation RGBO if validation is active, otherwise use measurement list RGBO
-    glm::ivec4 displayRGBO = validationState.displayValidationColor ? validationState.currentRGBO : RGBO;
-    
+    glm::ivec4 displayRGBO
+        = validationState.displayValidationColor ? validationState.currentRGBO : RGBO;
+
     drawLandoltCStimulus(ctx, displayRGBO, menuHeight);
     ImGui::End();
     ImGui::PopStyleColor(2); // Pop both WindowBg and Text colors
@@ -517,7 +518,7 @@ void AppAutoMeasure::runDailyValidation()
         validationState.displayValidationColor = false;
         return;
     }
-    
+
     // Step 2: Convert RYGB to RGBO
     validationState.stepNumber = 2;
     validationState.currentStep = "Converting RYGB to RGBO";
@@ -528,7 +529,7 @@ void AppAutoMeasure::runDailyValidation()
         validationState.displayValidationColor = false;
         return;
     }
-    
+
     // Step 3: Measure validation targets
     validationState.stepNumber = 3;
     validationState.currentStep = "Measuring Validation Targets";
@@ -539,7 +540,7 @@ void AppAutoMeasure::runDailyValidation()
         validationState.displayValidationColor = false;
         return;
     }
-    
+
     // Step 4: Run validation
     validationState.stepNumber = 4;
     validationState.currentStep = "Running Validation";
@@ -554,7 +555,7 @@ void AppAutoMeasure::runDailyValidation()
     validationState.statusMessage = "Validation complete! Check measurements/" + date + "/";
     INFO("Daily validation complete for {}", date);
     pr650States.validationComplete = true;
-    
+
     // Clear validation display state
     validationState.displayValidationColor = false;
 }
@@ -587,7 +588,7 @@ bool AppAutoMeasure::convertRYGBToRGBO(const std::string& date)
     INFO("Converting RYGB to RGBO for date: {}", date);
 
     // Build Python command
-    std::string cmd = "conda run -n chromalab python " + TETRIUM_COLOR_PATH
+    std::string cmd = "conda run -n tetrium python " + TETRIUM_COLOR_PATH
                       + "scripts/validation/convert_rygb_to_rgbo.py " + "--metamers "
                       + TETRIUM_COLOR_PATH + "config/display_validation_metamers.json "
                       + "--primaries " + TETRIUM_COLOR_PATH + "measurements/" + date
@@ -641,7 +642,7 @@ bool AppAutoMeasure::runValidation(const std::string& date)
     INFO("Running validation for date: {}", date);
 
     // Build Python command
-    std::string cmd = "conda run -n chromalab python " + TETRIUM_COLOR_PATH
+    std::string cmd = "conda run -n tetrium python " + TETRIUM_COLOR_PATH
                       + "scripts/validation/validate_display_measurements.py " + "--metamers "
                       + TETRIUM_COLOR_PATH + "config/display_validation_metamers.json "
                       + "--primaries " + TETRIUM_COLOR_PATH + "measurements/" + date
@@ -717,7 +718,7 @@ void AppAutoMeasure::measureAndSaveSpectrum(glm::ivec4 rgbo, const std::string& 
     // Display the color on screen
     validationState.currentRGBO = rgbo;
     validationState.displayValidationColor = true;
-    
+
     // Wait for display to update and stabilize (increased from 500ms to 1000ms)
     // This ensures the ImGui rendering loop has time to display the new color
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
