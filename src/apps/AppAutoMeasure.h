@@ -44,7 +44,7 @@ class AppAutoMeasure : public App
     void drawMeasurementBoxes(ImVec2 center, float innerRadius, float outerRadius);
     bool loadPrimariesFromFile(const std::string& filename);
     void scanMeasurementFiles();
-    
+
     // Daily validation methods
     void runDailyValidation();
     bool measureDisplayPrimaries(const std::string& primariesDir);
@@ -72,7 +72,7 @@ class AppAutoMeasure : public App
         int selectedFileIndex = 0;
         int currPrimaryIndex = 0;
     } measurementData;
-    
+
     struct
     {
         std::string currentStep = "";

@@ -734,22 +734,22 @@ void AppAutoMeasure::measureAndSaveSpectrum(glm::ivec4 rgbo, const std::string& 
     // Get measurement results
     auto& result = IPR650->MeasureResult;
 
-    // Determine filename format based on whether this is a primary or validation measurement
-    std::string filename;
-    bool isPrimary = (rgbo.x == 255 && rgbo.y == 0 && rgbo.z == 0 && rgbo.w == 0)
-                     || (rgbo.x == 0 && rgbo.y == 255 && rgbo.z == 0 && rgbo.w == 0)
-                     || (rgbo.x == 0 && rgbo.y == 0 && rgbo.z == 255 && rgbo.w == 0)
-                     || (rgbo.x == 0 && rgbo.y == 0 && rgbo.z == 0 && rgbo.w == 255);
-
-    if (isPrimary) {
-        // Use underscore format for primaries: <R>_<G>_<B>_<O>.csv
-        filename = outputDir + "/" + std::to_string(rgbo.x) + "_" + std::to_string(rgbo.y) + "_"
-                   + std::to_string(rgbo.z) + "_" + std::to_string(rgbo.w) + ".csv";
-    } else {
-        // Use lowercase format for validation measurements: r<R>g<G>b<B>o<O>.csv
-        filename = outputDir + "/r" + std::to_string(rgbo.x) + "g" + std::to_string(rgbo.y) + "b"
-                   + std::to_string(rgbo.z) + "o" + std::to_string(rgbo.w) + ".csv";
+    // Ensure output directory exists
+    try {
+        std::filesystem::create_directories(outputDir);
+        INFO("Output directory: {}", std::filesystem::absolute(outputDir).string());
+    } catch (const std::exception& e) {
+        ERROR("Failed to create directory {}: {}", outputDir, e.what());
+        IPR650->MeasureResult.ready = false;
+        return;
     }
+
+    // Generate filename with timestamp: r<R>g<G>b<B>o<O>_<timestamp>.csv
+    // This format is used by both primaries and validation measurements
+    std::string timestamp = getTimestampString();
+    std::string filename = outputDir + "/r" + std::to_string(rgbo.x) + "g" + std::to_string(rgbo.y)
+                           + "b" + std::to_string(rgbo.z) + "o" + std::to_string(rgbo.w) + "_"
+                           + timestamp + ".csv";
 
     // Format spectrum data (two columns: wavelength, power - no header)
     std::ostringstream resultStr;
@@ -766,13 +766,15 @@ void AppAutoMeasure::measureAndSaveSpectrum(glm::ivec4 rgbo, const std::string& 
     std::ofstream file(filename);
     if (!file.is_open()) {
         ERROR("Failed to open file for writing: {}", filename);
+        ERROR("Absolute path would be: {}", std::filesystem::absolute(filename).string());
+        IPR650->MeasureResult.ready = false;
         return;
     }
 
     file << resultStr.str();
     file.close();
 
-    INFO("Saved spectrum to: {}", filename);
+    INFO("Saved spectrum to: {}", std::filesystem::absolute(filename).string());
 
     // Reset measurement state
     IPR650->MeasureResult.ready = false;
