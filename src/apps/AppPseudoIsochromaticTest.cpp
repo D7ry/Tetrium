@@ -114,7 +114,7 @@ void TetriumApp::AppPseudoIsochromaticTest::TickImGui(const TetriumApp::TickCont
                 ColorTestResult result
                     = correct ? ColorTestResult::Success : ColorTestResult::Failure;
 
-                _currentTrial = _testGenerator->GetNextTrialRYGB(
+                _currentTrial = _testGenerator->GetNextTrialBGYR(
                     result,
                     filename,
                     hidden_symbol,
@@ -723,7 +723,7 @@ void AppPseudoIsochromaticTest::transitionSubjectState(
                 std::string hidden_symbol = "landolt_" + OrientationToString(next_orientation);
 
                 // Use Success as default (shouldn't matter for first trial after break)
-                _currentTrial = _testGenerator->GetNextTrialRYGB(
+                _currentTrial = _testGenerator->GetNextTrialBGYR(
                     ColorTestResult::Success,
                     filename,
                     hidden_symbol,
@@ -1025,7 +1025,7 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
             = LANDOLT_C_ORIENTATIONS[rand() % LANDOLT_C_ORIENTATIONS.size()];
         std::string hidden_symbol = "landolt_" + OrientationToString(first_orientation);
 
-        _currentTrial = _testGenerator->NewTrialRYGB(
+        _currentTrial = _testGenerator->NewTrialBGYR(
             filename,
             hidden_symbol,
             SETTINGS.LUM_NOISE,
@@ -1224,17 +1224,17 @@ void AppPseudoIsochromaticTest::populatePromptContext(
     }
 
     // Check if we have RYGB path (new architecture) or RGB/OCV paths (old architecture)
-    if (!trial.rygb_path.empty()) {
+    if (!trial.bgyr_path.empty()) {
         // Use new RYGB architecture via TextureManager
         INFO(
             "Loading RYGB texture for trial: rygb={}, genotype={}, axis={}",
-            trial.rygb_path,
+            trial.bgyr_path,
             trial.genotype,
             trial.metameric_axis
         );
 
         // Load RYGB texture via TextureManager API
-        _currentRYGBTextureHandle = ctx.apis.LoadRYGBTexture(trial.rygb_path);
+        _currentRYGBTextureHandle = ctx.apis.LoadRYGBTexture(trial.bgyr_path);
 
         // Get RGB and OCV textures for ImGui display
         auto [rgbTex, ocvTex] = ctx.apis.GetRYGBImGuiTextures(_currentRYGBTextureHandle);
@@ -1462,6 +1462,7 @@ void AppPseudoIsochromaticTest::Cleanup(TetriumApp::CleanupContext& ctx)
 void AppPseudoIsochromaticTest::TickVulkan(TetriumApp::TickContextVulkan& ctx)
 {
     // Note: RYGB texture transformation is now handled internally by TextureManager
-    // GPU rendering happens during LoadRYGBTexture() call, so no additional Vulkan commands needed here
+    // GPU rendering happens during LoadRYGBTexture() call, so no additional Vulkan commands needed
+    // here
 }
 } // namespace TetriumApp

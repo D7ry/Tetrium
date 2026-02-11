@@ -46,7 +46,7 @@ class AppAutoMeasure : public App
     void scanMeasurementFiles();
 
     // Daily validation methods
-    void runDailyValidation();
+    void runDailyValidation(bool debugSkipPR650Measurements);
     bool measureDisplayPrimaries(const std::string& primariesDir);
     bool convertRYGBToRGBO(const std::string& date);
     bool measureValidationTargets(const std::string& date);
@@ -81,6 +81,7 @@ class AppAutoMeasure : public App
         std::string statusMessage = "";
         glm::ivec4 currentRGBO = glm::ivec4(0, 0, 0, 0);
         bool displayValidationColor = false;
+        bool debugSkipPR650Measurements = false;
     } validationState;
 };
 }; // namespace TetriumApp

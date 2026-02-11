@@ -227,8 +227,23 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx)
             ImGui::Text("PR650 connected!");
         }
 
+        ImGui::Separator();
+        ImGui::Checkbox(
+            "Debug: skip PR650 measurements", &validationState.debugSkipPR650Measurements
+        );
+        ImGui::SameLine();
+        ImGui::TextDisabled("(?)");
+        if (ImGui::IsItemHovered()) {
+            ImGui::BeginTooltip();
+            ImGui::Text("When enabled, Daily Validate will:");
+            ImGui::Text("- Skip all PR650 measurements");
+            ImGui::Text("- Assume primaries and validation measurements already exist");
+            ImGui::Text("- Still run the Python conversion and validation scripts");
+            ImGui::EndTooltip();
+        }
+
         // Daily Validate section - separate from regular measurements
-        if (IPR650->isConnected()) {
+        if (IPR650->isConnected() || validationState.debugSkipPR650Measurements) {
             ImGui::Separator();
             ImGui::Text("Daily Display Validation:");
             ImGui::SameLine();
@@ -240,7 +255,8 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx)
 
             if (!pr650States.validating) {
                 if (ImGui::Button("Daily Validate")) {
-                    std::thread([this]() { runDailyValidation(); }).detach();
+                    bool debugSkip = validationState.debugSkipPR650Measurements;
+                    std::thread([this, debugSkip]() { runDailyValidation(debugSkip); }).detach();
                     pr650States.validating = true;
                     pr650States.validationComplete = false;
                 }
@@ -500,7 +516,7 @@ void AppAutoMeasure::drawMeasurementBoxes(ImVec2 center, float innerRadius, floa
     drawList->AddRect(centerBoxMin, centerBoxMax, boxColor, 0.0f, 0, boxThickness);
 }
 
-void AppAutoMeasure::runDailyValidation()
+void AppAutoMeasure::runDailyValidation(bool debugSkipPR650Measurements)
 {
     std::string date = getCurrentDate();
 
@@ -511,7 +527,7 @@ void AppAutoMeasure::runDailyValidation()
     validationState.stepNumber = 1;
     validationState.currentStep = "Measuring Display Primaries";
     std::string primariesDir = TETRIUM_COLOR_PATH + "measurements/" + date + "/primaries/";
-    if (!measureDisplayPrimaries(primariesDir)) {
+    if (!debugSkipPR650Measurements && !measureDisplayPrimaries(primariesDir)) {
         validationState.statusMessage = "ERROR: Failed to measure display primaries";
         ERROR("Failed to measure display primaries");
         pr650States.validating = false;
@@ -533,7 +549,7 @@ void AppAutoMeasure::runDailyValidation()
     // Step 3: Measure validation targets
     validationState.stepNumber = 3;
     validationState.currentStep = "Measuring Validation Targets";
-    if (!measureValidationTargets(date)) {
+    if (!debugSkipPR650Measurements && !measureValidationTargets(date)) {
         validationState.statusMessage = "ERROR: Failed to measure validation targets";
         ERROR("Failed to measure validation targets");
         pr650States.validating = false;
@@ -589,7 +605,7 @@ bool AppAutoMeasure::convertRYGBToRGBO(const std::string& date)
 
     // Build Python command
     std::string cmd = "conda run -n tetrium python " + TETRIUM_COLOR_PATH
-                      + "scripts/validation/convert_rygb_to_rgbo.py " + "--metamers "
+                      + "scripts/validation/convert_bgyr_to_bgor.py " + "--metamers "
                       + TETRIUM_COLOR_PATH + "config/display_validation_metamers.json "
                       + "--primaries " + TETRIUM_COLOR_PATH + "measurements/" + date
                       + "/primaries/ " + "--output " + TETRIUM_COLOR_PATH + "measurements/" + date
@@ -646,11 +662,12 @@ bool AppAutoMeasure::runValidation(const std::string& date)
                       + "scripts/validation/validate_display_measurements.py " + "--metamers "
                       + TETRIUM_COLOR_PATH + "config/display_validation_metamers.json "
                       + "--primaries " + TETRIUM_COLOR_PATH + "measurements/" + date
-                      + "/primaries/ " + "--measurements " + TETRIUM_COLOR_PATH + "measurements/"
-                      + date + "/validation_measurements/ " + "--output " + TETRIUM_COLOR_PATH
-                      + "measurements/" + date + "/validation_report.json " + "--plots "
-                      + TETRIUM_COLOR_PATH + "measurements/" + date + "/validation_plots/";
-
+                      + "/primaries/ " + "--plots " + TETRIUM_COLOR_PATH + "measurements/" + date
+                      + "/validation_plots/";
+    if (!validationState.debugSkipPR650Measurements) {
+        cmd += "--measurements " + TETRIUM_COLOR_PATH + "measurements/" + date
+               + "/validation_measurements/ ";
+    }
     INFO("Running command: {}", cmd);
     int result = system(cmd.c_str());
 
@@ -734,25 +751,47 @@ void AppAutoMeasure::measureAndSaveSpectrum(glm::ivec4 rgbo, const std::string& 
     // Get measurement results
     auto& result = IPR650->MeasureResult;
 
-    // Format spectrum data - same as regular measurements (lines 334-344)
-    std::ostringstream resultStr;
-    resultStr << "wavelength, power, luminance\n";
-    constexpr auto max_precision{std::numeric_limits<double>::digits10 + 1};
-    resultStr << std::scientific << std::setprecision(max_precision);
-    for (int i = 0; i < result.power.size(); i++) {
-        double wavelength = result.wavelength[i];
-        double power = result.power[i];
-        resultStr << wavelength << ',' << power << ',' << result.luminance << '\n';
+    // Ensure output directory exists
+    try {
+        std::filesystem::create_directories(outputDir);
+        INFO("Output directory: {}", std::filesystem::absolute(outputDir).string());
+    } catch (const std::exception& e) {
+        ERROR("Failed to create directory {}: {}", outputDir, e.what());
+        IPR650->MeasureResult.ready = false;
+        return;
     }
 
-    // Generate filename - same format as regular measurements (line 356-357)
+    // Generate filename with timestamp: r<R>g<G>b<B>o<O>_<timestamp>.csv
+    // This format is used by both primaries and validation measurements
     std::string timestamp = getTimestampString();
-    std::stringstream fileName;
-    fileName << outputDir << "/r" << rgbo.x << "g" << rgbo.y << "b" << rgbo.z << "o" << rgbo.w
-             << "_" << timestamp << ".csv";
+    std::string filename = outputDir + "/r" + std::to_string(rgbo.x) + "g" + std::to_string(rgbo.y)
+                           + "b" + std::to_string(rgbo.z) + "o" + std::to_string(rgbo.w) + "_"
+                           + timestamp + ".csv";
 
-    // Use the same writeToFile helper that creates directories automatically
-    writeToFile(fileName.str(), resultStr.str());
+    // Format spectrum data (two columns: wavelength, power - no header)
+    std::ostringstream resultStr;
+    constexpr auto max_precision{std::numeric_limits<double>::digits10 + 1};
+    resultStr << std::scientific << std::setprecision(max_precision);
+
+    for (size_t i = 0; i < result.power.size(); i++) {
+        double wavelength = result.wavelength[i];
+        double power = result.power[i];
+        resultStr << wavelength << ',' << power << '\n';
+    }
+
+    // Write to file
+    std::ofstream file(filename);
+    if (!file.is_open()) {
+        ERROR("Failed to open file for writing: {}", filename);
+        ERROR("Absolute path would be: {}", std::filesystem::absolute(filename).string());
+        IPR650->MeasureResult.ready = false;
+        return;
+    }
+
+    file << resultStr.str();
+    file.close();
+
+    INFO("Saved spectrum to: {}", std::filesystem::absolute(filename).string());
 
     // Reset measurement state
     IPR650->MeasureResult.ready = false;

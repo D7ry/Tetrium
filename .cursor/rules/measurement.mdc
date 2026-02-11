@@ -1,0 +1,10 @@
+---
+alwaysApply: true
+---
+
+Measurement files are spectral measurements from the PR-650, and are tabulated as 380nm to 780nm in 4nm steps, therefore with 100 power measurements from those wavelengths. 
+
+They are stored as .csv files, which are named as r{#}_g{#}_b{#}_o{#}_{date}_{time}.csv. These represent what we put in
+as 8-bit values, and it is measured spectrally.
+
+We can use the function load_primaries_from_csv(filename) from TetriumColor.Measurement.TetriumMeasurementRoutines in order to load them into a List[Spectra]. 

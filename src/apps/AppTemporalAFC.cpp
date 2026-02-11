@@ -461,7 +461,7 @@ void AppTemporalAFC::loadCurrentTrialTextures(const TetriumApp::TickContextImGui
         std::string baseFilename = "./temp/" + subjectName + "_trial"
                                    + std::to_string(currentTrialIdx) + "_stim" + std::to_string(i);
 
-        std::string rygbPath = colorGenerator->GenerateCircleRYGB(
+        std::string rygbPath = colorGenerator->GenerateCircleBGYR(
             baseFilename,
             r,
             g,
