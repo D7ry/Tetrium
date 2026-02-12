@@ -178,6 +178,57 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx)
             | ImGuiWindowFlags_NoResize;
 
     if (ImGui::Begin("measure", NULL, flags)) {
+        // Draw stimulus first (behind the menu) using window draw list
+        // ImGui renders draw list commands before widgets, so this will be behind
+        if (!measurementData.currentPrimaries.empty() || validationState.displayValidationColor) {
+            glm::ivec4 displayRGBO = glm::ivec4(0, 0, 0, 0);
+            if (!measurementData.currentPrimaries.empty()) {
+                glm::ivec4 RGBO
+                    = measurementData.currentPrimaries[measurementData.currPrimaryIndex];
+                displayRGBO
+                    = validationState.displayValidationColor ? validationState.currentRGBO : RGBO;
+            } else if (validationState.displayValidationColor) {
+                displayRGBO = validationState.currentRGBO;
+            }
+
+            // Use window draw list - commands here render before widgets
+            ImDrawList* drawList = ImGui::GetWindowDrawList();
+            ImVec2 windowSize = ImGui::GetWindowSize();
+            ImVec2 windowPos = ImGui::GetWindowPos();
+
+            // Estimate menu height (will be ~300-400px depending on content)
+            float estimatedMenuHeight = 350.0f;
+            ImVec2 center = ImVec2(
+                windowPos.x + windowSize.x * 0.5f,
+                windowPos.y + (windowSize.y + estimatedMenuHeight) * 0.5f
+            );
+
+            // Fill background area below menu with black
+            drawList->AddRectFilled(
+                ImVec2(windowPos.x, windowPos.y + estimatedMenuHeight),
+                ImVec2(windowPos.x + windowSize.x, windowPos.y + windowSize.y),
+                IM_COL32(0, 0, 0, 255)
+            );
+
+            // Calculate stimulus size
+            float baseRadius = std::min(windowSize.x, windowSize.y - estimatedMenuHeight) * 0.4f;
+            float stimulusRadius = baseRadius * stimulusSize;
+
+            // Annulus parameters
+            float outerRadius = stimulusRadius * 0.8f;
+            float strokeWidth = outerRadius * 1.0f;
+            float innerRadius = outerRadius - strokeWidth;
+
+            // Choose color
+            ImU32 color = ctx.colorSpace == RGB
+                              ? IM_COL32(displayRGBO.x, displayRGBO.y, displayRGBO.w, 255)
+                              : IM_COL32(displayRGBO.z, displayRGBO.y, displayRGBO.w, 255);
+
+            // Draw stimulus circle
+            drawList->AddCircleFilled(center, outerRadius, color, 0);
+            drawList->AddCircleFilled(center, innerRadius, IM_COL32(0, 0, 0, 255), 0);
+        }
+
         // Measurement file selection dropdown
         ImGui::Text("Measurement File:");
         ImGui::SameLine();
@@ -380,12 +431,20 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx)
         }
     }
     constexpr std::array<const char*, 4> labels = {"r", "g", "b", "o"};
+
+    // Use validation RGBO if validation is active, otherwise use measurement list RGBO
+    glm::ivec4 displayRGBO
+        = validationState.displayValidationColor ? validationState.currentRGBO : RGBO;
+
     measureContext.rgboValuesString = "RGBO: ";
     for (int i = 0; i < 4; i++) {
-        measureContext.rgboValuesString += std::to_string(RGBO[i]);
+        measureContext.rgboValuesString += std::to_string(displayRGBO[i]);
         measureContext.rgboValuesString += ' ';
     }
     ImGui::Text("%s", measureContext.rgboValuesString.c_str());
+
+    // Stimulus size slider (multiplies the radius)
+    ImGui::SliderFloat("Stimulus Size", &stimulusSize, 0.1f, 3.0f, "%.2fx");
 
     // End disabled state if validation is running
     if (pr650States.validating) {
@@ -400,15 +459,8 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx)
     //     ImGui::SliderInt(label, &RGBO[i], 0, 255);
     // }
 
-    // Get the Y position after the menu (where we'll draw the stimulus)
-    float menuEndY = ImGui::GetCursorScreenPos().y;
-    float menuHeight = menuEndY - ImGui::GetWindowPos().y;
-
-    // Use validation RGBO if validation is active, otherwise use measurement list RGBO
-    glm::ivec4 displayRGBO
-        = validationState.displayValidationColor ? validationState.currentRGBO : RGBO;
-
-    drawLandoltCStimulus(ctx, displayRGBO, menuHeight);
+    // Menu is already drawn, stimulus was drawn first (behind menu)
+    // No need to draw stimulus again here
     ImGui::End();
     ImGui::PopStyleColor(2); // Pop both WindowBg and Text colors
 }
@@ -442,15 +494,11 @@ void AppAutoMeasure::drawLandoltCStimulus(
         IM_COL32(0, 0, 0, 255)
     );
 
-    // Calculate stimulus size to fit in available space below menu
-    // Use a reference texture size - typical Landolt C texture is around 1024x1024
-    // STIMULUS_SIZE of 0.5 means half the reference size
-    const float referenceTextureSize = 1024.0f;
-    float stimulusPixelSize = referenceTextureSize * STIMULUS_SIZE;
-
-    // Ensure stimulus fits in available space below menu
-    float maxRadius = std::min(windowSize.x, windowSize.y); // Use 40% of available space
-    float stimulusRadius = std::min(stimulusPixelSize * 0.5f, maxRadius);
+    // Calculate stimulus size - use available space and multiply by stimulusSize slider
+    // Base radius uses 40% of available space
+    float baseRadius = std::min(windowSize.x, windowSize.y - menuHeight) * 0.4f;
+    // Apply stimulusSize multiplier directly to the radius
+    float stimulusRadius = baseRadius * stimulusSize;
 
     // Annulus parameters
     float outerRadius = stimulusRadius * 0.8f;     // Leave margin
@@ -468,8 +516,7 @@ void AppAutoMeasure::drawLandoltCStimulus(
         center, innerRadius, IM_COL32(0, 0, 0, 255), 0
     ); // Black to create hole
 
-    // Draw measurement boxes at gap locations and center
-    drawMeasurementBoxes(center, innerRadius, outerRadius);
+    // Measurement boxes removed per user request
 }
 
 void AppAutoMeasure::drawMeasurementBoxes(ImVec2 center, float innerRadius, float outerRadius)
@@ -654,7 +701,7 @@ bool AppAutoMeasure::runValidation(const std::string& date)
                       + TETRIUM_COLOR_PATH + "config/display_validation_metamers.json "
                       + "--primaries " + TETRIUM_COLOR_PATH + "measurements/" + date
                       + "/primaries/ " + "--plots " + TETRIUM_COLOR_PATH + "measurements/" + date
-                      + "/validation_plots/";
+                      + "/validation_plots/ ";
     if (!validationState.debugSkipPR650Measurements) {
         cmd += "--measurements " + TETRIUM_COLOR_PATH + "measurements/" + date
                + "/validation_measurements/ ";

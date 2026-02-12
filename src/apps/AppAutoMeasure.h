@@ -60,7 +60,7 @@ class AppAutoMeasure : public App
     );
     void measureAndSaveSpectrum(glm::ivec4 rgbo, const std::string& outputDir);
 
-    static constexpr float STIMULUS_SIZE = 0.5f; // Same as AppPseudoIsochromaticTest default
+    float stimulusSize = 1.0f; // Default stimulus size (1.0 = full size)
 
     struct
     {
