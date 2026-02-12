@@ -1,6 +1,7 @@
 #pragma once
 
 #include "App.h"
+#include "app_components/PR650.h"
 #include "imgui.h"
 
 namespace TetriumApp
@@ -52,6 +53,11 @@ class AppAutoMeasure : public App
     bool measureValidationTargets(const std::string& date);
     bool runValidation(const std::string& date);
     std::vector<glm::ivec4> parseRGBOTargets(const std::string& csvPath);
+    void saveSpectrumData(
+        glm::ivec4 rgbo,
+        const std::string& outputDir,
+        const PR650::SpectrumMeasure& result
+    );
     void measureAndSaveSpectrum(glm::ivec4 rgbo, const std::string& outputDir);
 
     static constexpr float STIMULUS_SIZE = 0.5f; // Same as AppPseudoIsochromaticTest default

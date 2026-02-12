@@ -347,17 +347,11 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx)
                 auto& result = IPR650->MeasureResult;
                 INFO("luminance: {}", result.luminance);
 
-                std::ostringstream resultStr;
-                resultStr << "wavelength, power, luminance\n";
-                std::string file = "result";
-                constexpr auto max_precision{std::numeric_limits<double>::digits10 + 1};
-                resultStr << std::scientific << std::setprecision(max_precision);
+                // Log measurement details
                 for (int i = 0; i < result.power.size(); i++) {
-                    double wavelength = result.wavelength[i];
-                    double power = result.power[i];
-                    resultStr << wavelength << ',' << power << ',' << result.luminance << '\n';
-                    INFO("{} : {} {}", i, power, wavelength);
+                    INFO("{} : {} {}", i, result.power[i], result.wavelength[i]);
                 }
+
                 // write results to file in measurement-specific directory
                 std::string baseFileName = measurementData.selectedFile;
                 // Remove .txt extension
@@ -367,12 +361,9 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx)
                 }
 
                 std::string measurementDir = getTodayMeasurementsPath() + "/" + baseFileName;
-                std::string timestamp = getTimestampString();
-                std::stringstream fileName;
-                fileName << measurementDir << "/r" << RGBO.x << "g" << RGBO.y << "b" << RGBO.z
-                         << "o" << RGBO.w << "_" << timestamp << ".csv";
-                writeToFile(fileName.str(), resultStr.str());
-                INFO("Saved measurement to: {}", fileName.str());
+
+                // Use the shared saveSpectrumData function
+                saveSpectrumData(RGBO, measurementDir, result);
 
                 // measure next primary
                 measurementData.currPrimaryIndex++;
@@ -728,6 +719,56 @@ std::vector<glm::ivec4> AppAutoMeasure::parseRGBOTargets(const std::string& csvP
     return result;
 }
 
+void AppAutoMeasure::saveSpectrumData(
+    glm::ivec4 rgbo,
+    const std::string& outputDir,
+    const PR650::SpectrumMeasure& result
+)
+{
+    // Ensure output directory exists
+    try {
+        std::filesystem::create_directories(outputDir);
+        INFO("Output directory: {}", std::filesystem::absolute(outputDir).string());
+    } catch (const std::exception& e) {
+        ERROR("Failed to create directory {}: {}", outputDir, e.what());
+        return;
+    }
+
+    // Generate filename with timestamp: r<R>g<G>b<B>o<O>_<timestamp>.csv
+    // This format is used by both primaries and validation measurements
+    std::string timestamp = getTimestampString();
+    std::string filename = outputDir + "/r" + std::to_string(rgbo.x) + "g" + std::to_string(rgbo.y)
+                           + "b" + std::to_string(rgbo.z) + "o" + std::to_string(rgbo.w) + "_"
+                           + timestamp + ".csv";
+
+    // Format spectrum data (three columns: wavelength, power, luminance - with header)
+    std::ostringstream resultStr;
+    constexpr auto max_precision{std::numeric_limits<double>::digits10 + 1};
+    resultStr << std::scientific << std::setprecision(max_precision);
+
+    // Write header
+    resultStr << "wavelength, power, luminance\n";
+
+    for (size_t i = 0; i < result.power.size(); i++) {
+        double wavelength = result.wavelength[i];
+        double power = result.power[i];
+        resultStr << wavelength << ',' << power << ',' << result.luminance << '\n';
+    }
+
+    // Write to file
+    std::ofstream file(filename);
+    if (!file.is_open()) {
+        ERROR("Failed to open file for writing: {}", filename);
+        ERROR("Absolute path would be: {}", std::filesystem::absolute(filename).string());
+        return;
+    }
+
+    file << resultStr.str();
+    file.close();
+
+    INFO("Saved spectrum to: {}", std::filesystem::absolute(filename).string());
+}
+
 void AppAutoMeasure::measureAndSaveSpectrum(glm::ivec4 rgbo, const std::string& outputDir)
 {
     INFO("Measuring spectrum for RGBO: ({}, {}, {}, {})", rgbo.x, rgbo.y, rgbo.z, rgbo.w);
@@ -751,47 +792,8 @@ void AppAutoMeasure::measureAndSaveSpectrum(glm::ivec4 rgbo, const std::string& 
     // Get measurement results
     auto& result = IPR650->MeasureResult;
 
-    // Ensure output directory exists
-    try {
-        std::filesystem::create_directories(outputDir);
-        INFO("Output directory: {}", std::filesystem::absolute(outputDir).string());
-    } catch (const std::exception& e) {
-        ERROR("Failed to create directory {}: {}", outputDir, e.what());
-        IPR650->MeasureResult.ready = false;
-        return;
-    }
-
-    // Generate filename with timestamp: r<R>g<G>b<B>o<O>_<timestamp>.csv
-    // This format is used by both primaries and validation measurements
-    std::string timestamp = getTimestampString();
-    std::string filename = outputDir + "/r" + std::to_string(rgbo.x) + "g" + std::to_string(rgbo.y)
-                           + "b" + std::to_string(rgbo.z) + "o" + std::to_string(rgbo.w) + "_"
-                           + timestamp + ".csv";
-
-    // Format spectrum data (two columns: wavelength, power - no header)
-    std::ostringstream resultStr;
-    constexpr auto max_precision{std::numeric_limits<double>::digits10 + 1};
-    resultStr << std::scientific << std::setprecision(max_precision);
-
-    for (size_t i = 0; i < result.power.size(); i++) {
-        double wavelength = result.wavelength[i];
-        double power = result.power[i];
-        resultStr << wavelength << ',' << power << '\n';
-    }
-
-    // Write to file
-    std::ofstream file(filename);
-    if (!file.is_open()) {
-        ERROR("Failed to open file for writing: {}", filename);
-        ERROR("Absolute path would be: {}", std::filesystem::absolute(filename).string());
-        IPR650->MeasureResult.ready = false;
-        return;
-    }
-
-    file << resultStr.str();
-    file.close();
-
-    INFO("Saved spectrum to: {}", std::filesystem::absolute(filename).string());
+    // Save the spectrum data
+    saveSpectrumData(rgbo, outputDir, result);
 
     // Reset measurement state
     IPR650->MeasureResult.ready = false;
