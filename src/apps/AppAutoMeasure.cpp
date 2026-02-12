@@ -744,12 +744,14 @@ std::vector<glm::ivec4> AppAutoMeasure::parseRGBOTargets(const std::string& csvP
             fields.push_back(token);
         }
 
-        // Fields are: observer_index,genotype,q_cone_index,pair_index,metamer_index,R,G,B,O,...
+        // Fields are: observer_index,genotype,q_cone_index,pair_index,metamer_index,B,G,O,R,...
+        // CSV is in BGOR order, but we need RGBO order for glm::ivec4
         if (fields.size() >= 9) {
-            int r = std::stoi(fields[5]);
-            int g = std::stoi(fields[6]);
-            int b = std::stoi(fields[7]);
-            int o = std::stoi(fields[8]);
+            int b = std::stoi(fields[5]); // B is at index 5 in CSV (BGOR order)
+            int g = std::stoi(fields[6]); // G is at index 6
+            int o = std::stoi(fields[7]); // O is at index 7
+            int r = std::stoi(fields[8]); // R is at index 8
+            // Convert BGOR to RGBO: RGBO = [R, G, B, O]
             uniqueRGBO.insert({r, g, b, o});
         }
     }
