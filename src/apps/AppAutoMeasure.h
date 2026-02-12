@@ -49,9 +49,17 @@ class AppAutoMeasure : public App
     // Daily validation methods
     void runDailyValidation(bool debugSkipPR650Measurements);
     bool measureDisplayPrimaries(const std::string& primariesDir);
-    bool convertRYGBToRGBO(const std::string& date);
-    bool measureValidationTargets(const std::string& date);
-    bool runValidation(const std::string& date);
+    bool copyPrimariesToValidationFolder(
+        const std::string& primariesSourceDir,
+        const std::string& validationPrimariesDir
+    );
+    bool copyConfigToValidationFolder(
+        const std::string& configSourcePath,
+        const std::string& validationConfigPath
+    );
+    bool convertRYGBToRGBO(const std::string& date, const std::string& validationFolder);
+    bool measureValidationTargets(const std::string& date, const std::string& validationFolder);
+    bool runValidation(const std::string& date, const std::string& validationFolder);
     std::vector<glm::ivec4> parseRGBOTargets(const std::string& csvPath);
     void saveSpectrumData(
         glm::ivec4 rgbo,

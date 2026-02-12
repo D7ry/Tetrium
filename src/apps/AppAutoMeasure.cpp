@@ -573,10 +573,45 @@ void AppAutoMeasure::runDailyValidation(bool debugSkipPR650Measurements)
         return;
     }
 
+    // Generate timestamp for validation folder
+    auto now = std::chrono::system_clock::now();
+    auto time = std::chrono::system_clock::to_time_t(now);
+    std::tm tm = *std::localtime(&time);
+    std::ostringstream oss;
+    oss << std::put_time(&tm, "validation_%Y-%m-%d_%H-%M-%S");
+    std::string validationFolderName = oss.str();
+    std::string validationFolder
+        = TETRIUM_COLOR_PATH + "measurements/" + date + "/" + validationFolderName + "/";
+
+    // Create validation folder
+    std::filesystem::create_directories(validationFolder);
+    INFO("Created validation folder: {}", validationFolder);
+
+    // Copy primaries to validation folder
+    std::string validationPrimariesDir = validationFolder + "primaries/";
+    if (!copyPrimariesToValidationFolder(primariesDir, validationPrimariesDir)) {
+        validationState.statusMessage = "ERROR: Failed to copy primaries to validation folder";
+        ERROR("Failed to copy primaries to validation folder");
+        pr650States.validating = false;
+        validationState.displayValidationColor = false;
+        return;
+    }
+
+    // Copy config to validation folder
+    std::string configSourcePath = TETRIUM_COLOR_PATH + "config/display_validation_metamers.json";
+    std::string validationConfigPath = validationFolder + "display_validation_metamers.json";
+    if (!copyConfigToValidationFolder(configSourcePath, validationConfigPath)) {
+        validationState.statusMessage = "ERROR: Failed to copy config to validation folder";
+        ERROR("Failed to copy config to validation folder");
+        pr650States.validating = false;
+        validationState.displayValidationColor = false;
+        return;
+    }
+
     // Step 2: Convert RYGB to RGBO
     validationState.stepNumber = 2;
     validationState.currentStep = "Converting RYGB to RGBO";
-    if (!convertRYGBToRGBO(date)) {
+    if (!convertRYGBToRGBO(date, validationFolder)) {
         validationState.statusMessage = "ERROR: Failed to convert RYGB to RGBO";
         ERROR("Failed to convert RYGB to RGBO");
         pr650States.validating = false;
@@ -587,7 +622,7 @@ void AppAutoMeasure::runDailyValidation(bool debugSkipPR650Measurements)
     // Step 3: Measure validation targets
     validationState.stepNumber = 3;
     validationState.currentStep = "Measuring Validation Targets";
-    if (!debugSkipPR650Measurements && !measureValidationTargets(date)) {
+    if (!debugSkipPR650Measurements && !measureValidationTargets(date, validationFolder)) {
         validationState.statusMessage = "ERROR: Failed to measure validation targets";
         ERROR("Failed to measure validation targets");
         pr650States.validating = false;
@@ -598,7 +633,7 @@ void AppAutoMeasure::runDailyValidation(bool debugSkipPR650Measurements)
     // Step 4: Run validation
     validationState.stepNumber = 4;
     validationState.currentStep = "Running Validation";
-    if (!runValidation(date)) {
+    if (!runValidation(date, validationFolder)) {
         validationState.statusMessage = "ERROR: Validation failed";
         ERROR("Validation failed");
         pr650States.validating = false;
@@ -606,8 +641,9 @@ void AppAutoMeasure::runDailyValidation(bool debugSkipPR650Measurements)
         return;
     }
 
-    validationState.statusMessage = "Validation complete! Check measurements/" + date + "/";
-    INFO("Daily validation complete for {}", date);
+    validationState.statusMessage
+        = "Validation complete! Check measurements/" + date + "/" + validationFolderName + "/";
+    INFO("Daily validation complete for {} in folder {}", date, validationFolderName);
     pr650States.validationComplete = true;
 
     // Clear validation display state
@@ -637,17 +673,86 @@ bool AppAutoMeasure::measureDisplayPrimaries(const std::string& primariesDir)
     return true;
 }
 
-bool AppAutoMeasure::convertRYGBToRGBO(const std::string& date)
+bool AppAutoMeasure::copyPrimariesToValidationFolder(
+    const std::string& primariesSourceDir,
+    const std::string& validationPrimariesDir
+)
 {
-    INFO("Converting RYGB to RGBO for date: {}", date);
+    INFO("Copying primaries from {} to {}", primariesSourceDir, validationPrimariesDir);
+
+    // Create destination directory
+    std::filesystem::create_directories(validationPrimariesDir);
+
+    // Copy all CSV files from source to destination
+    try {
+        if (!std::filesystem::exists(primariesSourceDir)) {
+            ERROR("Source primaries directory does not exist: {}", primariesSourceDir);
+            return false;
+        }
+
+        int copiedCount = 0;
+        for (const auto& entry : std::filesystem::directory_iterator(primariesSourceDir)) {
+            if (entry.is_regular_file() && entry.path().extension() == ".csv") {
+                std::filesystem::path destPath
+                    = validationPrimariesDir + entry.path().filename().string();
+                std::filesystem::copy_file(
+                    entry.path(), destPath, std::filesystem::copy_options::overwrite_existing
+                );
+                copiedCount++;
+            }
+        }
+
+        INFO("Copied {} primary CSV files to validation folder", copiedCount);
+        return true;
+    } catch (const std::filesystem::filesystem_error& e) {
+        ERROR("Failed to copy primaries: {}", e.what());
+        return false;
+    }
+}
+
+bool AppAutoMeasure::copyConfigToValidationFolder(
+    const std::string& configSourcePath,
+    const std::string& validationConfigPath
+)
+{
+    INFO("Copying config from {} to {}", configSourcePath, validationConfigPath);
+
+    try {
+        if (!std::filesystem::exists(configSourcePath)) {
+            ERROR("Source config file does not exist: {}", configSourcePath);
+            return false;
+        }
+
+        // Create parent directory if needed
+        std::filesystem::path destPath(validationConfigPath);
+        std::filesystem::create_directories(destPath.parent_path());
+
+        std::filesystem::copy_file(
+            configSourcePath,
+            validationConfigPath,
+            std::filesystem::copy_options::overwrite_existing
+        );
+        INFO("Copied config file to validation folder");
+        return true;
+    } catch (const std::filesystem::filesystem_error& e) {
+        ERROR("Failed to copy config: {}", e.what());
+        return false;
+    }
+}
+
+bool AppAutoMeasure::convertRYGBToRGBO(const std::string& date, const std::string& validationFolder)
+{
+    INFO("Converting RYGB to RGBO for date: {} in validation folder: {}", date, validationFolder);
+
+    // Use config and primaries from validation folder
+    std::string configPath = validationFolder + "display_validation_metamers.json";
+    std::string primariesPath = validationFolder + "primaries/";
+    std::string outputPath = validationFolder + "display_targets.csv";
 
     // Build Python command
     std::string cmd = "conda run -n tetrium python " + TETRIUM_COLOR_PATH
-                      + "scripts/validation/convert_bgyr_to_bgor.py " + "--metamers "
-                      + TETRIUM_COLOR_PATH + "config/display_validation_metamers.json "
-                      + "--primaries " + TETRIUM_COLOR_PATH + "measurements/" + date
-                      + "/primaries/ " + "--output " + TETRIUM_COLOR_PATH + "measurements/" + date
-                      + "/display_targets.csv";
+                      + "scripts/validation/convert_bgyr_to_bgor.py " + "--metamers " + configPath
+                      + " --primaries " + primariesPath + " --output " + outputPath;
 
     INFO("Running command: {}", cmd);
     int result = system(cmd.c_str());
@@ -661,13 +766,17 @@ bool AppAutoMeasure::convertRYGBToRGBO(const std::string& date)
     return true;
 }
 
-bool AppAutoMeasure::measureValidationTargets(const std::string& date)
+bool AppAutoMeasure::measureValidationTargets(
+    const std::string& date,
+    const std::string& validationFolder
+)
 {
-    INFO("Measuring validation targets for date: {}", date);
+    INFO(
+        "Measuring validation targets for date: {} in validation folder: {}", date, validationFolder
+    );
 
-    std::string targetsFile = TETRIUM_COLOR_PATH + "measurements/" + date + "/display_targets.csv";
-    std::string measurementsDir
-        = TETRIUM_COLOR_PATH + "measurements/" + date + "/validation_measurements/";
+    std::string targetsFile = validationFolder + "display_targets.csv";
+    std::string measurementsDir = validationFolder + "validation_measurements/";
 
     // Create measurements directory
     std::filesystem::create_directories(measurementsDir);
@@ -691,20 +800,23 @@ bool AppAutoMeasure::measureValidationTargets(const std::string& date)
     return true;
 }
 
-bool AppAutoMeasure::runValidation(const std::string& date)
+bool AppAutoMeasure::runValidation(const std::string& date, const std::string& validationFolder)
 {
-    INFO("Running validation for date: {}", date);
+    INFO("Running validation for date: {} in validation folder: {}", date, validationFolder);
+
+    // Use config and primaries from validation folder
+    std::string configPath = validationFolder + "display_validation_metamers.json";
+    std::string primariesPath = validationFolder + "primaries/";
+    std::string plotsPath = validationFolder + "validation_plots/";
+    std::string measurementsPath = validationFolder + "validation_measurements/";
 
     // Build Python command
     std::string cmd = "conda run -n tetrium python " + TETRIUM_COLOR_PATH
                       + "scripts/validation/validate_display_measurements.py " + "--metamers "
-                      + TETRIUM_COLOR_PATH + "config/display_validation_metamers.json "
-                      + "--primaries " + TETRIUM_COLOR_PATH + "measurements/" + date
-                      + "/primaries/ " + "--plots " + TETRIUM_COLOR_PATH + "measurements/" + date
-                      + "/validation_plots/ ";
+                      + configPath + " --primaries " + primariesPath + " --plots " + plotsPath
+                      + " ";
     if (!validationState.debugSkipPR650Measurements) {
-        cmd += "--measurements " + TETRIUM_COLOR_PATH + "measurements/" + date
-               + "/validation_measurements/ ";
+        cmd += "--measurements " + measurementsPath + " ";
     }
     INFO("Running command: {}", cmd);
     int result = system(cmd.c_str());
@@ -731,28 +843,48 @@ std::vector<glm::ivec4> AppAutoMeasure::parseRGBOTargets(const std::string& csvP
     }
 
     std::string line;
-    // Skip header
+    // Skip header line (R,G,B,O)
     std::getline(file, line);
 
+    // Parse simplified CSV format: R,G,B,O
     while (std::getline(file, line)) {
-        std::istringstream iss(line);
-        std::string token;
-        std::vector<std::string> fields;
-
-        // Parse CSV line
-        while (std::getline(iss, token, ',')) {
-            fields.push_back(token);
+        // Skip empty lines
+        if (line.empty()) {
+            continue;
         }
 
-        // Fields are: observer_index,genotype,q_cone_index,pair_index,metamer_index,B,G,O,R,...
-        // CSV is in BGOR order, but we need RGBO order for glm::ivec4
-        if (fields.size() >= 9) {
-            int b = std::stoi(fields[5]); // B is at index 5 in CSV (BGOR order)
-            int g = std::stoi(fields[6]); // G is at index 6
-            int o = std::stoi(fields[7]); // O is at index 7
-            int r = std::stoi(fields[8]); // R is at index 8
-            // Convert BGOR to RGBO: RGBO = [R, G, B, O]
-            uniqueRGBO.insert({r, g, b, o});
+        // Simple CSV parsing: split by comma
+        std::vector<std::string> fields;
+        std::stringstream ss(line);
+        std::string field;
+
+        while (std::getline(ss, field, ',')) {
+            // Trim whitespace
+            field.erase(0, field.find_first_not_of(" \t"));
+            field.erase(field.find_last_not_of(" \t") + 1);
+            fields.push_back(field);
+        }
+
+        // Expect exactly 4 fields: R, G, B, O
+        if (fields.size() == 4) {
+            try {
+                int r = std::stoi(fields[0]); // R
+                int g = std::stoi(fields[1]); // G
+                int b = std::stoi(fields[2]); // B
+                int o = std::stoi(fields[3]); // O
+
+                // Validate they're in valid range
+                if (r >= 0 && r <= 255 && g >= 0 && g <= 255 && b >= 0 && b <= 255 && o >= 0
+                    && o <= 255) {
+                    uniqueRGBO.insert({r, g, b, o});
+                } else {
+                    WARN("RGBO values out of range [0-255]: R={}, G={}, B={}, O={}", r, g, b, o);
+                }
+            } catch (const std::exception& e) {
+                WARN("Failed to parse RGBO values from line (error: {}): {}", e.what(), line);
+            }
+        } else {
+            WARN("Expected 4 fields (R,G,B,O), got {} fields in line: {}", fields.size(), line);
         }
     }
 
@@ -760,11 +892,15 @@ std::vector<glm::ivec4> AppAutoMeasure::parseRGBOTargets(const std::string& csvP
 
     // Convert set to vector
     std::vector<glm::ivec4> result;
-    for (const auto& [r, g, b, o] : uniqueRGBO) {
-        result.emplace_back(r, g, b, o);
+    result.reserve(uniqueRGBO.size());
+    for (const auto& rgbo : uniqueRGBO) {
+        result.push_back(
+            glm::ivec4(std::get<0>(rgbo), std::get<1>(rgbo), std::get<2>(rgbo), std::get<3>(rgbo))
+        );
     }
 
     INFO("Parsed {} unique RGBO targets", result.size());
+    return result;
     return result;
 }
 
