@@ -20,10 +20,14 @@ void AppScrambledFaceTest::Init(TetriumApp::InitContext& ctx) { (void)ctx; }
 
 void AppScrambledFaceTest::Cleanup(TetriumApp::CleanupContext& ctx)
 {
-    // Note: RYGB texture cleanup is handled automatically when TextureManager is destroyed
-    // Individual textures will be cleaned up per-trial during the test
-    (void)ctx;
-
+    for (auto& t : trials) {
+        for (auto& c : t.choices) {
+            if (c.handleRGB)
+                ctx.api.UnloadTexture(c.handleRGB);
+            if (c.handleOCV)
+                ctx.api.UnloadTexture(c.handleOCV);
+        }
+    }
     trials.clear();
     if (testGenerator) {
         delete testGenerator;
@@ -731,9 +735,10 @@ void AppScrambledFaceTest::drawResult(const TetriumApp::TickContextImGui& ctx)
         state = TestState::kIdle;
         for (auto& t : trials) {
             for (auto& c : t.choices) {
-                if (c.rygbHandle != 0) {
-                    ctx.apis.UnloadRYGBTexture(c.rygbHandle);
-                }
+                if (c.handleRGB)
+                    ctx.apis.UnloadTexture(c.handleRGB);
+                if (c.handleOCV)
+                    ctx.apis.UnloadTexture(c.handleOCV);
             }
         }
         trials.clear();

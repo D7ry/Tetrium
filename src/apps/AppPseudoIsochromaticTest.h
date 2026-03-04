@@ -6,8 +6,6 @@
 #include "lib/TestDataLogger.h"
 
 #include "App.h"
-#include <glm/glm.hpp>
-#include <memory>
 #include <optional>
 #include <random>
 
@@ -29,7 +27,6 @@ class AppPseudoIsochromaticTest : public App
     virtual void Cleanup(TetriumApp::CleanupContext& ctx) override;
 
     virtual void TickImGui(const TetriumApp::TickContextImGui& ctx) override;
-    virtual void TickVulkan(TetriumApp::TickContextVulkan& ctx) override;
 
   private:
     enum class MusicSetting
@@ -103,7 +100,6 @@ class AppPseudoIsochromaticTest : public App
 
     struct SubjectPromptContext
     {
-        // Old texture handles (kept for compatibility, but will be replaced by RYGB renderer)
         uint32_t currentLandoltCTextureHandle[ColorSpace::ColorSpaceSize] = {};
         ImGuiTexture currentLandoltCTexture[ColorSpace::ColorSpaceSize];
         uint32_t currentAnswerTextureHandle[4];
@@ -200,9 +196,6 @@ class AppPseudoIsochromaticTest : public App
 
     // Track trial counter for filename generation
     int _trialCounter = 0;
-
-    // RYGB texture handle for current trial (managed via TextureManager)
-    uint32_t _currentRYGBTextureHandle = 0;
 
     void populatePromptContext(SubjectContext& subject, const TetriumApp::TickContextImGui& ctx);
     void logTrialData(

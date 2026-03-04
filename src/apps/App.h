@@ -28,11 +28,6 @@ struct InitContext
         std::function<vk::DescriptorImageInfo(uint32_t)> GetTextureDescriptorImageInfo;
         std::function<ImGuiTexture(uint32_t)> InitImGuiTexture;
 
-        // RYGB texture loading and transformation
-        std::function<uint32_t(const std::string&)> LoadRYGBTexture;
-        std::function<std::pair<ImGuiTexture, ImGuiTexture>(uint32_t)> GetRYGBImGuiTextures;
-        std::function<void(uint32_t)> UnloadRYGBTexture;
-
     } api;
 };
 
@@ -43,7 +38,6 @@ struct CleanupContext
     struct
     {
         std::function<void(uint32_t)> UnloadTexture;
-        std::function<void(uint32_t)> UnloadRYGBTexture;
     } api;
 };
 
@@ -58,11 +52,6 @@ struct TickContextImGui
         std::function<uint32_t(const std::string&)> LoadTexture;
         std::function<ImGuiTexture(uint32_t)> InitImGuiTexture;
         std::function<void(uint32_t)> UnloadTexture;
-
-        // RYGB texture loading and transformation
-        std::function<uint32_t(const std::string&)> LoadRYGBTexture;
-        std::function<std::pair<ImGuiTexture, ImGuiTexture>(uint32_t)> GetRYGBImGuiTextures;
-        std::function<void(uint32_t)> UnloadRYGBTexture;
     } apis;
 
     mutable struct

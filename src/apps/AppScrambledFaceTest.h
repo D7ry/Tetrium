@@ -55,12 +55,11 @@ class AppScrambledFaceTest : public App
 
     struct Trial
     {
-        // For each choice, we load textures (supports both RYGB and legacy PNG formats)
+        // For each choice, we load both RGB and OCV variants
         struct ChoiceTextures
         {
-            uint32_t rygbHandle = 0;  // Handle to RYGB texture (provides both RGB and OCV)
-            uint32_t handleRGB = 0;   // Legacy: separate RGB texture handle
-            uint32_t handleOCV = 0;   // Legacy: separate OCV texture handle
+            uint32_t handleRGB = 0;
+            uint32_t handleOCV = 0;
             ImGuiTexture texRGB{};
             ImGuiTexture texOCV{};
         };

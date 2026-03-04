@@ -33,9 +33,10 @@ void AppTemporalAFC::Cleanup(TetriumApp::CleanupContext& ctx)
 
     // Clean up current trial textures
     for (int i = 0; i < 3; ++i) {
-        if (currentStimuli[i].rygbHandle != 0) {
-            ctx.api.UnloadRYGBTexture(currentStimuli[i].rygbHandle);
-        }
+        if (currentStimuli[i].handleRGB)
+            ctx.api.UnloadTexture(currentStimuli[i].handleRGB);
+        if (currentStimuli[i].handleOCV)
+            ctx.api.UnloadTexture(currentStimuli[i].handleOCV);
     }
 
     trials.clear();
@@ -461,7 +462,7 @@ void AppTemporalAFC::loadCurrentTrialTextures(const TetriumApp::TickContextImGui
         std::string baseFilename = "./temp/" + subjectName + "_trial"
                                    + std::to_string(currentTrialIdx) + "_stim" + std::to_string(i);
 
-        std::string rygbPath = colorGenerator->GenerateCircleBGYR(
+        auto [rgbPath, ocvPath] = colorGenerator->GenerateCircle(
             baseFilename,
             r,
             g,
@@ -469,23 +470,30 @@ void AppTemporalAFC::loadCurrentTrialTextures(const TetriumApp::TickContextImGui
             o,
             512, // image size
             settings.circleRadius,
-            settings.hasNoisyBoundary
+            settings.hasNoisyBoundary,
+            GetOutputColorSpace()
         );
 
-        // Load RYGB texture (provides both RGB and OCV views)
-        currentStimuli[i].rygbHandle = ctx.apis.LoadRYGBTexture(rygbPath);
-        auto [rgbTex, ocvTex] = ctx.apis.GetRYGBImGuiTextures(currentStimuli[i].rygbHandle);
-        currentStimuli[i].texRGB = rgbTex;
-        currentStimuli[i].texOCV = ocvTex;
+        // Load textures
+        currentStimuli[i].handleRGB = ctx.apis.LoadTexture(rgbPath);
+        // If useRGOForOCV is enabled, use RGB path for OCV channel as well
+        std::string ocvTexturePath = settings.useRGOForOCV ? rgbPath : ocvPath;
+        currentStimuli[i].handleOCV = ctx.apis.LoadTexture(ocvTexturePath);
+        currentStimuli[i].texRGB = ctx.apis.InitImGuiTexture(currentStimuli[i].handleRGB);
+        currentStimuli[i].texOCV = ctx.apis.InitImGuiTexture(currentStimuli[i].handleOCV);
     }
 }
 
 void AppTemporalAFC::unloadCurrentTrialTextures(const TetriumApp::TickContextImGui& ctx)
 {
     for (int i = 0; i < 3; ++i) {
-        if (currentStimuli[i].rygbHandle != 0) {
-            ctx.apis.UnloadRYGBTexture(currentStimuli[i].rygbHandle);
-            currentStimuli[i].rygbHandle = 0;
+        if (currentStimuli[i].handleRGB) {
+            ctx.apis.UnloadTexture(currentStimuli[i].handleRGB);
+            currentStimuli[i].handleRGB = 0;
+        }
+        if (currentStimuli[i].handleOCV) {
+            ctx.apis.UnloadTexture(currentStimuli[i].handleOCV);
+            currentStimuli[i].handleOCV = 0;
         }
     }
 }
