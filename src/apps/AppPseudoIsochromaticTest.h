@@ -42,6 +42,13 @@ class AppPseudoIsochromaticTest : public App
         QUEST
     };
 
+    enum class StimulusType
+    {
+        PLATE,
+        BIPARTITE,
+        GAUSSIAN_BLOB
+    };
+
     enum class TrialTimingMode
     {
         FIXED_TRIAL_TIME, // Wait for full duration even if answered early
@@ -51,8 +58,11 @@ class AppPseudoIsochromaticTest : public App
     struct
     {
         ColorPickerType PICKER_TYPE = ColorPickerType::QUEST;
+        StimulusType STIMULUS_TYPE = StimulusType::GAUSSIAN_BLOB;
         int REPETITIONS_PER_AXIS
-            = 20; // number of repetitions for each genotype × metameric axis (Genetic mode)
+            = 50; // number of repetitions per (genotype × axis × intensity level) in Genetic MCS mode
+        int MCS_K = 7; // number of equally-spaced intensity levels in [0,1] for Genetic MCS (1 = max only)
+        float PERCENTAGE_SCREENED = 0.3f; // fraction of population covered by genotypes tested (lower = fewer genotypes)
         int QUEST_TRIALS_PER_DIRECTION = 20; // number of Quest trials per direction (Quest mode)
         bool QUEST_TEST_ONLY_547NM
             = true; // Quest: only test axis 1 (547nm cone) instead of all axes

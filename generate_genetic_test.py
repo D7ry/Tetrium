@@ -8,7 +8,7 @@ from PIL import Image
 from TetriumColor.Utils.ImageUtils import CreatePaddedGrid
 from TetriumColor.Measurement import load_primaries_from_csv
 from TetriumColor import PseudoIsochromaticPlateGenerator, ColorSpaceType
-from TetriumColor.TetraPlate import BipartiteFieldGenerator
+from TetriumColor.TetraPlate import BipartiteFieldGenerator, GaussianBlobGenerator
 from TetriumColor.TetraColorPicker import GeneticColorGenerator
 import sys
 import os
@@ -50,6 +50,9 @@ def generate_genetic_test(primaries_dir: str, output_dir: str, testing_dim: int 
     if generator_type == 'bipartite':
         print("Using BipartiteFieldGenerator")
         test_generator = BipartiteFieldGenerator(color_generator)
+    elif generator_type == 'gaussian_blob':
+        print("Using GaussianBlobGenerator")
+        test_generator = GaussianBlobGenerator(color_generator)
     else:
         print("Using PseudoIsochromaticPlateGenerator")
         test_generator = PseudoIsochromaticPlateGenerator(color_generator)
@@ -110,7 +113,7 @@ def generate_genetic_test(primaries_dir: str, output_dir: str, testing_dim: int 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
         print("Usage: python generate_genetic_test.py <primaries_dir> <output_dir> [testing_dim] [generator_type]")
-        print("  generator_type: 'plate' (default) or 'bipartite'")
+        print("  generator_type: 'plate' (default), 'bipartite', or 'gaussian_blob'")
         sys.exit(1)
 
     primaries_dir = sys.argv[1]

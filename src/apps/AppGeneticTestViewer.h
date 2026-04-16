@@ -13,7 +13,8 @@ class AppGeneticTestViewer : public App
     enum class GeneratorType
     {
         Plate,
-        Bipartite
+        Bipartite,
+        GaussianBlob
     };
 
     virtual void Init(TetriumApp::InitContext& ctx) override;
@@ -40,7 +41,7 @@ class AppGeneticTestViewer : public App
     std::vector<std::string> _primariesDirs;
     int _selectedDirIndex = -1;
     int _testingDim = 3;
-    GeneratorType _generatorType = GeneratorType::Plate;
+    GeneratorType _generatorType = GeneratorType::GaussianBlob;
     bool _generating = false;
     bool _adaptiveImageSize = true;
     float _zoom = 0.5f;

@@ -92,19 +92,24 @@ void AppGeneticTestViewer::drawControls()
     }
 
     // Generator type selector
-    const char* currentGeneratorType = (_generatorType == GeneratorType::Plate)
-                                           ? "Pseudoisochromatic Plate"
-                                           : "Bipartite Circle";
+    const char* currentGeneratorType;
+    switch (_generatorType) {
+    case GeneratorType::Plate: currentGeneratorType = "Pseudoisochromatic Plate"; break;
+    case GeneratorType::Bipartite: currentGeneratorType = "Bipartite Circle"; break;
+    case GeneratorType::GaussianBlob: currentGeneratorType = "Gaussian Blob"; break;
+    }
 
     if (ImGui::BeginCombo("Generator Type", currentGeneratorType)) {
-        bool isPlateSelected = _generatorType == GeneratorType::Plate;
-        if (ImGui::Selectable("Pseudoisochromatic Plate", isPlateSelected)) {
+        if (ImGui::Selectable(
+                "Pseudoisochromatic Plate", _generatorType == GeneratorType::Plate
+            )) {
             _generatorType = GeneratorType::Plate;
         }
-
-        bool isBipartiteSelected = _generatorType == GeneratorType::Bipartite;
-        if (ImGui::Selectable("Bipartite Circle", isBipartiteSelected)) {
+        if (ImGui::Selectable("Bipartite Circle", _generatorType == GeneratorType::Bipartite)) {
             _generatorType = GeneratorType::Bipartite;
+        }
+        if (ImGui::Selectable("Gaussian Blob", _generatorType == GeneratorType::GaussianBlob)) {
+            _generatorType = GeneratorType::GaussianBlob;
         }
 
         ImGui::EndCombo();
@@ -274,7 +279,12 @@ void AppGeneticTestViewer::generateGrid()
 
     // Build Python command
     std::string pythonScript = "../generate_genetic_test.py";
-    std::string generatorTypeStr = (_generatorType == GeneratorType::Plate) ? "plate" : "bipartite";
+    std::string generatorTypeStr;
+    switch (_generatorType) {
+    case GeneratorType::Plate: generatorTypeStr = "plate"; break;
+    case GeneratorType::Bipartite: generatorTypeStr = "bipartite"; break;
+    case GeneratorType::GaussianBlob: generatorTypeStr = "gaussian_blob"; break;
+    }
     std::stringstream cmd;
     cmd << "conda run -n tetrium python " << pythonScript << " \"" << primariesPath << "\" \""
         << outputPath << "\" " << _testingDim << " " << generatorTypeStr;

@@ -249,6 +249,14 @@ void TetriumApp::AppPseudoIsochromaticTest::drawSettingsWindow(
             SETTINGS.PICKER_TYPE = static_cast<ColorPickerType>(currentPickerType);
         }
 
+        // Stimulus type dropdown
+        ImGui::Text("Stimulus Type");
+        const char* stimulusOptions[] = {"Pseudoisochromatic Plate", "Bipartite Circle", "Gaussian Blob"};
+        int currentStimulusType = static_cast<int>(SETTINGS.STIMULUS_TYPE);
+        if (ImGui::Combo("##StimulusType", &currentStimulusType, stimulusOptions, 3)) {
+            SETTINGS.STIMULUS_TYPE = static_cast<StimulusType>(currentStimulusType);
+        }
+
         ImGui::Separator();
 
         // Dimension setting
@@ -259,7 +267,30 @@ void TetriumApp::AppPseudoIsochromaticTest::drawSettingsWindow(
 
         // Show different trial count setting based on picker type
         if (SETTINGS.PICKER_TYPE == ColorPickerType::GENETIC) {
-            ImGui::SliderInt("Repetitions Per Axis", &SETTINGS.REPETITIONS_PER_AXIS, 1, 10);
+            ImGui::SliderFloat(
+                "Population Coverage", &SETTINGS.PERCENTAGE_SCREENED, 0.01f, 0.999f, "%.3f"
+            );
+            // Estimate genotype count for display
+            // Breakpoints from ObserverGenotypes (dim=3, sex=both):
+            //   <0.70 -> 1,  <0.95 -> 2,  <0.99 -> 4,  <0.999 -> 9,  >=0.999 -> 21
+            int estGenotypes;
+            if (SETTINGS.PERCENTAGE_SCREENED < 0.70f)
+                estGenotypes = 1;
+            else if (SETTINGS.PERCENTAGE_SCREENED < 0.95f)
+                estGenotypes = 2;
+            else if (SETTINGS.PERCENTAGE_SCREENED < 0.99f)
+                estGenotypes = 4;
+            else if (SETTINGS.PERCENTAGE_SCREENED < 0.999f)
+                estGenotypes = 9;
+            else
+                estGenotypes = 21;
+            ImGui::SameLine();
+            ImGui::TextDisabled("(~%d genotype%s)", estGenotypes, estGenotypes == 1 ? "" : "s");
+
+            ImGui::SliderInt("Repetitions Per Condition", &SETTINGS.REPETITIONS_PER_AXIS, 1, 100);
+            ImGui::SliderInt("MCS Conditions (K)", &SETTINGS.MCS_K, 1, 20);
+            ImGui::SameLine();
+            ImGui::TextDisabled("(K=1 tests max metamer only)");
         } else {
             ImGui::SliderInt(
                 "Quest Trials Per Direction", &SETTINGS.QUEST_TRIALS_PER_DIRECTION, 1, 40
@@ -507,22 +538,11 @@ void AppPseudoIsochromaticTest::drawTestForSubject(
         }
     }
 
-    // Draw background at the target luminance level (always visible for adaptation)
+    // Draw black background
     ImVec2 screenSize = ImGui::GetIO().DisplaySize;
     ImDrawList* drawList = ImGui::GetWindowDrawList();
 
-    // Background color: scale LUMINANCE [0, MAX_L] to display range [0, 1]
-    // MAX_L is the Hering V of cone white, so LUMINANCE/MAX_L gives the display level
-    // During identification, scale by brightness ramp for smooth fade-in
-    float bgLevel = SETTINGS.LUMINANCE / MAX_L;
-    if (subject.state == SubjectState::kIdentification) {
-        bgLevel *= brightness; // Apply ramp only during identification
-    }
-
-    // Clamp to [0, 1] for display
-    bgLevel = std::max(0.0f, std::min(1.0f, bgLevel));
-
-    ImU32 bgColor = IM_COL32((int)(bgLevel * 255), (int)(bgLevel * 255), (int)(bgLevel * 255), 255);
+    ImU32 bgColor = IM_COL32(0, 0, 0, 255);
 
     // Draw fullscreen rectangle
     drawList->AddRectFilled(ImVec2(0, 0), screenSize, bgColor);
@@ -944,18 +964,22 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
     try {
         std::vector<int> metameric_axes;
         std::vector<int> dimensions;
-        // Handle dimension == 2 case: test M/L cones
         if (SETTINGS.DIMENSION == 2) {
-            metameric_axes = {1, 2}; // Test axes 1 and 2 for M/L cone function
-            dimensions = {2};        // Use 2D dimensions
-        } else {
-            // Default: dimension 3, use axis 2, peak 547
-            if (SETTINGS.QUEST_TEST_ONLY_547NM) {
-                metameric_axes = {2}; // Only test extra cone ( usually the 547nm cone)
+            dimensions = {2};
+            if (SETTINGS.PICKER_TYPE == ColorPickerType::GENETIC) {
+                metameric_axes = {2}; // Genetic MCS: single axis for dim-2
             } else {
-                metameric_axes = {1, 2, 3}; // Test all axes
+                metameric_axes = {1, 2}; // Quest: test both M/L axes
             }
+        } else {
             dimensions = {3};
+            if (SETTINGS.PICKER_TYPE == ColorPickerType::GENETIC) {
+                metameric_axes = {2}; // Genetic MCS: axis 2 (547nm extra cone)
+            } else if (SETTINGS.QUEST_TEST_ONLY_547NM) {
+                metameric_axes = {2};
+            } else {
+                metameric_axes = {1, 2, 3};
+            }
         }
 
         if (SETTINGS.PICKER_TYPE == ColorPickerType::GENETIC) {
@@ -963,16 +987,17 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
             float peak_to_test = 547.0f; // dummy basically for now
             pColorGenerator = TetriumColor::ColorGeneratorFactory::CreateGeneticColorGenerator(
                 "both",                        // sex
-                0.99f,                         // percentage_screened
+                SETTINGS.PERCENTAGE_SCREENED,  // percentage_screened
                 peak_to_test,                  // peak_to_test (547, 530, or 559)
                 SETTINGS.LUMINANCE,            // luminance (same as background)
                 0.5f,                          // saturation
                 dimensions,                    // dimensions (2 or 3)
                 42,                            // seed
-                SETTINGS.REPETITIONS_PER_AXIS, // trials_per_direction
+                SETTINGS.REPETITIONS_PER_AXIS, // trials_per_condition
                 metameric_axes,                // metameric_axes
                 display_primaries_path,        // display_primaries_path
-                SETTINGS.VISUAL_ANGLE          // degree (visual angle)
+                SETTINGS.VISUAL_ANGLE,         // degree (visual angle)
+                SETTINGS.MCS_K                 // mcs_k (number of intensity levels)
             );
         } else {
             // Create QuestColorGenerator
@@ -995,16 +1020,30 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
         throw;
     }
 
-    // Create PseudoIsochromaticPlateGenerator using factory
+    // Create test generator based on stimulus type
     PyObject* pTestGenerator = nullptr;
     try {
-        pTestGenerator
-            = TetriumColor::ColorGeneratorFactory::CreatePseudoIsochromaticPlateGenerator(
-                pColorGenerator,
-                42 // seed
-            );
-        Py_DECREF(pColorGenerator
-        ); // Factory returns new reference, we're done with color generator
+        switch (SETTINGS.STIMULUS_TYPE) {
+        case StimulusType::PLATE:
+            pTestGenerator
+                = TetriumColor::ColorGeneratorFactory::CreatePseudoIsochromaticPlateGenerator(
+                    pColorGenerator, 42
+                );
+            break;
+        case StimulusType::BIPARTITE:
+            pTestGenerator
+                = TetriumColor::ColorGeneratorFactory::CreateBipartiteFieldGenerator(
+                    pColorGenerator, 42, 512
+                );
+            break;
+        case StimulusType::GAUSSIAN_BLOB:
+            pTestGenerator
+                = TetriumColor::ColorGeneratorFactory::CreateGaussianBlobGenerator(
+                    pColorGenerator, 42, 1024
+                );
+            break;
+        }
+        Py_DECREF(pColorGenerator);
         pColorGenerator = nullptr;
     } catch (const std::exception& e) {
         if (pColorGenerator) {
@@ -1063,9 +1102,12 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
            "s_cone_noise",
            "stimulus_size"};
 
-    // Generate additional info string with picker type and dimension
+    // Generate additional info string with picker type, stimulus type, and dimension
     std::string pickerTypeStr = (_pickerType == ColorPickerType::GENETIC) ? "Genetic" : "Quest";
-    std::string additionalInfo = pickerTypeStr + "_dim" + std::to_string(SETTINGS.DIMENSION);
+    const char* stimTypeStrs[] = {"Plate", "Bipartite", "GaussianBlob"};
+    std::string stimTypeStr = stimTypeStrs[static_cast<int>(SETTINGS.STIMULUS_TYPE)];
+    std::string additionalInfo
+        = pickerTypeStr + "_" + stimTypeStr + "_dim" + std::to_string(SETTINGS.DIMENSION);
 
     _logger = new TestDataLogger(
         "AppPseudoIsochromaticTest", _nameInputBuffer, headers, additionalInfo
