@@ -81,6 +81,8 @@ class AppPseudoIsochromaticTest : public App
         float DOT_SIZE = 1.0f;          // dot size multiplier for plates [0.5, 2.0]
         float VISUAL_ANGLE = 4.0f;      // stimulus visual angle in degrees [1.0, 10.0]
         float VIEWING_DISTANCE = 57.0f; // viewing distance in cm [30.0, 200.0]
+        bool USE_CUBEMAP_CENTER
+            = false; // Genetic MCS: fix gamut sample to center cubemap cell (e.g. 5×5 → (2,2))
 
         struct
         {

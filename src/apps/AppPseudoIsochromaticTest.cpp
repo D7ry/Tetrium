@@ -291,6 +291,9 @@ void TetriumApp::AppPseudoIsochromaticTest::drawSettingsWindow(
             ImGui::SliderInt("MCS Conditions (K)", &SETTINGS.MCS_K, 1, 20);
             ImGui::SameLine();
             ImGui::TextDisabled("(K=1 tests max metamer only)");
+            ImGui::Checkbox("Use Cubemap Center Point (2,2)", &SETTINGS.USE_CUBEMAP_CENTER);
+            ImGui::SameLine();
+            ImGui::TextDisabled("(fixes hue to center of gamut surface instead of random)");
         } else {
             ImGui::SliderInt(
                 "Quest Trials Per Direction", &SETTINGS.QUEST_TRIALS_PER_DIRECTION, 1, 40
@@ -997,7 +1000,8 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
                 metameric_axes,                // metameric_axes
                 display_primaries_path,        // display_primaries_path
                 SETTINGS.VISUAL_ANGLE,         // degree (visual angle)
-                SETTINGS.MCS_K                 // mcs_k (number of intensity levels)
+                SETTINGS.MCS_K,                // mcs_k (number of intensity levels)
+                SETTINGS.USE_CUBEMAP_CENTER    // debug_middle: center cubemap cell (2,2)
             );
         } else {
             // Create QuestColorGenerator
