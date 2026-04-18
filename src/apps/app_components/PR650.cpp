@@ -1,6 +1,7 @@
 #include "PR650.h"
 #include <chrono>
 #include <cstring>
+#include <iomanip>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -64,10 +65,12 @@ void PR650::Init()
     }
 
     INFO("PR650 connected on {}, backlight on: {}", portName_, reply);
-    // Sync mode 0 = free-run: decouples measurements from display VSync to avoid
-    // phase-locked aliasing with 30 Hz stimuli on a 60 Hz display.
-    std::string sCmd = "s01,,,," + std::to_string(numExposures) + ",200,05,0";
-    ASSERT(sendMessage(sCmd, reply, 1000));
+    // Sync mode 0 = free-run. exposureTimeMs >= 34 ensures >= one full 30 Hz cycle is
+    // integrated, preventing aliasing regardless of when the exposure starts.
+    std::ostringstream sCmd;
+    sCmd << "s01,,," << std::setfill('0') << std::setw(4) << exposureTimeMs
+         << "," << numExposures << ",200,05,0";
+    ASSERT(sendMessage(sCmd.str(), reply, 1000));
     INFO("response to some shit we sent: {}", reply);
     connected_ = true;
 }
