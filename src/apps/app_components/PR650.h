@@ -10,6 +10,15 @@ public:
     explicit PR650(const std::string& portName);
     ~PR650();
 
+    // Number of exposures averaged per measurement (passed to PR650 's' command field BB).
+    // Sync mode is set to free-run (0) so measurements are NOT phase-locked to the display
+    // VSync. This prevents systematic aliasing with a 30 Hz stimulus on a 60 Hz display,
+    // where sync mode 1 would always sample the same half of the 30 Hz cycle.
+    // With free-run, each exposure lands at an arbitrary phase, so even numExposures=1
+    // has no systematic aliasing bias. Increase only if you need lower noise at the cost
+    // of proportionally longer measurement time.
+    int numExposures = 1;
+
     void Init();
 
     bool isConnected() const;
