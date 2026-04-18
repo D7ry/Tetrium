@@ -350,28 +350,9 @@ void Tetrium::drawFrame(ColorSpace colorSpace, uint8_t frameIdx)
 
         uint64_t time = 0;
 
-        // Hardware even-odd sync: ensure GPU rendering is complete *and* the
-        // target vblank has arrived before calling present. With IMMEDIATE
-        // present mode, the swap fires as soon as the render-finished
-        // semaphore signals; we want that to happen inside the target vblank
-        // window (no tearing). Waiting on the fence drains GPU before present;
-        // the second vblank wait catches cases where rendering overran.
-        if (_tetraMode == TetraMode::kEvenOddHardwareSync) {
-            {
-                PROFILE_SCOPE(&_profiler, "Wait: GPU render fence");
-                VK_CHECK_RESULT(vkWaitForFences(
-                    _device->logicalDevice,
-                    1,
-                    &sync.fenceBackbufferRendering,
-                    VK_TRUE,
-                    UINT64_MAX
-                ));
-            }
-            {
-                PROFILE_SCOPE(&_profiler, "Wait: vblank pre-present");
-                waitAndAlignVBlank();
-            }
-        }
+        // With FIFO present mode the driver holds the frame and flips at the next
+        // blanking interval — no pre-present vblank wait needed. The semaphore
+        // passed to vkQueuePresentKHR already serialises after GPU rendering.
 
         result = vkQueuePresentKHR(_device->presentationQueue, &presentInfo);
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR

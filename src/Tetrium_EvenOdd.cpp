@@ -200,8 +200,10 @@ bool Tetrium::isEvenFrame()
 uint64_t Tetrium::getSurfaceCounterValue()
 {
     if (_tetraMode == TetraMode::kEvenOddHardwareSync) {
-        // Return TARGET counter, not live read, so parity matches what we're rendering for
-        return _hardWareEvenOddCtx.expectedNextCounter;
+        // With FIFO present mode, the frame queued this tick is displayed at the
+        // vblank AFTER expectedNextCounter (the driver holds it one interval).
+        // Return +1 so parity matches the vblank the frame will actually appear on.
+        return _hardWareEvenOddCtx.expectedNextCounter + 1;
     }
     return _surfaceCounterValue;
 }
@@ -215,9 +217,9 @@ ColorSpace Tetrium::getCurrentColorSpace()
     return cs;
 }
 
-uint64_t Tetrium::readVBlankCounter()
+VkResult Tetrium::readVBlankCounter(uint64_t& counter)
 {
-    uint64_t counter = 0;
+    counter = 0;
 #if __linux__
     VkResult result = _hardWareEvenOddCtx.vkGetSwapchainCounterEXT(
         _device->logicalDevice,
@@ -226,18 +228,29 @@ uint64_t Tetrium::readVBlankCounter()
         &counter
     );
     if (result != VK_SUCCESS) {
-        ERROR("vkGetSwapchainCounterEXT failed with result: {}", (int)result);
+        // VK_ERROR_UNKNOWN (-13) is expected before the first vkQueuePresentKHR on NVIDIA —
+        // the counter isn't initialized by the driver until after the first present.
+        static bool firstFailureLogged = false;
+        if (!firstFailureLogged) {
+            WARN("vkGetSwapchainCounterEXT returned {} — expected on first frame, will retry", (int)result);
+            firstFailureLogged = true;
+        }
     }
+    return result;
+#else
+    return VK_SUCCESS;
 #endif
-    return counter;
 }
 
 void Tetrium::waitAndAlignVBlank()
 {
     auto& ctx = _hardWareEvenOddCtx;
 
+    uint64_t current = 0;
     if (!ctx.pacingInitialized) {
-        uint64_t current = readVBlankCounter();
+        if (readVBlankCounter(current) != VK_SUCCESS) {
+            return;
+        }
         ctx.expectedNextCounter = current + 1;
         ctx.pacingInitialized = true;
     }
@@ -245,7 +258,9 @@ void Tetrium::waitAndAlignVBlank()
     // If we've fallen behind the intended vblank, jump expectedNextCounter
     // forward to the next vblank of the same parity so rendered content
     // always matches its target vblank's parity.
-    uint64_t current = readVBlankCounter();
+    if (readVBlankCounter(current) != VK_SUCCESS) {
+        return;
+    }
     if (current > ctx.expectedNextCounter) {
         uint64_t intendedParity = ctx.expectedNextCounter & 1;
         uint64_t behind = current - ctx.expectedNextCounter;
@@ -267,7 +282,7 @@ void Tetrium::waitAndAlignVBlank()
     // Spin-sleep until the counter reaches our target. 500us sleep between
     // polls keeps one CPU from pegging while still landing inside the vblank
     // window (which is typically ~1ms at 60Hz).
-    while (readVBlankCounter() < ctx.expectedNextCounter) {
+    while (readVBlankCounter(current) == VK_SUCCESS && current < ctx.expectedNextCounter) {
         std::this_thread::sleep_for(std::chrono::microseconds(500));
     }
 }

@@ -307,7 +307,7 @@ class Tetrium
 
     // Hardware even-odd pacing (kEvenOddHardwareSync only).
     // Direct read of the swapchain vblank counter.
-    uint64_t readVBlankCounter();
+    VkResult readVBlankCounter(uint64_t& counter);
     // Waits until the vblank counter reaches `expectedNextCounter`, realigning
     // to the next same-parity vblank if we fell behind. Called twice per
     // frame: once at frame start (to commit to a target vblank + parity) and
