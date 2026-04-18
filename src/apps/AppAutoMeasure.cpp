@@ -303,13 +303,11 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx)
             if (pr650States.validating) {
                 ImGui::BeginDisabled();
             }
+            const char* configLabels[] = {"Center only", "5x5 cubemap", "Midpoint"};
             int configModeInt = static_cast<int>(validationState.configMode);
-            if (ImGui::RadioButton("Center only", &configModeInt, kValidationConfigCenter)) {
-                validationState.configMode = kValidationConfigCenter;
-            }
-            ImGui::SameLine();
-            if (ImGui::RadioButton("5x5 cubemap", &configModeInt, kValidationConfigFullGrid)) {
-                validationState.configMode = kValidationConfigFullGrid;
+            ImGui::SetNextItemWidth(160);
+            if (ImGui::Combo("##ValidationConfig", &configModeInt, configLabels, IM_ARRAYSIZE(configLabels))) {
+                validationState.configMode = static_cast<ValidationConfigMode>(configModeInt);
             }
             if (pr650States.validating) {
                 ImGui::EndDisabled();
@@ -617,10 +615,18 @@ void AppAutoMeasure::runDailyValidation(bool debugSkipPR650Measurements)
     }
 
     // Copy config to validation folder (select based on configMode)
-    std::string configFileName
-        = validationState.configMode == kValidationConfigCenter
-              ? "display_validation_metamers_center.json"
-              : "display_validation_metamers.json";
+    std::string configFileName;
+    switch (validationState.configMode) {
+    case kValidationConfigCenter:
+        configFileName = "display_validation_metamers_center.json";
+        break;
+    case kValidationConfigMidpoint:
+        configFileName = "display_validation_metamers_midpoint.json";
+        break;
+    default:
+        configFileName = "display_validation_metamers.json";
+        break;
+    }
     std::string configSourcePath = TETRIUM_COLOR_PATH + "config/" + configFileName;
     std::string validationConfigPath = validationFolder + "display_validation_metamers.json";
     if (!copyConfigToValidationFolder(configSourcePath, validationConfigPath)) {

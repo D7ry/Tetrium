@@ -91,6 +91,7 @@ class AppAutoMeasure : public App
     {
         kValidationConfigCenter = 0,
         kValidationConfigFullGrid = 1,
+        kValidationConfigMidpoint = 2,
     };
 
     struct
