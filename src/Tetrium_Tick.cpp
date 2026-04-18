@@ -47,9 +47,15 @@ void Tetrium::Tick()
     {
         {
             PROFILE_SCOPE(&_profiler, "Render Loop");
-            //_swapChain.chainDXGI->waitForPreviousFrame();
-            //_swapChain.chainDXGI->m_output->WaitForVBlank();
-            updateSurfaceCounterValue();
+            // Commit to a target vblank + parity for this frame before
+            // deriving the color space. `waitAndAlignVBlank` blocks until the
+            // counter reaches expectedNextCounter (realigning if we fell
+            // behind), so getCurrentColorSpace() reflects the target vblank's
+            // parity rather than a transient mid-frame counter value.
+            if (_tetraMode == TetraMode::kEvenOddHardwareSync) {
+                PROFILE_SCOPE(&_profiler, "Wait: vblank align");
+                waitAndAlignVBlank();
+            }
             // CPU-exclusive workloads
             double deltaTime = _deltaTimer.GetDeltaTime();
             _timeSinceStartSeconds += deltaTime;
@@ -343,6 +349,30 @@ void Tetrium::drawFrame(ColorSpace colorSpace, uint8_t frameIdx)
                                                           // presentation was successful
 
         uint64_t time = 0;
+
+        // Hardware even-odd sync: ensure GPU rendering is complete *and* the
+        // target vblank has arrived before calling present. With IMMEDIATE
+        // present mode, the swap fires as soon as the render-finished
+        // semaphore signals; we want that to happen inside the target vblank
+        // window (no tearing). Waiting on the fence drains GPU before present;
+        // the second vblank wait catches cases where rendering overran.
+        if (_tetraMode == TetraMode::kEvenOddHardwareSync) {
+            {
+                PROFILE_SCOPE(&_profiler, "Wait: GPU render fence");
+                VK_CHECK_RESULT(vkWaitForFences(
+                    _device->logicalDevice,
+                    1,
+                    &sync.fenceBackbufferRendering,
+                    VK_TRUE,
+                    UINT64_MAX
+                ));
+            }
+            {
+                PROFILE_SCOPE(&_profiler, "Wait: vblank pre-present");
+                waitAndAlignVBlank();
+            }
+        }
+
         result = vkQueuePresentKHR(_device->presentationQueue, &presentInfo);
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR
             || this->_framebufferResized) {
@@ -352,6 +382,13 @@ void Tetrium::drawFrame(ColorSpace colorSpace, uint8_t frameIdx)
             this->recreateSwapChain(_swapChain);
             recreateVirtualFrameBuffers();
             this->_framebufferResized = false;
+        }
+
+        // Advance target vblank for the next frame. If we overran during
+        // the render, waitAndAlignVBlank() next frame will realign and
+        // preserve parity.
+        if (_tetraMode == TetraMode::kEvenOddHardwareSync) {
+            _hardWareEvenOddCtx.expectedNextCounter += 1;
         }
 #endif
     }

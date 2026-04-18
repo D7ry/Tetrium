@@ -1,6 +1,9 @@
 // Even-Odd frame rendering implementations
 #include "Tetrium.h"
 
+#include <chrono>
+#include <thread>
+
 void Tetrium::initEvenOdd()
 {
     switch (_tetraMode) {
@@ -194,7 +197,14 @@ bool Tetrium::isEvenFrame()
     return surfaceCounterValue % 2 == 0;
 }
 
-uint64_t Tetrium::getSurfaceCounterValue() { return _surfaceCounterValue; }
+uint64_t Tetrium::getSurfaceCounterValue()
+{
+    if (_tetraMode == TetraMode::kEvenOddHardwareSync) {
+        // Return TARGET counter, not live read, so parity matches what we're rendering for
+        return _hardWareEvenOddCtx.expectedNextCounter;
+    }
+    return _surfaceCounterValue;
+}
 
 ColorSpace Tetrium::getCurrentColorSpace()
 {
@@ -203,4 +213,61 @@ ColorSpace Tetrium::getCurrentColorSpace()
         cs = cs == ColorSpace::RGB ? ColorSpace::OCV : ColorSpace::RGB;
     }
     return cs;
+}
+
+uint64_t Tetrium::readVBlankCounter()
+{
+    uint64_t counter = 0;
+#if __linux__
+    VkResult result = _hardWareEvenOddCtx.vkGetSwapchainCounterEXT(
+        _device->logicalDevice,
+        _swapChain.chain,
+        VkSurfaceCounterFlagBitsEXT::VK_SURFACE_COUNTER_VBLANK_EXT,
+        &counter
+    );
+    if (result != VK_SUCCESS) {
+        ERROR("vkGetSwapchainCounterEXT failed with result: {}", (int)result);
+    }
+#endif
+    return counter;
+}
+
+void Tetrium::waitAndAlignVBlank()
+{
+    auto& ctx = _hardWareEvenOddCtx;
+
+    if (!ctx.pacingInitialized) {
+        uint64_t current = readVBlankCounter();
+        ctx.expectedNextCounter = current + 1;
+        ctx.pacingInitialized = true;
+    }
+
+    // If we've fallen behind the intended vblank, jump expectedNextCounter
+    // forward to the next vblank of the same parity so rendered content
+    // always matches its target vblank's parity.
+    uint64_t current = readVBlankCounter();
+    if (current > ctx.expectedNextCounter) {
+        uint64_t intendedParity = ctx.expectedNextCounter & 1;
+        uint64_t behind = current - ctx.expectedNextCounter;
+        ctx.skippedPresentCount += behind;
+        ctx.expectedNextCounter = current + 1;
+        if ((ctx.expectedNextCounter & 1) != intendedParity) {
+            ctx.expectedNextCounter += 1;
+        }
+        WARN(
+            "Vblank pacing: behind by {} (counter={}), realigning to {} (parity preserved, "
+            "cumulative skips: {})",
+            behind,
+            current,
+            ctx.expectedNextCounter,
+            ctx.skippedPresentCount
+        );
+    }
+
+    // Spin-sleep until the counter reaches our target. 500us sleep between
+    // polls keeps one CPU from pegging while still landing inside the vblank
+    // window (which is typically ~1ms at 60Hz).
+    while (readVBlankCounter() < ctx.expectedNextCounter) {
+        std::this_thread::sleep_for(std::chrono::microseconds(500));
+    }
 }
