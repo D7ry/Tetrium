@@ -947,10 +947,12 @@ VkPresentModeKHR Tetrium::chooseSwapPresentMode(
     return VK_PRESENT_MODE_IMMEDIATE_KHR; // force immediate mode
 #endif                                    // VIRTUAL_VSYNC
 
-    // For hardware even-odd sync, we MUST use immediate mode to avoid buffering delays
+    // For hardware even-odd sync, use FIFO so the driver holds each frame and flips
+    // cleanly at the blanking interval. IMMEDIATE mode caused consistent top-of-screen
+    // tearing because render+fence time always exceeded the ~1ms blanking window.
     if (_tetraMode == TetraMode::kEvenOddHardwareSync) {
-        INFO("Hardware even-odd sync mode: forcing IMMEDIATE present mode");
-        return VK_PRESENT_MODE_IMMEDIATE_KHR;
+        INFO("Hardware even-odd sync mode: using FIFO present mode");
+        return VK_PRESENT_MODE_FIFO_KHR;
     }
 
     INFO("available present modes: ");

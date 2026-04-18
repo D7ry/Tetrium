@@ -47,9 +47,15 @@ void Tetrium::Tick()
     {
         {
             PROFILE_SCOPE(&_profiler, "Render Loop");
-            //_swapChain.chainDXGI->waitForPreviousFrame();
-            //_swapChain.chainDXGI->m_output->WaitForVBlank();
-            updateSurfaceCounterValue();
+            // Commit to a target vblank + parity for this frame before
+            // deriving the color space. `waitAndAlignVBlank` blocks until the
+            // counter reaches expectedNextCounter (realigning if we fell
+            // behind), so getCurrentColorSpace() reflects the target vblank's
+            // parity rather than a transient mid-frame counter value.
+            if (_tetraMode == TetraMode::kEvenOddHardwareSync) {
+                PROFILE_SCOPE(&_profiler, "Wait: vblank align");
+                waitAndAlignVBlank();
+            }
             // CPU-exclusive workloads
             double deltaTime = _deltaTimer.GetDeltaTime();
             _timeSinceStartSeconds += deltaTime;
@@ -343,6 +349,11 @@ void Tetrium::drawFrame(ColorSpace colorSpace, uint8_t frameIdx)
                                                           // presentation was successful
 
         uint64_t time = 0;
+
+        // With FIFO present mode the driver holds the frame and flips at the next
+        // blanking interval — no pre-present vblank wait needed. The semaphore
+        // passed to vkQueuePresentKHR already serialises after GPU rendering.
+
         result = vkQueuePresentKHR(_device->presentationQueue, &presentInfo);
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR
             || this->_framebufferResized) {
@@ -352,6 +363,13 @@ void Tetrium::drawFrame(ColorSpace colorSpace, uint8_t frameIdx)
             this->recreateSwapChain(_swapChain);
             recreateVirtualFrameBuffers();
             this->_framebufferResized = false;
+        }
+
+        // Advance target vblank for the next frame. If we overran during
+        // the render, waitAndAlignVBlank() next frame will realign and
+        // preserve parity.
+        if (_tetraMode == TetraMode::kEvenOddHardwareSync) {
+            _hardWareEvenOddCtx.expectedNextCounter += 1;
         }
 #endif
     }
