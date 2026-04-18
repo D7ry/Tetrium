@@ -87,6 +87,12 @@ class AppAutoMeasure : public App
         int currPrimaryIndex = 0;
     } measurementData;
 
+    enum ValidationConfigMode
+    {
+        kValidationConfigCenter = 0,
+        kValidationConfigFullGrid = 1,
+    };
+
     struct
     {
         std::string currentStep = "";
@@ -96,6 +102,7 @@ class AppAutoMeasure : public App
         glm::ivec4 currentRGBO = glm::ivec4(0, 0, 0, 0);
         bool displayValidationColor = false;
         bool debugSkipPR650Measurements = false;
+        ValidationConfigMode configMode = kValidationConfigFullGrid;
     } validationState;
 };
 }; // namespace TetriumApp

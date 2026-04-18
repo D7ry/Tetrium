@@ -296,6 +296,25 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx)
         // Daily Validate section - separate from regular measurements
         if (IPR650->isConnected() || validationState.debugSkipPR650Measurements) {
             ImGui::Separator();
+
+            // Config mode selection
+            ImGui::Text("Validation Config:");
+            ImGui::SameLine();
+            if (pr650States.validating) {
+                ImGui::BeginDisabled();
+            }
+            int configModeInt = static_cast<int>(validationState.configMode);
+            if (ImGui::RadioButton("Center only", &configModeInt, kValidationConfigCenter)) {
+                validationState.configMode = kValidationConfigCenter;
+            }
+            ImGui::SameLine();
+            if (ImGui::RadioButton("5x5 cubemap", &configModeInt, kValidationConfigFullGrid)) {
+                validationState.configMode = kValidationConfigFullGrid;
+            }
+            if (pr650States.validating) {
+                ImGui::EndDisabled();
+            }
+
             ImGui::Text("Daily Display Validation:");
             ImGui::SameLine();
 
@@ -597,8 +616,12 @@ void AppAutoMeasure::runDailyValidation(bool debugSkipPR650Measurements)
         return;
     }
 
-    // Copy config to validation folder
-    std::string configSourcePath = TETRIUM_COLOR_PATH + "config/display_validation_metamers.json";
+    // Copy config to validation folder (select based on configMode)
+    std::string configFileName
+        = validationState.configMode == kValidationConfigCenter
+              ? "display_validation_metamers_center.json"
+              : "display_validation_metamers.json";
+    std::string configSourcePath = TETRIUM_COLOR_PATH + "config/" + configFileName;
     std::string validationConfigPath = validationFolder + "display_validation_metamers.json";
     if (!copyConfigToValidationFolder(configSourcePath, validationConfigPath)) {
         validationState.statusMessage = "ERROR: Failed to copy config to validation folder";
