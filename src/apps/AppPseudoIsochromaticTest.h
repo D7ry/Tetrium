@@ -60,12 +60,13 @@ class AppPseudoIsochromaticTest : public App
         ColorPickerType PICKER_TYPE = ColorPickerType::QUEST;
         StimulusType STIMULUS_TYPE = StimulusType::GAUSSIAN_BLOB;
         int REPETITIONS_PER_AXIS
-            = 50; // number of repetitions per (genotype × axis × intensity level) in Genetic MCS mode
-        int MCS_K = 7; // number of equally-spaced intensity levels in [0,1] for Genetic MCS (1 = max only)
-        float PERCENTAGE_SCREENED = 0.3f; // fraction of population covered by genotypes tested (lower = fewer genotypes)
+            = 5; // number of repetitions per (genotype × axis × intensity level) in Genetic MCS mode
+        int MCS_K = 3; // number of equally-spaced intensity levels in [0,1] for Genetic MCS (1 = max only)
+        int NUM_OBSERVERS = 5;            // desired number of observer genotypes to test (1,2,4,9,21)
+        float PERCENTAGE_SCREENED = 0.995f; // derived from NUM_OBSERVERS; passed to Python generator
         int QUEST_TRIALS_PER_DIRECTION = 20; // number of Quest trials per direction (Quest mode)
         bool QUEST_TEST_ONLY_547NM
-            = true; // Quest: only test axis 1 (547nm cone) instead of all axes
+            = true; // Quest: only test the Q cone (547nm); axis index is computed dynamically per genotype
         bool QUEST_BIPOLAR
             = true;        // Quest: use bipolar sampling (sample in both direction and -direction)
         int DIMENSION = 3; // dimension: 2 for M/L cone testing, 3 for full trichromat
@@ -79,11 +80,8 @@ class AppPseudoIsochromaticTest : public App
             = 0.5f;                     // duration in seconds for brightness ramp-up [0.0, 10.0]
         float LUMINANCE = 0.5f;         // luminance level [0.0, 2.0]
         float DOT_SIZE = 1.0f;          // dot size multiplier for plates [0.5, 2.0]
-        float VISUAL_ANGLE = 4.0f;      // stimulus visual angle in degrees [1.0, 10.0]
+        float VISUAL_ANGLE = 2.0f;      // stimulus visual angle in degrees [1.0, 10.0]
         float VIEWING_DISTANCE = 57.0f; // viewing distance in cm [30.0, 200.0]
-        bool USE_CUBEMAP_CENTER
-            = false; // Genetic MCS: fix gamut sample to center cubemap cell (e.g. 5×5 → (2,2))
-
         struct
         {
             float BLANK = 1;
@@ -226,6 +224,9 @@ class AppPseudoIsochromaticTest : public App
 
     std::unordered_map<AnswerKind, uint32_t> _answerPromptTextureHandles = {};
     std::unordered_map<AnswerKind, ImGuiTexture> _answerPromptImGuiTextures = {};
+
+    std::vector<float> _observerCDF;   // cumulative probabilities per observer from Python
+    int _observerCDFDimension = -1;    // dimension used when _observerCDF was last loaded
 
     // Static map for orientation to string conversion
     static const std::unordered_map<AnswerKind, std::string> _orientationToStringMap;

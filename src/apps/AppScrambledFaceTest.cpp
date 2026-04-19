@@ -174,21 +174,21 @@ void AppScrambledFaceTest::startTest(const TetriumApp::TickContextImGui& ctx)
 
     std::string display_primaries_path = getTodayPrimariesPath();
 
-    // Create GeneticColorGenerator
+    // Create QuestColorGenerator in MCS mode (mcs_k=1: max metamer only)
     PyObject* pColorGenerator = nullptr;
     try {
         std::vector<int> metameric_axes = {2}; // Use axis 2 for now
-        pColorGenerator = TetriumColor::ColorGeneratorFactory::CreateGeneticColorGenerator(
+        pColorGenerator = TetriumColor::ColorGeneratorFactory::CreateQuestColorGenerator(
             "female",              // sex
             0.999f,                // percentage_screened
-            547.0f,                // peak_to_test
-            settings.luminance,    // luminance
-            settings.saturation,   // saturation
-            {3},                   // dimensions
-            42,                    // seed
+            settings.luminance,    // background_luminance
             20,                    // trials_per_direction (not used for circle grid)
             metameric_axes,        // metameric_axes
-            display_primaries_path // display_primaries_path
+            {3},                   // dimensions
+            display_primaries_path,// display_primaries_path
+            false,                 // bipolar
+            4.0f,                  // degree
+            1                      // mcs_k=1: max metamer only
         );
     } catch (const std::exception& e) {
         ERROR("Failed to create ColorGenerator: {}", e.what());

@@ -265,35 +265,35 @@ void TetriumApp::AppPseudoIsochromaticTest::drawSettingsWindow(
 
         ImGui::Separator();
 
+        // Reload CDF if dimension changed (shared by both picker types)
+        if (_observerCDFDimension != SETTINGS.DIMENSION) {
+            try {
+                _observerCDF = TetriumColor::ColorGeneratorFactory::GetObserverCDF(
+                    "both", SETTINGS.DIMENSION
+                );
+                _observerCDFDimension = SETTINGS.DIMENSION;
+                SETTINGS.NUM_OBSERVERS
+                    = std::min(SETTINGS.NUM_OBSERVERS, (int)_observerCDF.size());
+            } catch (const std::exception& e) {
+                ERROR("Failed to load observer CDF: {}", e.what());
+            }
+        }
+
+        int maxObservers = _observerCDF.empty() ? 21 : (int)_observerCDF.size();
+        ImGui::SliderInt("# Observers", &SETTINGS.NUM_OBSERVERS, 1, maxObservers);
+        SETTINGS.NUM_OBSERVERS = std::clamp(SETTINGS.NUM_OBSERVERS, 1, maxObservers);
+        if (!_observerCDF.empty()) {
+            SETTINGS.PERCENTAGE_SCREENED = _observerCDF[SETTINGS.NUM_OBSERVERS - 1];
+            ImGui::SameLine();
+            ImGui::TextDisabled("(%.1f%% population)", SETTINGS.PERCENTAGE_SCREENED * 100.0f);
+        }
+
         // Show different trial count setting based on picker type
         if (SETTINGS.PICKER_TYPE == ColorPickerType::GENETIC) {
-            ImGui::SliderFloat(
-                "Population Coverage", &SETTINGS.PERCENTAGE_SCREENED, 0.01f, 0.999f, "%.3f"
-            );
-            // Estimate genotype count for display
-            // Breakpoints from ObserverGenotypes (dim=3, sex=both):
-            //   <0.70 -> 1,  <0.95 -> 2,  <0.99 -> 4,  <0.999 -> 9,  >=0.999 -> 21
-            int estGenotypes;
-            if (SETTINGS.PERCENTAGE_SCREENED < 0.70f)
-                estGenotypes = 1;
-            else if (SETTINGS.PERCENTAGE_SCREENED < 0.95f)
-                estGenotypes = 2;
-            else if (SETTINGS.PERCENTAGE_SCREENED < 0.99f)
-                estGenotypes = 4;
-            else if (SETTINGS.PERCENTAGE_SCREENED < 0.999f)
-                estGenotypes = 9;
-            else
-                estGenotypes = 21;
-            ImGui::SameLine();
-            ImGui::TextDisabled("(~%d genotype%s)", estGenotypes, estGenotypes == 1 ? "" : "s");
-
             ImGui::SliderInt("Repetitions Per Condition", &SETTINGS.REPETITIONS_PER_AXIS, 1, 100);
             ImGui::SliderInt("MCS Conditions (K)", &SETTINGS.MCS_K, 1, 20);
             ImGui::SameLine();
             ImGui::TextDisabled("(K=1 tests max metamer only)");
-            ImGui::Checkbox("Use Cubemap Center Point (2,2)", &SETTINGS.USE_CUBEMAP_CENTER);
-            ImGui::SameLine();
-            ImGui::TextDisabled("(fixes hue to center of gamut surface instead of random)");
         } else {
             ImGui::SliderInt(
                 "Quest Trials Per Direction", &SETTINGS.QUEST_TRIALS_PER_DIRECTION, 1, 40
@@ -473,8 +473,9 @@ void AppPseudoIsochromaticTest::drawLandoltC(
     // Apply brightness as tint color (RGB all set to brightness, alpha = 1.0)
     ImVec4 tintColor(brightness, brightness, brightness, 1.0f);
 
-    // center the texture onto the screen
-    ImVec2 centerPos = ImVec2(availSize.x * 0.5f, availSize.y * 0.5f);
+    // center the texture onto the screen using window size, independent of cursor position
+    ImVec2 windowSize = ImGui::GetWindowSize();
+    ImVec2 centerPos = windowSize * 0.5f;
     ImGui::SetCursorPos(centerPos - textureFullscreenSize * 0.5f);
 
     ImGui::Image(tex.id, textureFullscreenSize, ImVec2(0, 0), ImVec2(1, 1), tintColor);
@@ -959,6 +960,22 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
 
     std::string display_primaries_path = getTodayPrimariesPath();
 
+    // Ensure PERCENTAGE_SCREENED is in sync with NUM_OBSERVERS via the real CDF
+    if (_observerCDFDimension != SETTINGS.DIMENSION || _observerCDF.empty()) {
+        try {
+            _observerCDF = TetriumColor::ColorGeneratorFactory::GetObserverCDF(
+                "both", SETTINGS.DIMENSION
+            );
+            _observerCDFDimension = SETTINGS.DIMENSION;
+        } catch (const std::exception& e) {
+            ERROR("Failed to load observer CDF: {}", e.what());
+        }
+    }
+    if (!_observerCDF.empty()) {
+        int idx = std::clamp(SETTINGS.NUM_OBSERVERS, 1, (int)_observerCDF.size()) - 1;
+        SETTINGS.PERCENTAGE_SCREENED = _observerCDF[idx];
+    }
+
     // Store picker type for later use
     _pickerType = SETTINGS.PICKER_TYPE;
 
@@ -977,46 +994,43 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
         } else {
             dimensions = {3};
             if (SETTINGS.PICKER_TYPE == ColorPickerType::GENETIC) {
-                metameric_axes = {2}; // Genetic MCS: axis 2 (547nm extra cone)
+                metameric_axes = {2}; // remapped dynamically to 547nm Q cone index per genotype
             } else if (SETTINGS.QUEST_TEST_ONLY_547NM) {
-                metameric_axes = {2};
+                metameric_axes = {2}; // remapped dynamically to 547nm Q cone index per genotype
             } else {
                 metameric_axes = {1, 2, 3};
             }
         }
 
         if (SETTINGS.PICKER_TYPE == ColorPickerType::GENETIC) {
-            // Create GeneticColorGenerator
-            float peak_to_test = 547.0f; // dummy basically for now
-            pColorGenerator = TetriumColor::ColorGeneratorFactory::CreateGeneticColorGenerator(
+            // MCS mode: use Quest generator with K equally-spaced intensity levels
+            pColorGenerator = TetriumColor::ColorGeneratorFactory::CreateQuestColorGenerator(
                 "both",                        // sex
                 SETTINGS.PERCENTAGE_SCREENED,  // percentage_screened
-                peak_to_test,                  // peak_to_test (547, 530, or 559)
-                SETTINGS.LUMINANCE,            // luminance (same as background)
-                0.5f,                          // saturation
-                dimensions,                    // dimensions (2 or 3)
-                42,                            // seed
-                SETTINGS.REPETITIONS_PER_AXIS, // trials_per_condition
+                SETTINGS.LUMINANCE,            // background_luminance
+                SETTINGS.REPETITIONS_PER_AXIS, // trials_per_direction
                 metameric_axes,                // metameric_axes
+                dimensions,                    // dimensions
                 display_primaries_path,        // display_primaries_path
+                SETTINGS.QUEST_BIPOLAR,        // bipolar
                 SETTINGS.VISUAL_ANGLE,         // degree (visual angle)
-                SETTINGS.MCS_K,                // mcs_k (number of intensity levels)
-                SETTINGS.USE_CUBEMAP_CENTER    // debug_middle: center cubemap cell (2,2)
+                SETTINGS.MCS_K                 // mcs_k: K intervals instead of Quest adaptive
             );
         } else {
-            // Create QuestColorGenerator
+            // Quest adaptive mode
 
             // Empty vector = test all axes
             pColorGenerator = TetriumColor::ColorGeneratorFactory::CreateQuestColorGenerator(
                 "both",                              // sex
-                0.99f,                               // percentage_screened
+                SETTINGS.PERCENTAGE_SCREENED,        // percentage_screened
                 SETTINGS.LUMINANCE,                  // background_luminance
                 SETTINGS.QUEST_TRIALS_PER_DIRECTION, // trials_per_direction
                 metameric_axes,                      // metameric_axes
                 dimensions,                          // dimensions
                 display_primaries_path,              // display_primaries_path
                 SETTINGS.QUEST_BIPOLAR,              // bipolar
-                SETTINGS.VISUAL_ANGLE                // degree (visual angle)
+                SETTINGS.VISUAL_ANGLE,               // degree (visual angle)
+                0                                    // mcs_k=0: use Quest adaptive
             );
         }
     } catch (const std::exception& e) {
@@ -1158,9 +1172,9 @@ void AppPseudoIsochromaticTest::endGame(SubjectContext& subject)
 void AppPseudoIsochromaticTest::drawFixGazePage()
 {
     ImDrawList* drawList = ImGui::GetWindowDrawList();
-    ImVec2 screenCenter = ImGui::GetIO().DisplaySize;
-    screenCenter.x *= 0.5f;
-    screenCenter.y *= 0.5f;
+    ImVec2 windowPos = ImGui::GetWindowPos();
+    ImVec2 windowSize = ImGui::GetWindowSize();
+    ImVec2 screenCenter = ImVec2(windowPos.x + windowSize.x * 0.5f, windowPos.y + windowSize.y * 0.5f);
 
     float crossHairSize = 70.f;
     float crossHairThickness = 10.f;
