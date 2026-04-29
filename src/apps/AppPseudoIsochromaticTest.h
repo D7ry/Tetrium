@@ -6,8 +6,10 @@
 #include "lib/TestDataLogger.h"
 
 #include "App.h"
+#include <map>
 #include <optional>
 #include <random>
+#include <string>
 
 namespace TetriumApp
 {
@@ -39,7 +41,8 @@ class AppPseudoIsochromaticTest : public App
     enum class ColorPickerType
     {
         GENETIC,
-        QUEST
+        QUEST,
+        AEPSYCH
     };
 
     enum class StimulusType
@@ -63,12 +66,23 @@ class AppPseudoIsochromaticTest : public App
             = 5; // number of repetitions per (genotype × axis × intensity level) in Genetic MCS mode
         int MCS_K = 3; // number of equally-spaced intensity levels in [0,1] for Genetic MCS (1 = max only)
         int NUM_OBSERVERS = 5;            // desired number of observer genotypes to test (1,2,4,9,21)
+        std::string OBSERVER_INDEX_FILTER = ""; // optional zero-based observer indices, e.g. "0,1,4,5"
         float PERCENTAGE_SCREENED = 0.995f; // derived from NUM_OBSERVERS; passed to Python generator
         int QUEST_TRIALS_PER_DIRECTION = 20; // number of Quest trials per direction (Quest mode)
         bool QUEST_TEST_ONLY_547NM
             = true; // Quest: only test the Q cone (547nm); axis index is computed dynamically per genotype
         bool QUEST_BIPOLAR
             = true;        // Quest: use bipolar sampling (sample in both direction and -direction)
+        int AEPSYCH_NUM_TRIALS = 300;
+        int AEPSYCH_NUM_SOBOL_TRIALS = 20;
+        float AEPSYCH_THRESHOLD_LEVEL = 0.75f;
+        int AEPSYCH_N_CMF_SAMPLES = 200;
+        float AEPSYCH_PATCH_SIGMA_SCALE = 5.0f;
+        float AEPSYCH_MIN_PATCH_MAJOR = 0.15f;
+        float AEPSYCH_MIN_PATCH_MINOR = 0.06f;
+        float AEPSYCH_MAX_RADIUS = 0.65f; // <= 0 passes Python None
+        int AEPSYCH_CONTOUR_SAMPLES_A = 31;
+        int AEPSYCH_CONTOUR_SAMPLES_B = 31;
         int DIMENSION = 3; // dimension: 2 for M/L cone testing, 3 for full trichromat
         int BREAK_INTERVAL = 50; // number of trials between breaks (0 = no breaks)
         MusicSetting MUSIC_SETTING = MusicSetting::CORRECT_WRONG;
@@ -215,7 +229,8 @@ class AppPseudoIsochromaticTest : public App
         AnswerKind orientation,
         int userChoice,
         bool correct,
-        double intensity
+        double intensity,
+        const std::map<std::string, std::string>& metadata = {}
     );
 
     // Static helper functions for Landolt C orientations

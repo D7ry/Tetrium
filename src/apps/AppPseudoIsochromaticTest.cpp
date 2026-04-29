@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <filesystem>
 #include <random>
@@ -34,6 +35,47 @@ ImVec2 calculateFitSize(float width, float height, const ImVec2& availableSize)
 
     return fitSize;
 }
+
+std::vector<int> ParseObserverIndexFilter(const std::string& text)
+{
+    std::string normalized;
+    normalized.reserve(text.size());
+    for (char c : text) {
+        if (std::isdigit(static_cast<unsigned char>(c))) {
+            normalized.push_back(c);
+        } else {
+            normalized.push_back(' ');
+        }
+    }
+
+    std::vector<int> indices;
+    std::stringstream stream(normalized);
+    std::string token;
+    while (stream >> token) {
+        try {
+            int value = std::stoi(token);
+            if (value >= 0 && std::find(indices.begin(), indices.end(), value) == indices.end()) {
+                indices.push_back(value);
+            }
+        } catch (const std::exception&) {
+            // Ignore malformed fragments so partial edits in the GUI do not break settings.
+        }
+    }
+    return indices;
+}
+
+std::string JoinObserverIndices(const std::vector<int>& indices)
+{
+    std::stringstream stream;
+    for (size_t i = 0; i < indices.size(); i++) {
+        if (i > 0) {
+            stream << ",";
+        }
+        stream << indices[i];
+    }
+    return stream.str();
+}
+
 } // namespace
 
 static const float MAX_L = 2.0f; // Maximum luminance in HERING space (cone white [1,1,1,1])
@@ -243,9 +285,9 @@ void TetriumApp::AppPseudoIsochromaticTest::drawSettingsWindow(
     if (ImGui::BeginPopup("Settings", ImGuiWindowFlags_AlwaysAutoResize)) {
         // Color picker type dropdown
         ImGui::Text("Color Picker Type");
-        const char* pickerOptions[] = {"Genetic", "Quest"};
+        const char* pickerOptions[] = {"Genetic", "Quest", "AEPsych"};
         int currentPickerType = static_cast<int>(SETTINGS.PICKER_TYPE);
-        if (ImGui::Combo("##PickerType", &currentPickerType, pickerOptions, 2)) {
+        if (ImGui::Combo("##PickerType", &currentPickerType, pickerOptions, 3)) {
             SETTINGS.PICKER_TYPE = static_cast<ColorPickerType>(currentPickerType);
         }
 
@@ -287,6 +329,15 @@ void TetriumApp::AppPseudoIsochromaticTest::drawSettingsWindow(
             ImGui::SameLine();
             ImGui::TextDisabled("(%.1f%% population)", SETTINGS.PERCENTAGE_SCREENED * 100.0f);
         }
+        ImGui::InputText("Observer Indices", &SETTINGS.OBSERVER_INDEX_FILTER);
+        std::vector<int> selectedObserverIndices
+            = ParseObserverIndexFilter(SETTINGS.OBSERVER_INDEX_FILTER);
+        if (!selectedObserverIndices.empty()) {
+            ImGui::SameLine();
+            ImGui::TextDisabled(
+                "(testing %zu explicit observers)", selectedObserverIndices.size()
+            );
+        }
 
         // Show different trial count setting based on picker type
         if (SETTINGS.PICKER_TYPE == ColorPickerType::GENETIC) {
@@ -294,13 +345,49 @@ void TetriumApp::AppPseudoIsochromaticTest::drawSettingsWindow(
             ImGui::SliderInt("MCS Conditions (K)", &SETTINGS.MCS_K, 1, 20);
             ImGui::SameLine();
             ImGui::TextDisabled("(K=1 tests max metamer only)");
-        } else {
+        } else if (SETTINGS.PICKER_TYPE == ColorPickerType::QUEST) {
             ImGui::SliderInt(
                 "Quest Trials Per Direction", &SETTINGS.QUEST_TRIALS_PER_DIRECTION, 1, 40
             );
             ImGui::Checkbox("Test Only 547nm Cone (Axis 1)", &SETTINGS.QUEST_TEST_ONLY_547NM);
             ImGui::Checkbox("Bipolar Sampling", &SETTINGS.QUEST_BIPOLAR);
             ImGui::Text("Bipolar: Sample in both direction and -direction");
+        } else {
+            SETTINGS.AEPSYCH_NUM_SOBOL_TRIALS = std::clamp(
+                SETTINGS.AEPSYCH_NUM_SOBOL_TRIALS, 1, SETTINGS.AEPSYCH_NUM_TRIALS
+            );
+            ImGui::SliderInt("AEPsych Trials", &SETTINGS.AEPSYCH_NUM_TRIALS, 2, 1000);
+            SETTINGS.AEPSYCH_NUM_SOBOL_TRIALS = std::clamp(
+                SETTINGS.AEPSYCH_NUM_SOBOL_TRIALS, 1, SETTINGS.AEPSYCH_NUM_TRIALS
+            );
+            ImGui::SliderInt(
+                "AEPsych Sobol Trials",
+                &SETTINGS.AEPSYCH_NUM_SOBOL_TRIALS,
+                1,
+                SETTINGS.AEPSYCH_NUM_TRIALS
+            );
+            ImGui::SliderFloat(
+                "AEPsych Threshold Level", &SETTINGS.AEPSYCH_THRESHOLD_LEVEL, 0.5f, 0.95f
+            );
+            ImGui::SliderInt("AEPsych CMF Samples", &SETTINGS.AEPSYCH_N_CMF_SAMPLES, 10, 2000);
+            ImGui::SliderFloat(
+                "AEPsych Patch Sigma Scale", &SETTINGS.AEPSYCH_PATCH_SIGMA_SCALE, 0.5f, 10.0f
+            );
+            ImGui::SliderFloat(
+                "AEPsych Min Patch Major", &SETTINGS.AEPSYCH_MIN_PATCH_MAJOR, 0.01f, 1.0f
+            );
+            ImGui::SliderFloat(
+                "AEPsych Min Patch Minor", &SETTINGS.AEPSYCH_MIN_PATCH_MINOR, 0.01f, 1.0f
+            );
+            ImGui::SliderFloat(
+                "AEPsych Max Radius (<=0 = auto)", &SETTINGS.AEPSYCH_MAX_RADIUS, -1.0f, 1.5f
+            );
+            ImGui::SliderInt(
+                "AEPsych Contour Samples A", &SETTINGS.AEPSYCH_CONTOUR_SAMPLES_A, 5, 101
+            );
+            ImGui::SliderInt(
+                "AEPsych Contour Samples B", &SETTINGS.AEPSYCH_CONTOUR_SAMPLES_B, 5, 101
+            );
         }
 
         ImGui::SliderInt("Break Interval (0 = no breaks)", &SETTINGS.BREAK_INTERVAL, 0, 100);
@@ -798,7 +885,8 @@ void AppPseudoIsochromaticTest::transitionSubjectState(
                     _deferredResponse.orientation,
                     _deferredResponse.buttonIndex,
                     _deferredResponse.correct,
-                    trial.intensity
+                    trial.intensity,
+                    trial.metadata
                 );
 
                 _deferredResponse.hasResponse = false;
@@ -863,7 +951,8 @@ void AppPseudoIsochromaticTest::transitionSubjectState(
                     _deferredResponse.orientation,
                     _deferredResponse.buttonIndex,
                     _deferredResponse.correct,
-                    trial.intensity
+                    trial.intensity,
+                    trial.metadata
                 );
 
                 _deferredResponse.hasResponse = false;
@@ -906,7 +995,8 @@ void AppPseudoIsochromaticTest::transitionSubjectState(
                     subject.prompt.currentOrientation,
                     -1,    // No response
                     false, // No response = incorrect
-                    trial.intensity
+                    trial.intensity,
+                    trial.metadata
                 );
             }
 
@@ -978,6 +1068,10 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
 
     // Store picker type for later use
     _pickerType = SETTINGS.PICKER_TYPE;
+    std::vector<int> observerIndices = ParseObserverIndexFilter(SETTINGS.OBSERVER_INDEX_FILTER);
+    if (!observerIndices.empty()) {
+        INFO("Using explicit observer indices: {}", JoinObserverIndices(observerIndices));
+    }
 
     // Create Python ColorGenerator using factory
     PyObject* pColorGenerator = nullptr;
@@ -1014,9 +1108,10 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
                 display_primaries_path,        // display_primaries_path
                 SETTINGS.QUEST_BIPOLAR,        // bipolar
                 SETTINGS.VISUAL_ANGLE,         // degree (visual angle)
-                SETTINGS.MCS_K                 // mcs_k: K intervals instead of Quest adaptive
+                SETTINGS.MCS_K,                // mcs_k: K intervals instead of Quest adaptive
+                observerIndices                // observer_indices: explicit population-sorted subset
             );
-        } else {
+        } else if (SETTINGS.PICKER_TYPE == ColorPickerType::QUEST) {
             // Quest adaptive mode
 
             // Empty vector = test all axes
@@ -1030,8 +1125,26 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
                 display_primaries_path,              // display_primaries_path
                 SETTINGS.QUEST_BIPOLAR,              // bipolar
                 SETTINGS.VISUAL_ANGLE,               // degree (visual angle)
-                0                                    // mcs_k=0: use Quest adaptive
+                0,                                   // mcs_k=0: use Quest adaptive
+                observerIndices                      // observer_indices: explicit population-sorted subset
             );
+        } else {
+            pColorGenerator
+                = TetriumColor::ColorGeneratorFactory::CreateAEPsychThresholdContourGenerator(
+                    SETTINGS.AEPSYCH_NUM_TRIALS,
+                    SETTINGS.AEPSYCH_NUM_SOBOL_TRIALS,
+                    SETTINGS.AEPSYCH_THRESHOLD_LEVEL,
+                    "both",
+                    SETTINGS.LUMINANCE,
+                    dimensions,
+                    display_primaries_path,
+                    42,
+                    SETTINGS.AEPSYCH_N_CMF_SAMPLES,
+                    SETTINGS.AEPSYCH_PATCH_SIGMA_SCALE,
+                    SETTINGS.AEPSYCH_MIN_PATCH_MAJOR,
+                    SETTINGS.AEPSYCH_MIN_PATCH_MINOR,
+                    SETTINGS.AEPSYCH_MAX_RADIUS
+                );
         }
     } catch (const std::exception& e) {
         ERROR("Failed to create ColorGenerator: {}", e.what());
@@ -1118,14 +1231,40 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
            "intensity",
            "lum_noise",
            "s_cone_noise",
-           "stimulus_size"};
+           "stimulus_size",
+           "picker_type",
+           "stimulus_type",
+           "dimension",
+           "aepsych_sample_index",
+           "aepsych_completed_trials",
+           "aepsych_phase",
+           "aepsych_a",
+           "aepsych_b",
+           "aepsych_u",
+           "aepsych_v",
+           "aepsych_r",
+           "aepsych_theta",
+           "aepsych_phi",
+           "aepsych_direction",
+           "aepsych_disp",
+           "aepsych_q_axis",
+           "aepsych_actual_max_radius",
+           "aepsych_threshold_level"};
 
     // Generate additional info string with picker type, stimulus type, and dimension
-    std::string pickerTypeStr = (_pickerType == ColorPickerType::GENETIC) ? "Genetic" : "Quest";
+    std::string pickerTypeStr = "Quest";
+    if (_pickerType == ColorPickerType::GENETIC) {
+        pickerTypeStr = "Genetic";
+    } else if (_pickerType == ColorPickerType::AEPSYCH) {
+        pickerTypeStr = "AEPsych";
+    }
     const char* stimTypeStrs[] = {"Plate", "Bipartite", "GaussianBlob"};
     std::string stimTypeStr = stimTypeStrs[static_cast<int>(SETTINGS.STIMULUS_TYPE)];
     std::string additionalInfo
         = pickerTypeStr + "_" + stimTypeStr + "_dim" + std::to_string(SETTINGS.DIMENSION);
+    if (!observerIndices.empty()) {
+        additionalInfo += "_obs" + JoinObserverIndices(observerIndices);
+    }
 
     _logger = new TestDataLogger(
         "AppPseudoIsochromaticTest", _nameInputBuffer, headers, additionalInfo
@@ -1148,9 +1287,13 @@ void AppPseudoIsochromaticTest::endGame(SubjectContext& subject)
 {
     DEBUG("ending game for subject {}", subject.name);
 
+    if (_testGenerator) {
+        std::filesystem::create_directories("../data/AppPseudoIsochromaticTest");
+    }
+
     // Export Quest thresholds if using Quest color generator
     if (_pickerType == ColorPickerType::QUEST && _testGenerator) {
-        std::string pickerTypeStr = (_pickerType == ColorPickerType::GENETIC) ? "Genetic" : "Quest";
+        std::string pickerTypeStr = "Quest";
         std::string additionalInfo = pickerTypeStr + "_dim" + std::to_string(SETTINGS.DIMENSION);
         std::string filenameBase = subject.name;
         if (!additionalInfo.empty()) {
@@ -1162,6 +1305,38 @@ void AppPseudoIsochromaticTest::endGame(SubjectContext& subject)
             INFO("Quest thresholds exported to {}", thresholdPath);
         } else {
             WARN("Failed to export Quest thresholds");
+        }
+    } else if (_pickerType == ColorPickerType::AEPSYCH && _testGenerator) {
+        std::string filenameBase
+            = subject.name + "_AEPsych_dim" + std::to_string(SETTINGS.DIMENSION);
+        std::string timestamp = TestDataLogger::getCurrentTimestamp();
+        std::string basePath
+            = "../data/AppPseudoIsochromaticTest/" + filenameBase + "_" + timestamp;
+
+        std::string modelPath = basePath + "_aepsych_model.pkl";
+        if (_testGenerator->SaveModelState(modelPath)) {
+            INFO("AEPsych model exported to {}", modelPath);
+        } else {
+            WARN("Failed to export AEPsych model");
+        }
+
+        std::string contourPath = basePath + "_aepsych_threshold_contour.npz";
+        if (_testGenerator->ExportThresholdPatch(
+                contourPath,
+                SETTINGS.AEPSYCH_CONTOUR_SAMPLES_A,
+                SETTINGS.AEPSYCH_CONTOUR_SAMPLES_B,
+                SETTINGS.AEPSYCH_THRESHOLD_LEVEL
+            )) {
+            INFO("AEPsych threshold contour exported to {}", contourPath);
+        } else {
+            WARN("Failed to export AEPsych threshold contour");
+        }
+
+        std::string trialLogPath = basePath + "_aepsych_trials.csv";
+        if (_testGenerator->ExportColorGeneratorTrialLog(trialLogPath)) {
+            INFO("AEPsych trial log exported to {}", trialLogPath);
+        } else {
+            WARN("Failed to export AEPsych trial log");
         }
     }
 
@@ -1414,7 +1589,8 @@ void AppPseudoIsochromaticTest::logTrialData(
     AnswerKind orientation,
     int userChoice,
     bool correct,
-    double intensity
+    double intensity,
+    const std::map<std::string, std::string>& metadata
 )
 {
     if (!_logger)
@@ -1450,6 +1626,22 @@ void AppPseudoIsochromaticTest::logTrialData(
     data["lum_noise"] = std::to_string(SETTINGS.LUM_NOISE);
     data["s_cone_noise"] = std::to_string(SETTINGS.S_CONE_NOISE);
     data["stimulus_size"] = std::to_string(SETTINGS.STIMULUS_SIZE);
+    if (_pickerType == ColorPickerType::GENETIC) {
+        data["picker_type"] = "Genetic";
+    } else if (_pickerType == ColorPickerType::AEPSYCH) {
+        data["picker_type"] = "AEPsych";
+    } else {
+        data["picker_type"] = "Quest";
+    }
+    const char* stimTypeStrs[] = {"Plate", "Bipartite", "GaussianBlob"};
+    data["stimulus_type"] = stimTypeStrs[static_cast<int>(SETTINGS.STIMULUS_TYPE)];
+    data["dimension"] = std::to_string(SETTINGS.DIMENSION);
+
+    for (const auto& [key, value] : metadata) {
+        if (key.rfind("aepsych_", 0) == 0) {
+            data[key] = value;
+        }
+    }
 
     _logger->LogRow(data);
 }
