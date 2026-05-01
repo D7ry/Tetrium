@@ -303,7 +303,9 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx)
             if (pr650States.validating) {
                 ImGui::BeginDisabled();
             }
-            const char* configLabels[] = {"Center only", "5x5 cubemap", "Midpoint"};
+            const char* configLabels[] = {
+                "Center only", "5x5 cubemap", "Midpoint", "Midpoint contrast"
+            };
             int configModeInt = static_cast<int>(validationState.configMode);
             ImGui::SetNextItemWidth(160);
             if (ImGui::Combo("##ValidationConfig", &configModeInt, configLabels, IM_ARRAYSIZE(configLabels))) {
@@ -328,6 +330,18 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx)
                     pr650States.validating = true;
                     pr650States.validationComplete = false;
                 }
+                ImGui::SameLine();
+                if (!IPR650->isConnected()) {
+                    ImGui::BeginDisabled();
+                }
+                if (ImGui::Button("Measure Primaries Only")) {
+                    std::thread([this]() { runPrimariesOnlyMeasurement(); }).detach();
+                    pr650States.validating = true;
+                    pr650States.validationComplete = false;
+                }
+                if (!IPR650->isConnected()) {
+                    ImGui::EndDisabled();
+                }
                 if (pr650States.measuring) {
                     ImGui::EndDisabled();
                 }
@@ -340,13 +354,16 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx)
                     ImGui::Text("2. Converts RYGB metamers to display values");
                     ImGui::Text("3. Measures validation targets");
                     ImGui::Text("4. Validates metamer accuracy");
+                    ImGui::Separator();
+                    ImGui::Text("Measure Primaries Only records just RGBO primaries");
+                    ImGui::Text("to measurements/<date>/primaries/.");
                     ImGui::EndTooltip();
                 }
             } else if (pr650States.validationComplete) {
                 if (pr650States.measuring) {
                     ImGui::EndDisabled();
                 }
-                ImGui::Text("Validation Complete!");
+                ImGui::Text("%s", validationState.completeLabel.c_str());
                 ImGui::SameLine();
                 if (ImGui::Button("OK##validation")) {
                     pr650States.validating = false;
@@ -575,6 +592,8 @@ void AppAutoMeasure::runDailyValidation(bool debugSkipPR650Measurements)
 {
     std::string date = getCurrentDate();
 
+    validationState.totalSteps = 4;
+    validationState.completeLabel = "Validation Complete!";
     validationState.statusMessage = "Starting daily validation...";
     INFO("Starting daily validation for date: {}", date);
 
@@ -622,6 +641,9 @@ void AppAutoMeasure::runDailyValidation(bool debugSkipPR650Measurements)
         break;
     case kValidationConfigMidpoint:
         configFileName = "display_validation_metamers_midpoint.json";
+        break;
+    case kValidationConfigMidpointContrast:
+        configFileName = "display_validation_metamers_midpoint_contrast.json";
         break;
     default:
         configFileName = "display_validation_metamers.json";
@@ -676,6 +698,40 @@ void AppAutoMeasure::runDailyValidation(bool debugSkipPR650Measurements)
     pr650States.validationComplete = true;
 
     // Clear validation display state
+    validationState.displayValidationColor = false;
+}
+
+void AppAutoMeasure::runPrimariesOnlyMeasurement()
+{
+    if (!IPR650->isConnected()) {
+        validationState.statusMessage = "ERROR: PR650 not connected";
+        ERROR("Cannot measure primaries: PR650 not connected");
+        pr650States.validating = false;
+        validationState.displayValidationColor = false;
+        return;
+    }
+
+    std::string date = getCurrentDate();
+    std::string primariesDir = TETRIUM_COLOR_PATH + "measurements/" + date + "/primaries/";
+
+    validationState.totalSteps = 1;
+    validationState.stepNumber = 1;
+    validationState.currentStep = "Measuring Display Primaries";
+    validationState.completeLabel = "Primaries Measurement Complete!";
+    validationState.statusMessage = "Measuring display primaries only...";
+    INFO("Starting primaries-only measurement for date: {}", date);
+
+    if (!measureDisplayPrimaries(primariesDir)) {
+        validationState.statusMessage = "ERROR: Failed to measure display primaries";
+        ERROR("Failed to measure display primaries");
+        pr650States.validating = false;
+        validationState.displayValidationColor = false;
+        return;
+    }
+
+    validationState.statusMessage = "Primaries saved to measurements/" + date + "/primaries/";
+    INFO("Primaries-only measurement complete for {}", date);
+    pr650States.validationComplete = true;
     validationState.displayValidationColor = false;
 }
 

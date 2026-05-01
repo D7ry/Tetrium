@@ -7,6 +7,27 @@
 
 namespace TetriumApp
 {
+namespace
+{
+std::string EscapeCsvValue(const std::string& value)
+{
+    bool needsQuotes = value.find_first_of(",\"\n\r") != std::string::npos;
+    if (!needsQuotes) {
+        return value;
+    }
+
+    std::string escaped = "\"";
+    for (char c : value) {
+        if (c == '"') {
+            escaped += "\"\"";
+        } else {
+            escaped += c;
+        }
+    }
+    escaped += "\"";
+    return escaped;
+}
+} // namespace
 
 TestDataLogger::TestDataLogger(
     const std::string& appName,
@@ -75,7 +96,7 @@ void TestDataLogger::LogRow(const std::map<std::string, std::string>& data)
     for (size_t i = 0; i < _headers.size(); ++i) {
         auto it = data.find(_headers[i]);
         if (it != data.end()) {
-            _file << it->second;
+            _file << EscapeCsvValue(it->second);
         }
         if (i < _headers.size() - 1)
             _file << ",";

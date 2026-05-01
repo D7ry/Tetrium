@@ -345,12 +345,25 @@ void TetriumApp::AppPseudoIsochromaticTest::drawSettingsWindow(
             ImGui::SliderInt("MCS Conditions (K)", &SETTINGS.MCS_K, 1, 20);
             ImGui::SameLine();
             ImGui::TextDisabled("(K=1 tests max metamer only)");
+            ImGui::Checkbox("Bipolar Sampling", &SETTINGS.QUEST_BIPOLAR);
+            const char* colorPickingOptions[] = {"Cone contrast", "Cone"};
+            int colorPickingSpace = static_cast<int>(SETTINGS.QUEST_COLOR_PICKING_SPACE);
+            if (ImGui::Combo("Color Picking Space", &colorPickingSpace, colorPickingOptions, 2)) {
+                SETTINGS.QUEST_COLOR_PICKING_SPACE
+                    = static_cast<ColorPickingSpace>(colorPickingSpace);
+            }
         } else if (SETTINGS.PICKER_TYPE == ColorPickerType::QUEST) {
             ImGui::SliderInt(
                 "Quest Trials Per Direction", &SETTINGS.QUEST_TRIALS_PER_DIRECTION, 1, 40
             );
             ImGui::Checkbox("Test Only 547nm Cone (Axis 1)", &SETTINGS.QUEST_TEST_ONLY_547NM);
             ImGui::Checkbox("Bipolar Sampling", &SETTINGS.QUEST_BIPOLAR);
+            const char* colorPickingOptions[] = {"Cone contrast", "Cone"};
+            int colorPickingSpace = static_cast<int>(SETTINGS.QUEST_COLOR_PICKING_SPACE);
+            if (ImGui::Combo("Color Picking Space", &colorPickingSpace, colorPickingOptions, 2)) {
+                SETTINGS.QUEST_COLOR_PICKING_SPACE
+                    = static_cast<ColorPickingSpace>(colorPickingSpace);
+            }
             ImGui::Text("Bipolar: Sample in both direction and -direction");
         } else {
             SETTINGS.AEPSYCH_NUM_SOBOL_TRIALS = std::clamp(
@@ -439,8 +452,14 @@ void TetriumApp::AppPseudoIsochromaticTest::drawSettingsWindow(
         // Luminance slider
         ImGui::SliderFloat("Luminance", &SETTINGS.LUMINANCE, 0.0f, float(MAX_L));
 
-        // Dot size slider
-        ImGui::SliderFloat("Dot Size", &SETTINGS.DOT_SIZE, 0.5f, 2.0f);
+        if (SETTINGS.STIMULUS_TYPE == StimulusType::GAUSSIAN_BLOB) {
+            ImGui::SliderFloat(
+                "Gaussian Blob Size", &SETTINGS.GAUSSIAN_BLOB_SIZE, 0.25f, 3.0f
+            );
+            ImGui::TextDisabled("Changes blob spread only; field size stays fixed.");
+        } else {
+            ImGui::SliderFloat("Dot Size", &SETTINGS.DOT_SIZE, 0.5f, 2.0f);
+        }
 
         // Music setting dropdown
         ImGui::Text("Music Setting");
@@ -1072,6 +1091,10 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
     if (!observerIndices.empty()) {
         INFO("Using explicit observer indices: {}", JoinObserverIndices(observerIndices));
     }
+    const std::string colorPickingSpace
+        = SETTINGS.QUEST_COLOR_PICKING_SPACE == ColorPickingSpace::CONE_CONTRAST
+              ? "cone_contrast"
+              : "cone";
 
     // Create Python ColorGenerator using factory
     PyObject* pColorGenerator = nullptr;
@@ -1109,7 +1132,8 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
                 SETTINGS.QUEST_BIPOLAR,        // bipolar
                 SETTINGS.VISUAL_ANGLE,         // degree (visual angle)
                 SETTINGS.MCS_K,                // mcs_k: K intervals instead of Quest adaptive
-                observerIndices                // observer_indices: explicit population-sorted subset
+                observerIndices,               // observer_indices: explicit population-sorted subset
+                colorPickingSpace              // color_picking_space
             );
         } else if (SETTINGS.PICKER_TYPE == ColorPickerType::QUEST) {
             // Quest adaptive mode
@@ -1126,7 +1150,8 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
                 SETTINGS.QUEST_BIPOLAR,              // bipolar
                 SETTINGS.VISUAL_ANGLE,               // degree (visual angle)
                 0,                                   // mcs_k=0: use Quest adaptive
-                observerIndices                      // observer_indices: explicit population-sorted subset
+                observerIndices,                     // observer_indices: explicit population-sorted subset
+                colorPickingSpace                    // color_picking_space
             );
         } else {
             pColorGenerator
@@ -1170,7 +1195,7 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
         case StimulusType::GAUSSIAN_BLOB:
             pTestGenerator
                 = TetriumColor::ColorGeneratorFactory::CreateGaussianBlobGenerator(
-                    pColorGenerator, 42, 1024
+                    pColorGenerator, 42, 1024, SETTINGS.GAUSSIAN_BLOB_SIZE
                 );
             break;
         }
@@ -1232,9 +1257,24 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
            "lum_noise",
            "s_cone_noise",
            "stimulus_size",
+           "gaussian_blob_size",
            "picker_type",
            "stimulus_type",
            "dimension",
+           "color_picking_space",
+           "quest_direction_idx",
+           "quest_proportion",
+           "quest_bipolar",
+           "quest_color_picking_space",
+           "quest_background_disp",
+           "quest_adapting_background",
+           "quest_adapting_background_space",
+           "quest_inside_disp",
+           "quest_outside_disp",
+           "quest_genotype",
+           "quest_metameric_axis",
+           "quest_raw_cone_delta",
+           "quest_cone_contrast_delta",
            "aepsych_sample_index",
            "aepsych_completed_trials",
            "aepsych_phase",
@@ -1261,7 +1301,8 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
     const char* stimTypeStrs[] = {"Plate", "Bipartite", "GaussianBlob"};
     std::string stimTypeStr = stimTypeStrs[static_cast<int>(SETTINGS.STIMULUS_TYPE)];
     std::string additionalInfo
-        = pickerTypeStr + "_" + stimTypeStr + "_dim" + std::to_string(SETTINGS.DIMENSION);
+        = pickerTypeStr + "_" + stimTypeStr + "_dim" + std::to_string(SETTINGS.DIMENSION)
+          + "_" + colorPickingSpace;
     if (!observerIndices.empty()) {
         additionalInfo += "_obs" + JoinObserverIndices(observerIndices);
     }
@@ -1353,7 +1394,7 @@ void AppPseudoIsochromaticTest::drawFixGazePage()
 
     float crossHairSize = 70.f;
     float crossHairThickness = 10.f;
-    ImU32 crossHairColor = IM_COL32(255, 255, 255, 255); // White color
+    ImU32 crossHairColor = IM_COL32(128, 128, 128, 128);
 
     drawList->AddLine(
         ImVec2(screenCenter.x - crossHairSize, screenCenter.y),
@@ -1626,6 +1667,7 @@ void AppPseudoIsochromaticTest::logTrialData(
     data["lum_noise"] = std::to_string(SETTINGS.LUM_NOISE);
     data["s_cone_noise"] = std::to_string(SETTINGS.S_CONE_NOISE);
     data["stimulus_size"] = std::to_string(SETTINGS.STIMULUS_SIZE);
+    data["gaussian_blob_size"] = std::to_string(SETTINGS.GAUSSIAN_BLOB_SIZE);
     if (_pickerType == ColorPickerType::GENETIC) {
         data["picker_type"] = "Genetic";
     } else if (_pickerType == ColorPickerType::AEPSYCH) {
@@ -1636,9 +1678,13 @@ void AppPseudoIsochromaticTest::logTrialData(
     const char* stimTypeStrs[] = {"Plate", "Bipartite", "GaussianBlob"};
     data["stimulus_type"] = stimTypeStrs[static_cast<int>(SETTINGS.STIMULUS_TYPE)];
     data["dimension"] = std::to_string(SETTINGS.DIMENSION);
+    data["color_picking_space"]
+        = SETTINGS.QUEST_COLOR_PICKING_SPACE == ColorPickingSpace::CONE_CONTRAST
+              ? "cone_contrast"
+              : "cone";
 
     for (const auto& [key, value] : metadata) {
-        if (key.rfind("aepsych_", 0) == 0) {
+        if (key.rfind("aepsych_", 0) == 0 || key.rfind("quest_", 0) == 0) {
             data[key] = value;
         }
     }

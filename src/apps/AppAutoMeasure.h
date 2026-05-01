@@ -48,6 +48,7 @@ class AppAutoMeasure : public App
 
     // Daily validation methods
     void runDailyValidation(bool debugSkipPR650Measurements);
+    void runPrimariesOnlyMeasurement();
     bool measureDisplayPrimaries(const std::string& primariesDir);
     bool copyPrimariesToValidationFolder(
         const std::string& primariesSourceDir,
@@ -92,6 +93,7 @@ class AppAutoMeasure : public App
         kValidationConfigCenter = 0,
         kValidationConfigFullGrid = 1,
         kValidationConfigMidpoint = 2,
+        kValidationConfigMidpointContrast = 3,
     };
 
     struct
@@ -99,6 +101,7 @@ class AppAutoMeasure : public App
         std::string currentStep = "";
         int stepNumber = 0;
         int totalSteps = 4;
+        std::string completeLabel = "Validation Complete!";
         std::string statusMessage = "";
         glm::ivec4 currentRGBO = glm::ivec4(0, 0, 0, 0);
         bool displayValidationColor = false;
