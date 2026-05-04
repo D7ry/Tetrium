@@ -69,17 +69,17 @@ class AppPseudoIsochromaticTest : public App
         ColorPickerType PICKER_TYPE = ColorPickerType::QUEST;
         StimulusType STIMULUS_TYPE = StimulusType::GAUSSIAN_BLOB;
         int REPETITIONS_PER_AXIS
-            = 5; // number of repetitions per (genotype × axis × intensity level) in Genetic MCS mode
-        int MCS_K = 3; // number of equally-spaced intensity levels in [0,1] for Genetic MCS (1 = max only)
-        int NUM_OBSERVERS = 5;            // desired number of observer genotypes to test (1,2,4,9,21)
+            = 30; // number of repetitions per (genotype × axis × intensity level) in Genetic MCS mode
+        int MCS_K = 1; // number of equally-spaced intensity levels in [0,1] for Genetic MCS (1 = max only)
+        int NUM_OBSERVERS = 10;           // desired number of observer genotypes to test
         std::string OBSERVER_INDEX_FILTER = ""; // optional zero-based observer indices, e.g. "0,1,4,5"
         float PERCENTAGE_SCREENED = 0.995f; // derived from NUM_OBSERVERS; passed to Python generator
-        int QUEST_TRIALS_PER_DIRECTION = 20; // number of Quest trials per direction (Quest mode)
+        int QUEST_TRIALS_PER_DIRECTION = 40; // number of Quest trials per direction (Quest mode)
         bool QUEST_TEST_ONLY_547NM
             = true; // Quest: only test the Q cone (547nm); axis index is computed dynamically per genotype
         bool QUEST_BIPOLAR
-            = true;        // Quest: use bipolar sampling (sample in both direction and -direction)
-        ColorPickingSpace QUEST_COLOR_PICKING_SPACE = ColorPickingSpace::CONE_CONTRAST;
+            = false;       // Quest: use bipolar sampling (sample in both direction and -direction)
+        ColorPickingSpace QUEST_COLOR_PICKING_SPACE = ColorPickingSpace::CONE;
         int AEPSYCH_NUM_TRIALS = 300;
         int AEPSYCH_NUM_SOBOL_TRIALS = 20;
         float AEPSYCH_THRESHOLD_LEVEL = 0.75f;
