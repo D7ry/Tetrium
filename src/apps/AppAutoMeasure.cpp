@@ -1,6 +1,7 @@
 #include "AppAutoMeasure.h"
 #include "Pathing.h"
 #include "imgui.h"
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <filesystem>
@@ -23,6 +24,13 @@ static struct
     std::string measuringString;
 } measureContext;
 
+struct SpectrumSnapshot
+{
+    std::vector<double> wavelength;
+    std::vector<double> power;
+    double luminance = 0.0;
+};
+
 std::string getTimestampString()
 {
     auto now = std::chrono::system_clock::now();
@@ -38,6 +46,41 @@ std::string getTimestampString()
     ss << "_" << std::setfill('0') << std::setw(3) << ms.count();
 
     return ss.str();
+}
+
+SpectrumSnapshot snapshotSpectrum(const PR650::SpectrumMeasure& measurement)
+{
+    SpectrumSnapshot snapshot;
+    snapshot.wavelength = measurement.wavelength;
+    snapshot.power = measurement.power;
+    snapshot.luminance = measurement.luminance;
+    return snapshot;
+}
+
+SpectrumSnapshot meanSpectrum(const std::vector<SpectrumSnapshot>& measurements)
+{
+    SpectrumSnapshot aggregate;
+    if (measurements.empty()) {
+        return aggregate;
+    }
+
+    const size_t n = measurements.front().power.size();
+    aggregate.wavelength = measurements.front().wavelength;
+    aggregate.power.resize(n, 0.0);
+
+    for (const auto& measurement : measurements) {
+        for (size_t i = 0; i < n; ++i) {
+            aggregate.power[i] += measurement.power[i];
+        }
+        aggregate.luminance += measurement.luminance;
+    }
+
+    const double count = static_cast<double>(measurements.size());
+    for (size_t i = 0; i < n; ++i) {
+        aggregate.power[i] /= count;
+    }
+    aggregate.luminance /= count;
+    return aggregate;
 }
 
 void writeToFile(const std::string file_path, const std::string text_to_write)
@@ -313,6 +356,32 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx)
             }
             if (pr650States.validating) {
                 ImGui::EndDisabled();
+            }
+
+            ImGui::Text("Primary Samples:");
+            ImGui::SameLine();
+            if (pr650States.validating) {
+                ImGui::BeginDisabled();
+            }
+            ImGui::SetNextItemWidth(100);
+            if (ImGui::InputInt("##PrimarySamples", &validationState.primaryRepeatSamples)) {
+                validationState.primaryRepeatSamples
+                    = std::clamp(validationState.primaryRepeatSamples, 1, 20);
+            }
+            if (validationState.primaryRepeatSamples < 1 || validationState.primaryRepeatSamples > 20) {
+                validationState.primaryRepeatSamples
+                    = std::clamp(validationState.primaryRepeatSamples, 1, 20);
+            }
+            if (pr650States.validating) {
+                ImGui::EndDisabled();
+            }
+            ImGui::SameLine();
+            ImGui::TextDisabled("(?)");
+            if (ImGui::IsItemHovered()) {
+                ImGui::BeginTooltip();
+                ImGui::Text("Number of PR650 repeats per RGBO primary.");
+                ImGui::Text("The app saves each repeat and a mean aggregate.");
+                ImGui::EndTooltip();
             }
 
             ImGui::Text("Daily Display Validation:");
@@ -751,7 +820,7 @@ bool AppAutoMeasure::measureDisplayPrimaries(const std::string& primariesDir)
     };
 
     for (const auto& primary : primaries) {
-        measureAndSaveSpectrum(primary, primariesDir);
+        measureAndSavePrimarySpectrumRobust(primary, primariesDir);
     }
 
     INFO("Display primaries measured successfully");
@@ -992,7 +1061,8 @@ std::vector<glm::ivec4> AppAutoMeasure::parseRGBOTargets(const std::string& csvP
 void AppAutoMeasure::saveSpectrumData(
     glm::ivec4 rgbo,
     const std::string& outputDir,
-    const PR650::SpectrumMeasure& result
+    const PR650::SpectrumMeasure& result,
+    const std::string& filenameSuffix
 )
 {
     // Ensure output directory exists
@@ -1009,7 +1079,7 @@ void AppAutoMeasure::saveSpectrumData(
     std::string timestamp = getTimestampString();
     std::string filename = outputDir + "/r" + std::to_string(rgbo.x) + "g" + std::to_string(rgbo.y)
                            + "b" + std::to_string(rgbo.z) + "o" + std::to_string(rgbo.w) + "_"
-                           + timestamp + ".csv";
+                           + timestamp + filenameSuffix + ".csv";
 
     // Format spectrum data (three columns: wavelength, power, luminance - with header)
     std::ostringstream resultStr;
@@ -1037,6 +1107,108 @@ void AppAutoMeasure::saveSpectrumData(
     file.close();
 
     INFO("Saved spectrum to: {}", std::filesystem::absolute(filename).string());
+}
+
+void AppAutoMeasure::measureAndSavePrimarySpectrumRobust(glm::ivec4 rgbo, const std::string& outputDir)
+{
+    const int primaryRepeats = std::clamp(validationState.primaryRepeatSamples, 1, 20);
+    constexpr int kInitialSettleMs = 2000;
+    constexpr int kRepeatSettleMs = 250;
+
+    INFO(
+        "Measuring robust primary spectrum for RGBO: ({}, {}, {}, {}) with {} repeats",
+        rgbo.x,
+        rgbo.y,
+        rgbo.z,
+        rgbo.w,
+        primaryRepeats
+    );
+
+    validationState.currentRGBO = rgbo;
+    validationState.displayValidationColor = true;
+    std::this_thread::sleep_for(std::chrono::milliseconds(kInitialSettleMs));
+
+    std::vector<SpectrumSnapshot> validMeasurements;
+    validMeasurements.reserve(primaryRepeats);
+
+    for (int repeat = 0; repeat < primaryRepeats; ++repeat) {
+        if (repeat > 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(kRepeatSettleMs));
+        }
+
+        validationState.statusMessage = "Measuring primary repeat " + std::to_string(repeat + 1)
+                                        + "/" + std::to_string(primaryRepeats);
+
+        IPR650->StartMeasuring();
+        while (!IPR650->MeasureResult.ready) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+
+        const PR650::SpectrumMeasure& result = IPR650->MeasureResult;
+
+        saveSpectrumData(rgbo, outputDir, result, "_repeat" + std::to_string(repeat + 1));
+        SpectrumSnapshot resultSnapshot = snapshotSpectrum(result);
+        IPR650->MeasureResult.ready = false;
+
+        if (resultSnapshot.wavelength.empty() || resultSnapshot.power.empty()
+            || resultSnapshot.wavelength.size() != resultSnapshot.power.size()) {
+            WARN(
+                "Skipping invalid primary repeat {} for RGBO ({}, {}, {}, {}): {} wavelengths, {} powers",
+                repeat + 1,
+                rgbo.x,
+                rgbo.y,
+                rgbo.z,
+                rgbo.w,
+                resultSnapshot.wavelength.size(),
+                resultSnapshot.power.size()
+            );
+            continue;
+        }
+
+        if (!validMeasurements.empty()
+            && resultSnapshot.power.size() != validMeasurements.front().power.size()) {
+            WARN(
+                "Skipping primary repeat {} for RGBO ({}, {}, {}, {}): length {} does not match {}",
+                repeat + 1,
+                rgbo.x,
+                rgbo.y,
+                rgbo.z,
+                rgbo.w,
+                resultSnapshot.power.size(),
+                validMeasurements.front().power.size()
+            );
+            continue;
+        }
+
+        validMeasurements.push_back(resultSnapshot);
+    }
+
+    if (validMeasurements.empty()) {
+        ERROR(
+            "No valid primary repeats for RGBO ({}, {}, {}, {}); aggregate not saved",
+            rgbo.x,
+            rgbo.y,
+            rgbo.z,
+            rgbo.w
+        );
+        return;
+    }
+
+    SpectrumSnapshot aggregateSnapshot = meanSpectrum(validMeasurements);
+    PR650::SpectrumMeasure aggregate;
+    aggregate.wavelength = aggregateSnapshot.wavelength;
+    aggregate.power = aggregateSnapshot.power;
+    aggregate.luminance = aggregateSnapshot.luminance;
+    aggregate.ready = true;
+    saveSpectrumData(rgbo, outputDir, aggregate, "_zz_mean");
+    INFO(
+        "Saved mean primary aggregate for RGBO ({}, {}, {}, {}) from {} valid repeats",
+        rgbo.x,
+        rgbo.y,
+        rgbo.z,
+        rgbo.w,
+        validMeasurements.size()
+    );
 }
 
 void AppAutoMeasure::measureAndSaveSpectrum(glm::ivec4 rgbo, const std::string& outputDir)

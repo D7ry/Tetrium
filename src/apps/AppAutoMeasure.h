@@ -65,8 +65,10 @@ class AppAutoMeasure : public App
     void saveSpectrumData(
         glm::ivec4 rgbo,
         const std::string& outputDir,
-        const PR650::SpectrumMeasure& result
+        const PR650::SpectrumMeasure& result,
+        const std::string& filenameSuffix = ""
     );
+    void measureAndSavePrimarySpectrumRobust(glm::ivec4 rgbo, const std::string& outputDir);
     void measureAndSaveSpectrum(glm::ivec4 rgbo, const std::string& outputDir);
 
     float stimulusSize = 1.0f; // Default stimulus size (1.0 = full size)
@@ -107,6 +109,7 @@ class AppAutoMeasure : public App
         bool displayValidationColor = false;
         bool debugSkipPR650Measurements = false;
         ValidationConfigMode configMode = kValidationConfigFullGrid;
+        int primaryRepeatSamples = 5;
     } validationState;
 };
 }; // namespace TetriumApp
