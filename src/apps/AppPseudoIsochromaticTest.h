@@ -6,10 +6,12 @@
 #include "lib/TestDataLogger.h"
 
 #include "App.h"
+#include <array>
 #include <map>
 #include <optional>
 #include <random>
 #include <string>
+#include <vector>
 
 namespace TetriumApp
 {
@@ -64,10 +66,17 @@ class AppPseudoIsochromaticTest : public App
         EARLY_EXIT        // Move to next state immediately after answer
     };
 
+    enum class RendererMode
+    {
+        STANDARD,
+        STEADY_ADAPTATION
+    };
+
     struct
     {
         ColorPickerType PICKER_TYPE = ColorPickerType::QUEST;
         StimulusType STIMULUS_TYPE = StimulusType::GAUSSIAN_BLOB;
+        RendererMode RENDERER_MODE = RendererMode::STANDARD;
         int REPETITIONS_PER_AXIS
             = 30; // number of repetitions per (genotype × axis × intensity level) in Genetic MCS mode
         int MCS_K = 1; // number of equally-spaced intensity levels in [0,1] for Genetic MCS (1 = max only)
@@ -102,6 +111,12 @@ class AppPseudoIsochromaticTest : public App
         float LUMINANCE = 0.5f;         // luminance level [0.0, 2.0]
         float DOT_SIZE = 1.0f;          // dot size multiplier for plates [0.5, 2.0]
         float GAUSSIAN_BLOB_SIZE = 2.0f; // blob sigma multiplier; does not change field size
+        float STEADY_BACKGROUND_DRIVE = 0.5f; // display-space midpoint background [0.0, 1.0]
+        float STEADY_CUE_DELAY_SECONDS = 0.3f;
+        float STEADY_PRESENTATION_SECONDS = 1.0f;
+        float STEADY_ITI_SECONDS = 1.0f;
+        float STEADY_TEMPORAL_NOISE_AMPLITUDE = 0.02f; // overlay alpha amplitude [0.0, 0.1]
+        float STEADY_TEMPORAL_NOISE_TILE_SIZE = 4.0f; // screen-space tile size in pixels
         float VISUAL_ANGLE = 2.0f;      // stimulus visual angle in degrees [1.0, 10.0]
         float VIEWING_DISTANCE = 57.0f; // viewing distance in cm [30.0, 200.0]
         struct
@@ -163,6 +178,20 @@ class AppPseudoIsochromaticTest : public App
 
     // Current trial data (generated on-demand)
     std::optional<TetriumColor::TrialData> _currentTrial;
+    std::optional<TetriumColor::TrialData> _preparedTrial;
+    bool _preparedTrialAvailable = false;
+    bool _waitingForPreparedTrial = false;
+
+    struct PendingTrialGeneration
+    {
+        bool active = false;
+        int delayFrames = 0;
+        ColorTestResult previousResult = ColorTestResult::Failure;
+        std::string filename;
+        std::string hiddenSymbol;
+    };
+
+    PendingTrialGeneration _pendingTrialGeneration;
 
     // Input state captured once per frame
     int _capturedGamepadInput = -1; // -1 = no input, 0-3 = button index
@@ -208,6 +237,17 @@ class AppPseudoIsochromaticTest : public App
         float brightness
     );
 
+    void drawSteadyStimulusTexture(
+        SubjectContext& subject,
+        const TetriumApp::TickContextImGui& ctx
+    );
+
+    void drawAdaptationFrame(const TetriumApp::TickContextImGui& ctx);
+
+    void drawSteadyTemporalNoise(const TetriumApp::TickContextImGui& ctx);
+
+    void drawSteadyFixationCross();
+
     void drawAnswerPrompts(SubjectContext& subject, const TetriumApp::TickContextImGui& ctx);
 
     void drawFixGazePage();
@@ -230,6 +270,11 @@ class AppPseudoIsochromaticTest : public App
     int _trialCounter = 0;
 
     void populatePromptContext(SubjectContext& subject, const TetriumApp::TickContextImGui& ctx);
+    void initializeSteadyTemporalNoiseTextures(const TetriumApp::InitContext& ctx);
+    void cleanupSteadyTemporalNoiseTextures(const TetriumApp::CleanupContext& ctx);
+    void queueNextTrialGeneration(ColorTestResult result);
+    void processPendingTrialGeneration();
+    bool commitPreparedTrial();
     void logTrialData(
         const SubjectContext& subject,
         const std::string& genotype,
@@ -245,8 +290,14 @@ class AppPseudoIsochromaticTest : public App
     static std::string GetLandoltCAnswerTexturePath(AnswerKind orientation);
     static std::string OrientationToString(AnswerKind orientation);
 
+    bool isSteadyAdaptationMode() const;
+
     std::unordered_map<AnswerKind, uint32_t> _answerPromptTextureHandles = {};
     std::unordered_map<AnswerKind, ImGuiTexture> _answerPromptImGuiTextures = {};
+
+    static constexpr int STEADY_NOISE_FRAME_COUNT = 16;
+    std::array<uint32_t, STEADY_NOISE_FRAME_COUNT> _steadyNoiseTextureHandles = {};
+    std::array<ImGuiTexture, STEADY_NOISE_FRAME_COUNT> _steadyNoiseTextures = {};
 
     std::vector<float> _observerCDF;   // cumulative probabilities per observer from Python
     int _observerCDFDimension = -1;    // dimension used when _observerCDF was last loaded

@@ -96,6 +96,7 @@ class AppAutoMeasure : public App
         kValidationConfigFullGrid = 1,
         kValidationConfigMidpoint = 2,
         kValidationConfigMidpointContrast = 3,
+        kValidationConfigTetraPicker = 4,
     };
 
     struct

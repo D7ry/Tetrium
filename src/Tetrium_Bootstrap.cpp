@@ -190,6 +190,9 @@ void Tetrium::Init(const Tetrium::InitOptions& options)
             .LoadTexture = [this](const std::string& texture) {
                 return this->_textureManager.LoadTexture(texture);
             },
+            .LoadTextureRGBA = [this](const uint8_t* pixels, int width, int height) {
+                return this->_textureManager.LoadTextureRGBA(pixels, width, height);
+            },
             .LoadCubemapTexture = [this](const std::string& texture) {
                 return this->_textureManager.LoadCubemapTexture(texture);
             },

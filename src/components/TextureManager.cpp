@@ -363,9 +363,9 @@ uint32_t TextureManager::LoadTexture(const std::string& texturePath)
     samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
     samplerInfo.magFilter = VK_FILTER_LINEAR;
     samplerInfo.minFilter = VK_FILTER_LINEAR;
-    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
     samplerInfo.anisotropyEnable = VK_FALSE;
     samplerInfo.maxAnisotropy = 1;
     samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
@@ -391,6 +391,106 @@ uint32_t TextureManager::LoadTexture(const std::string& texturePath)
 
     stagingBuffer.Cleanup();
     DEBUG("Texture {} loaded: {}", texturePath, handle);
+    return handle;
+}
+
+uint32_t TextureManager::LoadTextureRGBA(
+    const uint8_t* pixels,
+    int width,
+    int height,
+    VkFilter filter
+)
+{
+    if (pixels == nullptr) {
+        FATAL("Null texture pixels!");
+    }
+    if (_device == VK_NULL_HANDLE) {
+        FATAL("Texture manager hasn't been initialized!");
+    }
+
+    VkDeviceSize vkTextureSize = width * height * 4;
+
+    VQBuffer stagingBuffer = this->_device->CreateBuffer(
+        vkTextureSize,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+    );
+
+    memcpy(stagingBuffer.bufferAddress, pixels, static_cast<size_t>(vkTextureSize));
+
+    VkImage textureImage = VK_NULL_HANDLE;
+    VkImageView textureImageView = VK_NULL_HANDLE;
+    VkDeviceMemory textureImageMemory = VK_NULL_HANDLE;
+    VkSampler textureSampler = VK_NULL_HANDLE;
+
+    VulkanUtils::createImage(
+        width,
+        height,
+        VK_FORMAT_R8G8B8A8_UNORM,
+        VK_IMAGE_TILING_OPTIMAL,
+        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        textureImage,
+        textureImageMemory,
+        _device->physicalDevice,
+        _device->logicalDevice
+    );
+
+    transitionImageLayout(
+        textureImage,
+        VK_FORMAT_R8G8B8A8_UNORM,
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+    );
+    copyBufferToImage(
+        stagingBuffer.buffer,
+        textureImage,
+        static_cast<uint32_t>(width),
+        static_cast<uint32_t>(height)
+    );
+    transitionImageLayout(
+        textureImage,
+        VK_FORMAT_R8G8B8A8_UNORM,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+    );
+
+    textureImageView = VulkanUtils::createImageView(
+        textureImage, _device->logicalDevice, VK_FORMAT_R8G8B8A8_UNORM
+    );
+
+    VkSamplerCreateInfo samplerInfo{};
+    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerInfo.magFilter = filter;
+    samplerInfo.minFilter = filter;
+    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerInfo.anisotropyEnable = VK_FALSE;
+    samplerInfo.maxAnisotropy = 1;
+    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    samplerInfo.unnormalizedCoordinates = VK_FALSE;
+    samplerInfo.compareEnable = VK_FALSE;
+    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+    samplerInfo.mipLodBias = 0.0f;
+    samplerInfo.minLod = 0.0f;
+    samplerInfo.maxLod = 0.0f;
+
+    if (vkCreateSampler(_device->logicalDevice, &samplerInfo, nullptr, &textureSampler)
+        != VK_SUCCESS) {
+        FATAL("Failed to create texture sampler!");
+    }
+
+    uint32_t handle = _nextHandle++;
+    _textures.emplace(
+        handle,
+        __TextureInternal{
+            textureImage, textureImageView, textureImageMemory, textureSampler, width, height}
+    );
+
+    stagingBuffer.Cleanup();
+    DEBUG("RGBA texture loaded: {}", handle);
     return handle;
 }
 

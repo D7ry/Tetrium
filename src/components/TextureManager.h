@@ -36,6 +36,12 @@ class TextureManager
     void GetDescriptorImageInfo(uint32_t handle, VkDescriptorImageInfo& imageInfo);
 
     uint32_t LoadTexture(const std::string& texturePath);
+    uint32_t LoadTextureRGBA(
+        const uint8_t* pixels,
+        int width,
+        int height,
+        VkFilter filter = VK_FILTER_NEAREST
+    );
     
     uint32_t LoadCubemapTexture(const std::string& imagePath);
     

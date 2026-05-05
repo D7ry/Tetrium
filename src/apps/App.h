@@ -23,6 +23,7 @@ struct InitContext
             LoadAndGetTextureDescriptorImageInfo;
 
         std::function<uint32_t(const std::string&)> LoadTexture;
+        std::function<uint32_t(const uint8_t*, int, int)> LoadTextureRGBA;
         std::function<uint32_t(const std::string&)> LoadCubemapTexture;
 
         std::function<vk::DescriptorImageInfo(uint32_t)> GetTextureDescriptorImageInfo;

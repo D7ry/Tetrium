@@ -347,7 +347,7 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx)
                 ImGui::BeginDisabled();
             }
             const char* configLabels[] = {
-                "Center only", "5x5 cubemap", "Midpoint", "Midpoint contrast"
+                "Center only", "5x5 cubemap", "Midpoint", "Midpoint contrast", "Tetra picker"
             };
             int configModeInt = static_cast<int>(validationState.configMode);
             ImGui::SetNextItemWidth(160);
@@ -713,6 +713,9 @@ void AppAutoMeasure::runDailyValidation(bool debugSkipPR650Measurements)
         break;
     case kValidationConfigMidpointContrast:
         configFileName = "display_validation_metamers_midpoint_contrast.json";
+        break;
+    case kValidationConfigTetraPicker:
+        configFileName = "display_validation_metamers_tetra_picker.json";
         break;
     default:
         configFileName = "display_validation_metamers.json";

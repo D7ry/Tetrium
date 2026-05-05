@@ -16,6 +16,7 @@ class SoundManager
         {Sound::kMusicGameMenu, ASSETS_PATH + "sounds/music/wii.wav"},
         {Sound::kMusicGamePlay, ASSETS_PATH + "sounds/music/sneaky.wav"},
         {Sound::kCorrectAnswer, ASSETS_PATH + "sounds/correct.wav"},
+        {Sound::kGlassCue, ASSETS_PATH + "sounds/glass_ding.wav"},
         {Sound::kMusicInterstellar, ASSETS_PATH + "sounds/music/spin.wav"},
     };
 

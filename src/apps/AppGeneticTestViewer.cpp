@@ -39,8 +39,7 @@ void AppGeneticTestViewer::TickImGui(const TetriumApp::TickContextImGui& ctx)
     // Check if we need to load the generated image
     if (_generating == false && !_gridImage.loaded && _selectedDirIndex >= 0) {
         // Try to load if the files exist
-        std::string dateDir = _primariesDirs[_selectedDirIndex];
-        std::string outputPath = OUTPUT_PATH + dateDir + "/";
+        std::string outputPath = getOutputDirectoryForSelection();
         std::string rgbPath = outputPath + "genetic_test_grid_RGB.png";
         if (std::filesystem::exists(rgbPath)) {
             loadGridImage(ctx);
@@ -94,12 +93,18 @@ void AppGeneticTestViewer::drawControls()
     // Generator type selector
     const char* currentGeneratorType;
     switch (_generatorType) {
+    case GeneratorType::TetraPicker: currentGeneratorType = "TetraColorPicker Gaussian Blob"; break;
     case GeneratorType::Plate: currentGeneratorType = "Pseudoisochromatic Plate"; break;
     case GeneratorType::Bipartite: currentGeneratorType = "Bipartite Circle"; break;
     case GeneratorType::GaussianBlob: currentGeneratorType = "Gaussian Blob"; break;
     }
 
     if (ImGui::BeginCombo("Generator Type", currentGeneratorType)) {
+        if (ImGui::Selectable(
+                "TetraColorPicker Gaussian Blob", _generatorType == GeneratorType::TetraPicker
+            )) {
+            _generatorType = GeneratorType::TetraPicker;
+        }
         if (ImGui::Selectable(
                 "Pseudoisochromatic Plate", _generatorType == GeneratorType::Plate
             )) {
@@ -113,6 +118,10 @@ void AppGeneticTestViewer::drawControls()
         }
 
         ImGui::EndCombo();
+    }
+
+    if (_generatorType == GeneratorType::GaussianBlob) {
+        ImGui::Checkbox("Cone Contrast", &_gaussianBlobConeContrast);
     }
 
     // Testing dimension
@@ -261,6 +270,30 @@ void AppGeneticTestViewer::scanPrimariesDirectories()
     }
 }
 
+std::string AppGeneticTestViewer::getOutputDirectoryForSelection() const
+{
+    if (_selectedDirIndex < 0 || _selectedDirIndex >= _primariesDirs.size()) {
+        return "";
+    }
+
+    const std::string dateDir = _primariesDirs[_selectedDirIndex];
+    if (_generatorType == GeneratorType::TetraPicker) {
+        return OUTPUT_PATH + dateDir + "/tetra_picker/";
+    }
+    if (_generatorType == GeneratorType::GaussianBlob && _gaussianBlobConeContrast) {
+        return OUTPUT_PATH + dateDir + "/gaussian_blob_cone_contrast/";
+    }
+
+    switch (_generatorType) {
+    case GeneratorType::TetraPicker: return OUTPUT_PATH + dateDir + "/tetra_picker/";
+    case GeneratorType::Plate: return OUTPUT_PATH + dateDir + "/plate/";
+    case GeneratorType::Bipartite: return OUTPUT_PATH + dateDir + "/bipartite/";
+    case GeneratorType::GaussianBlob: return OUTPUT_PATH + dateDir + "/gaussian_blob/";
+    }
+
+    return OUTPUT_PATH + dateDir + "/";
+}
+
 void AppGeneticTestViewer::generateGrid()
 {
     if (_selectedDirIndex < 0 || _selectedDirIndex >= _primariesDirs.size()) {
@@ -272,7 +305,7 @@ void AppGeneticTestViewer::generateGrid()
 
     std::string dateDir = _primariesDirs[_selectedDirIndex];
     std::string primariesPath = MEASUREMENTS_BASE_PATH + dateDir + "/primaries";
-    std::string outputPath = OUTPUT_PATH + dateDir;
+    std::string outputPath = getOutputDirectoryForSelection();
 
     INFO("Generating test grid from: {}", primariesPath);
     INFO("Output path: {}", outputPath);
@@ -281,6 +314,7 @@ void AppGeneticTestViewer::generateGrid()
     std::string pythonScript = "../generate_genetic_test.py";
     std::string generatorTypeStr;
     switch (_generatorType) {
+    case GeneratorType::TetraPicker: generatorTypeStr = "tetra_picker"; break;
     case GeneratorType::Plate: generatorTypeStr = "plate"; break;
     case GeneratorType::Bipartite: generatorTypeStr = "bipartite"; break;
     case GeneratorType::GaussianBlob: generatorTypeStr = "gaussian_blob"; break;
@@ -288,6 +322,9 @@ void AppGeneticTestViewer::generateGrid()
     std::stringstream cmd;
     cmd << "conda run -n tetrium python " << pythonScript << " \"" << primariesPath << "\" \""
         << outputPath << "\" " << _testingDim << " " << generatorTypeStr;
+    if (_generatorType == GeneratorType::GaussianBlob) {
+        cmd << " " << (_gaussianBlobConeContrast ? "cone_contrast" : "raw");
+    }
 
     INFO("Running: {}", cmd.str());
 
@@ -319,11 +356,18 @@ void AppGeneticTestViewer::loadGridImage(const TickContextImGui& ctx)
         return;
 
     std::string dateDir = _primariesDirs[_selectedDirIndex];
-    std::string outputPath = OUTPUT_PATH + dateDir + "/";
+    std::string outputPath = getOutputDirectoryForSelection();
     std::string rgbPath = outputPath + "genetic_test_grid_RGB.png";
     std::string ocvPath = outputPath + "genetic_test_grid_OCV.png";
 
     // Check if files exist
+    if (!std::filesystem::exists(rgbPath) || !std::filesystem::exists(ocvPath)) {
+        std::string fallbackPath = OUTPUT_PATH + dateDir + "/";
+        rgbPath = fallbackPath + "genetic_test_grid_RGB.png";
+        ocvPath = fallbackPath + "genetic_test_grid_OCV.png";
+        outputPath = fallbackPath;
+    }
+
     if (!std::filesystem::exists(rgbPath) || !std::filesystem::exists(ocvPath)) {
         INFO("Grid images not found, please generate first");
         return;

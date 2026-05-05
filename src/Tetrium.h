@@ -277,7 +277,7 @@ class Tetrium
     void triggerClose();
 
     /* ---------- Render-Time Functions ---------- */
-    void drawFrame(ColorSpace colorSpace, uint8_t frameIdx);
+    void drawFrame(uint8_t frameIdx);
     void drawMainMenu(ColorSpace colorSpace);
     void drawImGui(ColorSpace colorSpace, int currentFrameInFlight);
     void drawCursor();
@@ -308,11 +308,8 @@ class Tetrium
     // Hardware even-odd pacing (kEvenOddHardwareSync only).
     // Direct read of the swapchain vblank counter.
     VkResult readVBlankCounter(uint64_t& counter);
-    // Waits until the vblank counter reaches `expectedNextCounter`, realigning
-    // to the next same-parity vblank if we fell behind. Called twice per
-    // frame: once at frame start (to commit to a target vblank + parity) and
-    // once just before `vkQueuePresentKHR` (to ensure the present lands in
-    // the target vblank window rather than during scanout).
+    // Commits the current frame to the next vblank counter so color-space
+    // selection is based on the vblank where FIFO presentation should display.
     void waitAndAlignVBlank();
     ColorSpace getCurrentColorSpace();
 
@@ -390,12 +387,9 @@ class Tetrium
     {
         PFN_vkGetSwapchainCounterEXT vkGetSwapchainCounterEXT = nullptr;
 
-        // Vblank-aligned present pacing. `expectedNextCounter` is the vblank we
-        // intend the next present to land on; its parity determines the color
-        // space we render. After each present, we advance it by one vblank.
-        // If render/present overruns, `waitAndAlignVBlank` realigns to the
-        // next vblank with the same parity so rendered content always matches
-        // its target vblank's parity.
+        // Vblank-targeted color-space selection. `expectedNextCounter` is the
+        // next vblank at frame start; its parity determines which image pair
+        // (RGO/BGO) we render for FIFO presentation.
         uint64_t expectedNextCounter = 0;
         bool pacingInitialized = false;
         uint64_t skippedPresentCount = 0; // diagnostic: overruns since start

@@ -114,83 +114,14 @@ std::string AppPseudoIsochromaticTest::GetLandoltCAnswerTexturePath(
            + OrientationToString(orientation) + ".png";
 }
 
+bool AppPseudoIsochromaticTest::isSteadyAdaptationMode() const
+{
+    return SETTINGS.RENDERER_MODE == RendererMode::STEADY_ADAPTATION;
+}
+
 void TetriumApp::AppPseudoIsochromaticTest::TickImGui(const TetriumApp::TickContextImGui& ctx)
 {
-    // Generate next trial if needed (deferred from previous frame)
-    // Do this at start of frame so trial is available for state transitions
-    // But delay sound/logging until state transition to avoid timing issues
-    if (_deferredResponse.needsTrialGeneration && _testGenerator) {
-        // Store previous trial data BEFORE generating next one (for logging during state
-        // transition)
-        std::optional<TetriumColor::TrialData> previousTrial = _currentTrial;
-        AnswerKind previousOrientation = _subject.prompt.currentOrientation;
-
-        // Check if this is a no-answer case (buttonIndex == -1)
-        bool isNoAnswer = (_deferredResponse.buttonIndex == -1);
-
-        // Calculate correctness (needed for trial generation)
-        bool correct = (_deferredResponse.buttonIndex == _subject.prompt.correctAnswerTextureIndex);
-
-        // Store for logging during state transition
-        _deferredResponse.previousTrial = previousTrial;
-        _deferredResponse.orientation = previousOrientation;
-        _deferredResponse.correct = correct;
-
-        try {
-            if (isNoAnswer) {
-                // No answer given - re-queue the previous trial by keeping current trial
-                // Don't increment trial counter, don't generate new trial
-                INFO("No answer given for trial {} - re-queuing same trial", _trialCounter);
-                // _currentTrial remains unchanged - we'll re-use it
-            } else {
-                // Normal response - generate next trial
-                _trialCounter++;
-                std::string filename
-                    = "./temp/" + _subject.name + "_trial_" + std::to_string(_trialCounter);
-                AnswerKind next_orientation
-                    = LANDOLT_C_ORIENTATIONS[rand() % LANDOLT_C_ORIENTATIONS.size()];
-                std::string hidden_symbol = "landolt_" + OrientationToString(next_orientation);
-
-                ColorTestResult result
-                    = correct ? ColorTestResult::Success : ColorTestResult::Failure;
-
-                _currentTrial = _testGenerator->GetNextTrial(
-                    result,
-                    filename,
-                    hidden_symbol,
-                    GetOutputColorSpace(),
-                    SETTINGS.LUM_NOISE,
-                    SETTINGS.S_CONE_NOISE,
-                    SETTINGS.LUMINANCE,
-                    SETTINGS.DOT_SIZE,
-                    SETTINGS.VISUAL_ANGLE
-                );
-
-                if (!_currentTrial.has_value()) {
-                    INFO("Test completed - no more trials");
-                } else if (std::holds_alternative<TetriumColor::PseudoIsochromaticTrial>(
-                               *_currentTrial
-                           )) {
-                    const auto& trial
-                        = std::get<TetriumColor::PseudoIsochromaticTrial>(*_currentTrial);
-                    INFO(
-                        "Generated trial {}: rgb_path={}, ocv_path={}, genotype={}, axis={}",
-                        _trialCounter,
-                        trial.rgb_path,
-                        trial.ocv_path,
-                        trial.genotype,
-                        trial.metameric_axis
-                    );
-                }
-            }
-            // Don't populatePromptContext here - let it happen during state transition
-            // to avoid texture loading during render phase
-        } catch (const std::exception& e) {
-            ERROR("Failed to generate next trial: {}", e.what());
-        }
-
-        _deferredResponse.needsTrialGeneration = false;
-    }
+    processPendingTrialGeneration();
 
     // Load textures if needed (deferred from previous frame to avoid GPU sync issues)
     if (_needsTextureLoad && _currentTrial.has_value() && _state == TestState::kTesting) {
@@ -297,6 +228,20 @@ void TetriumApp::AppPseudoIsochromaticTest::drawSettingsWindow(
         int currentStimulusType = static_cast<int>(SETTINGS.STIMULUS_TYPE);
         if (ImGui::Combo("##StimulusType", &currentStimulusType, stimulusOptions, 3)) {
             SETTINGS.STIMULUS_TYPE = static_cast<StimulusType>(currentStimulusType);
+        }
+
+        ImGui::Text("Renderer Mode");
+        const char* rendererOptions[] = {"Standard", "Steady Adaptation"};
+        int currentRendererMode = static_cast<int>(SETTINGS.RENDERER_MODE);
+        if (ImGui::Combo("##RendererMode", &currentRendererMode, rendererOptions, 2)) {
+            SETTINGS.RENDERER_MODE = static_cast<RendererMode>(currentRendererMode);
+            if (isSteadyAdaptationMode()) {
+                SETTINGS.STIMULUS_TYPE = StimulusType::GAUSSIAN_BLOB;
+            }
+        }
+        if (isSteadyAdaptationMode()) {
+            SETTINGS.STIMULUS_TYPE = StimulusType::GAUSSIAN_BLOB;
+            ImGui::TextDisabled("Uses Gaussian blobs on a continuous 0.5 display background.");
         }
 
         ImGui::Separator();
@@ -426,6 +371,33 @@ void TetriumApp::AppPseudoIsochromaticTest::drawSettingsWindow(
         ImGui::InputFloat("##Identification", &SETTINGS.STATE_DURATIONS_SECONDS.IDENTIFICATION);
         ImGui::Text("Duration of Answering (seconds)");
         ImGui::InputFloat("##Answering", &SETTINGS.STATE_DURATIONS_SECONDS.ANSWERING);
+
+        if (isSteadyAdaptationMode()) {
+            ImGui::Separator();
+            ImGui::Text("Steady Adaptation Timing");
+            ImGui::SliderFloat(
+                "Cue Delay (seconds)", &SETTINGS.STEADY_CUE_DELAY_SECONDS, 0.1f, 1.0f
+            );
+            ImGui::SliderFloat(
+                "Presentation (seconds)", &SETTINGS.STEADY_PRESENTATION_SECONDS, 0.05f, 2.0f
+            );
+            ImGui::SliderFloat("ITI (seconds)", &SETTINGS.STEADY_ITI_SECONDS, 0.1f, 3.0f);
+            ImGui::SliderFloat(
+                "Adaptation Background Drive", &SETTINGS.STEADY_BACKGROUND_DRIVE, 0.0f, 1.0f
+            );
+            ImGui::SliderFloat(
+                "Temporal Noise Amplitude",
+                &SETTINGS.STEADY_TEMPORAL_NOISE_AMPLITUDE,
+                0.0f,
+                0.1f
+            );
+            ImGui::SliderFloat(
+                "Temporal Noise Tile Size",
+                &SETTINGS.STEADY_TEMPORAL_NOISE_TILE_SIZE,
+                4.0f,
+                96.0f
+            );
+        }
 
         // Lum noise slider
         ImGui::SliderFloat("Lum Noise", &SETTINGS.LUM_NOISE, 0.0f, 1.0f);
@@ -564,6 +536,11 @@ void AppPseudoIsochromaticTest::drawLandoltC(
     float brightness
 )
 {
+    if (isSteadyAdaptationMode()) {
+        drawSteadyStimulusTexture(subject, ctx);
+        return;
+    }
+
     // Always draw the stimulus for the full presentation time
     ImGuiTexture tex = subject.prompt.currentLandoltCTexture[ctx.colorSpace];
 
@@ -587,6 +564,212 @@ void AppPseudoIsochromaticTest::drawLandoltC(
     ImGui::Image(tex.id, textureFullscreenSize, ImVec2(0, 0), ImVec2(1, 1), tintColor);
 }
 
+void AppPseudoIsochromaticTest::drawSteadyStimulusTexture(
+    SubjectContext& subject,
+    const TetriumApp::TickContextImGui& ctx
+)
+{
+    ImGuiTexture tex = subject.prompt.currentLandoltCTexture[ctx.colorSpace];
+    if (tex.id == nullptr) {
+        return;
+    }
+
+    float calculatedSize = SETTINGS.VISUAL_ANGLE / 8.0f;
+    ImVec2 textureSize(tex.width * calculatedSize, tex.height * calculatedSize);
+
+    ImVec2 windowPos = ImGui::GetWindowPos();
+    ImVec2 windowSize = ImGui::GetWindowSize();
+    ImVec2 center = windowPos + windowSize * 0.5f;
+
+    ImVec2 imageBegin(
+        std::round(center.x - textureSize.x * 0.5f),
+        std::round(center.y - textureSize.y * 0.5f)
+    );
+    ImVec2 imageEnd(
+        std::round(imageBegin.x + textureSize.x),
+        std::round(imageBegin.y + textureSize.y)
+    );
+
+    ImGui::GetWindowDrawList()->AddImage(
+        tex.id,
+        imageBegin,
+        imageEnd,
+        ImVec2(0, 0),
+        ImVec2(1, 1),
+        IM_COL32_WHITE
+    );
+}
+
+void AppPseudoIsochromaticTest::drawAdaptationFrame(const TetriumApp::TickContextImGui& ctx)
+{
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+    ImVec2 screenSize = ImGui::GetIO().DisplaySize;
+    float backgroundDrive = SETTINGS.STEADY_BACKGROUND_DRIVE;
+    if (_currentTrial.has_value()
+        && std::holds_alternative<TetriumColor::PseudoIsochromaticTrial>(*_currentTrial)) {
+        const auto& trial = std::get<TetriumColor::PseudoIsochromaticTrial>(*_currentTrial);
+        auto it = trial.metadata.find("display_background");
+        if (it == trial.metadata.end()) {
+            it = trial.metadata.find("background_luminance");
+        }
+        if (it != trial.metadata.end()) {
+            try {
+                backgroundDrive = std::stof(it->second);
+            } catch (const std::exception&) {
+                WARN("Invalid trial background_luminance metadata: {}", it->second);
+            }
+        }
+    }
+    int drive = static_cast<int>(std::round(std::clamp(backgroundDrive, 0.0f, 1.0f) * 255.0f));
+    drawList->AddRectFilled(ImVec2(0, 0), screenSize, IM_COL32(drive, drive, drive, 255));
+}
+
+void AppPseudoIsochromaticTest::drawSteadyTemporalNoise(const TetriumApp::TickContextImGui& ctx)
+{
+    float amplitude = std::clamp(SETTINGS.STEADY_TEMPORAL_NOISE_AMPLITUDE, 0.0f, 0.1f);
+    if (amplitude <= 0.0f) {
+        return;
+    }
+
+    int frameIdx = (ImGui::GetFrameCount() / 2) % STEADY_NOISE_FRAME_COUNT;
+    ImGuiTexture tex = _steadyNoiseTextures[frameIdx];
+    if (tex.id == nullptr) {
+        return;
+    }
+
+    ImVec2 screenSize = ImGui::GetIO().DisplaySize;
+    int alphaByte = static_cast<int>(std::round(amplitude * 255.0f));
+    ImGui::GetWindowDrawList()->AddImage(
+        tex.id,
+        ImVec2(0, 0),
+        screenSize,
+        ImVec2(0, 0),
+        ImVec2(1, 1),
+        IM_COL32(255, 255, 255, alphaByte)
+    );
+}
+
+void AppPseudoIsochromaticTest::drawSteadyFixationCross()
+{
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+    ImVec2 windowPos = ImGui::GetWindowPos();
+    ImVec2 windowSize = ImGui::GetWindowSize();
+    ImVec2 center(
+        std::round(windowPos.x + windowSize.x * 0.5f),
+        std::round(windowPos.y + windowSize.y * 0.5f)
+    );
+    int drive = static_cast<int>(std::round(std::clamp(
+        SETTINGS.STEADY_BACKGROUND_DRIVE, 0.0f, 1.0f
+    ) * 255.0f));
+    int contrast = drive >= 128 ? 32 : 224;
+    ImU32 crossColor = IM_COL32(contrast, contrast, contrast, 255);
+    float halfLength = 18.0f;
+    float thickness = 3.0f;
+    drawList->AddLine(
+        ImVec2(center.x - halfLength, center.y),
+        ImVec2(center.x + halfLength, center.y),
+        crossColor,
+        thickness
+    );
+    drawList->AddLine(
+        ImVec2(center.x, center.y - halfLength),
+        ImVec2(center.x, center.y + halfLength),
+        crossColor,
+        thickness
+    );
+}
+
+void AppPseudoIsochromaticTest::queueNextTrialGeneration(ColorTestResult result)
+{
+    _trialCounter++;
+    AnswerKind nextOrientation = LANDOLT_C_ORIENTATIONS[rand() % LANDOLT_C_ORIENTATIONS.size()];
+
+    _pendingTrialGeneration.active = true;
+    _pendingTrialGeneration.delayFrames = 2;
+    _pendingTrialGeneration.previousResult = result;
+    _pendingTrialGeneration.filename
+        = "./temp/" + _subject.name + "_trial_" + std::to_string(_trialCounter);
+    _pendingTrialGeneration.hiddenSymbol = "landolt_" + OrientationToString(nextOrientation);
+
+    _preparedTrial.reset();
+    _preparedTrialAvailable = false;
+    _waitingForPreparedTrial = true;
+}
+
+void AppPseudoIsochromaticTest::processPendingTrialGeneration()
+{
+    if (!_pendingTrialGeneration.active || !_testGenerator) {
+        return;
+    }
+    if (_state == TestState::kTesting && _subject.state != SubjectState::kFixation
+        && _subject.state != SubjectState::kBlank) {
+        return;
+    }
+
+    if (_pendingTrialGeneration.delayFrames > 0) {
+        _pendingTrialGeneration.delayFrames--;
+        return;
+    }
+
+    try {
+        _preparedTrial = _testGenerator->GetNextTrial(
+            _pendingTrialGeneration.previousResult,
+            _pendingTrialGeneration.filename,
+            _pendingTrialGeneration.hiddenSymbol,
+            GetOutputColorSpace(),
+            SETTINGS.LUM_NOISE,
+            SETTINGS.S_CONE_NOISE,
+            isSteadyAdaptationMode() ? SETTINGS.STEADY_BACKGROUND_DRIVE : SETTINGS.LUMINANCE,
+            SETTINGS.DOT_SIZE,
+            SETTINGS.VISUAL_ANGLE
+        );
+
+        _preparedTrialAvailable = true;
+        if (!_preparedTrial.has_value()) {
+            INFO("Test completed - no more trials");
+        } else if (std::holds_alternative<TetriumColor::PseudoIsochromaticTrial>(
+                       *_preparedTrial
+                   )) {
+            const auto& trial = std::get<TetriumColor::PseudoIsochromaticTrial>(*_preparedTrial);
+            INFO(
+                "Prepared trial {}: rgb_path={}, ocv_path={}, genotype={}, axis={}",
+                _trialCounter,
+                trial.rgb_path,
+                trial.ocv_path,
+                trial.genotype,
+                trial.metameric_axis
+            );
+        }
+    } catch (const std::exception& e) {
+        ERROR("Failed to prepare next trial: {}", e.what());
+        _preparedTrial.reset();
+        _preparedTrialAvailable = true;
+    }
+
+    _pendingTrialGeneration.active = false;
+}
+
+bool AppPseudoIsochromaticTest::commitPreparedTrial()
+{
+    if (!_preparedTrialAvailable) {
+        return false;
+    }
+
+    if (!_preparedTrial.has_value()) {
+        _currentTrial.reset();
+        _waitingForPreparedTrial = false;
+        _preparedTrialAvailable = false;
+        return false;
+    }
+
+    _currentTrial = _preparedTrial;
+    _preparedTrial.reset();
+    _preparedTrialAvailable = false;
+    _waitingForPreparedTrial = false;
+    _needsTextureLoad = true;
+    return true;
+}
+
 void AppPseudoIsochromaticTest::drawTestForSubject(
     SubjectContext& subject,
     const TetriumApp::TickContextImGui& ctx
@@ -598,9 +781,9 @@ void AppPseudoIsochromaticTest::drawTestForSubject(
         ctx.controls.musicOverride = std::nullopt;
     }
 
-    // Process gamepad input for identification and answer states
-    // Do ABSOLUTE MINIMUM - just set flags, defer ALL processing to next frame
-    // Any calculation or data access here delays the frame, which desyncs even-odd counter
+    // Process gamepad input for identification and answer states.
+    // Keep this path limited to response bookkeeping; adaptive generation and texture swaps happen
+    // later during the inter-trial fixation/blank path.
     if ((subject.state == SubjectState::kIdentification || subject.state == SubjectState::kAnswer)
         && !subject.prompt.responseGiven && _capturedGamepadInput >= 0) {
 
@@ -608,15 +791,19 @@ void AppPseudoIsochromaticTest::drawTestForSubject(
         subject.prompt.responseGiven = true;
         subject.prompt.currentSelectedAnswer = _capturedGamepadInput;
 
-        // Store ONLY the button index - defer ALL other processing to next frame
+        bool correct = _capturedGamepadInput == subject.prompt.correctAnswerTextureIndex;
+
         _deferredResponse.hasResponse = true;
         _deferredResponse.buttonIndex = _capturedGamepadInput;
-        // Don't calculate correct, don't access trial data, don't access orientation
-        // ALL processing (correctness check, trial storage, etc.) happens in TickImGui() next frame
-        _deferredResponse.needsTrialGeneration = true; // Generate next trial at start of next frame
+        _deferredResponse.correct = correct;
+        _deferredResponse.orientation = subject.prompt.currentOrientation;
+        _deferredResponse.previousTrial = _currentTrial;
+        _deferredResponse.needsTrialGeneration = false;
+
+        queueNextTrialGeneration(correct ? ColorTestResult::Success : ColorTestResult::Failure);
 
         // If EARLY_EXIT mode is enabled, immediately trigger state transition
-        if (SETTINGS.TIMING_MODE == TrialTimingMode::EARLY_EXIT) {
+        if (!isSteadyAdaptationMode() && SETTINGS.TIMING_MODE == TrialTimingMode::EARLY_EXIT) {
             subject.currStateRemainderTime = 0.0f; // Force timer to expire immediately
         }
     }
@@ -630,15 +817,29 @@ void AppPseudoIsochromaticTest::drawTestForSubject(
         }
     }
 
-    // If waiting for state transition, show black screen (no rendering)
+    // If waiting for state transition, keep the adaptation field stable in steady mode.
     if (_needsStateTransition) {
+        if (isSteadyAdaptationMode()) {
+            drawAdaptationFrame(ctx);
+            drawSteadyTemporalNoise(ctx);
+            drawSteadyFixationCross();
+        }
         return;
     }
 
     // Calculate brightness ramp for stimulus
     float brightness = 0.0f; // Default to black for states that don't show stimuli
     if (subject.state == SubjectState::kIdentification) {
-        if (SETTINGS.STIMULUS_RAMP_UP_DURATION > 0.0f) {
+        if (isSteadyAdaptationMode()) {
+            if (SETTINGS.STIMULUS_RAMP_UP_DURATION > 0.0f) {
+                float elapsedTime
+                    = subject.identificationStateStartTime - subject.currStateRemainderTime;
+                brightness = std::min(1.0f, elapsedTime / SETTINGS.STIMULUS_RAMP_UP_DURATION);
+                brightness = std::max(0.0f, brightness);
+            } else {
+                brightness = 1.0f;
+            }
+        } else if (SETTINGS.STIMULUS_RAMP_UP_DURATION > 0.0f) {
             float elapsedTime
                 = subject.identificationStateStartTime - subject.currStateRemainderTime;
             brightness = std::min(1.0f, elapsedTime / SETTINGS.STIMULUS_RAMP_UP_DURATION);
@@ -648,11 +849,38 @@ void AppPseudoIsochromaticTest::drawTestForSubject(
         }
     }
 
-    // Draw black background
+    if (isSteadyAdaptationMode()) {
+        drawAdaptationFrame(ctx);
+        switch (subject.state) {
+        case SubjectState::kIdentification:
+            drawLandoltC(subject, ctx, brightness);
+            drawSteadyTemporalNoise(ctx);
+            drawSteadyFixationCross();
+            break;
+        case SubjectState::kBreak:
+            drawBreakWindow(subject, ctx);
+            break;
+        case SubjectState::kBlank:
+        case SubjectState::kFixation:
+        case SubjectState::kAnswer:
+            drawSteadyTemporalNoise(ctx);
+            drawSteadyFixationCross();
+            break;
+        }
+        return;
+    }
+
+    // Draw background
     ImVec2 screenSize = ImGui::GetIO().DisplaySize;
     ImDrawList* drawList = ImGui::GetWindowDrawList();
 
     ImU32 bgColor = IM_COL32(0, 0, 0, 255);
+    if (isSteadyAdaptationMode()) {
+        int drive = static_cast<int>(std::round(std::clamp(
+            SETTINGS.STEADY_BACKGROUND_DRIVE, 0.0f, 1.0f
+        ) * 255.0f));
+        bgColor = IM_COL32(drive, drive, drive, 255);
+    }
 
     // Draw fullscreen rectangle
     drawList->AddRectFilled(ImVec2(0, 0), screenSize, bgColor);
@@ -673,16 +901,19 @@ void AppPseudoIsochromaticTest::drawTestForSubject(
         snprintf(progressText, sizeof(progressText), "Trial %d", currentTrial);
     }
 
-    ImGui::SetCursorPos(ImVec2(20, 20));
-    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 0.8f)); // Semi-transparent white
-    ImGui::SetWindowFontScale(1.5f);
-    ImGui::Text("%s", progressText);
-    ImGui::SetWindowFontScale(1.0f);
-    ImGui::PopStyleColor();
+    if (!isSteadyAdaptationMode()) {
+        ImGui::SetCursorPos(ImVec2(20, 20));
+        ImGui::PushStyleColor(
+            ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 0.8f)
+        ); // Semi-transparent white
+        ImGui::SetWindowFontScale(1.5f);
+        ImGui::Text("%s", progressText);
+        ImGui::SetWindowFontScale(1.0f);
+        ImGui::PopStyleColor();
+    }
 
     switch (subject.state) {
     case SubjectState::kBlank:
-        // Blank state - draw nothing (entirely black)
         break;
     case SubjectState::kFixation:
         drawFixGazePage();
@@ -838,37 +1069,22 @@ void AppPseudoIsochromaticTest::transitionSubjectState(
 {
     switch (subject.state) {
     case SubjectState::kFixation:
-        // Generate next trial if we don't have one yet (shouldn't happen, but safety check)
-        if (!_currentTrial.has_value() && _testGenerator && _trialCounter > 0) {
-            // This shouldn't happen - next trial should have been generated in deferred response
-            // handler
-            ERROR("No current trial available when transitioning to fixation - generating one now");
-            try {
-                _trialCounter++;
-                std::string filename
-                    = "./temp/" + subject.name + "_trial_" + std::to_string(_trialCounter);
-                AnswerKind next_orientation
-                    = LANDOLT_C_ORIENTATIONS[rand() % LANDOLT_C_ORIENTATIONS.size()];
-                std::string hidden_symbol = "landolt_" + OrientationToString(next_orientation);
-
-                // Use Success as default (shouldn't matter for first trial after break)
-                _currentTrial = _testGenerator->GetNextTrial(
-                    ColorTestResult::Success,
-                    filename,
-                    hidden_symbol,
-                    GetOutputColorSpace(),
-                    SETTINGS.LUM_NOISE,
-                    SETTINGS.S_CONE_NOISE,
-                    SETTINGS.LUMINANCE,
-                    SETTINGS.DOT_SIZE,
-                    SETTINGS.VISUAL_ANGLE
-                );
-            } catch (const std::exception& e) {
-                ERROR("Failed to generate trial in transition: {}", e.what());
+        if (_waitingForPreparedTrial) {
+            if (!_preparedTrialAvailable) {
+                subject.currStateRemainderTime = 0.016f;
+                return;
             }
+            if (!commitPreparedTrial()) {
+                endGame(subject);
+                return;
+            }
+            subject.currStateRemainderTime = 0.016f;
+            return;
         }
-        subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.IDENTIFICATION;
-        subject.identificationStateStartTime = SETTINGS.STATE_DURATIONS_SECONDS.IDENTIFICATION;
+        subject.currStateRemainderTime = isSteadyAdaptationMode()
+                                             ? SETTINGS.STEADY_PRESENTATION_SECONDS
+                                             : SETTINGS.STATE_DURATIONS_SECONDS.IDENTIFICATION;
+        subject.identificationStateStartTime = subject.currStateRemainderTime;
         subject.state = SubjectState::kIdentification;
         break;
     case SubjectState::kIdentification:
@@ -911,9 +1127,12 @@ void AppPseudoIsochromaticTest::transitionSubjectState(
                 _deferredResponse.hasResponse = false;
             }
 
-            // Response was given during identification - skip answer phase
-            // Check if there's a next trial
-            if (!_currentTrial.has_value()) {
+            // Response was given during identification - skip answer phase.
+            if (_preparedTrialAvailable && !commitPreparedTrial()) {
+                endGame(subject);
+                return;
+            }
+            if (_preparedTrialAvailable && !_currentTrial.has_value()) {
                 endGame(subject);
                 return;
             }
@@ -926,14 +1145,20 @@ void AppPseudoIsochromaticTest::transitionSubjectState(
                 subject.state = SubjectState::kBreak;
                 subject.trialsSinceLastBreak = 0;
             } else {
-                // Skip blank period, go directly to fixation
-                subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.FIXATION;
-                subject.state = SubjectState::kFixation;
-                _needsTextureLoad = true; // Defer texture loading to avoid GPU sync issues
+                subject.currStateRemainderTime = isSteadyAdaptationMode()
+                                                     ? SETTINGS.STEADY_ITI_SECONDS
+                                                     : SETTINGS.STATE_DURATIONS_SECONDS.FIXATION;
+                subject.state = isSteadyAdaptationMode() ? SubjectState::kBlank
+                                                          : SubjectState::kFixation;
+                if (!_waitingForPreparedTrial) {
+                    _needsTextureLoad = true; // Defer texture loading to avoid GPU sync issues
+                }
             }
         } else {
             // No response yet, transition to answer phase
-            subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.ANSWERING;
+            subject.currStateRemainderTime = isSteadyAdaptationMode()
+                                                 ? SETTINGS.STEADY_ITI_SECONDS
+                                                 : SETTINGS.STATE_DURATIONS_SECONDS.ANSWERING;
             subject.state = SubjectState::kAnswer;
         }
         break;
@@ -977,8 +1202,12 @@ void AppPseudoIsochromaticTest::transitionSubjectState(
                 _deferredResponse.hasResponse = false;
             }
 
-            // Response was given during answer phase - skip blank, go to fixation
-            if (!_currentTrial.has_value()) {
+            // Response was given during answer phase - skip blank, go to fixation.
+            if (_preparedTrialAvailable && !commitPreparedTrial()) {
+                endGame(subject);
+                return;
+            }
+            if (_preparedTrialAvailable && !_currentTrial.has_value()) {
                 endGame(subject);
                 return;
             }
@@ -991,10 +1220,14 @@ void AppPseudoIsochromaticTest::transitionSubjectState(
                 subject.state = SubjectState::kBreak;
                 subject.trialsSinceLastBreak = 0;
             } else {
-                // Skip blank period, go directly to fixation
-                subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.FIXATION;
-                subject.state = SubjectState::kFixation;
-                _needsTextureLoad = true; // Defer texture loading to avoid GPU sync issues
+                subject.currStateRemainderTime = isSteadyAdaptationMode()
+                                                     ? SETTINGS.STEADY_ITI_SECONDS
+                                                     : SETTINGS.STATE_DURATIONS_SECONDS.FIXATION;
+                subject.state = isSteadyAdaptationMode() ? SubjectState::kBlank
+                                                          : SubjectState::kFixation;
+                if (!_waitingForPreparedTrial) {
+                    _needsTextureLoad = true; // Defer texture loading to avoid GPU sync issues
+                }
             }
         } else {
             // No response given - re-queue the same trial
@@ -1025,26 +1258,34 @@ void AppPseudoIsochromaticTest::transitionSubjectState(
             _deferredResponse.correct = false;  // No response = incorrect
             _deferredResponse.orientation = subject.prompt.currentOrientation;
             _deferredResponse.previousTrial = previousTrial;
-            _deferredResponse.needsTrialGeneration
-                = true; // Handle trial re-queuing at start of next frame
+            _deferredResponse.needsTrialGeneration = false;
 
             // Don't increment trial counters - we're re-queuing the same trial
             // Just transition back to fixation to show the trial again
-            subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.FIXATION;
-            subject.state = SubjectState::kFixation;
+            subject.currStateRemainderTime = isSteadyAdaptationMode()
+                                                 ? SETTINGS.STEADY_ITI_SECONDS
+                                                 : SETTINGS.STATE_DURATIONS_SECONDS.FIXATION;
+            subject.state = isSteadyAdaptationMode() ? SubjectState::kBlank
+                                                      : SubjectState::kFixation;
             _needsTextureLoad = true; // Reload textures (same trial, but reset state)
         }
         break;
     case SubjectState::kBreak:
         // Continuing from break - transition to fixation and load new trial
-        subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.FIXATION;
-        subject.state = SubjectState::kFixation;
+        subject.currStateRemainderTime = isSteadyAdaptationMode()
+                                             ? SETTINGS.STEADY_ITI_SECONDS
+                                             : SETTINGS.STATE_DURATIONS_SECONDS.FIXATION;
+        subject.state = isSteadyAdaptationMode() ? SubjectState::kBlank : SubjectState::kFixation;
         _needsTextureLoad = true; // Defer texture loading to avoid GPU sync issues
         break;
     case SubjectState::kBlank:
-        // This state is no longer used but kept for safety
-        subject.currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.FIXATION;
+        subject.currStateRemainderTime = isSteadyAdaptationMode()
+                                             ? SETTINGS.STEADY_CUE_DELAY_SECONDS
+                                             : SETTINGS.STATE_DURATIONS_SECONDS.FIXATION;
         subject.state = SubjectState::kFixation;
+        if (isSteadyAdaptationMode()) {
+            ctx.apis.PlaySound(Sound::kGlassCue);
+        }
         break;
     }
 }
@@ -1066,6 +1307,11 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
     // Reset trial counter and current trial
     _trialCounter = 0;
     _currentTrial = std::nullopt;
+    _preparedTrial = std::nullopt;
+    _preparedTrialAvailable = false;
+    _waitingForPreparedTrial = false;
+    _pendingTrialGeneration = PendingTrialGeneration{};
+    _deferredResponse = DeferredResponse{};
 
     std::string display_primaries_path = getTodayPrimariesPath();
 
@@ -1095,6 +1341,8 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
         = SETTINGS.QUEST_COLOR_PICKING_SPACE == ColorPickingSpace::CONE_CONTRAST
               ? "cone_contrast"
               : "cone";
+    const float trialBackgroundDrive
+        = isSteadyAdaptationMode() ? SETTINGS.STEADY_BACKGROUND_DRIVE : SETTINGS.LUMINANCE;
 
     // Create Python ColorGenerator using factory
     PyObject* pColorGenerator = nullptr;
@@ -1124,7 +1372,7 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
             pColorGenerator = TetriumColor::ColorGeneratorFactory::CreateQuestColorGenerator(
                 "both",                        // sex
                 SETTINGS.PERCENTAGE_SCREENED,  // percentage_screened
-                SETTINGS.LUMINANCE,            // background_luminance
+                trialBackgroundDrive,          // background_luminance
                 SETTINGS.REPETITIONS_PER_AXIS, // trials_per_direction
                 metameric_axes,                // metameric_axes
                 dimensions,                    // dimensions
@@ -1142,7 +1390,7 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
             pColorGenerator = TetriumColor::ColorGeneratorFactory::CreateQuestColorGenerator(
                 "both",                              // sex
                 SETTINGS.PERCENTAGE_SCREENED,        // percentage_screened
-                SETTINGS.LUMINANCE,                  // background_luminance
+                trialBackgroundDrive,                // background_luminance
                 SETTINGS.QUEST_TRIALS_PER_DIRECTION, // trials_per_direction
                 metameric_axes,                      // metameric_axes
                 dimensions,                          // dimensions
@@ -1160,7 +1408,7 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
                     SETTINGS.AEPSYCH_NUM_SOBOL_TRIALS,
                     SETTINGS.AEPSYCH_THRESHOLD_LEVEL,
                     "both",
-                    SETTINGS.LUMINANCE,
+                    trialBackgroundDrive,
                     dimensions,
                     display_primaries_path,
                     42,
@@ -1195,7 +1443,11 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
         case StimulusType::GAUSSIAN_BLOB:
             pTestGenerator
                 = TetriumColor::ColorGeneratorFactory::CreateGaussianBlobGenerator(
-                    pColorGenerator, 42, 1024, SETTINGS.GAUSSIAN_BLOB_SIZE
+                    pColorGenerator,
+                    42,
+                    1024,
+                    SETTINGS.GAUSSIAN_BLOB_SIZE,
+                    isSteadyAdaptationMode()
                 );
             break;
         }
@@ -1226,7 +1478,7 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
             GetOutputColorSpace(),
             SETTINGS.LUM_NOISE,
             SETTINGS.S_CONE_NOISE,
-            SETTINGS.LUMINANCE,
+            trialBackgroundDrive,
             SETTINGS.DOT_SIZE,
             SETTINGS.VISUAL_ANGLE
         );
@@ -1260,6 +1512,11 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
            "gaussian_blob_size",
            "picker_type",
            "stimulus_type",
+           "renderer_mode",
+           "steady_background_drive",
+           "steady_cue_delay_seconds",
+           "steady_presentation_seconds",
+           "steady_iti_seconds",
            "dimension",
            "color_picking_space",
            "quest_direction_idx",
@@ -1303,6 +1560,9 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
     std::string additionalInfo
         = pickerTypeStr + "_" + stimTypeStr + "_dim" + std::to_string(SETTINGS.DIMENSION)
           + "_" + colorPickingSpace;
+    if (isSteadyAdaptationMode()) {
+        additionalInfo += "_steady_adaptation";
+    }
     if (!observerIndices.empty()) {
         additionalInfo += "_obs" + JoinObserverIndices(observerIndices);
     }
@@ -1313,9 +1573,13 @@ void AppPseudoIsochromaticTest::newGame(const TetriumApp::TickContextImGui& ctx)
 
     _subject = SubjectContext{
         .name = _nameInputBuffer,
-        .currStateRemainderTime = SETTINGS.STATE_DURATIONS_SECONDS.FIXATION,
-        .identificationStateStartTime = SETTINGS.STATE_DURATIONS_SECONDS.IDENTIFICATION,
-        .state = SubjectState::kFixation,
+        .currStateRemainderTime = isSteadyAdaptationMode()
+                                       ? SETTINGS.STEADY_ITI_SECONDS
+                                       : SETTINGS.STATE_DURATIONS_SECONDS.FIXATION,
+        .identificationStateStartTime = isSteadyAdaptationMode()
+                                            ? SETTINGS.STEADY_PRESENTATION_SECONDS
+                                            : SETTINGS.STATE_DURATIONS_SECONDS.IDENTIFICATION,
+        .state = isSteadyAdaptationMode() ? SubjectState::kBlank : SubjectState::kFixation,
         .currentTrialIndex = 0,
         .numSuccessAttempts = 0,
         .trialsSinceLastBreak = 0,
@@ -1677,6 +1941,15 @@ void AppPseudoIsochromaticTest::logTrialData(
     }
     const char* stimTypeStrs[] = {"Plate", "Bipartite", "GaussianBlob"};
     data["stimulus_type"] = stimTypeStrs[static_cast<int>(SETTINGS.STIMULUS_TYPE)];
+    data["renderer_mode"] = isSteadyAdaptationMode() ? "steady_adaptation" : "standard";
+    data["steady_background_drive"] = std::to_string(SETTINGS.STEADY_BACKGROUND_DRIVE);
+    data["steady_cue_delay_seconds"] = std::to_string(SETTINGS.STEADY_CUE_DELAY_SECONDS);
+    data["steady_presentation_seconds"] = std::to_string(SETTINGS.STEADY_PRESENTATION_SECONDS);
+    data["steady_iti_seconds"] = std::to_string(SETTINGS.STEADY_ITI_SECONDS);
+    data["steady_temporal_noise_amplitude"]
+        = std::to_string(SETTINGS.STEADY_TEMPORAL_NOISE_AMPLITUDE);
+    data["steady_temporal_noise_tile_size"]
+        = std::to_string(SETTINGS.STEADY_TEMPORAL_NOISE_TILE_SIZE);
     data["dimension"] = std::to_string(SETTINGS.DIMENSION);
     data["color_picking_space"]
         = SETTINGS.QUEST_COLOR_PICKING_SPACE == ColorPickingSpace::CONE_CONTRAST
@@ -1700,6 +1973,7 @@ void AppPseudoIsochromaticTest::Init(TetriumApp::InitContext& ctx)
         _answerPromptTextureHandles[orientation] = textureHandle;
         _answerPromptImGuiTextures[orientation] = ctx.api.InitImGuiTexture(textureHandle);
     }
+    initializeSteadyTemporalNoiseTextures(ctx);
     // load chromalab logo
     _textures.chromalabLogo
         = ctx.api.InitImGuiTexture(ctx.api.LoadTexture(ASSETS_PATH + "textures/chromalab-logo.png")
@@ -1711,6 +1985,7 @@ void AppPseudoIsochromaticTest::Cleanup(TetriumApp::CleanupContext& ctx)
     for (AnswerKind orientation : LANDOLT_C_ORIENTATIONS) {
         ctx.api.UnloadTexture(_answerPromptTextureHandles[orientation]);
     }
+    cleanupSteadyTemporalNoiseTextures(ctx);
 
     // Clean up test generator
     if (_testGenerator) {
@@ -1721,5 +1996,44 @@ void AppPseudoIsochromaticTest::Cleanup(TetriumApp::CleanupContext& ctx)
         delete _logger;
         _logger = nullptr;
     }
+}
+
+void AppPseudoIsochromaticTest::initializeSteadyTemporalNoiseTextures(
+    const TetriumApp::InitContext& ctx
+)
+{
+    float tileSize = std::max(SETTINGS.STEADY_TEMPORAL_NOISE_TILE_SIZE, 1.0f);
+    int width = std::max(1, static_cast<int>(std::ceil(ctx.swapchain.extent.width / tileSize)));
+    int height = std::max(1, static_cast<int>(std::ceil(ctx.swapchain.extent.height / tileSize)));
+
+    std::mt19937 rng(0x51ead123);
+    std::uniform_int_distribution<int> bitDist(0, 1);
+    std::vector<uint8_t> pixels(static_cast<size_t>(width) * height * 4);
+
+    for (int frame = 0; frame < STEADY_NOISE_FRAME_COUNT; frame++) {
+        for (int i = 0; i < width * height; i++) {
+            uint8_t value = bitDist(rng) == 0 ? 0 : 255;
+            pixels[static_cast<size_t>(i) * 4 + 0] = value;
+            pixels[static_cast<size_t>(i) * 4 + 1] = value;
+            pixels[static_cast<size_t>(i) * 4 + 2] = value;
+            pixels[static_cast<size_t>(i) * 4 + 3] = 255;
+        }
+
+        _steadyNoiseTextureHandles[frame] = ctx.api.LoadTextureRGBA(pixels.data(), width, height);
+        _steadyNoiseTextures[frame] = ctx.api.InitImGuiTexture(_steadyNoiseTextureHandles[frame]);
+    }
+}
+
+void AppPseudoIsochromaticTest::cleanupSteadyTemporalNoiseTextures(
+    const TetriumApp::CleanupContext& ctx
+)
+{
+    for (uint32_t& handle : _steadyNoiseTextureHandles) {
+        if (handle != 0) {
+            ctx.api.UnloadTexture(handle);
+            handle = 0;
+        }
+    }
+    _steadyNoiseTextures = {};
 }
 } // namespace TetriumApp

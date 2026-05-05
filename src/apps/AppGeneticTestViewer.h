@@ -12,6 +12,7 @@ class AppGeneticTestViewer : public App
   public:
     enum class GeneratorType
     {
+        TetraPicker,
         Plate,
         Bipartite,
         GaussianBlob
@@ -33,6 +34,7 @@ class AppGeneticTestViewer : public App
     void drawControls();
     void drawImage(const TickContextImGui& ctx, ColorSpace colorSpace);
     void scanPrimariesDirectories();
+    std::string getOutputDirectoryForSelection() const;
     void generateGrid();
     void loadGridImage(const TickContextImGui& ctx);
     void unloadGridImage(const TickContextImGui& ctx);
@@ -41,7 +43,8 @@ class AppGeneticTestViewer : public App
     std::vector<std::string> _primariesDirs;
     int _selectedDirIndex = -1;
     int _testingDim = 3;
-    GeneratorType _generatorType = GeneratorType::GaussianBlob;
+    GeneratorType _generatorType = GeneratorType::TetraPicker;
+    bool _gaussianBlobConeContrast = true;
     bool _generating = false;
     bool _adaptiveImageSize = true;
     float _zoom = 0.5f;

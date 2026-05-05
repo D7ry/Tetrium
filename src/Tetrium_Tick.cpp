@@ -47,24 +47,10 @@ void Tetrium::Tick()
     {
         {
             PROFILE_SCOPE(&_profiler, "Render Loop");
-            // Commit to a target vblank + parity for this frame before
-            // deriving the color space. `waitAndAlignVBlank` blocks until the
-            // counter reaches expectedNextCounter (realigning if we fell
-            // behind), so getCurrentColorSpace() reflects the target vblank's
-            // parity rather than a transient mid-frame counter value.
-            if (_tetraMode == TetraMode::kEvenOddHardwareSync) {
-                PROFILE_SCOPE(&_profiler, "Wait: vblank align");
-                waitAndAlignVBlank();
-            }
             // CPU-exclusive workloads
             double deltaTime = _deltaTimer.GetDeltaTime();
             _timeSinceStartSeconds += deltaTime;
-            ColorSpace colorSpace = getCurrentColorSpace();
-#if MONO_COLOR_SPACE
-            colorSpace = _flipEvenOdd ? OCV : RGB;
-#endif
-            drawImGui(colorSpace, _currentFrame);
-            drawFrame(colorSpace, _currentFrame);
+            drawFrame(_currentFrame);
             _currentFrame = (_currentFrame + 1) % NUM_FRAME_IN_FLIGHT;
         }
         {
@@ -154,7 +140,7 @@ void Tetrium::blockOnBackbufferRenderingFence(uint8_t frameIdx)
     ))
 }
 
-void Tetrium::drawFrame(ColorSpace colorSpace, uint8_t frameIdx)
+void Tetrium::drawFrame(uint8_t frameIdx)
 {
     SyncPrimitives& sync = _syncProjector[frameIdx];
     VkResult result;
@@ -191,6 +177,20 @@ void Tetrium::drawFrame(ColorSpace colorSpace, uint8_t frameIdx)
         }
 #endif
     }
+
+    // Choose the RGB/OCV half-frame after acquire. vkAcquireNextImageKHR can block until a
+    // vblank frees a swapchain image, so choosing parity before acquire can target the previous
+    // half-frame and send one frame of the stimulus to the wrong channel.
+    if (_tetraMode == TetraMode::kEvenOddHardwareSync) {
+        PROFILE_SCOPE(&_profiler, "Read: vblank target");
+        waitAndAlignVBlank();
+    }
+    ColorSpace colorSpace = getCurrentColorSpace();
+#if MONO_COLOR_SPACE
+    colorSpace = _flipEvenOdd ? OCV : RGB;
+#endif
+
+    drawImGui(colorSpace, frameIdx);
 
     vk::CommandBuffer appCB(_device->appCommandBuffers[frameIdx]);
     vk::CommandBuffer engineCB(_device->graphicsCommandBuffers[frameIdx]);
@@ -365,12 +365,6 @@ void Tetrium::drawFrame(ColorSpace colorSpace, uint8_t frameIdx)
             this->_framebufferResized = false;
         }
 
-        // Advance target vblank for the next frame. If we overran during
-        // the render, waitAndAlignVBlank() next frame will realign and
-        // preserve parity.
-        if (_tetraMode == TetraMode::kEvenOddHardwareSync) {
-            _hardWareEvenOddCtx.expectedNextCounter += 1;
-        }
 #endif
     }
 }

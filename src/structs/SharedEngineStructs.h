@@ -62,5 +62,6 @@ enum class Sound
     kMusicInterstellar,
 
     kCorrectAnswer,
+    kGlassCue,
     kWrongAnswer = kDigitalBellNegative,
 };
