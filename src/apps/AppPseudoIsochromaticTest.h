@@ -88,7 +88,7 @@ class AppPseudoIsochromaticTest : public App
             = true; // Quest: only test the Q cone (547nm); axis index is computed dynamically per genotype
         bool QUEST_BIPOLAR
             = false;       // Quest: use bipolar sampling (sample in both direction and -direction)
-        ColorPickingSpace QUEST_COLOR_PICKING_SPACE = ColorPickingSpace::CONE;
+        ColorPickingSpace QUEST_COLOR_PICKING_SPACE = ColorPickingSpace::CONE_CONTRAST;
         int AEPSYCH_NUM_TRIALS = 300;
         int AEPSYCH_NUM_SOBOL_TRIALS = 20;
         float AEPSYCH_THRESHOLD_LEVEL = 0.75f;
@@ -107,7 +107,7 @@ class AppPseudoIsochromaticTest : public App
         float S_CONE_NOISE = 0.1f;                                 // s-cone noise [0.0, 1.0]
         float STIMULUS_SIZE = 0.5f; // stimulus texture size multiplier [0.0, 1.0]
         float STIMULUS_RAMP_UP_DURATION
-            = 0.5f;                     // duration in seconds for brightness ramp-up [0.0, 10.0]
+            = 0.1f;                     // duration in seconds for brightness ramp-up [0.0, 10.0]
         float LUMINANCE = 0.5f;         // luminance level [0.0, 2.0]
         float DOT_SIZE = 1.0f;          // dot size multiplier for plates [0.5, 2.0]
         float GAUSSIAN_BLOB_SIZE = 2.0f; // blob sigma multiplier; does not change field size
