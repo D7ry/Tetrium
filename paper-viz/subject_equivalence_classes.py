@@ -34,6 +34,7 @@ from TetriumColor.Plotting.PlotStyle import (  # noqa: E402
 
 OUTPUT_STEM = "subject_equivalence_classes"
 SUMMARY_CSV = REPO_ROOT / "data" / "quest_mocs_subject_summary" / "quest_mocs_compare_grid.csv"
+THRESHOLD_CRITERION = 0.625
 TOP_N = 10
 LABEL_FONT_SIZE = 6
 TITLE_FONT_SIZE = 8
@@ -45,7 +46,6 @@ SUBJECT_ORDER = [
     "hannah-5-7",
     "james-5-7",
     "chris-5-7",
-    "will-5-8",
     "atsu-5-8-3",
     "ben-5-8-2",
 ]
@@ -82,8 +82,13 @@ def _load_quest_summary(summary_csv: Path) -> pd.DataFrame:
 
     df = pd.read_csv(summary_csv)
     df = df[(df["method"] == "Quest") & (df["subject"].isin(SUBJECT_ORDER))].copy()
+    if "threshold_criterion" in df.columns:
+        criteria = pd.to_numeric(df["threshold_criterion"], errors="coerce")
+        df = df[np.isclose(criteria, THRESHOLD_CRITERION)].copy()
     if df.empty:
-        raise ValueError(f"No Quest rows found for requested subjects in {summary_csv}.")
+        raise ValueError(
+            f"No Quest rows at criterion {THRESHOLD_CRITERION:g} found for requested subjects in {summary_csv}."
+        )
 
     subject_rank = {subject: idx for idx, subject in enumerate(SUBJECT_ORDER)}
     df["subject_rank"] = df["subject"].map(subject_rank)
@@ -96,10 +101,11 @@ def _load_quest_summary(summary_csv: Path) -> pd.DataFrame:
 def _build_subject_matrix(
     df: pd.DataFrame,
     test_order: list[str],
-) -> tuple[np.ndarray, np.ndarray]:
-    thresholds = np.full((len(SUBJECT_ORDER), len(test_order)), np.nan, dtype=float)
-    censored = np.zeros((len(SUBJECT_ORDER), len(test_order)), dtype=bool)
-    subject_index = {subject: idx for idx, subject in enumerate(SUBJECT_ORDER)}
+) -> tuple[np.ndarray, np.ndarray, list[str]]:
+    subjects = [subject for subject in SUBJECT_ORDER if subject in set(df["subject"])]
+    thresholds = np.full((len(subjects), len(test_order)), np.nan, dtype=float)
+    censored = np.zeros((len(subjects), len(test_order)), dtype=bool)
+    subject_index = {subject: idx for idx, subject in enumerate(subjects)}
     test_index = {test: idx for idx, test in enumerate(test_order)}
 
     for row in df.itertuples(index=False):
@@ -110,7 +116,7 @@ def _build_subject_matrix(
         thresholds[r, c] = float(row.threshold_value)
         censored[r, c] = bool(row.is_censored) or float(row.threshold_raw_value) > 1.0
 
-    return thresholds, censored
+    return thresholds, censored, subjects
 
 
 def _classification_sets(mask: np.ndarray, test_order: list[str]) -> list[list[str]]:
@@ -132,6 +138,7 @@ def _draw_threshold_grid(
     thresholds: np.ndarray,
     censored: np.ndarray,
     test_order: list[str],
+    subjects: list[str],
 ) -> None:
     n_subjects, n_tests = thresholds.shape
     ax.set_xlim(-0.5, n_tests - 0.5)
@@ -140,7 +147,10 @@ def _draw_threshold_grid(
     for row in range(n_subjects):
         for col in range(n_tests):
             value = thresholds[row, col]
-            if np.isfinite(value):
+            if censored[row, col]:
+                color = PAPER_RED
+                alpha = 0.92
+            elif np.isfinite(value):
                 clipped = float(np.clip(value, 0.0, 1.0))
                 color = plt.cm.YlOrBr(0.08 + 0.50 * clipped)
                 alpha = 0.50 + 0.38 * clipped
@@ -186,41 +196,67 @@ def _draw_threshold_grid(
     ax.xaxis.tick_top()
     ax.tick_params(axis="x", length=0, pad=1.5, labelsize=5.5)
     ax.set_yticks(range(n_subjects))
-    ax.set_yticklabels([str(idx + 1) for idx in range(n_subjects)])
+    ax.set_yticklabels([str(SUBJECT_ORDER.index(subject) + 1) for subject in subjects])
     ax.tick_params(axis="y", length=0, labelsize=LABEL_FONT_SIZE, pad=2)
     ax.text(
-        -0.70,
-        -1.12,
-        "Subject",
-        ha="right",
-        va="center",
+        -0.5,
+        -0.5,
+        "Subject ID",
+        ha="center",
+        va="bottom",
         fontsize=LABEL_FONT_SIZE,
+        rotation=45,
         clip_on=False,
     )
-    ax.set_title("Null-Space Threshold Signature", loc="left", pad=8, fontsize=TITLE_FONT_SIZE)
+    ax.set_title("A. Measured Null Threshold Vectors", loc="left", pad=8, fontsize=TITLE_FONT_SIZE)
     for spine in ax.spines.values():
         spine.set_visible(False)
 
 
-def _draw_classification_axis(
+def _draw_class_size_axis(
     ax: plt.Axes,
     class_sets: list[list[str]],
 ) -> None:
+    n_subjects = len(class_sets)
+    ax.set_xlim(0.0, 1.0)
+    ax.set_ylim(n_subjects - 0.5, -0.5)
+    ax.text(0.5, -1.12, r"$|S^*|$", ha="center", va="center", fontsize=LABEL_FONT_SIZE, clip_on=False)
+    for idx, labels in enumerate(class_sets):
+        ax.text(
+            0.5,
+            idx,
+            str(len(labels)),
+            ha="center",
+            va="center",
+            fontsize=LABEL_FONT_SIZE,
+        )
+    ax.set_axis_off()
+
+
+def _draw_example_axis(
+    ax: plt.Axes,
+    class_sets: list[list[str]],
+) -> None:
+    classifications = [
+        ("Broad", "S1, S3, S4, S5"),
+        ("Narrow", "S2, S6"),
+        ("Unclassifiable", "S7"),
+        ("Protanomalous", "S8")
+        ,
+    ]
     ax.set_xlim(0.0, 1.0)
     ax.set_ylim(0.0, 1.0)
-    ax.text(0.0, 0.98, "Equivalence Classes", ha="left", va="top", fontsize=TITLE_FONT_SIZE)
-
-    for idx, labels in enumerate(class_sets):
-        y = 0.82 - idx * 0.087
+    ax.text(0.0, 0.86, "B. Null-Threshold Vector Classes ", ha="left", va="center", fontsize=TITLE_FONT_SIZE)
+    y_positions = [0.58, 0.38, 0.18, -0.02]
+    for (label, subjects), y in zip(classifications, y_positions):
         ax.text(
             0.0,
             y,
-            rf"{idx + 1}: {_wrap_classification(labels)}",
+            rf"{label}: {subjects}",
             ha="left",
             va="center",
-            fontsize=5.3,
+            fontsize=LABEL_FONT_SIZE,
         )
-
     ax.set_axis_off()
 
 
@@ -243,20 +279,27 @@ def make_figure(summary_csv: Path, output_dir: Path, formats: list[str]) -> None
     output_dir.mkdir(parents=True, exist_ok=True)
     df = _load_quest_summary(summary_csv)
     test_order = _trichromat_prior_order(TOP_N)
-    thresholds, censored = _build_subject_matrix(df, test_order)
+    thresholds, censored, subjects = _build_subject_matrix(df, test_order)
     class_sets = _classification_sets(censored, test_order)
 
-    fig, (grid_ax, class_ax) = plt.subplots(
-        2,
-        1,
-        figsize=(SINGLE_COL, 4.2),
+    fig = plt.figure(
+        figsize=(SINGLE_COL, 3.55),
         constrained_layout=True,
-        gridspec_kw={"height_ratios": [1.0, 0.50]},
     )
+    gs = fig.add_gridspec(
+        2,
+        2,
+        width_ratios=[1.0, 0.095],
+        height_ratios=[1.0, 0.22],
+    )
+    grid_ax = fig.add_subplot(gs[0, 0])
+    size_ax = fig.add_subplot(gs[0, 1], sharey=grid_ax)
+    example_ax = fig.add_subplot(gs[1, :])
     fig.set_constrained_layout_pads(w_pad=0.01, h_pad=0.01, wspace=0.01, hspace=0.015)
 
-    _draw_threshold_grid(grid_ax, thresholds, censored, test_order)
-    _draw_classification_axis(class_ax, class_sets)
+    _draw_threshold_grid(grid_ax, thresholds, censored, test_order, subjects)
+    _draw_class_size_axis(size_ax, class_sets)
+    _draw_example_axis(example_ax, class_sets)
 
     for fmt in formats:
         fig.savefig(output_dir / f"{OUTPUT_STEM}.{fmt}", bbox_inches="tight")

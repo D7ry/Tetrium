@@ -35,6 +35,10 @@ from TetriumColor.Plotting.PlotStyle import (  # noqa: E402
 
 S_PEAKS = [ALL_PEAKS[0]]
 FIG_WIDTH = DOUBLE_COL / 3
+FAMILY_HEIGHT_RATIO = 0.95
+COMBINED_HEIGHT_RATIO = 0.8
+SHORT_FAMILY_HEIGHT_RATIO = 0.85
+SHORT_COMBINED_HEIGHT_RATIO = 0.6
 STOCKMAN_SHARPE_PEAKS = {"S": 420, "M": 530, "L": 559}
 STOCKMAN_SHARPE_LINESTYLES = {"S": ":", "M": "--", "L": "-."}
 
@@ -82,6 +86,7 @@ def _plot_cones(
     stockman_sharpe_matrix,
     stockman_sharpe_families,
     split_legend: bool = False,
+    compact_legend: bool = False,
 ) -> None:
     variant_lines = []
     for peak in peaks:
@@ -116,6 +121,20 @@ def _plot_cones(
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     if split_legend:
+        if compact_legend:
+            ax.legend(
+                handles=variant_lines + stockman_sharpe_lines,
+                frameon=False,
+                loc="upper center",
+                bbox_to_anchor=(0.4, -0.5),
+                bbox_transform=ax.transAxes,
+                ncol=5,
+                columnspacing=0.45,
+                handlelength=1.1,
+                borderaxespad=0.0,
+                alignment="center",
+            )
+            return
         variant_legend = ax.legend(
             handles=variant_lines,
             frameon=False,
@@ -161,7 +180,7 @@ def _save_figure(fig, output_dir: Path, stem: str, formats: list[str]) -> None:
     plt.close(fig)
 
 
-def make_plots(output_dir: Path, formats: list[str]) -> None:
+def make_plots(output_dir: Path, formats: list[str], shorter: bool = False) -> None:
     apply_style()
     plt.rcParams.update(
         {
@@ -185,9 +204,11 @@ def make_plots(output_dir: Path, formats: list[str]) -> None:
         ("m", "M Cone Variants", M_PEAKS),
         ("l", "L Cone Variants", L_PEAKS),
     ]
+    family_height_ratio = SHORT_FAMILY_HEIGHT_RATIO if shorter else FAMILY_HEIGHT_RATIO
+    combined_height_ratio = SHORT_COMBINED_HEIGHT_RATIO if shorter else COMBINED_HEIGHT_RATIO
 
     for stem, title, peaks in family_specs:
-        fig, ax = plt.subplots(figsize=(FIG_WIDTH, FIG_WIDTH * 0.95))
+        fig, ax = plt.subplots(figsize=(FIG_WIDTH, FIG_WIDTH * family_height_ratio))
         family = stem.upper()
         _plot_cones(
             ax,
@@ -201,7 +222,7 @@ def make_plots(output_dir: Path, formats: list[str]) -> None:
         fig.subplots_adjust(left=0.22, right=0.96, bottom=0.46, top=0.97)
         _save_figure(fig, output_dir, f"hyperobserver_{stem}_cones", formats)
 
-    fig, ax = plt.subplots(figsize=(FIG_WIDTH, FIG_WIDTH * 0.8))
+    fig, ax = plt.subplots(figsize=(FIG_WIDTH, FIG_WIDTH * combined_height_ratio))
     _plot_cones(
         ax,
         WAVELENGTHS,
@@ -211,8 +232,10 @@ def make_plots(output_dir: Path, formats: list[str]) -> None:
         stockman_sharpe_matrix,
         ["S", "M", "L"],
         split_legend=True,
+        compact_legend=shorter,
     )
-    fig.subplots_adjust(left=0.22, right=0.96, bottom=0.44, top=0.97)
+    combined_bottom = 0.50 if shorter else 0.44
+    fig.subplots_adjust(left=0.22, right=0.96, bottom=combined_bottom, top=0.97)
     _save_figure(fig, output_dir, "hyperobserver_all_cones", formats)
 
 
@@ -231,9 +254,14 @@ def main() -> None:
         choices=["png", "pdf", "svg"],
         help="Output formats.",
     )
+    parser.add_argument(
+        "--shorter",
+        action="store_true",
+        help="Use shorter figure heights while preserving the default layout otherwise.",
+    )
     args = parser.parse_args()
 
-    make_plots(args.output_dir, args.formats)
+    make_plots(args.output_dir, args.formats, shorter=args.shorter)
     print(f"Wrote hyperobserver cone sensitivity plots to {args.output_dir}")
 
 

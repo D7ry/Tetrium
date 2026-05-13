@@ -27,6 +27,7 @@ from TetriumColor.Plotting.PlotStyle import (  # noqa: E402
     ALL_PEAKS,
     PAPER_BLUE,
     PAPER_LIGHT_GRAY,
+    PAPER_NEUTRAL,
     PAPER_RED,
     SINGLE_COL,
     apply_style,
@@ -47,7 +48,7 @@ SILENT_LABELS = ["Isolate M530", "Isolate L559"]
 NULL_SPACE = np.array(
     [
         [0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
-        [0, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1],
+        [0, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1],
         [0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0],
     ],
     dtype=int,
@@ -73,11 +74,11 @@ def _cone_labels() -> list[str]:
 
 def _draw_cell(ax, col: int, row: int, nonzero: bool, color: str, emphasize: str) -> None:
     if emphasize == "o":
-        face = "#e9f0f8" if nonzero else PAPER_LIGHT_GRAY
-        edge = "#aebfd3" if nonzero else "#d6d6d6"
-        alpha = 0.98 if nonzero else 0.30
-        text_color = color if nonzero else "#777777"
-        text_alpha = 1.0 if nonzero else 0.38
+        face = "#e9f0f8" if nonzero else "#f9d6d5"
+        edge = "#aebfd3" if nonzero else "#d98984"
+        alpha = 0.98 if nonzero else 0.98
+        text_color = color if nonzero else "#9c1f1f"
+        text_alpha = 1.0
         weight = "bold" if nonzero else "normal"
     else:
         face = PAPER_LIGHT_GRAY if nonzero else "#f9d6d5"
@@ -134,7 +135,15 @@ def _draw_fingerprint(ax) -> None:
     for row, label in enumerate(row_labels):
         ax.text(-0.78, row, label, ha="right", va="center", fontsize=LABEL_FONT_SIZE)
 
-    ax.axhline(split_y, color="#777777", linewidth=0.6, linestyle="--", alpha=0.75)
+    ax.plot(
+        [-3.5, n_cols - 0.5],
+        [split_y, split_y],
+        color="#777777",
+        linewidth=1.05,
+        linestyle="--",
+        alpha=0.88,
+        clip_on=False,
+    )
     ax.set_axis_off()
 
 
@@ -157,6 +166,15 @@ def make_figure(output_dir: Path, formats: list[str]) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     fig, ax = plt.subplots(figsize=(SINGLE_COL, 1.85), constrained_layout=True)
     _draw_fingerprint(ax)
+    fig.text(
+        0.5,
+        -0.04,
+        "x = nulled cone response    o = non-zero response",
+        ha="center",
+        va="center",
+        fontsize=LABEL_FONT_SIZE,
+        bbox={"facecolor": "white", "edgecolor": PAPER_NEUTRAL, "linewidth": 0.5, "pad": 2.0, "alpha": 0.78},
+    )
 
     for fmt in formats:
         fig.savefig(output_dir / f"{OUTPUT_STEM}.{fmt}", bbox_inches="tight")

@@ -18,6 +18,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 TETRIUM_ROOT = REPO_ROOT / "extern" / "TetriumColor"
@@ -38,11 +39,14 @@ QUEST_COLOR = PAPER_YELLOW
 NEUTRAL_COLOR = PAPER_NEUTRAL
 LABEL_FONT_SIZE = 6
 CENSORED_COLOR = PAPER_RED
+SUMMARY_CSV = REPO_ROOT / "data" / "quest_mocs_subject_summary" / "quest_mocs_compare_grid.csv"
+THRESHOLD_CRITERION = 0.625
+THRESHOLD_SUBJECT = "chris-5-7"
 
 FINGERPRINTS = np.array(
     [
         [0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
-        [0, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1],
+        [0, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1],
         [0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0],
     ],
     dtype=int,
@@ -54,15 +58,45 @@ ROW_LABELS = [
     "(533, 559)",
 ]
 
-# Chris-5-7 Quest threshold_proportion values for the top three null-space
-# genotypes. The third threshold is above gamut max, matching the censored
-# threshold convention in summarize_quest_mocs_subjects.py.
-CHRIS_QUEST_THRESHOLDS_RAW = np.array([0.690288048137, 0.479841511958, 1.43328867691])
-CHRIS_QUEST_THRESHOLDS = np.minimum(CHRIS_QUEST_THRESHOLDS_RAW, 1.0)
-
-
 def _fmt_peak(peak: float) -> str:
     return f"{peak:.0f}" if float(peak).is_integer() else f"{peak:g}"
+
+
+def _label_key(label: str) -> str:
+    return ",".join(part.strip() for part in label.strip("()").split(",") if part.strip())
+
+
+def _load_threshold_data(summary_csv: Path, subject: str) -> tuple[np.ndarray, np.ndarray]:
+    if not summary_csv.exists():
+        raise FileNotFoundError(
+            f"{summary_csv} does not exist. Run summarize_quest_mocs_subjects.py first."
+        )
+    df = pd.read_csv(summary_csv)
+    df = df[(df["method"] == "Quest") & (df["subject"] == subject)].copy()
+    if "threshold_criterion" in df.columns:
+        criteria = pd.to_numeric(df["threshold_criterion"], errors="coerce")
+        df = df[np.isclose(criteria, THRESHOLD_CRITERION)].copy()
+    if df.empty:
+        raise ValueError(f"No Quest rows at criterion {THRESHOLD_CRITERION:g} for {subject} in {summary_csv}.")
+
+    df["threshold_value"] = pd.to_numeric(df["threshold"], errors="coerce")
+    df["threshold_raw_value"] = pd.to_numeric(df["threshold_raw"], errors="coerce")
+    df["is_censored"] = df["threshold_censored"].astype(str).str.lower().eq("true")
+    by_label = {str(row.genotype_label): row for row in df.itertuples(index=False)}
+
+    thresholds = []
+    censored = []
+    for label in ROW_LABELS:
+        key = _label_key(label)
+        row = by_label.get(key)
+        if row is None:
+            thresholds.append(np.nan)
+            censored.append(False)
+            continue
+        thresholds.append(float(row.threshold_value))
+        raw_censored = np.isfinite(row.threshold_raw_value) and float(row.threshold_raw_value) > 1.0
+        censored.append(bool(row.is_censored) or raw_censored)
+    return np.asarray(thresholds, dtype=float), np.asarray(censored, dtype=bool)
 
 
 def _cone_labels() -> list[str]:
@@ -115,14 +149,6 @@ def draw_chart(ax) -> None:
     for row, label in enumerate(ROW_LABELS):
         ax.text(-0.82, row, label, ha="right", va="center", fontsize=LABEL_FONT_SIZE)
 
-    ax.text(
-        n_cols - 0.5,
-        n_rows - 0.03,
-        "x = nulled cone response    o = non-zero",
-        ha="right",
-        va="top",
-        fontsize=LABEL_FONT_SIZE,
-    )
     ax.set_axis_off()
 
 
@@ -201,6 +227,15 @@ def make_figure(output_dir: Path, formats: list[str]) -> None:
     fig.set_constrained_layout_pads(hspace=0.11)
     draw_chart(axes[0])
     draw_response_panel(axes[1])
+    fig.text(
+        0.5,
+        0.012,
+        "x = nulled cone response    o = non-zero response",
+        ha="center",
+        va="center",
+        fontsize=LABEL_FONT_SIZE,
+        bbox={"facecolor": "white", "edgecolor": PAPER_NEUTRAL, "linewidth": 0.5, "pad": 2.0, "alpha": 0.78},
+    )
 
     for fmt in formats:
         fig.savefig(output_dir / f"{OUTPUT_STEM}.{fmt}", bbox_inches="tight")

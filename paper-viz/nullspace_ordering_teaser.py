@@ -18,6 +18,7 @@ import argparse
 import csv
 import itertools
 import sys
+from collections import defaultdict
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -47,7 +48,9 @@ LABEL_FONT_SIZE = 6
 TOP_N = 10
 CDF_DISPLAY_N = 15
 RANDOM_SEED = 7
-CHRIS_THRESHOLDS = REPO_ROOT / "data" / "AppPseudoIsochromaticTest" / "chris-5-7_Quest_dim3_20260507_115712_306_thresholds.csv"
+SUMMARY_THRESHOLDS = REPO_ROOT / "data" / "quest_mocs_subject_summary" / "quest_mocs_compare_grid.csv"
+THRESHOLD_CRITERION = 0.625
+OMITTED_THRESHOLD_SUBJECTS = {"will-5-8"}
 COMPATIBILITY_ROWS = 3
 
 OBSERVER_ROWS = [
@@ -105,16 +108,67 @@ def _trichromat_prior() -> list[tuple[tuple[float, ...], float]]:
     return [(test, prob / total) for test, prob in items if total > 0]
 
 
-def _load_chris_thresholds() -> dict[tuple[float, ...], float]:
-    if not CHRIS_THRESHOLDS.exists():
+def _measured_threshold_order(
+    prior: list[tuple[tuple[float, ...], float]],
+    thresholds: dict[tuple[float, ...], float],
+) -> list[tuple[float, ...]]:
+    prior_rank = {test: idx for idx, (test, _prob) in enumerate(prior)}
+    measured = [test for test, _prob in prior if test in thresholds]
+    measured.sort(key=lambda test: (thresholds[test], prior_rank[test]))
+    if len(measured) >= TOP_N:
+        return measured[:TOP_N]
+    fallback = [test for test, _prob in prior if test not in set(measured)]
+    return (measured + fallback)[:TOP_N]
+
+
+def _threshold_test_from_row(row: dict[str, str]) -> tuple[float, ...] | None:
+    genotype_key = row.get("genotype_key", "")
+    if not genotype_key:
+        genotype_key = row.get("genotype", "")
+    if not genotype_key:
+        return None
+    genotype = tuple(
+        sorted(
+            float(part)
+            for part in genotype_key.split(",")
+            if part and abs(float(part) - 547.0) > 1e-6
+        )
+    )
+    if len(genotype) != 2:
+        return None
+    return tuple(sorted((420.0, *genotype)))
+
+
+def _load_measured_thresholds() -> dict[tuple[float, ...], float]:
+    if not SUMMARY_THRESHOLDS.exists():
         return {}
-    thresholds = {}
-    with CHRIS_THRESHOLDS.open(newline="") as f:
+    thresholds_by_test = defaultdict(list)
+    with SUMMARY_THRESHOLDS.open(newline="") as f:
         for row in csv.DictReader(f):
-            genotype = tuple(sorted(float(part) for part in row["genotype"].split(",") if abs(float(part) - 547.0) > 1e-6))
-            test = tuple(sorted((420.0, *genotype)))
-            thresholds[test] = float(row["threshold_proportion"])
-    return thresholds
+            if row.get("subject") in OMITTED_THRESHOLD_SUBJECTS:
+                continue
+            if row.get("method") != "Quest":
+                continue
+            if row.get("threshold_criterion"):
+                try:
+                    if not np.isclose(float(row["threshold_criterion"]), THRESHOLD_CRITERION):
+                        continue
+                except ValueError:
+                    continue
+            test = _threshold_test_from_row(row)
+            if test is None:
+                continue
+            try:
+                threshold = float(row["threshold"])
+            except (TypeError, ValueError):
+                continue
+            if np.isfinite(threshold):
+                thresholds_by_test[test].append(threshold)
+    return {
+        test: float(np.median(values))
+        for test, values in thresholds_by_test.items()
+        if values
+    }
 
 
 def _draw_xo_grid(ax, matrix: np.ndarray, row_labels: list[str] | None = None) -> None:
@@ -325,7 +379,8 @@ def make_figure(output_dir: Path, formats: list[str]) -> None:
     rng = np.random.default_rng(RANDOM_SEED)
     random_tests = [all_tests[idx] for idx in rng.choice(len(all_tests), size=TOP_N, replace=False)]
     prior = _trichromat_prior()
-    prior_tests = [test for test, _prob in prior[:TOP_N]]
+    measured_thresholds = _load_measured_thresholds()
+    prior_tests = _measured_threshold_order(prior, measured_thresholds)
 
     fig, axes = plt.subplots(
         1,
@@ -339,7 +394,7 @@ def make_figure(output_dir: Path, formats: list[str]) -> None:
     _draw_candidate_panel(axes[0], all_tests)
     axes[1].set_title("B. Random Ordering", pad=3)
     _draw_barcode_panel(axes[1], random_tests)
-    axes[2].set_title("C. Genetic Prior Ordering", pad=3)
+    axes[2].set_title("C. Measured Threshold Ordering", pad=3)
     _draw_barcode_panel(axes[2], prior_tests)
     _draw_cdf_panel(axes[3], prior)
     fig.text(
