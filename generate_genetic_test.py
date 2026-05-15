@@ -126,7 +126,8 @@ def generate_genetic_test(primaries_dir: str,
         output_dir: Directory to save output images
         testing_dim: Testing dimension (default: 3)
         generator_type: Type of generator to use - 'tetra_picker', 'plate', 'bipartite', or 'gaussian_blob'
-        gaussian_blob_mode: 'raw' or 'cone_contrast' when generator_type is gaussian_blob
+        gaussian_blob_mode: 'raw' or 'raw_cone_excitation' when generator_type is gaussian_blob.
+            The legacy value 'cone_contrast' is still accepted as an alias.
     """
     # Load primaries
     print(f"Loading primaries from: {primaries_dir}")
@@ -135,9 +136,13 @@ def generate_genetic_test(primaries_dir: str,
     # Match AppPseudoIsochromaticTest genetic gaussian mode: top observers,
     # display-midpoint background, one MCS level at maximal contrast.
     top_n_genotypes = 10
+    uses_raw_cone_excitation = (
+        generator_type == 'tetra_picker'
+        or gaussian_blob_mode in {'raw_cone_excitation', 'cone_contrast'}
+    )
     color_picking_space = (
-        'cone_contrast'
-        if generator_type == 'tetra_picker' or gaussian_blob_mode == 'cone_contrast'
+        'raw_cone_excitation'
+        if uses_raw_cone_excitation
         else 'cone'
     )
     direct_display_output = generator_type in {'tetra_picker', 'gaussian_blob'}
@@ -171,7 +176,9 @@ def generate_genetic_test(primaries_dir: str,
         print("Using GaussianBlobGenerator")
         test_generator = GaussianBlobGenerator(
             color_generator,
-            constant_disp_background=(gaussian_blob_mode == 'cone_contrast')
+            constant_disp_background=(
+                gaussian_blob_mode in {'raw_cone_excitation', 'cone_contrast'}
+            )
         )
     else:
         print("Using PseudoIsochromaticPlateGenerator")
@@ -187,7 +194,7 @@ if __name__ == "__main__":
             "[testing_dim] [generator_type] [gaussian_blob_mode]"
         )
         print("  generator_type: 'tetra_picker' (default), 'plate', 'bipartite', or 'gaussian_blob'")
-        print("  gaussian_blob_mode: 'raw' (default) or 'cone_contrast'")
+        print("  gaussian_blob_mode: 'raw' (default), 'raw_cone_excitation', or legacy 'cone_contrast'")
         sys.exit(1)
 
     primaries_dir = sys.argv[1]

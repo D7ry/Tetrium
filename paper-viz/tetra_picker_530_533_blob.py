@@ -93,7 +93,7 @@ def generate_blob(args: argparse.Namespace) -> dict:
         degree=args.degree,
         mcs_k=1,
         observer_indices=[observer_index],
-        color_picking_space="cone_contrast",
+        color_picking_space="raw_cone_excitation",
         adapting_background=background,
         adapting_background_space=ColorSpaceType.DISP,
         display_primaries=primaries,
