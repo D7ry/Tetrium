@@ -3,6 +3,10 @@
 #include "App.h"
 #include "app_components/PR650.h"
 #include "imgui.h"
+#include <atomic>
+#include <chrono>
+#include <string>
+#include <vector>
 
 namespace TetriumApp
 {
@@ -61,8 +65,16 @@ class AppAutoMeasure : public App
     bool convertRYGBToRGBO(const std::string& date, const std::string& validationFolder);
     bool measureValidationTargets(const std::string& date, const std::string& validationFolder);
     bool runValidation(const std::string& date, const std::string& validationFolder);
+    void runLedDriftMeasurement();
+    bool runLedDriftAnalysis(const std::string& sessionDir);
+    void writeLedDriftMetadata(
+        const std::string& sessionDir,
+        const std::string& startTimestamp,
+        const std::string& endTimestamp,
+        bool completed
+    );
     std::vector<glm::ivec4> parseRGBOTargets(const std::string& csvPath);
-    void saveSpectrumData(
+    std::string saveSpectrumData(
         glm::ivec4 rgbo,
         const std::string& outputDir,
         const PR650::SpectrumMeasure& result,
@@ -79,6 +91,7 @@ class AppAutoMeasure : public App
         bool measuring = false;
         bool validating = false;
         bool validationComplete = false;
+        bool ledDriftRunning = false;
     } pr650States;
 
     struct
@@ -112,5 +125,23 @@ class AppAutoMeasure : public App
         ValidationConfigMode configMode = kValidationConfigFullGrid;
         int primaryRepeatSamples = 5;
     } validationState;
+
+    struct
+    {
+        float durationHours = 5.0f;
+        char startTemperature[64] = "";
+        char endTemperature[64] = "";
+        char notes[512] = "";
+        std::string statusMessage = "";
+        std::string sessionDir = "";
+        std::string currentLed = "";
+        glm::ivec4 currentRGBO = glm::ivec4(0, 0, 0, 0);
+        bool displayDriftColor = false;
+        std::atomic<bool> stopRequested = false;
+        int cycleIndex = 0;
+        double elapsedMinutes = 0.0;
+        double remainingMinutes = 0.0;
+        double lastLuminance = 0.0;
+    } ledDriftState;
 };
 }; // namespace TetriumApp

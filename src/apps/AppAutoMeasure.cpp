@@ -2,6 +2,7 @@
 #include "Pathing.h"
 #include "imgui.h"
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <filesystem>
@@ -12,6 +13,7 @@
 #include <sstream>
 #include <thread>
 #include <tuple>
+#include <utility>
 
 #include "app_components/PR650.h"
 
@@ -46,6 +48,97 @@ std::string getTimestampString()
     ss << "_" << std::setfill('0') << std::setw(3) << ms.count();
 
     return ss.str();
+}
+
+std::string getFolderTimestampString()
+{
+    auto now = std::chrono::system_clock::now();
+    std::time_t t = std::chrono::system_clock::to_time_t(now);
+    std::tm tm = *std::localtime(&t);
+
+    std::stringstream ss;
+    ss << std::put_time(&tm, "%Y-%m-%d_%H-%M-%S");
+    return ss.str();
+}
+
+std::string csvEscape(const std::string& value)
+{
+    if (value.find_first_of(",\"\n\r") == std::string::npos) {
+        return value;
+    }
+
+    std::string escaped = "\"";
+    for (char c : value) {
+        if (c == '"') {
+            escaped += "\"\"";
+        } else {
+            escaped += c;
+        }
+    }
+    escaped += '"';
+    return escaped;
+}
+
+std::string jsonEscape(const std::string& value)
+{
+    std::string escaped;
+    escaped.reserve(value.size());
+    for (char c : value) {
+        switch (c) {
+        case '\\':
+            escaped += "\\\\";
+            break;
+        case '"':
+            escaped += "\\\"";
+            break;
+        case '\n':
+            escaped += "\\n";
+            break;
+        case '\r':
+            escaped += "\\r";
+            break;
+        case '\t':
+            escaped += "\\t";
+            break;
+        default:
+            escaped += c;
+            break;
+        }
+    }
+    return escaped;
+}
+
+double integrateSpectrumPower(const PR650::SpectrumMeasure& measurement)
+{
+    if (measurement.power.empty()) {
+        return 0.0;
+    }
+    if (measurement.power.size() == 1 || measurement.wavelength.size() != measurement.power.size()) {
+        double total = 0.0;
+        for (double power : measurement.power) {
+            total += power;
+        }
+        return total;
+    }
+
+    double total = 0.0;
+    for (size_t i = 1; i < measurement.power.size(); ++i) {
+        const double dx = measurement.wavelength[i] - measurement.wavelength[i - 1];
+        total += 0.5 * dx * (measurement.power[i] + measurement.power[i - 1]);
+    }
+    return total;
+}
+
+std::pair<double, double> peakSpectrumPower(const PR650::SpectrumMeasure& measurement)
+{
+    if (measurement.power.empty()) {
+        return {0.0, 0.0};
+    }
+
+    auto it = std::max_element(measurement.power.begin(), measurement.power.end());
+    const size_t idx = static_cast<size_t>(std::distance(measurement.power.begin(), it));
+    double wavelength = idx < measurement.wavelength.size() ? measurement.wavelength[idx] : 0.0;
+    return {wavelength, *it};
 }
 
 SpectrumSnapshot snapshotSpectrum(const PR650::SpectrumMeasure& measurement)
@@ -223,9 +316,12 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx)
     if (ImGui::Begin("measure", NULL, flags)) {
         // Draw stimulus first (behind the menu) using window draw list
         // ImGui renders draw list commands before widgets, so this will be behind
-        if (!measurementData.currentPrimaries.empty() || validationState.displayValidationColor) {
+        if (!measurementData.currentPrimaries.empty() || validationState.displayValidationColor
+            || ledDriftState.displayDriftColor) {
             glm::ivec4 displayRGBO = glm::ivec4(0, 0, 0, 0);
-            if (!measurementData.currentPrimaries.empty()) {
+            if (ledDriftState.displayDriftColor) {
+                displayRGBO = ledDriftState.currentRGBO;
+            } else if (!measurementData.currentPrimaries.empty()) {
                 glm::ivec4 RGBO
                     = measurementData.currentPrimaries[measurementData.currPrimaryIndex];
                 displayRGBO
@@ -239,8 +335,9 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx)
             ImVec2 windowSize = ImGui::GetWindowSize();
             ImVec2 windowPos = ImGui::GetWindowPos();
 
-            // Estimate menu height (will be ~300-400px depending on content)
-            float estimatedMenuHeight = 350.0f;
+            // During LED drift runs, hide the full menu and use the whole viewport for
+            // the measurement stimulus.
+            float estimatedMenuHeight = pr650States.ledDriftRunning ? 0.0f : 350.0f;
             ImVec2 center = ImVec2(
                 windowPos.x + windowSize.x * 0.5f,
                 windowPos.y + (windowSize.y + estimatedMenuHeight) * 0.5f
@@ -270,6 +367,27 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx)
             // Draw stimulus circle
             drawList->AddCircleFilled(center, outerRadius, color, 0);
             drawList->AddCircleFilled(center, innerRadius, IM_COL32(0, 0, 0, 255), 0);
+        }
+
+        if (pr650States.ledDriftRunning) {
+            ImGui::SetCursorPos(ImVec2(12.0f, 12.0f));
+            ImGui::Text(
+                "LED drift: %s  %.1f / %.1f min",
+                ledDriftState.currentLed.c_str(),
+                ledDriftState.elapsedMinutes,
+                ledDriftState.elapsedMinutes + ledDriftState.remainingMinutes
+            );
+            ImGui::Text("Cycle %d  Luminance %.6f", ledDriftState.cycleIndex, ledDriftState.lastLuminance);
+            if (!ledDriftState.statusMessage.empty()) {
+                ImGui::Text("%s", ledDriftState.statusMessage.c_str());
+            }
+            if (ImGui::Button("Stop LED Drift Run")) {
+                ledDriftState.stopRequested = true;
+                ledDriftState.statusMessage = "Stopping after the current PR650 measurement...";
+            }
+            ImGui::End();
+            ImGui::PopStyleColor(2);
+            return;
         }
 
         // Measurement file selection dropdown
@@ -336,6 +454,61 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx)
             ImGui::EndTooltip();
         }
 
+        if (IPR650->isConnected()) {
+            ImGui::Separator();
+            ImGui::Text("LED Drift Characterization:");
+            if (pr650States.ledDriftRunning) {
+                ImGui::Text(
+                    "Elapsed %.1f min, remaining %.1f min, LED %s, cycle %d",
+                    ledDriftState.elapsedMinutes,
+                    ledDriftState.remainingMinutes,
+                    ledDriftState.currentLed.c_str(),
+                    ledDriftState.cycleIndex
+                );
+                ImGui::Text("Last luminance: %.6f", ledDriftState.lastLuminance);
+                if (!ledDriftState.sessionDir.empty()) {
+                    ImGui::Text("Session: %s", ledDriftState.sessionDir.c_str());
+                }
+                if (ImGui::Button("Stop LED Drift Run")) {
+                    ledDriftState.stopRequested = true;
+                    ledDriftState.statusMessage = "Stopping after the current PR650 measurement...";
+                }
+            } else {
+                bool disableDriftStart = pr650States.measuring || pr650States.validating;
+                if (disableDriftStart) {
+                    ImGui::BeginDisabled();
+                }
+                ImGui::SetNextItemWidth(120);
+                if (ImGui::InputFloat("Duration Hours", &ledDriftState.durationHours, 0.25f, 1.0f, "%.2f")) {
+                    ledDriftState.durationHours = std::clamp(ledDriftState.durationHours, 0.01f, 24.0f);
+                }
+                if (ledDriftState.durationHours < 0.01f || ledDriftState.durationHours > 24.0f) {
+                    ledDriftState.durationHours = std::clamp(ledDriftState.durationHours, 0.01f, 24.0f);
+                }
+                ImGui::InputText("Start Temp", ledDriftState.startTemperature, IM_ARRAYSIZE(ledDriftState.startTemperature));
+                ImGui::InputText("End Temp", ledDriftState.endTemperature, IM_ARRAYSIZE(ledDriftState.endTemperature));
+                ImGui::InputTextMultiline("Notes", ledDriftState.notes, IM_ARRAYSIZE(ledDriftState.notes), ImVec2(420, 64));
+                if (ImGui::Button("Start LED Drift Run")) {
+                    ledDriftState.stopRequested = false;
+                    ledDriftState.statusMessage = "Starting LED drift run...";
+                    std::thread([this]() { runLedDriftMeasurement(); }).detach();
+                    pr650States.ledDriftRunning = true;
+                }
+                if (disableDriftStart) {
+                    ImGui::EndDisabled();
+                    ImGui::TextColored(
+                        ImVec4(1.0f, 0.8f, 0.2f, 1.0f),
+                        "LED drift disabled during validation or list measurement"
+                    );
+                }
+            }
+            if (!ledDriftState.statusMessage.empty()) {
+                ImGui::TextColored(
+                    ImVec4(0.8f, 1.0f, 0.8f, 1.0f), "%s", ledDriftState.statusMessage.c_str()
+                );
+            }
+        }
+
         // Daily Validate section - separate from regular measurements
         if (IPR650->isConnected() || validationState.debugSkipPR650Measurements) {
             ImGui::Separator();
@@ -343,7 +516,7 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx)
             // Config mode selection
             ImGui::Text("Validation Config:");
             ImGui::SameLine();
-            if (pr650States.validating) {
+            if (pr650States.validating || pr650States.ledDriftRunning) {
                 ImGui::BeginDisabled();
             }
             const char* configLabels[] = {
@@ -354,13 +527,13 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx)
             if (ImGui::Combo("##ValidationConfig", &configModeInt, configLabels, IM_ARRAYSIZE(configLabels))) {
                 validationState.configMode = static_cast<ValidationConfigMode>(configModeInt);
             }
-            if (pr650States.validating) {
+            if (pr650States.validating || pr650States.ledDriftRunning) {
                 ImGui::EndDisabled();
             }
 
             ImGui::Text("Primary Samples:");
             ImGui::SameLine();
-            if (pr650States.validating) {
+            if (pr650States.validating || pr650States.ledDriftRunning) {
                 ImGui::BeginDisabled();
             }
             ImGui::SetNextItemWidth(100);
@@ -372,7 +545,7 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx)
                 validationState.primaryRepeatSamples
                     = std::clamp(validationState.primaryRepeatSamples, 1, 20);
             }
-            if (pr650States.validating) {
+            if (pr650States.validating || pr650States.ledDriftRunning) {
                 ImGui::EndDisabled();
             }
             ImGui::SameLine();
@@ -388,7 +561,7 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx)
             ImGui::SameLine();
 
             // Disable validation during regular measurements
-            if (pr650States.measuring) {
+            if (pr650States.measuring || pr650States.ledDriftRunning) {
                 ImGui::BeginDisabled();
             }
 
@@ -411,7 +584,7 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx)
                 if (!IPR650->isConnected()) {
                     ImGui::EndDisabled();
                 }
-                if (pr650States.measuring) {
+                if (pr650States.measuring || pr650States.ledDriftRunning) {
                     ImGui::EndDisabled();
                 }
                 ImGui::SameLine();
@@ -429,7 +602,7 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx)
                     ImGui::EndTooltip();
                 }
             } else if (pr650States.validationComplete) {
-                if (pr650States.measuring) {
+                if (pr650States.measuring || pr650States.ledDriftRunning) {
                     ImGui::EndDisabled();
                 }
                 ImGui::Text("%s", validationState.completeLabel.c_str());
@@ -440,7 +613,7 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx)
                     validationState.displayValidationColor = false;
                 }
             } else {
-                if (pr650States.measuring) {
+                if (pr650States.measuring || pr650States.ledDriftRunning) {
                     ImGui::EndDisabled();
                 }
                 std::string statusText = "Step " + std::to_string(validationState.stepNumber) + "/"
@@ -462,6 +635,11 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx)
                     ImVec4(1.0f, 0.8f, 0.2f, 1.0f), "Validation disabled during list measurements"
                 );
             }
+            if (pr650States.ledDriftRunning) {
+                ImGui::TextColored(
+                    ImVec4(1.0f, 0.8f, 0.2f, 1.0f), "Validation disabled during LED drift run"
+                );
+            }
         }
 
         ImGui::Separator();
@@ -470,15 +648,14 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx)
 
     if (measurementData.currentPrimaries.empty()) {
         ImGui::Text("No measurement data loaded. Please select a valid .txt file.");
-        ImGui::End();
-        ImGui::PopStyleColor(2);
-        return;
     }
 
-    glm::ivec4 RGBO = measurementData.currentPrimaries[measurementData.currPrimaryIndex];
-    if (IPR650->isConnected()) {
+    glm::ivec4 RGBO = measurementData.currentPrimaries.empty()
+                          ? glm::ivec4(0, 0, 0, 0)
+                          : measurementData.currentPrimaries[measurementData.currPrimaryIndex];
+    if (IPR650->isConnected() && !measurementData.currentPrimaries.empty()) {
         // Disable measurement controls during validation
-        if (pr650States.validating) {
+        if (pr650States.validating || pr650States.ledDriftRunning) {
             ImGui::BeginDisabled();
         }
 
@@ -536,8 +713,10 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx)
     constexpr std::array<const char*, 4> labels = {"r", "g", "b", "o"};
 
     // Use validation RGBO if validation is active, otherwise use measurement list RGBO
-    glm::ivec4 displayRGBO
-        = validationState.displayValidationColor ? validationState.currentRGBO : RGBO;
+    glm::ivec4 displayRGBO = ledDriftState.displayDriftColor
+                                 ? ledDriftState.currentRGBO
+                                 : (validationState.displayValidationColor ? validationState.currentRGBO
+                                                                           : RGBO);
 
     measureContext.rgboValuesString = "RGBO: ";
     for (int i = 0; i < 4; i++) {
@@ -550,10 +729,13 @@ void AppAutoMeasure::TickImGui(const TetriumApp::TickContextImGui& ctx)
     ImGui::SliderFloat("Stimulus Size", &stimulusSize, 0.1f, 3.0f, "%.2fx");
 
     // End disabled state if validation is running
-    if (pr650States.validating) {
+    if (!measurementData.currentPrimaries.empty()
+        && (pr650States.validating || pr650States.ledDriftRunning)) {
         ImGui::EndDisabled();
         ImGui::TextColored(
-            ImVec4(1.0f, 0.8f, 0.2f, 1.0f), "Measurement controls disabled during validation"
+            ImVec4(1.0f, 0.8f, 0.2f, 1.0f),
+            pr650States.ledDriftRunning ? "Measurement controls disabled during LED drift run"
+                                         : "Measurement controls disabled during validation"
         );
     }
 
@@ -1061,7 +1243,7 @@ std::vector<glm::ivec4> AppAutoMeasure::parseRGBOTargets(const std::string& csvP
     return result;
 }
 
-void AppAutoMeasure::saveSpectrumData(
+std::string AppAutoMeasure::saveSpectrumData(
     glm::ivec4 rgbo,
     const std::string& outputDir,
     const PR650::SpectrumMeasure& result,
@@ -1074,7 +1256,7 @@ void AppAutoMeasure::saveSpectrumData(
         INFO("Output directory: {}", std::filesystem::absolute(outputDir).string());
     } catch (const std::exception& e) {
         ERROR("Failed to create directory {}: {}", outputDir, e.what());
-        return;
+        return "";
     }
 
     // Generate filename with timestamp: r<R>g<G>b<B>o<O>_<timestamp>.csv
@@ -1103,13 +1285,188 @@ void AppAutoMeasure::saveSpectrumData(
     if (!file.is_open()) {
         ERROR("Failed to open file for writing: {}", filename);
         ERROR("Absolute path would be: {}", std::filesystem::absolute(filename).string());
-        return;
+        return "";
     }
 
     file << resultStr.str();
     file.close();
 
     INFO("Saved spectrum to: {}", std::filesystem::absolute(filename).string());
+    return filename;
+}
+
+void AppAutoMeasure::runLedDriftMeasurement()
+{
+    if (!IPR650->isConnected()) {
+        ledDriftState.statusMessage = "ERROR: PR650 not connected";
+        pr650States.ledDriftRunning = false;
+        return;
+    }
+
+    const std::array<std::pair<const char*, glm::ivec4>, 4> primaries = {
+        std::make_pair("R", glm::ivec4(255, 0, 0, 0)),
+        std::make_pair("G", glm::ivec4(0, 255, 0, 0)),
+        std::make_pair("B", glm::ivec4(0, 0, 255, 0)),
+        std::make_pair("O", glm::ivec4(0, 0, 0, 255)),
+    };
+
+    const float durationHours = std::clamp(ledDriftState.durationHours, 0.01f, 24.0f);
+    const auto requestedDuration = std::chrono::duration<double>(durationHours * 60.0 * 60.0);
+    const auto start = std::chrono::steady_clock::now();
+    const std::string startTimestamp = getFolderTimestampString();
+
+    std::string date = getCurrentDate();
+    std::string sessionDir = TETRIUM_COLOR_PATH + "measurements/" + date + "/led_drift/led_drift_"
+                             + startTimestamp + "/";
+    std::string spectraDir = sessionDir + "spectra/";
+    std::filesystem::create_directories(spectraDir);
+
+    ledDriftState.sessionDir = sessionDir;
+    ledDriftState.cycleIndex = 0;
+    ledDriftState.elapsedMinutes = 0.0;
+    ledDriftState.remainingMinutes = durationHours * 60.0;
+    ledDriftState.lastLuminance = 0.0;
+    ledDriftState.displayDriftColor = true;
+    ledDriftState.statusMessage = "Collecting LED drift data...";
+
+    std::ofstream timeseries(sessionDir + "led_drift_timeseries.csv", std::ios::out | std::ios::trunc);
+    if (!timeseries.is_open()) {
+        ledDriftState.statusMessage = "ERROR: Failed to open drift timeseries CSV";
+        ERROR("Failed to open LED drift timeseries file in {}", sessionDir);
+        ledDriftState.displayDriftColor = false;
+        pr650States.ledDriftRunning = false;
+        return;
+    }
+
+    constexpr auto maxPrecision{std::numeric_limits<double>::digits10 + 1};
+    timeseries << "timestamp,elapsed_seconds,elapsed_minutes,cycle_index,led,r,g,b,o,luminance,"
+                  "integrated_power,peak_wavelength,peak_power,spectrum_file\n";
+
+    bool completed = false;
+    while (!ledDriftState.stopRequested) {
+        auto now = std::chrono::steady_clock::now();
+        if (now - start >= requestedDuration) {
+            completed = true;
+            break;
+        }
+
+        for (const auto& [label, rgbo] : primaries) {
+            now = std::chrono::steady_clock::now();
+            if (ledDriftState.stopRequested || now - start >= requestedDuration) {
+                completed = !ledDriftState.stopRequested;
+                break;
+            }
+
+            ledDriftState.currentLed = label;
+            ledDriftState.currentRGBO = rgbo;
+            ledDriftState.displayDriftColor = true;
+            ledDriftState.statusMessage = "Measuring LED " + ledDriftState.currentLed;
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+
+            IPR650->StartMeasuring();
+            while (!IPR650->MeasureResult.ready && !ledDriftState.stopRequested) {
+                auto elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - start);
+                ledDriftState.elapsedMinutes = elapsed.count() / 60.0;
+                ledDriftState.remainingMinutes
+                    = std::max(0.0, (requestedDuration.count() - elapsed.count()) / 60.0);
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            }
+
+            if (!IPR650->MeasureResult.ready) {
+                break;
+            }
+
+            auto& result = IPR650->MeasureResult;
+            std::string spectrumFile = saveSpectrumData(
+                rgbo,
+                spectraDir,
+                result,
+                "_cycle" + std::to_string(ledDriftState.cycleIndex) + "_" + label
+            );
+            const double integratedPower = integrateSpectrumPower(result);
+            const auto [peakWavelength, peakPower] = peakSpectrumPower(result);
+            const auto elapsed = std::chrono::duration<double>(
+                std::chrono::steady_clock::now() - start
+            );
+
+            ledDriftState.elapsedMinutes = elapsed.count() / 60.0;
+            ledDriftState.remainingMinutes
+                = std::max(0.0, (requestedDuration.count() - elapsed.count()) / 60.0);
+            ledDriftState.lastLuminance = result.luminance;
+
+            timeseries << std::scientific << std::setprecision(maxPrecision)
+                       << getFolderTimestampString() << ',' << elapsed.count() << ','
+                       << ledDriftState.elapsedMinutes << ',' << ledDriftState.cycleIndex << ','
+                       << label << ',' << rgbo.x << ',' << rgbo.y << ',' << rgbo.z << ','
+                       << rgbo.w << ',' << result.luminance << ',' << integratedPower << ','
+                       << peakWavelength << ',' << peakPower << ','
+                       << csvEscape(std::filesystem::relative(spectrumFile, sessionDir).string())
+                       << '\n';
+            timeseries.flush();
+
+            IPR650->MeasureResult.ready = false;
+        }
+
+        ledDriftState.cycleIndex++;
+    }
+
+    timeseries.close();
+    const std::string endTimestamp = getFolderTimestampString();
+    ledDriftState.displayDriftColor = false;
+    validationState.displayValidationColor = false;
+    writeLedDriftMetadata(sessionDir, startTimestamp, endTimestamp, completed);
+
+    if (runLedDriftAnalysis(sessionDir)) {
+        ledDriftState.statusMessage = completed ? "LED drift run complete; plots generated"
+                                                : "LED drift run stopped; plots generated";
+    } else {
+        ledDriftState.statusMessage = completed ? "LED drift run complete; analysis failed"
+                                                : "LED drift run stopped; analysis failed";
+    }
+
+    pr650States.ledDriftRunning = false;
+    ledDriftState.stopRequested = false;
+}
+
+void AppAutoMeasure::writeLedDriftMetadata(
+    const std::string& sessionDir,
+    const std::string& startTimestamp,
+    const std::string& endTimestamp,
+    bool completed
+)
+{
+    std::ofstream metadata(sessionDir + "session_metadata.json", std::ios::out | std::ios::trunc);
+    if (!metadata.is_open()) {
+        ERROR("Failed to write LED drift metadata in {}", sessionDir);
+        return;
+    }
+
+    metadata << "{\n";
+    metadata << "  \"start_timestamp\": \"" << jsonEscape(startTimestamp) << "\",\n";
+    metadata << "  \"end_timestamp\": \"" << jsonEscape(endTimestamp) << "\",\n";
+    metadata << "  \"requested_duration_hours\": " << ledDriftState.durationHours << ",\n";
+    metadata << "  \"actual_elapsed_minutes\": " << ledDriftState.elapsedMinutes << ",\n";
+    metadata << "  \"completed\": " << (completed ? "true" : "false") << ",\n";
+    metadata << "  \"start_temperature\": \"" << jsonEscape(ledDriftState.startTemperature) << "\",\n";
+    metadata << "  \"end_temperature\": \"" << jsonEscape(ledDriftState.endTemperature) << "\",\n";
+    metadata << "  \"notes\": \"" << jsonEscape(ledDriftState.notes) << "\",\n";
+    metadata << "  \"primary_order\": \"RGBO\",\n";
+    metadata << "  \"pr650_exposure_time_ms\": " << IPR650->exposureTimeMs << ",\n";
+    metadata << "  \"pr650_num_exposures\": " << IPR650->numExposures << "\n";
+    metadata << "}\n";
+}
+
+bool AppAutoMeasure::runLedDriftAnalysis(const std::string& sessionDir)
+{
+    std::string cmd = "conda run -n tetrium python ../scripts/validation/analyze_led_drift.py"
+                      + std::string(" --session ") + sessionDir;
+    INFO("Running command: {}", cmd);
+    int result = system(cmd.c_str());
+    if (result != 0) {
+        ERROR("LED drift analysis failed with code: {}", result);
+        return false;
+    }
+    return true;
 }
 
 void AppAutoMeasure::measureAndSavePrimarySpectrumRobust(glm::ivec4 rgbo, const std::string& outputDir)
