@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="180" height="220" viewBox="0 0 180 220">
+  <title>Observer 1 — minimal human silhouette</title>
+  <circle cx="90" cy="62" r="39" fill="#343434"/>
+  <path d="M25 198 V181 C25 145 50 120 90 120 C130 120 155 145 155 181 V198
+    Q155 205 148 205 H32 Q25 205 25 198 Z" fill="#343434"/>
+</svg>
