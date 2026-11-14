@@ -23,7 +23,10 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import font_manager
-from matplotlib.patches import Rectangle
+from matplotlib.font_manager import FontProperties
+from matplotlib.patches import Circle, Rectangle, Wedge
+from matplotlib.path import Path as MplPath
+from matplotlib.textpath import TextPath
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 HERE = Path(__file__).resolve().parent
@@ -63,17 +66,34 @@ S_COLOR = "#8a8f96"
 ACCENT = "#2166ac"  # "our method" / emphasis; never means can't-see
 L_BAR = "#e08214"
 PAIR_COLORS = ("#2166ac", "#7b3294")
-FONT_DIR = Path("/usr/share/fonts/opentype/linux-libertine")
+# Linux Biolinum: the OpenType build on Linux, the TrueType build on macOS.
+FONT_DIRS = (
+    Path("/usr/share/fonts/opentype/linux-libertine"),
+    Path.home() / "Library" / "Fonts",
+    Path("/Library/Fonts"),
+)
+FONT_STEMS = ("LinBiolinum_R", "LinBiolinum_RB", "LinBiolinum_RI")
+FONT_FAMILY = "Linux Biolinum O"
 TOTAL_TESTS = 220  # C(12, 3) candidate null-space tests
 
 
 def setup_style() -> None:
-    for name in ("LinBiolinum_R.otf", "LinBiolinum_RB.otf", "LinBiolinum_RI.otf"):
-        path = FONT_DIR / name
-        if path.exists():
-            font_manager.fontManager.addfont(str(path))
+    global FONT_FAMILY
+    found = None
+    for font_dir in FONT_DIRS:
+        paths = [font_dir / f"{stem}{ext}" for stem in FONT_STEMS for ext in (".otf", ".ttf")]
+        paths = [path for path in paths if path.exists()]
+        if paths:
+            found = paths
+            break
+    if not found:
+        raise RuntimeError(f"Linux Biolinum not found in any of {[str(d) for d in FONT_DIRS]}; "
+                           "install Linux Libertine/Biolinum rather than falling back to DejaVu.")
+    for path in found:
+        font_manager.fontManager.addfont(str(path))
+    FONT_FAMILY = FontProperties(fname=str(found[0])).get_name()
     plt.rcParams.update({
-        "font.family": "Linux Biolinum O",
+        "font.family": FONT_FAMILY,
         "font.size": 20,
         "axes.titlesize": 22,
         "axes.labelsize": 20,
@@ -91,7 +111,7 @@ def setup_style() -> None:
         "savefig.facecolor": "white",
         "text.usetex": False,
         "mathtext.fontset": "custom",
-        "mathtext.rm": "Linux Biolinum O",
+        "mathtext.rm": FONT_FAMILY,
     })
 
 
@@ -118,6 +138,253 @@ def save(fig, stem: str) -> None:
         fig.savefig(OUT_DIR / f"{stem}.{ext}", bbox_inches="tight", pad_inches=0.15)
     plt.close(fig)
     print(f"wrote {OUT_DIR / stem}.png")
+
+
+# --------------------------------------------------------------------------
+# 0a. Hook: a pattern shown to seven observers (simulated appearance)
+# --------------------------------------------------------------------------
+HOOK_BG = np.array([204, 200, 206]) / 255
+HOOK_BLOB = np.array([237, 178, 203]) / 255
+
+
+def _blob_image(n: int, centers, blob_at: int | None, opacity: float = 1.0,
+                radius: float = 0.13) -> np.ndarray:
+    """Background-colored square with a soft-edged blob at one of `centers`."""
+    yy, xx = np.mgrid[0:n, 0:n] / (n - 1)
+    img = np.broadcast_to(HOOK_BG, (n, n, 3)).copy()
+    if blob_at is not None and opacity > 0:
+        cx, cy = centers[blob_at]
+        r = np.hypot(xx - cx, yy - cy)
+        alpha = np.clip((radius - r) / (0.25 * radius) + 0.5, 0, 1) * opacity
+        img = img * (1 - alpha[..., None]) + HOOK_BLOB * alpha[..., None]
+    return img
+
+
+def _person(ax, x: float, y: float, s: float, color: str) -> None:
+    ax.add_patch(Circle((x, y + 0.62 * s), 0.2 * s, color=color, lw=0))
+    ax.add_patch(Wedge((x, y), 0.36 * s, 0, 180, color=color, lw=0))
+
+
+def fig_hook_stimulus() -> None:
+    centers = [(0.5, 0.2), (0.8, 0.5), (0.5, 0.8), (0.2, 0.5)]
+    fig = plt.figure(figsize=(SLIDE_W, BODY_H))
+    ax = fig.add_axes([0.03, 0.12, 0.36, 0.76])
+    ax.imshow(_blob_image(600, centers, blob_at=1), extent=(0, 1, 0, 1), origin="lower")
+    for i, (cx, cy) in enumerate(centers):
+        if i != 1:
+            ax.add_patch(Circle((cx, cy), 0.13, fill=False, ec="#a9a6ad", lw=1.6, ls=(0, (4, 4))))
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.axis("off")
+    fig.text(0.03, 0.05, "Simulated: the real stimulus needs four primaries.",
+             fontsize=18, color=MUTED, va="center")
+    fig.text(0.03 + 0.18, 0.97, "Where is the blob? (4 choices)", fontsize=20,
+             ha="center", va="top", color=INK)
+
+    ax2 = fig.add_axes([0.45, 0.12, 0.54, 0.84])
+    ax2.set_xlim(0, 7.4)
+    ax2.set_ylim(0, 4)
+    ax2.set_aspect("equal")
+    ax2.axis("off")
+    for i in range(7):
+        x = 0.6 + i * 1.03
+        _person(ax2, x, 1.75, 1.0, MUTED)
+        ax2.text(x, 1.3, f"S{i + 1}", ha="center", va="top", fontsize=20)
+    save(fig, "00a_hook_stimulus")
+
+
+# --------------------------------------------------------------------------
+# 0b. Hook answer: four of seven never found it
+# --------------------------------------------------------------------------
+HOOK_TEST = (530.0, 559.0)
+HOOK_EXPECTED = {"S7": 0.50, "S6": 0.69, "S2": 0.98}
+
+
+def fig_hook_answer() -> None:
+    sec = _load_sibling("subject_equivalence_classes")
+    df = sec._load_quest_summary(sec.SUMMARY_CSV)
+    order = sec._trichromat_prior_order(10)
+    thresholds, censored, subjects = sec._build_subject_matrix(df, order)
+    genos = [tuple(float(p) for p in t.split(",")) for t in order]
+    col = genos.index(HOOK_TEST)
+    n = 7  # S1-S7: the normal observers; S8 is anomalous.
+    thr = thresholds[:n, col]
+    cen = censored[:n, col]
+    for label, expected in HOOK_EXPECTED.items():
+        r = int(label[1:]) - 1
+        assert not cen[r] and abs(thr[r] - expected) < 0.01, (label, thr[r], expected)
+    assert cen.sum() == 4, cen
+    print("hook thresholds:", {f"S{r + 1}": ("censored" if cen[r] else round(float(thr[r]), 2))
+                               for r in range(n)})
+
+    fig, ax = plt.subplots(figsize=(SLIDE_W, BODY_H))
+    y = np.arange(n)[::-1]
+    past = 1.18
+    for r in range(n):
+        if cen[r]:
+            ax.barh(y[r], past, color=RED, height=0.66)
+            ax.text(past + 0.02, y[r], "never found it", va="center", fontsize=19, color=RED)
+        else:
+            ax.barh(y[r], thr[r], color=MUTED, height=0.66)
+            ax.text(thr[r] - 0.015, y[r], f"{thr[r]:.2f}", ha="right", va="center",
+                    fontsize=19, color="white")
+    ax.plot([1.0, 1.0], [-0.6, n - 0.5], color=INK, lw=1.6, ls=(0, (5, 4)), zorder=3)
+    ax.text(1.0, n - 0.4, "max contrast", ha="center", va="bottom", fontsize=19)
+    ax.set_yticks(y)
+    ax.set_yticklabels([f"S{r + 1}" for r in range(n)])
+    ax.tick_params(axis="y", length=0)
+    ax.spines["left"].set_visible(False)
+    ax.set_xlim(0, 1.5)
+    ax.set_xticks([0, 0.25, 0.5, 0.75, 1.0])
+    ax.set_ylim(-0.6, n + 0.3)
+    ax.set_xlabel("Contrast needed to find it (fraction of max)")
+    save(fig, "00b_hook_answer")
+
+
+# --------------------------------------------------------------------------
+# 0c. A generated pseudo-isochromatic plate (protan confusion line)
+# --------------------------------------------------------------------------
+# Vienot, Brettel & Mollon 1999: linear RGB -> LMS, and the protanope projection.
+VIENOT_RGB2LMS = np.array([
+    [17.8824, 43.5161, 4.11935],
+    [3.45565, 27.1554, 3.86714],
+    [0.0299566, 0.184309, 1.46709],
+])
+VIENOT_PROTAN = np.array([[0, 2.02344, -2.52581], [0, 1, 0], [0, 0, 1]])
+
+
+def _srgb_encode(lin: np.ndarray) -> np.ndarray:
+    lin = np.clip(lin, 0, 1)
+    return np.where(lin <= 0.0031308, 12.92 * lin, 1.055 * lin ** (1 / 2.4) - 0.055)
+
+
+def _plate_dots(rng, n_try: int = 40000):
+    dots = []
+    for _ in range(n_try):
+        r = rng.uniform(0.012, 0.032)
+        x, y = rng.uniform(-1, 1, 2)
+        if np.hypot(x, y) + r > 0.98:
+            continue
+        if any(np.hypot(x - a, y - b) < r + c + 0.006 for a, b, c in dots):
+            continue
+        dots.append((x, y, r))
+    return np.array(dots)
+
+
+def _digit_mask(points: np.ndarray, digit: str = "5") -> np.ndarray:
+    path = TextPath((0, 0), digit, size=1.0, prop=FontProperties(family=FONT_FAMILY, weight="bold"))
+    verts = path.vertices
+    lo, hi = verts.min(0), verts.max(0)
+    scale = 1.25 / (hi - lo)[1]
+    center = (lo + hi) / 2
+    inside = np.zeros(len(points), dtype=int)
+    for poly in path.to_polygons():
+        poly = (poly - center) * scale
+        inside += MplPath(poly).contains_points(points)
+    return inside % 2 == 1
+
+
+def fig_plate() -> None:
+    rng = np.random.default_rng(7)
+    dots = _plate_dots(rng)
+    in_digit = _digit_mask(dots[:, :2])
+    lms2rgb = np.linalg.inv(VIENOT_RGB2LMS)
+    base = np.array([0.42, 0.30, 0.12])  # linear RGB
+    l_dir = lms2rgb @ np.array([1.0, 0.0, 0.0])  # pure L-cone change
+    jitter = rng.uniform(0.72, 1.12, len(dots))
+    # Largest symmetric L step that keeps every jittered dot inside [0, 1].
+    step = np.inf
+    for sign in (1, -1):
+        for i in range(3):
+            d = sign * l_dir[i]
+            if d > 0:
+                step = min(step, (1 / jitter.max() - base[i]) / d)
+            elif d < 0:
+                step = min(step, base[i] / -d)
+    step *= 0.9
+    lin = base + np.where(in_digit, 1, -1)[:, None] * step * l_dir
+    lin = lin * jitter[:, None]
+    assert lin.min() >= 0 and lin.max() <= 1, (lin.min(), lin.max())
+    lms = lin @ VIENOT_RGB2LMS.T
+    dl = lms[in_digit] / jitter[in_digit, None] - lms[~in_digit][:1] / jitter[~in_digit][:1, None]
+    assert np.allclose(dl[:, 1:], 0, atol=1e-9)  # digit differs only in L
+    protan = (lms @ VIENOT_PROTAN.T) @ lms2rgb.T
+    assert protan.min() >= -1e-9 and protan.max() <= 1 + 1e-9, (protan.min(), protan.max())
+    gap = np.abs(protan[in_digit] / jitter[in_digit, None] - protan[~in_digit][0] / jitter[~in_digit][0])
+    assert gap.max() < 1e-9  # digit vanishes for the protanope
+    print(f"plate: {len(dots)} dots, {in_digit.sum()} in digit, L step {step:.4f}")
+
+    fig, axes = plt.subplots(1, 2, figsize=(SLIDE_W, BODY_H))
+    for ax, colors, title in ((axes[0], lin, "Normal trichromat"),
+                              (axes[1], protan, "Simulated protanope")):
+        rgb = _srgb_encode(colors)
+        for (x, y, r), c in zip(dots, rgb):
+            ax.add_patch(Circle((x, y), r, color=c, lw=0))
+        ax.set_xlim(-1.02, 1.02)
+        ax.set_ylim(-1.02, 1.02)
+        ax.set_aspect("equal")
+        ax.axis("off")
+        ax.set_title(title, fontsize=22, pad=10)
+    fig.subplots_adjust(wspace=0.08)
+    save(fig, "00c_plate")
+
+
+# --------------------------------------------------------------------------
+# 0d. Each normal type has its own hidden pattern (measured primaries)
+# --------------------------------------------------------------------------
+def fig_hidden_per_type(primaries_dir: Path) -> None:
+    sop = _load_sibling("simple_observer_projection")
+    from TetriumColor.ColorSpace import ColorSpace
+    from TetriumColor.Measurement import load_primaries_from_csv
+
+    primaries = load_primaries_from_csv(str(primaries_dir), extract_zero=False, primary_order="BGOR")
+    wl = primaries[0].wavelengths
+    genotypes = ObserverGenotypes(wavelengths=wl, dimensions=[3], template="baylor")
+    kw = dict(degree=2.0, illuminant="raw", template="baylor")
+    disp = sop._display_matrix(primaries, wl)
+    targets = [(530, 547, 559), (530, 547, 555)]
+    observers = [(530, 559), (530, 555)]
+    contrast = np.zeros((2, 2))
+    for i, target in enumerate(targets):
+        cs = ColorSpace(genotypes.get_observer_for_peaks(target, **kw),
+                        display_primaries=primaries, metameric_axis=2)
+        w1, w2, _, _ = sop._metamer_pair_for_observer(cs, primaries, 0.8)
+        for j, geno in enumerate(observers):
+            obs = genotypes.get_observer_for_peaks(geno, **kw)
+            diff = sop._raw_cone_diff(obs, primaries, w1, w2)
+            mean = 0.5 * np.abs(obs.sensor_matrix @ disp @ (w1 + w2))
+            contrast[i, j] = float(np.max(100 * diff / mean))
+    print("hidden-per-type max cone contrast %:", np.round(contrast, 3).tolist())
+    assert np.all(np.diag(contrast) < 0.05) and np.all(contrast[[0, 1], [1, 0]] > 1.0), contrast
+
+    fig = plt.figure(figsize=(SLIDE_W, BODY_H))
+    h = 0.32
+    w = h * BODY_H / SLIDE_W  # square cells
+    col_x = (0.47, 0.72)
+    row_y = (0.53, 0.09)
+    for i, target in enumerate(targets):
+        for j, geno in enumerate(observers):
+            ax = fig.add_axes([col_x[j] - w / 2, row_y[i], w, h])
+            c = contrast[i, j]
+            ax.imshow(_blob_image(300, [(0.5, 0.5)], 0, opacity=c / contrast.max(), radius=0.24),
+                      extent=(0, 1, 0, 1), origin="lower")
+            ax.set_xticks([])
+            ax.set_yticks([])
+            hidden = c < 0.05
+            for side in ax.spines.values():
+                side.set_visible(True)
+                side.set_color(RED if hidden else FAINT)
+                side.set_linewidth(4 if hidden else 1)
+            note = f"{c:.1f}% contrast" + (" · can't see" if hidden else "")
+            ax.text(0.5, -0.04, note, transform=ax.transAxes, ha="center", va="top",
+                    fontsize=19, color=RED if hidden else INK)
+            if i == 0:
+                ax.text(0.5, 1.04, f"Observer\n{class_label(geno)}", transform=ax.transAxes,
+                        ha="center", va="bottom", fontsize=20)
+        fig.text(col_x[0] - w / 2 - 0.03, row_y[i] + h / 2,
+                 f"Pattern hidden from\n{class_label((target[0], target[2]))}",
+                 ha="right", va="center", fontsize=20)
+    save(fig, "00d_hidden_per_type")
 
 
 # --------------------------------------------------------------------------
@@ -178,7 +445,6 @@ def fig_class_prior(prior) -> None:
     ax.spines["left"].set_visible(False)
     ax.tick_params(axis="y", length=0)
     ax.text(73, y[0], "the “standard observer”", va="center", fontsize=19, color=MUTED)
-    ax.text(31, y[1], "1 in 4 trichromats", va="center", fontsize=19, color=ACCENT)
     cum10 = sum(probs[:10]) * 100
     ax.text(94, y[6], f"Top 10 classes\ncover {cum10:.1f}%",
             ha="right", va="center", fontsize=20, color=INK)
@@ -266,6 +532,9 @@ def fig_tests_needed(prior) -> None:
             color=ACCENT, fontsize=20, va="top")
     ax.text(12, random[12] + 14, f"Random order of {TOTAL_TESTS} tests (expected {e_random:.0f})",
             color=MUTED, fontsize=20)
+    ax.text(12, ordered[12] - 32,
+            "idealized: assumes each observer fails\nonly their own class's test",
+            color=ACCENT, fontsize=18, style="italic", va="top")
     ax.plot([10], [ordered[10]], "o", color=ACCENT, ms=10)
     ax.annotate(f"{ordered[10]:.1f}% after 10 tests", xy=(10, ordered[10]), xytext=(14, 96),
                 fontsize=20, va="center", arrowprops=dict(arrowstyle="-", color=INK, lw=1))
@@ -324,6 +593,10 @@ def main() -> None:
     args = parser.parse_args()
     setup_style()
     prior = trichromat_prior()
+    fig_hook_stimulus()
+    fig_hook_answer()
+    fig_plate()
+    fig_hidden_per_type(args.primaries)
     fig_cone_variants()
     fig_class_prior(prior)
     fig_invisible_to_one(args.primaries)
