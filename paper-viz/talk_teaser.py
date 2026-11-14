@@ -191,8 +191,15 @@ class Teaser:
     def base(self):
         return Image.new("RGB", (1920, 1080), "white")
 
-    def chart(self, im, box, peaks, alpha=1.0, dashed=False, axes=True, width=8, reveal=1):
+    def plot_frame(self,im,box,alpha=1.):
+        x,y,w,h=box
+        ImageDraw.Draw(im).rounded_rectangle((x-18,y-18,x+w+18,y+h+18),
+            radius=16,fill="white",outline=pale("#c6c9ce",alpha),width=3)
+
+    def chart(self, im, box, peaks, alpha=1.0, dashed=False, axes=True, width=8, reveal=1, framed=True):
         x, y, w, h = box
+        if framed:
+            self.plot_frame(im,box,alpha)
         if axes:
             line(im, [(x, y), (x, y+h), (x+w, y+h)], pale("#a3a6aa", alpha), 3)
         for peak in peaks:
@@ -203,12 +210,14 @@ class Teaser:
             line(im, pts[:max(2, round(len(pts)*reveal))], pale(data["color"], .82 * alpha), width, dashed)
 
     def observer(self, im, which, y=425, alpha=1., small=False, x=None):
+        if alpha<=0:
+            return
         x = (250 if which == "A" else 1510) if x is None else x
         scale=.88 if small else 1.
         profile=self.profiles[which].resize((round(180*scale),round(220*scale)),Image.Resampling.LANCZOS)
         if alpha<1:
             profile.putalpha(profile.getchannel("A").point(lambda a:round(a*alpha)))
-        im.paste(profile,(x,round(y)),profile)
+        im.paste(profile,(round(x),round(y)),profile)
         text(im,(x+90*scale,y+220*scale+24),f"Observer {1 if which=='A' else 2}",
              34,"sans",pale(INK,alpha),"ma")
 
@@ -235,32 +244,35 @@ class Teaser:
         line(im,[(cx-4,cy),(cx+4,cy)],"#817e84",1.5)
         line(im,[(cx,cy-4),(cx,cy+4)],"#817e84",1.5)
 
-    def intro(self, t):
+    def intro(self, t, exit_progress=0.):
         im = self.base()
-        self.observer(im,"A")
-        self.observer(im,"B")
+        self.observer(im,"B",alpha=1-exit_progress)
+        self.observer(im,"A",x=mix(250,1450,exit_progress),y=mix(425,510,exit_progress))
         split=ease((t-.8)/1.6)
         parent=(620,70,680,285)
         # The whole library persists above both observer-specific selections.
-        self.chart(im,parent,self.peaks,.9*ease(t/.45),width=7)
+        # The library belongs to the cone-comparison scene, not the display scene.
+        self.chart(im,parent,self.peaks,.9*ease(t/.45)*(1-exit_progress),width=7)
         if split>0:
             for peaks,side in [(self.a,0),(self.b,1)]:
                 end_x=470 if side==0 else 1100
                 cx=end_x+175
                 start_x=790 if side==0 else 1130
                 branch=[(start_x,375),(start_x,400),(cx,450),(cx,485)]
-                line(im,branch,pale("#858990",split),6)
+                line(im,branch,pale("#858990",split*(1-exit_progress)),6)
                 if split>.8:
-                    line(im,[(cx-12,470),(cx,485),(cx+12,470)],pale("#858990",split),6)
+                    line(im,[(cx-12,470),(cx,485),(cx+12,470)],pale("#858990",split*(1-exit_progress)),6)
                 # Copy the actual selected curves from their parent coordinates.
                 # Darken-compositing avoids repainting identical strokes darker.
                 box=tuple(mix(a,b,split) for a,b in zip(parent,(end_x,510,350,255)))
                 emerging=self.base()
-                self.chart(emerging,box,peaks,.9,axes=False,width=mix(7,8,split))
+                self.plot_frame(emerging,box,ease((split-.3)/.5)*(1-exit_progress))
+                self.chart(emerging,box,peaks,.9*(1-exit_progress),axes=False,
+                           width=mix(7,8,split),framed=False)
                 im=ImageChops.darker(im,emerging)
                 if split>.85:
                     x,y,w,h=box
-                    line(im,[(x,y),(x,y+h),(x+w,y+h)],pale("#a3a6aa",ease((split-.85)/.15)),3)
+                    line(im,[(x,y),(x,y+h),(x+w,y+h)],pale("#a3a6aa",ease((split-.85)/.15)*(1-exit_progress)),3)
         return im
 
     def arrow(self,im,start,end,alpha=1.):
@@ -293,12 +305,16 @@ class Teaser:
                 fill=pale("#f9d6d5" if nulled else "#f7f7f7",alpha),
                 outline=pale("#bfc1c4",alpha),width=3)
             if labels:
-                label="S" if peak==420 else f"{'M' if peak<540 else 'L'}{peak:g}"
-                text(im,(x+(i+.5)*cell,y-30),label,20,fill=pale(MUTED,alpha),anchor="ma")
+                # Stack the cone family and peak instead of crowding one line.
+                label="S" if peak==420 else ("M" if peak<540 else "L")
+                text(im,(x+(i+.5)*cell,y-49),label,20,"bold",pale(MUTED,alpha),"ma")
+                if peak!=420:
+                    text(im,(x+(i+.5)*cell,y-27),f"{peak:g}",22,
+                         fill=pale(MUTED,alpha),anchor="ma")
 
-    def primary_spectra(self,im):
+    def primary_spectra(self,im,box=(555,330,260,105)):
         """Measured primary spectra, individually normalized, below the projector."""
-        x,y,w,h=535,798,340,85
+        x,y,w,h=box
         line(im,[(x,y),(x,y+h),(x+w,y+h)],"#a3a6aa",3)
         for primary in self.assets["spectra"]:
             points=[(x+(wavelength-400)/300*w,y+h*(1-.94*power))
@@ -307,33 +323,65 @@ class Teaser:
         text(im,(x,y+h+8),"400",20,fill=MUTED)
         text(im,(x+w,y+h+8),"700 nm",20,fill=MUTED,anchor="ra")
 
-    def display(self,t):
-        im = self.base()
-        self.observer(im,"A",x=220,y=420)
+    def display(self,t,transfer=None):
+        # Carry the observer out of the cone comparison while its plots fade.
+        moving=transfer is not None
+        u=0. if transfer is None else transfer
+        if moving:
+            im=self.base()
+            observer_move=ease(min(u/.7,1.))
+            self.observer(im,"A",x=mix(1450,220,observer_move),
+                          y=mix(510,420,observer_move)+100*np.sin(np.pi*observer_move))
+        else:
+            im=self.intro(4.5,ease(t/.7))
         # Establish the hardware first, before presenting its output or response.
         hardware=self.base()
         projector=self.projector.resize((211,132),Image.Resampling.LANCZOS)
-        hardware.paste(projector,(590,636))
-        text(hardware,(695,564),"Four-primary display",34,anchor="ma")
+        hardware.paste(projector,(580,155))
+        text(hardware,(685,100),"Four-primary display",34,anchor="ma")
         self.primary_spectra(hardware)
-        im=ImageChops.darker(im,Image.blend(self.base(),hardware,ease(t/.3)))
+        hardware_alpha=ease((t-.35)/.3)*(1-ease(u/.3))
+        im=ImageChops.darker(im,Image.blend(self.base(),hardware,hardware_alpha))
         # Then show the physical pattern, its pair of spectra, and null vector.
         pattern=self.base()
-        line(pattern,[(794,687),(985,568)],"#999da3",5)
-        line(pattern,[(794,702),(985,878)],"#999da3",5)
-        self.stimulus(pattern,(985,568,310,310),1-ease((t-2.05)/.55),direction="right")
-        im=ImageChops.darker(im,Image.blend(self.base(),pattern,ease((t-.65)/.3)))
-        self.spectra_pair(im,(575,180,460,255),ease((t-.9)/.4))
-        a=ease((t-1.35)/.35)
-        text(im,(1452,215),"Null-space stimulus",34,fill=pale(INK,a),anchor="ma")
-        self.null_vector(im,1140,300,self.a,cell=52,height=60,alpha=a,labels=True)
-        text(im,(1452,420),"Same cone response",34,
-             fill=pale(INK,ease((t-2.05)/.55)),anchor="ma")
+        ray_color=pale("#bdc1c7",1-ease(u/.3))
+        # Two projection boundaries connect the projector to the stimulus edges.
+        line(pattern,[(784,225),(1030,465)],ray_color,3)
+        line(pattern,[(784,240),(1030,805)],ray_color,3)
+        # Clear the observer's travel lane horizontally before rising into the
+        # first row, so neither the person nor the vector crosses the stimulus.
+        lateral=ease(min(u/.4,1.))
+        stimulus_box=(mix(1030,515,lateral),mix(465,170,u),
+                      mix(340,150,lateral),mix(340,150,lateral))
+        self.stimulus(pattern,stimulus_box,1-ease((t-2.2)/.55),direction="right")
+        im=ImageChops.darker(im,Image.blend(self.base(),pattern,ease((t-.95)/.3)))
+        spectra=self.base()
+        self.spectra_pair(spectra,(530,525,380,235),ease((t-1.1)/.35)*(1-ease(u/.3)))
+        im=ImageChops.darker(im,spectra)
+        annotations=self.base()
+        a=ease((t-1.5)/.3)
+        text(annotations,(1200,160),"Null-space stimulus",32,fill=pale(INK,a*(1-ease(u/.3))),anchor="ma")
+        vector_x,vector_y=mix(888,760,u),mix(260,215,u)
+        vector_cell=52
+        old_vector=self.base()
+        self.null_vector(old_vector,vector_x,vector_y,self.a,cell=vector_cell,alpha=a,labels=True)
+        if moving:
+            new_vector=self.base()
+            self.null_vector(new_vector,vector_x,vector_y,self.math["trials"][0]["peaks"],
+                             cell=vector_cell,labels=True)
+            old_vector=Image.blend(old_vector,new_vector,ease((u-.65)/.35))
+        im=ImageChops.darker(im,old_vector)
+        text(annotations,(720,830),"Same cone response",32,
+             fill=pale(INK,ease((t-2.2)/.55)*(1-ease(u/.3))),anchor="ma")
         # Only give the response after the illustrated blob has disappeared.
-        response_alpha=ease((t-2.6)/.3)
-        text(im,(1470,678),"Can’t see",42,fill=pale(INK,response_alpha),anchor="ma")
-        self.response(im,310,335,False,response_alpha)
-        return im
+        response_alpha=ease((t-2.75)/.3)*(1-ease(u/.3))
+        self.response(annotations,1540,455,False,response_alpha)
+        im=ImageChops.darker(im,annotations)
+        # Center the display group, which previously occupied the right side.
+        # Ease the offset at both boundaries to preserve the shared-element move.
+        shift=-120*ease(t/.7)*(1-u)
+        return im.transform(im.size,Image.Transform.AFFINE,(1,0,-shift,0,1,0),
+                            resample=Image.Resampling.BICUBIC,fillcolor="white")
 
     def compare(self,t):
         im = self.base()
@@ -353,11 +401,25 @@ class Teaser:
         return im
 
     def classify(self,t):
+        # Move the same stimulus and vector into row one; the next test changes
+        # the null vector near landing, then reveals its new cardinal blob.
+        if t<.5:
+            u=ease(t/.5)
+            im=self.display(3.8,transfer=u)
+            rows=self.base()
+            ImageDraw.Draw(rows).rounded_rectangle((490,155,1770,333),12,
+                                                   outline="#bdbdbf",width=4)
+            for i,trial in enumerate(self.math["trials"][1:],start=1):
+                y=170+i*185
+                self.stimulus(rows,(515,y,150,150),0,direction=("right","left")[i-1])
+                self.null_vector(rows,760,y+45,trial["peaks"],alpha=.4)
+            return ImageChops.darker(im,Image.blend(self.base(),rows,ease((u-.6)/.4)))
+        t-=.5
         im=self.base()
         self.observer(im,"A",x=220,y=420)
         trials=self.math["trials"]
-        collect=ease((t-2.95)/.65)
-        classified=ease((t-3.85)/.45)
+        collect=ease((t-2.9)/.5)
+        classified=ease((t-3.5)/.35)
         for i,trial in enumerate(trials):
             y=170+i*185
             local=t-i*.95
@@ -407,7 +469,7 @@ class Teaser:
         im=im.transform(im.size,Image.Transform.AFFINE,
             (1/scale,0,960-960/scale,0,1/scale,480-target_y/scale),
             resample=Image.Resampling.BICUBIC,fillcolor="white")
-        # Retain consistent observer positions across direct, purposeful cuts.
+        # Apply one stable camera framing to the animated element positions.
         if captions:
             self.caption(im,t)
         return im
@@ -524,7 +586,7 @@ def save_notes(config,out,voiceover):
   o-x-o response vector, compatible library models, and source-figure provenance.
 
 {audio_note} Cue timing is provisional until rehearsed aloud.
-The user's latest narration is preserved verbatim (57 words). The cut opens on
+The user's latest narration is preserved verbatim ({sum(len(c['text'].split()) for c in cues)} words). The cut opens on
 the same-image / different-perception comparison, then reveals the cone differences
 at 5.3 s, the display at 9.8 s, and classification at 13.6 s. The ordering scene
 remains for the closing invitation, 17.65–20 s.
@@ -533,9 +595,28 @@ typographic end card are shown. Mathematical notation labels the spectra and
 response-vector workflow. Observer 1 and Observer 2 use identical-size faceless
 SVG silhouettes and numbered labels. The opening starts with one stimulus, expands
 to two, then removes the blob for Observer 1. Only Observer 1 remains for the display
-and classification shots, at a fixed position. The taller hyperobserver fades in
+and classification shots. The taller hyperobserver fades in
 as a whole; selected curves originate at its coordinates and travel out to the
 two observers. Darken-compositing prevents coincident copies doubling stroke opacity.
+At the display transition, the hyperobserver and individual cone plots fade away,
+and Observer 1 moves beside the blob on the right as Observer 2 fades. The third
+scene does not repeat the hyperobserver. The null-space strip and its label occupy
+the upper space, with the spectra immediately left of the blob below them.
+The complete display group is centered 120 source pixels farther left; this offset
+eases in and out with the shared-element moves. The third scene uses only the red
+x response marker, without the “Can't see” text. Classification-row wording is
+unchanged.
+Cone plots have white, shadow-free rounded frames with 3 px light-gray borders,
+18 px padding, and 16 px corner radii; each frame travels with its curves.
+The display's null-space strip and blob share a horizontal center.
+The observer sits closer to the stimulus, with two light-gray projection
+boundaries connecting the projector to the stimulus edges. Cone family letters and
+wavelengths use separate lines so the labels do not crowd neighboring columns.
+The next transition moves the same stimulus and null vector into the first test
+row while Observer 1 moves back to the left. Supporting display elements fade
+away and the other rows appear. The incoming first test updates the vector near
+landing, then reveals its up-position blob; it does not reuse the preceding
+test's invisible response as evidence for a different condition.
 Cone curves use 7–8 px strokes and the branching arrows use 6 px strokes before
 framing. All artwork is enlarged 6% for review and 12% for the caption-free talk
 cut, which is also vertically recentered to use the available screen height.
@@ -549,15 +630,18 @@ gray background and pink blob spectra; both are drawn on one common vertical sca
 The raw-cone null direction and symmetric .8-gamut spectral pair follow the method
 in `simple_observer_projection.py`. S420/M530/L559 are nulled to floating-point
 precision. Difference bars are omitted; the two spectra are labeled Background
-and Blob, with “Same cone response” and “Can't see.” A twelve-cell null-space strip
-beside the spectra introduces the same representation used in the next scene.
+and Blob, with “Same cone response” and a red x marker. A twelve-cell null-space strip
+above the blob introduces the representation used in the next scene.
 Measured R/G/B/O primary spectra are plotted below the projector on a 400–700 nm
 axis, each normalized to its own maximum. There are no color-block swatches.
 The display scene first establishes the projector and its primary spectra, then
 reveals the projected pattern, the background/blob spectra, and the null vector.
-The blob fades only after those elements have appeared; “Can't see” follows its
+The blob fades only after those elements have appeared; the red x follows its
 disappearance. This hardware → stimulus → response sequence replaces the prior
-simultaneous reveal.
+simultaneous reveal. The first scene-boundary move lasts 0.7 seconds and the move
+into classification lasts 0.5 seconds. The trials begin after the second move;
+response collection and its following pause are shortened so the final class is
+fully visible at 17.95 s and holds for 2.05 seconds, within the unchanged 20-second cut.
 These are modeled spectra from measured primaries, not measured stimulus spectra.
 The original projector is
 cropped from `teaser-image.png`; the profiles are editable SVG files in
@@ -602,7 +686,7 @@ CairoSVG, and imageio-ffmpeg. All video text uses Linux Biolinum. After the init
 run the scientific arrays are cached in `assets.json`. Delete only that generated
 cache if source models or measurements change and need to be re-exported.
 
-Rehearse a timed read before finalizing pacing (approximately 171 words/minute).
+Rehearse a timed read before finalizing pacing (approximately {round(sum(len(c['text'].split()) for c in cues)*60/config['duration'])} words/minute).
 The renderer
 accepts voiceover up to 20 seconds without time-stretching, and pads shorter audio.
 """)

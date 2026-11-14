@@ -7,6 +7,7 @@ Outputs separate S, M, and L cone-family plots, plus one combined plot.
 Usage:
     python paper-viz/plot_hyperobserver.py
     python paper-viz/plot_hyperobserver.py --output-dir paper-viz/output/hyperobserver_cones
+    python paper-viz/plot_hyperobserver.py --aspect-ratio-1-to-1-5
 """
 
 from __future__ import annotations
@@ -39,6 +40,7 @@ FAMILY_HEIGHT_RATIO = 0.95
 COMBINED_HEIGHT_RATIO = 0.8
 SHORT_FAMILY_HEIGHT_RATIO = 0.85
 SHORT_COMBINED_HEIGHT_RATIO = 0.6
+PORTRAIT_HEIGHT_RATIO = 1.5
 STOCKMAN_SHARPE_PEAKS = {"S": 420, "M": 530, "L": 559}
 STOCKMAN_SHARPE_LINESTYLES = {"S": ":", "M": "--", "L": "-."}
 
@@ -87,6 +89,7 @@ def _plot_cones(
     stockman_sharpe_families,
     split_legend: bool = False,
     compact_legend: bool = False,
+    show_ylabel: bool = True,
 ) -> None:
     variant_lines = []
     for peak in peaks:
@@ -115,7 +118,8 @@ def _plot_cones(
         stockman_sharpe_lines.append(line)
 
     ax.set_xlabel("Wavelength (nm)")
-    ax.set_ylabel("Spectral sensitivity")
+    if show_ylabel:
+        ax.set_ylabel("Spectral sensitivity")
     ax.set_xlim(wavelengths[0], wavelengths[-1])
     ax.set_ylim(bottom=0)
     ax.spines["top"].set_visible(False)
@@ -174,13 +178,19 @@ def _plot_cones(
         )
 
 
-def _save_figure(fig, output_dir: Path, stem: str, formats: list[str]) -> None:
+def _save_figure(fig, output_dir: Path, stem: str, formats: list[str], dpi: int) -> None:
     for fmt in formats:
-        fig.savefig(output_dir / f"{stem}.{fmt}", facecolor="white")
+        fig.savefig(output_dir / f"{stem}.{fmt}", facecolor="white", dpi=dpi)
     plt.close(fig)
 
 
-def make_plots(output_dir: Path, formats: list[str], shorter: bool = False) -> None:
+def make_plots(
+    output_dir: Path,
+    formats: list[str],
+    shorter: bool = False,
+    aspect_ratio_1_to_1_5: bool = False,
+    dpi: int = 300,
+) -> None:
     apply_style()
     plt.rcParams.update(
         {
@@ -206,6 +216,10 @@ def make_plots(output_dir: Path, formats: list[str], shorter: bool = False) -> N
     ]
     family_height_ratio = SHORT_FAMILY_HEIGHT_RATIO if shorter else FAMILY_HEIGHT_RATIO
     combined_height_ratio = SHORT_COMBINED_HEIGHT_RATIO if shorter else COMBINED_HEIGHT_RATIO
+    if aspect_ratio_1_to_1_5:
+        family_height_ratio = PORTRAIT_HEIGHT_RATIO
+        combined_height_ratio = PORTRAIT_HEIGHT_RATIO
+    stem_suffix = "_1x1p5" if aspect_ratio_1_to_1_5 else ""
 
     for stem, title, peaks in family_specs:
         fig, ax = plt.subplots(figsize=(FIG_WIDTH, FIG_WIDTH * family_height_ratio))
@@ -218,9 +232,13 @@ def make_plots(output_dir: Path, formats: list[str], shorter: bool = False) -> N
             title,
             stockman_sharpe_matrix,
             [family],
+            show_ylabel=not aspect_ratio_1_to_1_5,
         )
-        fig.subplots_adjust(left=0.22, right=0.96, bottom=0.46, top=0.97)
-        _save_figure(fig, output_dir, f"hyperobserver_{stem}_cones", formats)
+        family_bottom = 0.36 if aspect_ratio_1_to_1_5 else 0.46
+        family_top = 0.91 if aspect_ratio_1_to_1_5 else 0.97
+        family_left = 0.15 if aspect_ratio_1_to_1_5 else 0.22
+        fig.subplots_adjust(left=family_left, right=0.96, bottom=family_bottom, top=family_top)
+        _save_figure(fig, output_dir, f"hyperobserver_{stem}_cones{stem_suffix}", formats, dpi)
 
     fig, ax = plt.subplots(figsize=(FIG_WIDTH, FIG_WIDTH * combined_height_ratio))
     _plot_cones(
@@ -233,10 +251,13 @@ def make_plots(output_dir: Path, formats: list[str], shorter: bool = False) -> N
         ["S", "M", "L"],
         split_legend=True,
         compact_legend=shorter,
+        show_ylabel=not aspect_ratio_1_to_1_5,
     )
-    combined_bottom = 0.50 if shorter else 0.44
-    fig.subplots_adjust(left=0.22, right=0.96, bottom=combined_bottom, top=0.97)
-    _save_figure(fig, output_dir, "hyperobserver_all_cones", formats)
+    combined_bottom = 0.36 if aspect_ratio_1_to_1_5 else 0.50 if shorter else 0.44
+    combined_top = 0.89 if aspect_ratio_1_to_1_5 else 0.97
+    combined_left = 0.15 if aspect_ratio_1_to_1_5 else 0.22
+    fig.subplots_adjust(left=combined_left, right=0.96, bottom=combined_bottom, top=combined_top)
+    _save_figure(fig, output_dir, f"hyperobserver_all_cones{stem_suffix}", formats, dpi)
 
 
 def main() -> None:
@@ -259,9 +280,29 @@ def main() -> None:
         action="store_true",
         help="Use shorter figure heights while preserving the default layout otherwise.",
     )
+    parser.add_argument(
+        "--aspect-ratio-1-to-1-5",
+        action="store_true",
+        help="Write a 1:1.5 width-to-height version of each plot.",
+    )
+    parser.add_argument(
+        "--dpi",
+        type=int,
+        default=300,
+        help="DPI for saved figures; defaults to 300.",
+    )
     args = parser.parse_args()
 
-    make_plots(args.output_dir, args.formats, shorter=args.shorter)
+    if args.dpi < 300:
+        parser.error("--dpi must be at least 300")
+
+    make_plots(
+        args.output_dir,
+        args.formats,
+        shorter=args.shorter,
+        aspect_ratio_1_to_1_5=args.aspect_ratio_1_to_1_5,
+        dpi=args.dpi,
+    )
     print(f"Wrote hyperobserver cone sensitivity plots to {args.output_dir}")
 
 

@@ -89,7 +89,7 @@ def _raw_cone_excitation_null_direction_in_disp(
     color_space: ColorSpace,
     metameric_axis: int,
 ) -> np.ndarray:
-    excitation_matrix = color_space.get_raw_display_to_cone_matrix()
+    excitation_matrix = color_space.display_to_raw_cone_matrix()
     nulled = np.delete(excitation_matrix, metameric_axis, axis=0)
     _, _, vh = np.linalg.svd(nulled)
     direction = vh[-1]

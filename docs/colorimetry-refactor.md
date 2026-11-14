@@ -34,7 +34,7 @@ The refactor should make the data model explicit enough that API names reveal th
 ## Current Repo Findings
 
 - Core transform code is in `extern/TetriumColor/TetriumColor/ColorSpace.py`.
-- `Observer` in `extern/TetriumColor/TetriumColor/Observer/Observer.py` owns cone fundamentals and also stores an optional illuminant. Its `raw_illuminant` mode makes emission-style workflows possible, but the API does not make the stimulus kind explicit.
+- `Observer` in `extern/TetriumColor/TetriumColor/Observer/Observer.py` owns cone fundamentals and also stores an optional illuminant. The illuminant and `raw_illuminant` flag should be treated as legacy compatibility state for `observe(...)`, not as part of the new display/emission API model.
 - `ColorSpaceType.CONE` is used as a central internal coordinate, but it can mean normalized display-conversion coordinates, raw cone responses, or cone-like vectors depending on the call path.
 - `ColorSpace.get_raw_display_to_cone_matrix()` already computes the direct display-primary to raw cone excitation matrix.
 - `QuestColorGenerator` currently allows `color_picking_space='cone_contrast'`, but its own docstring says this computes raw cone-excitation axes in display space.
@@ -89,6 +89,8 @@ Prefer explicit methods over generic conversion names when stimulus meaning matt
 - `color_space.display_to_raw_cone_matrix()`
 - `color_space.display_to_raw_cone(display_weights)`
 - `color_space.raw_cone_to_display_weights(raw_cone, method=...)`
+- `ColorSpaceType.RAW_CONE_EXCITATION` for explicit device/display primary weights to raw cone response conversion.
+- `ColorSpaceType.WHITEPOINT_NORMALIZED_CONE_RESPONSE` for raw cone response divided by an explicit display/reference whitepoint.
 - `color_space.display_to_cone_contrast_matrix(background)`
 - `color_space.cone_contrast_delta(a, b, background, sample_space=...)`
 - `QuestColorGenerator(color_picking_space='raw_cone_excitation')`
@@ -100,17 +102,38 @@ Compatibility aliases may remain temporarily, but they must warn and document th
 | Existing API/name | New API/name | Migration behavior |
 | --- | --- | --- |
 | `ColorSpace.get_raw_display_to_cone_matrix()` | `ColorSpace.display_to_raw_cone_matrix()` | Keep old method as alias with no numerical change |
-| `ColorSpaceType.CONE` for display response | `RawConeExcitation` or explicit `raw_cone` method | Keep enum during transition, clarify docs |
-| `color_picking_space='cone_contrast'` in `QuestColorGenerator` raw-excitation path | `color_picking_space='raw_cone_excitation'` | Warn, map to canonical value |
+| `ColorSpaceType.CONE` for display response | `ColorSpaceType.RAW_CONE_EXCITATION` or `ColorSpaceType.WHITEPOINT_NORMALIZED_CONE_RESPONSE` | Keep `CONE` as legacy/internal during transition. New explicit types must not depend on `Observer.raw_illuminant`. |
+| `color_picking_space='cone_contrast'` in `QuestColorGenerator` raw-excitation path | `color_picking_space=ColorSpaceType.RAW_CONE_EXCITATION` | Warn, map to canonical value |
+| `color_picking_space='cone'` in `QuestColorGenerator` | `color_picking_space=ColorSpaceType.WHITEPOINT_NORMALIZED_CONE_RESPONSE` | Warn, map to explicit whitepoint-normalized response space |
 | `quest_cone_contrast_delta` when equal to raw delta | `quest_raw_cone_delta` | Emit both during migration, mark old key deprecated |
 | Plot labels `cone contrast` for raw deltas | `raw cone response` or `raw cone delta` | Rename labels, keep true contrast labels only for background-normalized values |
 | `observer.observe(spectra)` | `integrate_emission`, `integrate_reflectance`, or legacy `observe` | Add explicit helpers first, deprecate ambiguous usage later |
+
+### Migration Guide
+
+Use this table when updating code:
+
+| Old pattern | Preferred pattern | Notes |
+| --- | --- | --- |
+| `color_picking_space='cone_contrast'` for Quest raw display null directions | `color_picking_space=ColorSpaceType.RAW_CONE_EXCITATION` | The old value remains a warning alias during migration. |
+| `color_picking_space='cone'` for Quest display directions | `color_picking_space=ColorSpaceType.WHITEPOINT_NORMALIZED_CONE_RESPONSE` | The old value remains a warning alias because `cone` does not say which cone response space is intended. |
+| `metadata['quest_cone_contrast_delta']` when no true background-normalized contrast is intended | `metadata['quest_raw_cone_delta']` | Keep the old key only for compatibility with already-generated files. |
+| `color_space.get_raw_display_to_cone_matrix() @ disp` | `color_space.display_to_raw_cone(disp)` | Preserves raw display-primary to cone-excitation math. |
+| `color_space.convert(disp, ColorSpaceType.DISP, ColorSpaceType.CONE)` when raw cone excitation is intended | `color_space.convert(disp, ColorSpaceType.DISP, ColorSpaceType.RAW_CONE_EXCITATION)` or `color_space.display_to_raw_cone(disp)` | Uses the measured display-primary SPD integration path. |
+| `color_space.convert(disp, ColorSpaceType.DISP, ColorSpaceType.CONE)` when whitepoint-normalized response is intended | `color_space.convert(disp, ColorSpaceType.DISP, ColorSpaceType.WHITEPOINT_NORMALIZED_CONE_RESPONSE)` | Uses raw display-primary integration divided by an explicit/default display whitepoint, independent of `Observer.raw_illuminant`. |
+| `np.linalg.solve(color_space.get_raw_display_to_cone_matrix(), raw_cone)` | `color_space.raw_cone_to_display_weights(raw_cone)` | Uses the canonical inverse helper and leaves gamut handling to the caller. |
+| Plot label `cone contrast` for raw cone deltas | `raw cone response` or `raw cone difference` | Reserve `cone contrast` for `(sample - background) / background`. |
+| `observer.observe(emission_spd)` for display/projector emission | `observer.integrate_emission(emission_spd)` | Avoids implicit illuminant and whitepoint assumptions. |
+| `observer.observe(reflectance)` for object color | `observer.integrate_reflectance(reflectance, illuminant=...)` or legacy `observe` if normalized output is required | The explicit helper returns raw cone excitation. |
+| `Observer(..., illuminant='raw')` to disable illuminant behavior in display workflows | Construct the observer normally and call `integrate_emission(...)`, `display_to_raw_cone(...)`, or `RAW_CONE_EXCITATION` | `illuminant='raw'` remains a legacy escape hatch for `observe(...)`, not a new API requirement. |
 
 ### First-Pass API Rules
 
 - Any API named `contrast` must require or derive a background response.
 - Any API named `reflectance` must require an illuminant unless it returns an intermediate object.
 - Any API named `emission` must not multiply by an illuminant.
+- New display/emission APIs must use `observer.sensor_matrix` directly and must not branch on `Observer.raw_illuminant`.
+- Whitepoint-normalized APIs must take or derive an explicit whitepoint/reference response. They must not infer the normalization rule from `Observer.illuminant`.
 - Any display-to-cone method must say whether it returns raw cone excitation or normalized/internal `CONE` coordinates.
 - Metadata must store the canonical name and may store deprecated aliases only with a comment or schema note.
 
@@ -223,6 +246,12 @@ Goal: make raw cone excitation explicit while preserving old behavior.
 - Add helper methods for `display_to_raw_cone(...)` and `raw_cone_to_display_weights(...)` if they can delegate to existing matrix logic without numerical changes.
 - Rename plot labels that are raw cone response/delta, not true contrast.
 
+Current status:
+
+- Done: `ColorSpace.display_to_raw_cone_matrix()` delegates to `get_raw_display_to_cone_matrix()`.
+- Done: `ColorSpace.display_to_raw_cone(...)` multiplies display weights by the raw display-to-cone matrix.
+- Done: `ColorSpace.raw_cone_to_display_weights(..., method='pinv')` provides the current pseudo-inverse reconstruction path without clipping.
+
 Exit gate:
 
 - Active scripts no longer request `color_picking_space='cone_contrast'` for raw cone excitation.
@@ -240,6 +269,15 @@ Goal: make stimulus assumptions explicit at transform boundaries.
 - Document `Observer.observe(...)` as legacy ambiguous behavior, then route it internally through explicit helpers where feasible.
 - Add explicit normalized cone sensitivity accessor for 2D Contour Estimation.
 
+Current status:
+
+- Done: `Observer.integrate_emission(...)` returns raw cone excitation without illuminant multiplication or whitepoint normalization.
+- Done: `Observer.integrate_reflectance(..., illuminant=...)` returns raw cone excitation after explicit reflectance-and-illuminant multiplication.
+- Done: `Observer.normalized_cone_sensitivities(...)` exposes the normalized sensor matrix under a name intended for sensitivity workflows.
+- Done: lightweight value wrappers exist for `EmissionSpectrum`, `ReflectanceSpectrum`, `RawConeExcitation`, and `ConeContrast`.
+- Done: `ConeContrast.from_raw(sample, background)` requires a background response and rejects zero-background channels.
+- Remaining: call sites still need to migrate toward the wrappers before the data model is fully guarded.
+
 Exit gate:
 
 - New code paths can perform display emission, object reflectance, raw cone, and cone contrast workflows without ambiguous API names.
@@ -251,6 +289,8 @@ Goal: prevent generic conversion from hiding stimulus meaning.
 
 - Audit `ColorSpace.convert(..., ColorSpaceType.CONE, ...)` and decide which calls should move to explicit raw-cone or display methods.
 - Keep `ColorSpaceType.CONE` for internal basis routing only where removal would create large churn.
+- Add `ColorSpaceType.RAW_CONE_EXCITATION` and `ColorSpaceType.WHITEPOINT_NORMALIZED_CONE_RESPONSE` for explicit public conversions.
+- Use `ColorSpaceType` values directly in `TetraColorPicker` instead of maintaining a separate string mode for cone-response spaces.
 - Update docstrings so `ColorSpaceType.CONE` no longer claims to be a single scientific representation.
 - Consider adding separate enum values only if wrappers and explicit methods are insufficient.
 
@@ -281,7 +321,7 @@ Exit gate:
 - Which existing `ColorSpaceType.CONE` call sites expect raw cone excitation and which expect normalized internal coordinates?
 - Should extracted repository APIs use runtime dataclasses only, numpy type aliases only, or both?
 - What should the canonical inverse path be for raw cone excitation to `DISP` when the display matrix is non-square or out of gamut?
-- Should `Observer` retain an `illuminant` attribute for compatibility, or should illuminant move entirely to reflectance transforms after the migration window?
+- Should `Observer` retain an `illuminant` attribute for compatibility, or should illuminant move entirely to reflectance transforms after the migration window? Current direction: retain as legacy `observe(...)` compatibility only; new APIs should pass illuminants/whitepoints explicitly.
 - What tolerance should define a zero background channel for cone contrast rejection?
 - Should display primary weights carry a required `primary_order` field such as `RGBO`, `BGYR`, or `RGB/OCV`?
 - Which existing generated JSON files are canonical data artifacts that need schema migration, and which can remain legacy?
@@ -296,15 +336,20 @@ This inventory should be updated as call sites are audited.
 | Path | Current symbol/key | Current meaning | Target | Status |
 | --- | --- | --- | --- | --- |
 | `extern/TetriumColor/TetriumColor/TetraColorPicker.py` | `color_picking_space='cone_contrast'` | Raw cone-excitation null directions in display space | `raw_cone_excitation` canonical; `cone_contrast` deprecated alias | Done |
+| `extern/TetriumColor/TetriumColor/TetraColorPicker.py` | `color_picking_space='cone'` | Legacy whitepoint-normalized display-response direction | `whitepoint_normalized_cone_response` canonical; `cone` deprecated alias | Done |
+| `extern/TetriumColor/TetriumColor/TetraColorPicker.py` | internal `color_picking_space` string branch | Duplicated `ColorSpaceType` semantics | Store explicit `ColorSpaceType` internally; legacy strings adapt at boundary | Done |
 | `extern/TetriumColor/TetriumColor/TetraColorPicker.py` | `quest_raw_cone_delta` | Raw cone delta | Keep canonical | Done |
 | `extern/TetriumColor/TetriumColor/TetraColorPicker.py` | `quest_cone_contrast_delta` | Duplicate of raw cone delta | Keep temporary deprecated alias | Done |
 | `generate_genetic_test.py` | `gaussian_blob_mode='cone_contrast'` | Raw cone-excitation display workflow with constant display background | Accept legacy alias; prefer `raw_cone_excitation` | Done |
 | `paper-viz/tetra_picker_530_533_blob.py` | `color_picking_space='cone_contrast'` | Raw cone-excitation picker direction | Use `raw_cone_excitation` | Done |
-| `paper-viz/simple_observer_projection.py` | `_raw_cone_excitation_null_direction_in_disp` | Explicit raw cone-excitation null direction | Keep, eventually call shared helper | Not started |
-| `paper-viz/hyperobserver_diff_viz.py` | `get_raw_display_to_cone_matrix()` with stored `raw_cone` | Raw cone-to-display reconstruction | Prefer `display_to_raw_cone_matrix()` alias where appropriate | Not started |
-| `extern/TetriumColor/scripts/validation/convert_bgyr_to_bgor.py` | `get_raw_display_to_cone_matrix()` with stored `raw_cone` | Raw cone-to-display reconstruction | Prefer `display_to_raw_cone_matrix()` alias where appropriate | Not started |
+| `paper-viz/simple_observer_projection.py` | `_raw_cone_excitation_null_direction_in_disp` | Explicit raw cone-excitation null direction | Use `display_to_raw_cone_matrix()` | Done |
+| `paper-viz/hyperobserver_diff_viz.py` | `get_raw_display_to_cone_matrix()` with stored `raw_cone` | Raw cone-to-display reconstruction | Use `raw_cone_to_display_weights()` | Done |
+| `extern/TetriumColor/scripts/validation/convert_bgyr_to_bgor.py` | `get_raw_display_to_cone_matrix()` with stored `raw_cone` | Raw cone-to-display reconstruction | Use `raw_cone_to_display_weights()` | Done |
 | `extern/TetriumColor/scripts/validation/generate_tetra_picker_validation_metamers.py` | metadata `color_picking_space='cone_contrast'` | Raw cone-excitation validation stimuli | Use `raw_cone_excitation`; keep deprecated metadata notes | Done |
-| `extern/TetriumColor/scripts/validation/validate_display_measurements.py` | `use_cone_contrast_plot` and labels | Mixed raw cone vs contrast plot labeling | Rename raw-cone paths and reserve contrast labels for true contrast | Not started |
+| `extern/TetriumColor/scripts/validation/validate_display_measurements.py` | `use_cone_contrast_plot` and labels | Mixed raw cone vs contrast plot labeling | Rename raw-cone paths and reserve contrast labels for true contrast | Done |
+| `extern/TetriumColor/scripts/validation/validate_display_measurements.py` | stored `raw_cone_*` to BGOR conversion | Raw cone-to-display reconstruction | Use `raw_cone_to_display_weights()` | Done |
+| `extern/TetriumColor/scripts/validation/visualize_metamer_summary.py` | stored `raw_cone_*` to display conversion | Raw cone-to-display reconstruction | Use `raw_cone_to_display_weights()` | Done |
+| `extern/TetriumColor/scripts/validation/verify_display_null_consistency.py` | display midpoint to raw cone response | Raw cone-excitation validation math | Use `display_to_raw_cone_matrix()` / `display_to_raw_cone()` | Done |
 | `src/apps/AppGeneticTestViewer.cpp` | `gaussian_blob_cone_contrast`, CLI arg `cone_contrast` | Legacy app-level raw-cone mode name | Update after Python CLI accepts both names | Not started |
 | `src/apps/AppPseudoIsochromaticTest.cpp` | `cone_contrast` command/config strings | Legacy app-level raw-cone mode name | Update after Python CLI accepts both names | Not started |
 
@@ -312,10 +357,10 @@ This inventory should be updated as call sites are audited.
 
 | Path | Symbol | Meaning | Target | Status |
 | --- | --- | --- | --- | --- |
-| `extern/TetriumColor/TetriumColor/ColorSpace.py` | `cone_contrast_delta(...)` | True contrast if called with background and interpreted as `(a - b) / background` | Keep, strengthen docs/tests | Not started |
-| `extern/TetriumColor/TetriumColor/ColorSpace.py` | `get_display_to_cone_contrast_matrix(...)` | True contrast matrix `Q / (Q S0)` | Keep, test zero-background rejection | Not started |
-| `extern/TetriumColor/TetriumColor/ColorSpace.py` | `get_cone_contrast_null_direction_in_disp(...)` | Contrast-normalized null direction | Keep only for true contrast workflows | Not started |
-| `extern/TetriumColor/TetriumColor/ColorSpace.py` | `get_cone_contrast_axis_in(...)` | Raw cone delta implied from unit contrast axis and background | Keep, clarify docs | Not started |
+| `extern/TetriumColor/TetriumColor/ColorSpace.py` | `cone_contrast_delta(...)` | True contrast if called with background and interpreted as `(a - b) / background` | Keep, strengthen docs/tests | In progress |
+| `extern/TetriumColor/TetriumColor/ColorSpace.py` | `get_display_to_cone_contrast_matrix(...)` | True contrast matrix `Q / (Q S0)` | Keep, test zero-background rejection | In progress |
+| `extern/TetriumColor/TetriumColor/ColorSpace.py` | `get_cone_contrast_null_direction_in_disp(...)` | Contrast-normalized null direction | Keep only for true contrast workflows | In progress |
+| `extern/TetriumColor/TetriumColor/ColorSpace.py` | `get_cone_contrast_axis_in(...)` | Raw cone delta implied from unit contrast axis and background | Keep, clarify docs | In progress |
 | `extern/TetriumColor/TetriumColor/ColorSampler.py` | `get_cone_contrast_metamers_brainard(...)` | Brainard-style cone contrast modulation | Keep, add tests/examples | Not started |
 | `extern/TetriumColor/TetriumColor/ColorSampler.py` | `get_cone_contrast_plate(...)` | Plate generation from Brainard contrast method | Keep, clarify metadata | Not started |
 | `extern/TetriumColor/scripts/validation/verify_generated_blob_output.py` | `cone_contrast_delta(...)` | True contrast verification of generated blob against background | Keep as contrast-specific verification | Not started |
@@ -324,11 +369,11 @@ This inventory should be updated as call sites are audited.
 
 | Path/pattern | Ambiguity | Review action | Status |
 | --- | --- | --- | --- |
-| `ColorSpace.convert(..., ColorSpaceType.CONE, ...)` | `CONE` may mean raw cone response, normalized display-conversion coordinate, or internal basis | Classify by source/target pair and caller intent | Not started |
+| `ColorSpace.convert(..., ColorSpaceType.CONE, ...)` | `CONE` may mean raw cone response, whitepoint-normalized display-conversion response, or internal basis | Classify by source/target pair and caller intent | In progress |
 | `Observer.observe(...)` | Input may be reflectance, emission SPD, or generic spectral vector depending on observer illuminant state | Classify by caller and add explicit helper target | Not started |
 | `np.ones(dim)` | May mean white point, display midpoint, flat reflectance, or unit cone vector | Classify by caller before replacing | Not started |
 | validation JSON metadata | Some `cone_contrast` keys store raw deltas | Keep deprecated keys but add canonical raw-cone keys and schema note | In progress |
-| validation scripts plot labels | `cone contrast` label sometimes means raw cone response | Rename by quantity actually plotted | Not started |
+| validation scripts plot labels | `cone contrast` label sometimes means raw cone response | Rename by quantity actually plotted | Done for `validate_display_measurements.py` |
 | generated output files under `paper-viz/output` | Legacy artifacts contain old metadata | Do not rewrite unless regenerating outputs | Deferred |
 
 ## Migration Todos
@@ -338,15 +383,18 @@ This inventory should be updated as call sites are audited.
 - [ ] Inventory every `observer.observe(...)` call site and classify input as reflectance, emission SPD, or generic spectral vector.
 - [x] Add canonical `raw_cone_excitation` generator mode.
 - [x] Keep `cone_contrast` as a deprecated alias only where it preserves current behavior.
-- [ ] Update active display-generation scripts to request `raw_cone_excitation`.
-- [ ] Update metadata to prefer `quest_raw_cone_delta` and `quest_color_picking_space='raw_cone_excitation'`.
-- [ ] Keep deprecated metadata keys during the migration window.
-- [ ] Rename plot labels that say cone contrast when they are showing raw cone response.
+- [x] Update active display-generation scripts to request `raw_cone_excitation`.
+- [x] Update metadata to prefer `quest_raw_cone_delta` and `quest_color_picking_space='raw_cone_excitation'`.
+- [x] Keep deprecated metadata keys during the migration window.
+- [x] Rename plot labels that say cone contrast when they are showing raw cone response.
 - [x] Add explicit display-to-raw-cone API names.
-- [ ] Add explicit true cone contrast API docs requiring a background.
-- [ ] Add reflectance/emission helper APIs or value wrappers.
-- [ ] Add explicit normalized cone sensitivity API for contour estimation.
-- [ ] Write a migration guide from old names to new names.
+- [x] Add explicit `RAW_CONE_EXCITATION` and `WHITEPOINT_NORMALIZED_CONE_RESPONSE` color-space enum names.
+- [x] Decouple explicit raw/whitepoint display response paths from `Observer.raw_illuminant`.
+- [x] Make `TetraColorPicker` use `ColorSpaceType` for cone-response selection instead of separate internal string modes.
+- [x] Add explicit true cone contrast API docs requiring a background.
+- [x] Add reflectance/emission helper APIs or value wrappers.
+- [x] Add explicit normalized cone sensitivity API for contour estimation.
+- [x] Write a migration guide from old names to new names.
 - [ ] Decide the extracted package name and public module layout.
 - [ ] Remove deprecated aliases after downstream scripts are migrated.
 
@@ -362,17 +410,20 @@ This inventory should be updated as call sites are audited.
 #### API Additions
 
 - [x] Add `display_to_raw_cone_matrix()` alias in `ColorSpace`.
-- [ ] Add `display_to_raw_cone(display_weights)` helper.
-- [ ] Add `raw_cone_to_display_weights(raw_cone, method='pinv')` helper.
-- [ ] Add `Observer.integrate_emission(...)`.
-- [ ] Add `Observer.integrate_reflectance(..., illuminant=...)`.
-- [ ] Add `Observer.normalized_cone_sensitivities(...)`.
-- [ ] Add value wrappers for `EmissionSpectrum`, `ReflectanceSpectrum`, `RawConeExcitation`, and `ConeContrast`.
+- [x] Add `display_to_raw_cone(display_weights)` helper.
+- [x] Add `raw_cone_to_display_weights(raw_cone, method='pinv')` helper.
+- [x] Add `ColorSpaceType.RAW_CONE_EXCITATION`.
+- [x] Add `ColorSpaceType.WHITEPOINT_NORMALIZED_CONE_RESPONSE`.
+- [x] Add `Observer.integrate_emission(...)`.
+- [x] Add `Observer.integrate_reflectance(..., illuminant=...)`.
+- [x] Add `Observer.normalized_cone_sensitivities(...)`.
+- [x] Add value wrappers for `EmissionSpectrum`, `ReflectanceSpectrum`, `RawConeExcitation`, and `ConeContrast`.
 
 #### Migration
 
 - [x] Update `QuestColorGenerator` default to `raw_cone_excitation`.
 - [x] Accept legacy `cone_contrast` with `DeprecationWarning`.
+- [x] Accept legacy `cone` with `DeprecationWarning` and map to `whitepoint_normalized_cone_response`.
 - [x] Update Tetra picker validation generator metadata to use `raw_cone_excitation`.
 - [x] Update Gaussian blob verification to request `raw_cone_excitation` unless testing true contrast.
 - [x] Update paper visualization scripts to canonical names.
@@ -385,17 +436,21 @@ This inventory should be updated as call sites are audited.
 - [ ] Add examples for display primary weights to raw cone excitation.
 - [ ] Add examples for true cone contrast with a background.
 - [ ] Add examples for normalized cone sensitivities for contour estimation.
-- [ ] Add a migration guide table from old names to new names.
+- [x] Add a migration guide table from old names to new names.
 
 ## Test Todos
 
-- [ ] Unit test: `EmissionSpectrum -> RawConeExcitation` equals `observer.sensor_matrix @ emission_spd`.
-- [ ] Unit test: `ReflectanceSpectrum -> RawConeExcitation` refuses missing illuminant.
-- [ ] Unit test: `ConeContrast` cannot be constructed without a background response.
-- [ ] Regression test: `display_to_raw_cone_matrix()` matches current `get_raw_display_to_cone_matrix()`.
+- [x] Unit test: `EmissionSpectrum -> RawConeExcitation` equals `observer.sensor_matrix @ emission_spd`.
+- [x] Unit test: `ReflectanceSpectrum -> RawConeExcitation` refuses missing illuminant.
+- [x] Unit test: `ConeContrast` cannot be constructed without a background response.
+- [x] Regression test: `display_to_raw_cone_matrix()` matches current `get_raw_display_to_cone_matrix()`.
+- [x] Regression test: `ColorSpaceType.RAW_CONE_EXCITATION` uses raw display-primary integration.
+- [x] Regression test: `ColorSpaceType.WHITEPOINT_NORMALIZED_CONE_RESPONSE` divides raw display cone response by an explicit/default display whitepoint.
+- [x] Regression test: `ColorSpaceType.WHITEPOINT_NORMALIZED_CONE_RESPONSE` does not depend on `Observer.raw_illuminant`.
 - [ ] Regression test: current validation metamer generation keeps equivalent `DISP` endpoints.
-- [ ] Regression test: old `cone_contrast` generator mode warns and maps to `raw_cone_excitation`.
-- [ ] Regression test: true cone contrast uses `(sample - background) / background` and rejects zero background response.
+- [x] Regression test: old `cone_contrast` generator mode warns and maps to `raw_cone_excitation`.
+- [x] Regression test: old `cone` generator mode warns and maps to `whitepoint_normalized_cone_response`.
+- [x] Regression test: true cone contrast uses `(sample - background) / background` and rejects zero background response.
 - [ ] Integration test: reflective/object-color workflows still work through explicit illuminant paths.
 - [ ] Example test: 2D Contour Estimation can use normalized cone sensitivities without touching reflectance or display transforms.
 
@@ -446,7 +501,7 @@ The suite should generate images and also assert the underlying numeric invarian
 - [x] Quantized BGOR/RGBO codes in metadata match the written pixels.
 - [x] The grid generation path records whether it used true cone-contrast null directions or raw-cone-excitation null directions.
 - [x] If true cone contrast is used, the background must be explicit and nonzero.
-- [ ] If raw cone excitation is used, the path should use `display_to_raw_cone_matrix()` or equivalent raw display-to-cone math.
+- [x] If raw cone excitation is used, the path should use `display_to_raw_cone_matrix()` or equivalent raw display-to-cone math.
 
 ### Visual Acceptance
 

@@ -20,7 +20,7 @@
     {"start": 7.25, "end": 9.8, "text": "their cones respond slightly differently to light."},
     {"start": 9.8, "end": 12.0, "text": "Our mathematical algorithm uses their responses"},
     {"start": 12.0, "end": 14.35, "text": "to patterns on a four-primary display"},
-    {"start": 14.35, "end": 17.65, "text": "to narrow down their observer classes from a discrete library."},
+    {"start": 14.35, "end": 17.65, "text": "to classify an observer from a discrete library."},
     {"start": 17.65, "end": 20.0, "text": "Come discover what you can’t see."}
   ]
 }

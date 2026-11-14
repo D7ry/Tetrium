@@ -61,7 +61,7 @@ def _metamer_to_bgor(metamer: dict, color_space: ColorSpace, suffix: str) -> tup
     cone_key = f"cone_{suffix}"
     if raw_key in metamer:
         raw_cone = np.asarray(metamer[raw_key], dtype=float)
-        bgor = np.linalg.solve(color_space.get_raw_display_to_cone_matrix(), raw_cone)
+        bgor = color_space.raw_cone_to_display_weights(raw_cone)
         return bgor, raw_cone
 
     cone = np.asarray(metamer[cone_key], dtype=float)
