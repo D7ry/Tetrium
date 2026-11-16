@@ -229,7 +229,7 @@ def fig_hook_answer() -> None:
             ax.text(thr[r] - 0.015, y[r], f"{thr[r]:.2f}", ha="right", va="center",
                     fontsize=19, color="white")
     ax.plot([1.0, 1.0], [-0.6, n - 0.5], color=INK, lw=1.6, ls=(0, (5, 4)), zorder=3)
-    ax.text(1.0, n - 0.4, "max contrast", ha="center", va="bottom", fontsize=19)
+    ax.text(1.0, n - 0.4, "display maximum", ha="center", va="bottom", fontsize=19)
     ax.set_yticks(y)
     ax.set_yticklabels([f"S{r + 1}" for r in range(n)])
     ax.tick_params(axis="y", length=0)
@@ -237,7 +237,7 @@ def fig_hook_answer() -> None:
     ax.set_xlim(0, 1.5)
     ax.set_xticks([0, 0.25, 0.5, 0.75, 1.0])
     ax.set_ylim(-0.6, n + 0.3)
-    ax.set_xlabel("Contrast needed to find it (fraction of max)")
+    ax.set_xlabel("Detection threshold (1.0 = the strongest pattern the display can show)")
     save(fig, "00b_hook_answer")
 
 
@@ -258,17 +258,34 @@ def _srgb_encode(lin: np.ndarray) -> np.ndarray:
     return np.where(lin <= 0.0031308, 12.92 * lin, 1.055 * lin ** (1 / 2.4) - 0.055)
 
 
-def _plate_dots(rng, n_try: int = 40000):
-    dots = []
+def _plate_dots(rng, size: int = 1000, n_try: int = 30000, recent: int = 4000) -> np.ndarray:
+    """Ishihara-style dot layout, returned in plate units (plate radius ~0.94).
+
+    Sampled in pixels for a plate of side `size`: disk radius 0.47*size, dot
+    radius ~ U(0.008, 0.026)*size, each dot fully inside the disk and at least
+    2 px from the last `recent` accepted dots.
+    """
+    half = size / 2
+    big_r = 0.47 * size
+    xs, ys, rs = [], [], []
     for _ in range(n_try):
-        r = rng.uniform(0.012, 0.032)
-        x, y = rng.uniform(-1, 1, 2)
-        if np.hypot(x, y) + r > 0.98:
+        r = rng.uniform(0.008 * size, 0.026 * size)
+        x, y = rng.uniform(half - big_r, half + big_r, 2)
+        if np.hypot(x - half, y - half) > big_r - r:
             continue
-        if any(np.hypot(x - a, y - b) < r + c + 0.006 for a, b, c in dots):
-            continue
-        dots.append((x, y, r))
-    return np.array(dots)
+        if xs:
+            px = np.asarray(xs[-recent:])
+            py = np.asarray(ys[-recent:])
+            pr = np.asarray(rs[-recent:])
+            if np.any(np.hypot(px - x, py - y) < pr + r + 2):
+                continue
+        xs.append(x)
+        ys.append(y)
+        rs.append(r)
+    dots = np.column_stack([xs, ys, rs])
+    dots[:, :2] = (dots[:, :2] - half) / half
+    dots[:, 2] /= half
+    return dots
 
 
 def _digit_mask(points: np.ndarray, digit: str = "5") -> np.ndarray:
@@ -336,17 +353,18 @@ PLATE_K = 12.0  # display exaggeration of cone contrast; stated in the caption
 PLATE_TARGET = (530, 559)
 PLATE_OBSERVERS = ((530, 559), (530, 555), (530, 533))
 PLATE_WL = np.arange(400, 701)
+PLATE_SEED = 3
 
 
-def _hidden_plate(primaries_dir: Path, seed: int = 3):
-    """Dots, digit mask, per-observer cone contrast and simulated sRGB colors.
+_PLATE_CTX: dict = {}
 
-    Background dots show display weights w0 (every primary at 0.5); digit dots
-    show w0 + a * n, where n spans the null space of the M530 · L559 cone matrix
-    times the display matrix, so the two are metamers for that class.
-    """
+
+def _plate_context(primaries_dir: Path) -> dict:
+    """Display matrix, observer cone matrices and the standard-observer renderer."""
+    key = str(primaries_dir)
+    if key in _PLATE_CTX:
+        return _PLATE_CTX[key]
     import colour
-    from scipy.linalg import null_space
     from TetriumColor.Measurement import load_primaries_from_csv
 
     sop = _load_sibling("simple_observer_projection")
@@ -354,59 +372,100 @@ def _hidden_plate(primaries_dir: Path, seed: int = 3):
     disp = sop._display_matrix(primaries, PLATE_WL)
     genotypes = ObserverGenotypes(wavelengths=PLATE_WL, dimensions=[3], template="baylor")
     kw = dict(degree=2.0, illuminant="raw", template="baylor")
-    cones = {g: np.asarray(genotypes.get_observer_for_peaks(g, **kw).sensor_matrix) for g in PLATE_OBSERVERS}
-
-    n = null_space(cones[PLATE_TARGET] @ disp)[:, 0]
-    n = n / np.abs(n).max()
-    if n[np.argmax(np.abs(n))] < 0:
-        n = -n
-    w0 = np.full(4, 0.5)
-    amp = min(np.min(np.where(n > 0, (1 - w0) / np.where(n > 0, n, 1), np.inf)),
-              np.min(np.where(n < 0, w0 / np.where(n < 0, -n, 1), np.inf)))
-    w1 = w0 + amp * n
-    assert w1.min() >= -1e-12 and w1.max() <= 1 + 1e-12, w1
-    contrast = {g: (c @ disp @ w1 - c @ disp @ w0) / (c @ disp @ w0) for g, c in cones.items()}
-    max_pct = {g: float(100 * np.abs(v).max()) for g, v in contrast.items()}
-    print("plate digit vs background, max cone contrast %:",
-          {class_label(g): round(v, 3) for g, v in max_pct.items()}, f"(a = {amp:.3f})")
-    assert max_pct[PLATE_TARGET] < 0.05, max_pct
-    assert all(v > 0.5 for g, v in max_pct.items() if g != PLATE_TARGET), max_pct
-
+    cones = {g: np.asarray(genotypes.get_observer_for_peaks(g, **kw).sensor_matrix)
+             for g in PLATE_OBSERVERS}
     # Standard-observer rendering: Stockman & Sharpe LMS -> XYZ fit on the display lights.
     ss = colour.MSDS_CMFS["Stockman & Sharpe 2 Degree Cone Fundamentals"]
     cmf = colour.MSDS_CMFS["CIE 1931 2 Degree Standard Observer"]
     std_lms = np.array([[ss[w][i] for w in PLATE_WL] for i in (2, 1, 0)])  # S, M, L
     xyz = np.array([[cmf[w][i] for w in PLATE_WL] for i in range(3)])
     lms2xyz = np.linalg.lstsq((std_lms @ disp).T, (xyz @ disp).T, rcond=None)[0]
+    w0 = np.full(4, 0.5)
     base_lms = std_lms @ disp @ w0
-    y_norm = (base_lms @ lms2xyz)[1] / 0.62
+    ctx = dict(disp=disp, cones=cones, lms2xyz=lms2xyz, w0=w0, base_lms=base_lms,
+               y_norm=(base_lms @ lms2xyz)[1] / 0.62)
+    _PLATE_CTX[key] = ctx
+    return ctx
 
+
+def _hidden_plate(primaries_dir: Path, target=PLATE_TARGET, observers=PLATE_OBSERVERS,
+                  digit: str = "5", seed: int = PLATE_SEED):
+    """A dot plate whose digit is a metamer of the background for `target`.
+
+    Background dots show display weights w0 (every primary at 0.5); digit dots
+    show w0 + a * n, where n spans the null space of the target's cone matrix
+    times the display matrix and a is as large as stays in gamut. Returns dots,
+    simulated sRGB per observer (cone contrast x PLATE_K on a standard-observer
+    rendering) and each observer's max cone contrast (%).
+    """
+    import colour
+    from scipy.linalg import null_space
+
+    ctx = _plate_context(primaries_dir)
+    disp, cones, w0 = ctx["disp"], ctx["cones"], ctx["w0"]
+    n0 = null_space(cones[target] @ disp)[:, 0]
+    n0 = n0 / np.abs(n0).max()
+    if n0[np.argmax(np.abs(n0))] < 0:
+        n0 = -n0
     rng = np.random.default_rng(seed)
     dots = _plate_dots(rng)
-    in_digit = _digit_mask(dots[:, :2])
+    in_digit = _digit_mask(dots[:, :2], digit)
     jitter = rng.uniform(0.72, 1.0, len(dots))  # identical for every observer
-    colors = {}
-    for g in PLATE_OBSERVERS:
-        con = np.where(in_digit[:, None], contrast[g][None, :], 0.0)
-        lms = base_lms * (1 + PLATE_K * con) * jitter[:, None]
-        rgb = colour.XYZ_to_sRGB(lms @ lms2xyz / y_norm)
-        assert rgb.min() > -0.01 and rgb.max() < 1.01, (class_label(g), rgb.min(), rgb.max())
-        colors[g] = np.clip(rgb, 0, 1)
-    ref = colors[PLATE_TARGET][~in_digit]
+
+    # The null direction's sign is arbitrary: keep the first that renders in gamut.
+    for n in (n0, -n0):
+        amp = min(np.min((1 - w0)[n > 0] / n[n > 0]), np.min(w0[n < 0] / -n[n < 0]))
+        w1 = w0 + amp * n
+        assert w1.min() >= -1e-12 and w1.max() <= 1 + 1e-12, w1
+        contrast = {g: (cones[g] @ disp @ w1 - cones[g] @ disp @ w0) / (cones[g] @ disp @ w0)
+                    for g in observers}
+        colors = {}
+        for g in observers:
+            con = np.where(in_digit[:, None], contrast[g][None, :], 0.0)
+            lms = ctx["base_lms"] * (1 + PLATE_K * con) * jitter[:, None]
+            colors[g] = colour.XYZ_to_sRGB(lms @ ctx["lms2xyz"] / ctx["y_norm"])
+        lo = min(c.min() for c in colors.values())
+        hi = max(c.max() for c in colors.values())
+        if lo > -0.01 and hi < 1.01:
+            break
+    else:
+        raise AssertionError(f"plate '{digit}' out of gamut for both signs: {lo:.3f}, {hi:.3f}")
+    colors = {g: np.clip(c, 0, 1) for g, c in colors.items()}
+    max_pct = {g: float(100 * np.abs(v).max()) for g, v in contrast.items()}
+    print(f"plate '{digit}' hidden from {class_label(target)}, max cone contrast %:",
+          {class_label(g): round(v, 3) for g, v in max_pct.items()}, f"(a = {amp:.3f})")
+    assert max_pct[target] < 0.05, max_pct
+    assert all(v > 0.5 for g, v in max_pct.items() if g != target), max_pct
+    ref = colors[target][~in_digit]
     assert all(np.allclose(c[~in_digit], ref) for c in colors.values())  # same background
+    assert np.allclose(colors[target][in_digit],  # digit vanishes for the target
+                       _plate_background(ctx, jitter[in_digit]), atol=2e-3)
     return dots, colors, max_pct
+
+
+def _plate_background(ctx: dict, jitter: np.ndarray) -> np.ndarray:
+    import colour
+    lms = ctx["base_lms"] * jitter[:, None]
+    return np.clip(colour.XYZ_to_sRGB(lms @ ctx["lms2xyz"] / ctx["y_norm"]), 0, 1)
 
 
 def _draw_plate(ax, dots: np.ndarray, rgb: np.ndarray) -> None:
     for (x, y, r), c in zip(dots, rgb):
         ax.add_patch(Circle((x, y), r, color=c, lw=0))
-    ax.set_xlim(-1.03, 1.03)
-    ax.set_ylim(-1.03, 1.03)
+    ax.set_xlim(-1.0, 1.0)
+    ax.set_ylim(-1.0, 1.0)
     ax.set_aspect("equal")
     ax.set_xticks([])
     ax.set_yticks([])
     for side in ax.spines.values():
         side.set_visible(False)
+
+
+def _red_frame(ax) -> None:
+    for side in ax.spines.values():
+        side.set_visible(True)
+        side.set_color(RED)
+        side.set_linewidth(4)
 
 
 def fig_plate_question(plate) -> None:
@@ -424,23 +483,23 @@ def fig_plate_question(plate) -> None:
 def fig_plate_reveal(plate) -> None:
     dots, colors, max_pct = plate
     fig = plt.figure(figsize=(SLIDE_W, BODY_H))
-    h = 0.62
+    h = 0.58
     w = h * BODY_H / SLIDE_W
-    y0 = 0.25
-    for cx, geno in ((0.3, PLATE_TARGET), (0.7, (530, 555))):
+    y0 = 0.27
+    panels = ((1 / 6, (530, 559), ""), (0.5, (530, 555), ""), (5 / 6, (530, 533), " (protanomalous)"))
+    for cx, geno, suffix in panels:
         ax = fig.add_axes([cx - w / 2, y0, w, h])
         _draw_plate(ax, dots, colors[geno])
         hidden = geno == PLATE_TARGET
         if hidden:
-            for side in ax.spines.values():
-                side.set_visible(True)
-                side.set_color(RED)
-                side.set_linewidth(4)
-        fig.text(cx, y0 + h + 0.03, class_label(geno), ha="center", va="bottom", fontsize=22)
+            _red_frame(ax)
+        color = RED if hidden else INK
+        fig.text(cx, y0 + h + 0.03, class_label(geno) + suffix, ha="center", va="bottom",
+                 fontsize=20)
         fig.text(cx, y0 - 0.03, "can't see the 5" if hidden else "sees a 5", ha="center",
-                 va="top", fontsize=22, color=RED if hidden else INK)
+                 va="top", fontsize=22, color=color)
         fig.text(cx, y0 - 0.115, f"{max_pct[geno]:.2f}% cone contrast", ha="center", va="top",
-                 fontsize=19, color=RED if hidden else INK)
+                 fontsize=19, color=color)
     fig.text(0.5, 0.03, f"Simulated: real contrast ≈1%, magnified ×{PLATE_K:.0f} for this screen; "
              "the real plate needs four primaries.", ha="center", va="center",
              fontsize=18, color=MUTED)
@@ -451,57 +510,38 @@ def fig_plate_reveal(plate) -> None:
 # 0d. Each normal type has its own hidden pattern (measured primaries)
 # --------------------------------------------------------------------------
 def fig_hidden_per_type(primaries_dir: Path) -> None:
-    sop = _load_sibling("simple_observer_projection")
-    from TetriumColor.ColorSpace import ColorSpace
-    from TetriumColor.Measurement import load_primaries_from_csv
-
-    primaries = load_primaries_from_csv(str(primaries_dir), extract_zero=False, primary_order="BGOR")
-    wl = primaries[0].wavelengths
-    genotypes = ObserverGenotypes(wavelengths=wl, dimensions=[3], template="baylor")
-    kw = dict(degree=2.0, illuminant="raw", template="baylor")
-    disp = sop._display_matrix(primaries, wl)
-    targets = [(530, 547, 559), (530, 547, 555)]
-    observers = [(530, 559), (530, 555)]
-    contrast = np.zeros((2, 2))
-    for i, target in enumerate(targets):
-        cs = ColorSpace(genotypes.get_observer_for_peaks(target, **kw),
-                        display_primaries=primaries, metameric_axis=2)
-        w1, w2, _, _ = sop._metamer_pair_for_observer(cs, primaries, 0.8)
-        for j, geno in enumerate(observers):
-            obs = genotypes.get_observer_for_peaks(geno, **kw)
-            diff = sop._raw_cone_diff(obs, primaries, w1, w2)
-            mean = 0.5 * np.abs(obs.sensor_matrix @ disp @ (w1 + w2))
-            contrast[i, j] = float(np.max(100 * diff / mean))
+    observers = ((530, 559), (530, 555))
+    rows = (((530, 559), "5"), ((530, 555), "3"))
+    plates = [_hidden_plate(primaries_dir, target, observers, digit) for target, digit in rows]
+    contrast = np.array([[pl[2][g] for g in observers] for pl in plates])
     print("hidden-per-type max cone contrast %:", np.round(contrast, 3).tolist())
     assert np.all(np.diag(contrast) < 0.05) and np.all(contrast[[0, 1], [1, 0]] > 1.0), contrast
 
     fig = plt.figure(figsize=(SLIDE_W, BODY_H))
-    h = 0.32
+    h = 0.31
     w = h * BODY_H / SLIDE_W  # square cells
     col_x = (0.47, 0.72)
-    row_y = (0.53, 0.09)
-    for i, target in enumerate(targets):
+    row_y = (0.565, 0.16)
+    for i, ((target, digit), (dots, colors, _)) in enumerate(zip(rows, plates)):
         for j, geno in enumerate(observers):
             ax = fig.add_axes([col_x[j] - w / 2, row_y[i], w, h])
+            _draw_plate(ax, dots, colors[geno])
             c = contrast[i, j]
-            ax.imshow(_blob_image(300, [(0.5, 0.5)], 0, opacity=c / contrast.max(), radius=0.24),
-                      extent=(0, 1, 0, 1), origin="lower")
-            ax.set_xticks([])
-            ax.set_yticks([])
-            hidden = c < 0.05
-            for side in ax.spines.values():
-                side.set_visible(True)
-                side.set_color(RED if hidden else FAINT)
-                side.set_linewidth(4 if hidden else 1)
-            note = f"{c:.1f}% contrast" + (" · can't see" if hidden else "")
-            ax.text(0.5, -0.04, note, transform=ax.transAxes, ha="center", va="top",
-                    fontsize=19, color=RED if hidden else INK)
+            hidden = geno == target
+            if hidden:
+                _red_frame(ax)
+            verdict = "can't see" if hidden else f"sees a {digit}"
+            ax.text(0.5, -0.04, f"{verdict} · {c:.2f}%", transform=ax.transAxes, ha="center",
+                    va="top", fontsize=19, color=RED if hidden else INK)
             if i == 0:
-                ax.text(0.5, 1.04, f"Observer\n{class_label(geno)}", transform=ax.transAxes,
+                ax.text(0.5, 1.05, f"Observer {class_label(geno)}", transform=ax.transAxes,
                         ha="center", va="bottom", fontsize=20)
         fig.text(col_x[0] - w / 2 - 0.03, row_y[i] + h / 2,
-                 f"Pattern hidden from\n{class_label((target[0], target[2]))}",
+                 f"Pattern hidden from\n{class_label(target)}",
                  ha="right", va="center", fontsize=20)
+    fig.text(0.5, 0.03, f"Simulated: real contrast ≈1–2%, magnified ×{PLATE_K:.0f} for this screen; "
+             "the real plate needs four primaries.", ha="center", va="center",
+             fontsize=18, color=MUTED)
     save(fig, "00d_hidden_per_type")
 
 
