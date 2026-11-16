@@ -330,6 +330,124 @@ def fig_plate() -> None:
 
 
 # --------------------------------------------------------------------------
+# 0a. Hook: a dot plate whose "5" is hidden from M530 · L559 (measured primaries)
+# --------------------------------------------------------------------------
+PLATE_K = 12.0  # display exaggeration of cone contrast; stated in the caption
+PLATE_TARGET = (530, 559)
+PLATE_OBSERVERS = ((530, 559), (530, 555), (530, 533))
+PLATE_WL = np.arange(400, 701)
+
+
+def _hidden_plate(primaries_dir: Path, seed: int = 3):
+    """Dots, digit mask, per-observer cone contrast and simulated sRGB colors.
+
+    Background dots show display weights w0 (every primary at 0.5); digit dots
+    show w0 + a * n, where n spans the null space of the M530 · L559 cone matrix
+    times the display matrix, so the two are metamers for that class.
+    """
+    import colour
+    from scipy.linalg import null_space
+    from TetriumColor.Measurement import load_primaries_from_csv
+
+    sop = _load_sibling("simple_observer_projection")
+    primaries = load_primaries_from_csv(str(primaries_dir), extract_zero=False, primary_order="BGOR")
+    disp = sop._display_matrix(primaries, PLATE_WL)
+    genotypes = ObserverGenotypes(wavelengths=PLATE_WL, dimensions=[3], template="baylor")
+    kw = dict(degree=2.0, illuminant="raw", template="baylor")
+    cones = {g: np.asarray(genotypes.get_observer_for_peaks(g, **kw).sensor_matrix) for g in PLATE_OBSERVERS}
+
+    n = null_space(cones[PLATE_TARGET] @ disp)[:, 0]
+    n = n / np.abs(n).max()
+    if n[np.argmax(np.abs(n))] < 0:
+        n = -n
+    w0 = np.full(4, 0.5)
+    amp = min(np.min(np.where(n > 0, (1 - w0) / np.where(n > 0, n, 1), np.inf)),
+              np.min(np.where(n < 0, w0 / np.where(n < 0, -n, 1), np.inf)))
+    w1 = w0 + amp * n
+    assert w1.min() >= -1e-12 and w1.max() <= 1 + 1e-12, w1
+    contrast = {g: (c @ disp @ w1 - c @ disp @ w0) / (c @ disp @ w0) for g, c in cones.items()}
+    max_pct = {g: float(100 * np.abs(v).max()) for g, v in contrast.items()}
+    print("plate digit vs background, max cone contrast %:",
+          {class_label(g): round(v, 3) for g, v in max_pct.items()}, f"(a = {amp:.3f})")
+    assert max_pct[PLATE_TARGET] < 0.05, max_pct
+    assert all(v > 0.5 for g, v in max_pct.items() if g != PLATE_TARGET), max_pct
+
+    # Standard-observer rendering: Stockman & Sharpe LMS -> XYZ fit on the display lights.
+    ss = colour.MSDS_CMFS["Stockman & Sharpe 2 Degree Cone Fundamentals"]
+    cmf = colour.MSDS_CMFS["CIE 1931 2 Degree Standard Observer"]
+    std_lms = np.array([[ss[w][i] for w in PLATE_WL] for i in (2, 1, 0)])  # S, M, L
+    xyz = np.array([[cmf[w][i] for w in PLATE_WL] for i in range(3)])
+    lms2xyz = np.linalg.lstsq((std_lms @ disp).T, (xyz @ disp).T, rcond=None)[0]
+    base_lms = std_lms @ disp @ w0
+    y_norm = (base_lms @ lms2xyz)[1] / 0.62
+
+    rng = np.random.default_rng(seed)
+    dots = _plate_dots(rng)
+    in_digit = _digit_mask(dots[:, :2])
+    jitter = rng.uniform(0.72, 1.0, len(dots))  # identical for every observer
+    colors = {}
+    for g in PLATE_OBSERVERS:
+        con = np.where(in_digit[:, None], contrast[g][None, :], 0.0)
+        lms = base_lms * (1 + PLATE_K * con) * jitter[:, None]
+        rgb = colour.XYZ_to_sRGB(lms @ lms2xyz / y_norm)
+        assert rgb.min() > -0.01 and rgb.max() < 1.01, (class_label(g), rgb.min(), rgb.max())
+        colors[g] = np.clip(rgb, 0, 1)
+    ref = colors[PLATE_TARGET][~in_digit]
+    assert all(np.allclose(c[~in_digit], ref) for c in colors.values())  # same background
+    return dots, colors, max_pct
+
+
+def _draw_plate(ax, dots: np.ndarray, rgb: np.ndarray) -> None:
+    for (x, y, r), c in zip(dots, rgb):
+        ax.add_patch(Circle((x, y), r, color=c, lw=0))
+    ax.set_xlim(-1.03, 1.03)
+    ax.set_ylim(-1.03, 1.03)
+    ax.set_aspect("equal")
+    ax.set_xticks([])
+    ax.set_yticks([])
+    for side in ax.spines.values():
+        side.set_visible(False)
+
+
+def fig_plate_question(plate) -> None:
+    dots, colors, _ = plate
+    fig = plt.figure(figsize=(SLIDE_W, BODY_H))
+    h = 0.84
+    w = h * BODY_H / SLIDE_W
+    ax = fig.add_axes([0.5 - w / 2, 0.12, w, h])
+    _draw_plate(ax, dots, colors[PLATE_TARGET])
+    fig.text(0.5, 0.04, "Simulated: the real plate needs four primaries.",
+             ha="center", va="center", fontsize=18, color=MUTED)
+    save(fig, "00a_plate_question")
+
+
+def fig_plate_reveal(plate) -> None:
+    dots, colors, max_pct = plate
+    fig = plt.figure(figsize=(SLIDE_W, BODY_H))
+    h = 0.62
+    w = h * BODY_H / SLIDE_W
+    y0 = 0.25
+    for cx, geno in ((0.3, PLATE_TARGET), (0.7, (530, 555))):
+        ax = fig.add_axes([cx - w / 2, y0, w, h])
+        _draw_plate(ax, dots, colors[geno])
+        hidden = geno == PLATE_TARGET
+        if hidden:
+            for side in ax.spines.values():
+                side.set_visible(True)
+                side.set_color(RED)
+                side.set_linewidth(4)
+        fig.text(cx, y0 + h + 0.03, class_label(geno), ha="center", va="bottom", fontsize=22)
+        fig.text(cx, y0 - 0.03, "can't see the 5" if hidden else "sees a 5", ha="center",
+                 va="top", fontsize=22, color=RED if hidden else INK)
+        fig.text(cx, y0 - 0.115, f"{max_pct[geno]:.2f}% cone contrast", ha="center", va="top",
+                 fontsize=19, color=RED if hidden else INK)
+    fig.text(0.5, 0.03, f"Simulated: real contrast ≈1%, magnified ×{PLATE_K:.0f} for this screen; "
+             "the real plate needs four primaries.", ha="center", va="center",
+             fontsize=18, color=MUTED)
+    save(fig, "00a2_plate_reveal")
+
+
+# --------------------------------------------------------------------------
 # 0d. Each normal type has its own hidden pattern (measured primaries)
 # --------------------------------------------------------------------------
 def fig_hidden_per_type(primaries_dir: Path) -> None:
@@ -593,7 +711,9 @@ def main() -> None:
     args = parser.parse_args()
     setup_style()
     prior = trichromat_prior()
-    fig_hook_stimulus()
+    plate = _hidden_plate(args.primaries)
+    fig_plate_question(plate)
+    fig_plate_reveal(plate)
     fig_hook_answer()
     fig_plate()
     fig_hidden_per_type(args.primaries)
