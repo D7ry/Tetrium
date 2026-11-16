@@ -388,15 +388,27 @@ def _plate_context(primaries_dir: Path) -> dict:
     return ctx
 
 
+_PLATE_CACHE: dict = {}
+
+
 def _hidden_plate(primaries_dir: Path, target=PLATE_TARGET, observers=PLATE_OBSERVERS,
                   digit: str = "5", seed: int = PLATE_SEED):
+    """Cached: 00a, 00a2, 03 and 00d all read the same metamer from here."""
+    key = (str(primaries_dir), tuple(target), tuple(observers), digit, seed)
+    if key not in _PLATE_CACHE:
+        _PLATE_CACHE[key] = _build_hidden_plate(primaries_dir, target, observers, digit, seed)
+    return _PLATE_CACHE[key]
+
+
+def _build_hidden_plate(primaries_dir: Path, target, observers, digit: str, seed: int):
     """A dot plate whose digit is a metamer of the background for `target`.
 
     Background dots show display weights w0 (every primary at 0.5); digit dots
     show w0 + a * n, where n spans the null space of the target's cone matrix
     times the display matrix and a is as large as stays in gamut. Returns dots,
     simulated sRGB per observer (cone contrast x PLATE_K on a standard-observer
-    rendering) and each observer's max cone contrast (%).
+    rendering), each observer's max cone contrast (%), and the metamer itself
+    (w0, w1, display matrix, per-cone contrast).
     """
     import colour
     from scipy.linalg import null_space
@@ -440,7 +452,8 @@ def _hidden_plate(primaries_dir: Path, target=PLATE_TARGET, observers=PLATE_OBSE
     assert all(np.allclose(c[~in_digit], ref) for c in colors.values())  # same background
     assert np.allclose(colors[target][in_digit],  # digit vanishes for the target
                        _plate_background(ctx, jitter[in_digit]), atol=2e-3)
-    return dots, colors, max_pct
+    metamer = dict(w0=w0, w1=w1, disp=disp, contrast=contrast)
+    return dots, colors, max_pct, metamer
 
 
 def _plate_background(ctx: dict, jitter: np.ndarray) -> np.ndarray:
@@ -469,7 +482,7 @@ def _red_frame(ax) -> None:
 
 
 def fig_plate_question(plate) -> None:
-    dots, colors, _ = plate
+    dots, colors = plate[:2]
     fig = plt.figure(figsize=(SLIDE_W, BODY_H))
     h = 0.84
     w = h * BODY_H / SLIDE_W
@@ -481,7 +494,7 @@ def fig_plate_question(plate) -> None:
 
 
 def fig_plate_reveal(plate) -> None:
-    dots, colors, max_pct = plate
+    dots, colors, max_pct = plate[:3]
     fig = plt.figure(figsize=(SLIDE_W, BODY_H))
     h = 0.58
     w = h * BODY_H / SLIDE_W
@@ -522,7 +535,8 @@ def fig_hidden_per_type(primaries_dir: Path) -> None:
     w = h * BODY_H / SLIDE_W  # square cells
     col_x = (0.47, 0.72)
     row_y = (0.565, 0.16)
-    for i, ((target, digit), (dots, colors, _)) in enumerate(zip(rows, plates)):
+    for i, ((target, digit), plate) in enumerate(zip(rows, plates)):
+        dots, colors = plate[:2]
         for j, geno in enumerate(observers):
             ax = fig.add_axes([col_x[j] - w / 2, row_y[i], w, h])
             _draw_plate(ax, dots, colors[geno])
@@ -539,7 +553,7 @@ def fig_hidden_per_type(primaries_dir: Path) -> None:
         fig.text(col_x[0] - w / 2 - 0.03, row_y[i] + h / 2,
                  f"Pattern hidden from\n{class_label(target)}",
                  ha="right", va="center", fontsize=20)
-    fig.text(0.5, 0.03, f"Simulated: real contrast ≈1–2%, magnified ×{PLATE_K:.0f} for this screen; "
+    fig.text(0.5, 0.03, f"Simulated: real contrast ≈1%, magnified ×{PLATE_K:.0f} for this screen; "
              "the real plate needs four primaries.", ha="center", va="center",
              fontsize=18, color=MUTED)
     save(fig, "00d_hidden_per_type")
@@ -613,34 +627,23 @@ def fig_class_prior(prior) -> None:
 # 3. One pair of lights: invisible to one class, visible to another
 # --------------------------------------------------------------------------
 def fig_invisible_to_one(primaries_dir: Path) -> None:
-    sop = _load_sibling("simple_observer_projection")
-    from TetriumColor.ColorSpace import ColorSpace
-    from TetriumColor.Measurement import load_primaries_from_csv
-
-    primaries = load_primaries_from_csv(str(primaries_dir), extract_zero=False, primary_order="BGOR")
-    wl = primaries[0].wavelengths
-    genotypes = ObserverGenotypes(wavelengths=wl, dimensions=[3], template="baylor")
-    kw = dict(degree=2.0, illuminant="raw", template="baylor")
-    target = genotypes.get_observer_for_peaks((530, 547, 559), **kw)
-    cs = ColorSpace(target, display_primaries=primaries, metameric_axis=2)
-    w1, w2, spec1, spec2 = sop._metamer_pair_for_observer(cs, primaries, 0.8)
-
-    obs = {
-        "A": ((530, 559), genotypes.get_observer_for_peaks((530, 559), **kw)),
-        "B": ((530, 555), genotypes.get_observer_for_peaks((530, 555), **kw)),
-    }
-    diffs = {k: sop._raw_cone_diff(o, primaries, w1, w2) for k, (_, o) in obs.items()}
-    # Relative cone contrast: difference over mean response of the pair.
-    disp = sop._display_matrix(primaries, wl)
-    means = {k: 0.5 * np.abs(o.sensor_matrix @ disp @ (w1 + w2)) for k, (_, o) in obs.items()}
-    contrast = {k: 100 * diffs[k] / means[k] for k in diffs}
+    # Same metamer as the 00a2 / 00d plates: background w0 vs digit w0 + a * n.
+    plate = _hidden_plate(primaries_dir)
+    max_pct, met = plate[2], plate[3]
+    spec_bg = met["disp"] @ met["w0"]
+    spec_digit = met["disp"] @ met["w1"]
+    obs = {"A": (530, 559), "B": (530, 555)}
+    contrast = {k: 100 * np.abs(met["contrast"][g]) for k, g in obs.items()}
+    for k, g in obs.items():
+        assert abs(contrast[k].max() - max_pct[g]) < 0.01, (g, contrast[k], max_pct[g])
+    assert contrast["A"].max() < 0.05, contrast["A"]
     ymax = max(c.max() for c in contrast.values()) * 1.25
 
     fig = plt.figure(figsize=(SLIDE_W, BODY_H))
     gs = fig.add_gridspec(1, 3, width_ratios=[1.35, 1, 1], wspace=0.35)
     ax0 = fig.add_subplot(gs[0])
-    ax0.plot(spec1.wavelengths, spec1.data, color=PAIR_COLORS[0], lw=2.4)
-    ax0.plot(spec2.wavelengths, spec2.data, color=PAIR_COLORS[1], lw=2.4)
+    ax0.plot(PLATE_WL, spec_bg, color=PAIR_COLORS[0], lw=2.4)
+    ax0.plot(PLATE_WL, spec_digit, color=PAIR_COLORS[1], lw=2.4)
     ax0.set_xlim(400, 700)
     ax0.set_ylim(bottom=0)
     ax0.set_yticks([])
@@ -650,7 +653,7 @@ def fig_invisible_to_one(primaries_dir: Path) -> None:
 
     for col, key in ((1, "A"), (2, "B")):
         ax = fig.add_subplot(gs[col])
-        geno, _ = obs[key]
+        geno = obs[key]
         c = contrast[key]
         bar_colors = [S_COLOR, M_COLOR, L_BAR]
         ax.bar([0, 1, 2], c, color=bar_colors, width=0.62)
@@ -658,13 +661,14 @@ def fig_invisible_to_one(primaries_dir: Path) -> None:
         ax.set_xticklabels(["S", "M", "L"])
         ax.set_ylim(0, ymax)
         ax.set_ylabel("Cone contrast (%)" if col == 1 else "")
-        sees = c.max() > 1.0
+        sees = c.max() > 0.05
         verdict = "sees a difference" if sees else "can't tell them apart"
         ax.set_title(f"{class_label(geno)}\n{verdict}", loc="left",
                      color=INK if sees else RED)
         if not sees:
             ax.text(1, ymax * 0.12, "≈ 0 for every cone", ha="center", fontsize=18, color=RED)
-    print("cone contrast %:", {k: np.round(v, 2).tolist() for k, v in contrast.items()})
+    print("03 per-cone contrast % (S, M, L):",
+          {class_label(g): np.round(contrast[k], 3).tolist() for k, g in obs.items()})
     save(fig, "03_invisible_to_one_class")
 
 
